@@ -176,6 +176,41 @@ Provide comprehensive summary:
 
 ---
 
+## Progress Reporting
+
+The Project Director provides regular progress reports to keep you informed:
+
+### Automatic Reports At:
+- **Phase transitions** - When moving between Analysis → Planning → Execution → QA → Delivery
+- **Agent handoffs** - When delegating work to a new specialist agent
+- **Milestones** - When significant deliverables are completed
+- **Blockers** - Immediately when issues arise that need attention
+- **Regular intervals** - Every 3-5 agent interactions during smooth execution
+
+### Report Types:
+
+**Standard Progress Report:**
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 PROGRESS REPORT | [Phase] | [Time elapsed]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ COMPLETED: [Tasks done]
+🔄 IN PROGRESS: [Current work]
+📋 NEXT UP: [Upcoming tasks]
+📈 OVERALL: [X]% complete
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+**Blocker Alert:**
+```
+🚨 BLOCKER DETECTED
+Issue: [Description]
+Options: [Choices for resolution]
+Recommendation: [Suggested path forward]
+```
+
+---
+
 ## Notes
 
 - The Project Director operates **autonomously** but will ask for clarification if requirements are ambiguous
@@ -183,3 +218,4 @@ Provide comprehensive summary:
 - Quality gates must pass before proceeding to next phase
 - The workflow is iterative - issues found in later phases trigger earlier agents
 - All work is tracked via TodoWrite for visibility
+- **Progress reports keep you informed without interrupting the workflow**
