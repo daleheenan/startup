@@ -19,7 +19,7 @@ Give me a requirement, and I'll autonomously orchestrate all necessary agents an
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         PROJECT DIRECTOR                                     │
-│                    (Alexandra Sterling, CTO)                                 │
+│                      (Dale Heenan, Founder)                                  │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
@@ -81,7 +81,7 @@ Give me a requirement, and I'll autonomously orchestrate all necessary agents an
 
 ### Step 1: Analyze the Requirement
 
-First, the **project-director** agent (Alexandra Sterling) analyzes the requirement to determine:
+First, the **project-director** agent (Dale Heenan) analyzes the requirement to determine:
 - **Type**: New feature, bug fix, performance issue, security concern, or full project
 - **Scope**: What needs to be delivered
 - **Complexity**: Simple (1 agent), Medium (1 workflow), Complex (multiple workflows)
@@ -178,7 +178,7 @@ Provide comprehensive summary:
 
 ## Progress Reporting
 
-The Project Director provides regular progress reports to keep you informed:
+The Project Director provides detailed highlight reports to keep you fully informed:
 
 ### Automatic Reports At:
 - **Phase transitions** - When moving between Analysis → Planning → Execution → QA → Delivery
@@ -189,24 +189,54 @@ The Project Director provides regular progress reports to keep you informed:
 
 ### Report Types:
 
-**Standard Progress Report:**
+**1. Full Project Highlight Report** (at phase transitions & milestones):
 ```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 PROGRESS REPORT | [Phase] | [Time elapsed]
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ COMPLETED: [Tasks done]
-🔄 IN PROGRESS: [Current work]
-📋 NEXT UP: [Upcoming tasks]
-📈 OVERALL: [X]% complete
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         📋 PROJECT HIGHLIGHT REPORT                          ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║ Project: [Name]           Status: 🟢 On Track / 🟡 At Risk / 🔴 Blocked      ║
+║ Report #: [N]             Overall Progress: [██████░░░░] XX%                 ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+Includes:
+• Executive Summary - High-level status overview
+• Phase Progress - Visual progress bars for each phase
+• Agent Activity Log - Who did what and current status
+• Key Accomplishments - What was achieved this period
+• Files Modified - Created/modified/deleted files
+• Quality Metrics - Tests, coverage, reviews, security
+• Risks & Issues - Current blockers and mitigations
+• Next Steps - Upcoming work with agent assignments
+• Decisions & Notes - Key decisions and observations
 ```
 
-**Blocker Alert:**
+**2. Quick Status Update** (between full reports):
 ```
-🚨 BLOCKER DETECTED
-Issue: [Description]
-Options: [Choices for resolution]
-Recommendation: [Suggested path forward]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 QUICK UPDATE | [Phase] | [HH:MM elapsed] | [XX]% complete
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Just completed: [Task] by [Agent]
+🔄 Now working on: [Task] by [Agent]
+📋 Up next: [Task]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+**3. Blocker Alert** (immediate escalation):
+```
+╔══════════════════════════════════════════════════════════════════════════════╗
+║ 🚨 BLOCKER ALERT                     Severity: 🔴 Critical / 🟠 High / 🟡 Med ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+Issue:        [Description]
+Agent:        [Who encountered it]
+Impact:       [What this blocks]
+Root Cause:   [Analysis]
+
+OPTIONS:
+1. [Option A] - Impact: [Trade-offs]
+2. [Option B] - Impact: [Trade-offs]
+
+Recommendation: [Suggested approach]
+⏳ Awaiting user decision...
 ```
 
 ---
