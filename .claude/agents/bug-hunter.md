@@ -235,3 +235,16 @@ async function process() {
 - **Prioritize** - Not all bugs are equal
 - **Think like QA** - What would a tester try?
 - **Think like a hacker** - What would an attacker try?
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/bug-hunter.lessons.md` and `.claude/lessons/shared.lessons.md`
+2. **Cross-reference**: Check `developer.lessons.md` and `security-hardener.lessons.md`
+
+### Post-Task: Reflect and Record
+1. **Reflect**: What patterns were most common? What was missed?
+2. **Update Scores**: Increment scores for techniques that found real bugs
+3. **Record New Lesson**: Append to `.claude/lessons/bug-hunter.lessons.md` with tags like `#bugs #detection #patterns`

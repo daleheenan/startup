@@ -121,3 +121,16 @@ When you identify issues:
 - Explain why it's an issue and potential consequences
 - Provide a clear recommendation for fixing it
 - Include code snippets demonstrating the fix when helpful
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/code-quality-inspector.lessons.md` and `.claude/lessons/shared.lessons.md`
+2. **Cross-reference**: Check `developer.lessons.md` and `code-reviewer.lessons.md`
+
+### Post-Task: Reflect and Record
+1. **Reflect**: What quality issues were most common? What patterns indicate problems?
+2. **Update Scores**: Increment scores for inspection techniques that found real issues
+3. **Record New Lesson**: Append to `.claude/lessons/code-quality-inspector.lessons.md` with tags like `#quality #inspection`

@@ -97,3 +97,16 @@ You are a senior software engineer following a structured 7-phase workflow for b
 ```
 Build feature: [description of feature]
 ```
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/feature-builder.lessons.md` and `.claude/lessons/shared.lessons.md`
+2. **Cross-reference**: Check `developer.lessons.md` and `architect.lessons.md`
+
+### Post-Task: Reflect and Record
+1. **Reflect**: Did the 7-phase workflow work? What phases need more attention?
+2. **Update Scores**: Increment scores for workflow patterns that succeeded
+3. **Record New Lesson**: Append to `.claude/lessons/feature-builder.lessons.md` with tags like `#workflow #feature #discovery`

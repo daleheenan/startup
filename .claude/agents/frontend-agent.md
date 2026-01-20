@@ -108,3 +108,16 @@ Design tokens used: ✓
 
 Ready for: [NEXT-TASK]
 ```
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/frontend-agent.lessons.md` and `.claude/lessons/shared.lessons.md`
+2. **Cross-reference**: Check `ux-design-specialist.lessons.md` and `developer.lessons.md`
+
+### Post-Task: Reflect and Record
+1. **Reflect**: What UI patterns worked well? Were there memory leaks or cleanup issues?
+2. **Update Scores**: Increment scores for frontend patterns that passed review
+3. **Record New Lesson**: Append to `.claude/lessons/frontend-agent.lessons.md` with tags like `#frontend #spa #vanilla-js`

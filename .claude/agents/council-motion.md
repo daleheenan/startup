@@ -74,3 +74,15 @@ Provide:
 ```
 Draft a motion about [topic] for [council/committee]
 ```
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/council-motion.lessons.md` and `.claude/lessons/shared.lessons.md`
+
+### Post-Task: Reflect and Record
+1. **Reflect**: Was the motion effective? What amendments were proposed? What worked?
+2. **Update Scores**: Increment scores for motion patterns that succeeded
+3. **Record New Lesson**: Append to `.claude/lessons/council-motion.lessons.md` with tags like `#council #motions #politics`

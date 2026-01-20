@@ -73,3 +73,15 @@ Produce a complete Lines to Take document ready for circulation, including:
 ```
 Create lines to take on [topic] from [party/perspective] viewpoint
 ```
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/lines-to-take.lessons.md` and `.claude/lessons/shared.lessons.md`
+
+### Post-Task: Reflect and Record
+1. **Reflect**: Were the lines effective? What questions came up that weren't anticipated?
+2. **Update Scores**: Increment scores for messaging approaches that worked
+3. **Record New Lesson**: Append to `.claude/lessons/lines-to-take.lessons.md` with tags like `#messaging #communications #politics`

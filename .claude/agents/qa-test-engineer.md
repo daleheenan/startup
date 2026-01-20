@@ -115,3 +115,16 @@ Structure your responses to include:
 - **High**: Major feature broken, significant user impact
 - **Medium**: Feature partially broken, workaround exists
 - **Low**: Minor issue, cosmetic, edge case
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/qa-test-engineer.lessons.md` and `.claude/lessons/shared.lessons.md`
+2. **Cross-reference**: Check `developer.lessons.md` and `qa-tester.lessons.md`
+
+### Post-Task: Reflect and Record
+1. **Reflect**: What test approaches caught bugs? What was missed in automation?
+2. **Update Scores**: Increment scores for testing strategies that found issues
+3. **Record New Lesson**: Append to `.claude/lessons/qa-test-engineer.lessons.md` with tags like `#testing #automation #playwright`

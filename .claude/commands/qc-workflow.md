@@ -238,3 +238,55 @@ After the consolidated report is complete:
 - Critical security issues are flagged for immediate attention
 - The workflow can be paused between any phases
 - Previous QC reports are archived with timestamps
+
+---
+
+## How to Spawn Agents (CRITICAL)
+
+**You MUST use the Task tool to spawn agents. NEVER use Bash commands with CLI flags.**
+
+### Correct Way - Use Task Tool
+When this workflow says "Have the **agent** agent...", you MUST use the Task tool:
+- `subagent_type`: The agent name
+- `prompt`: The detailed task instructions
+- `description`: A short 3-5 word summary
+
+**Run QC agents in parallel** by including multiple Task tool calls in a single message:
+
+**Example - Launch all 4 QC agents in parallel:**
+```
+[Task 1]
+- subagent_type: "code-optimizer"
+- prompt: "Analyze code in [target path] for performance bottlenecks, code quality issues, memory inefficiencies, redundant operations. Write report to docs/qc/01_OPTIMIZATION_REPORT.md"
+- description: "Code optimization analysis"
+
+[Task 2]
+- subagent_type: "test-architect"
+- prompt: "Analyze test coverage in [target path]. Find gaps in unit, integration, E2E tests. Identify critical untested paths. Write report to docs/qc/02_TEST_REPORT.md"
+- description: "Test coverage analysis"
+
+[Task 3]
+- subagent_type: "bug-hunter"
+- prompt: "Hunt for bugs in [target path]. Look for logic errors, null/undefined issues, race conditions, state management bugs, error handling gaps. Write report to docs/qc/03_BUG_REPORT.md"
+- description: "Bug detection analysis"
+
+[Task 4]
+- subagent_type: "security-hardener"
+- prompt: "Security audit of [target path]. Check OWASP Top 10, dependency vulnerabilities, security misconfigurations, attack surface. Write report to docs/qc/04_SECURITY_REPORT.md"
+- description: "Security vulnerability scan"
+```
+
+### WRONG Way - Never Do This
+```
+# WRONG - Will fail with "unknown option --prompt"
+Bash: claude agent run --agent bug-hunter --prompt "find bugs"
+
+# WRONG - CLI doesn't support this
+Bash: npx claude --agent security-hardener --task "audit code"
+```
+
+### Agent Names for subagent_type
+- `code-optimizer` - Phase 1: Performance & code quality
+- `test-architect` - Phase 2: Test strategy & coverage
+- `bug-hunter` - Phase 3: Bug detection & logic errors
+- `security-hardener` - Phase 4: Security assessment

@@ -52,3 +52,15 @@ Refactor for:
 ```
 Run the SEO architect agent
 ```
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/seo-architect.lessons.md` and `.claude/lessons/shared.lessons.md`
+
+### Post-Task: Reflect and Record
+1. **Reflect**: What SEO improvements had the biggest impact? What issues arose at scale?
+2. **Update Scores**: Increment scores for SEO patterns that improved rankings
+3. **Record New Lesson**: Append to `.claude/lessons/seo-architect.lessons.md` with tags like `#seo #performance #scalability`

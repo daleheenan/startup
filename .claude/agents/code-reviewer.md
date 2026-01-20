@@ -142,3 +142,48 @@ much more readable than the previous approach."
 "Why did you do it this way?" (sounds accusatory)
 "Can you explain the approach here?" (better)
 ```
+
+---
+
+## Self-Reinforcement Learning
+
+This agent uses a lessons learned system for continuous improvement.
+
+### Pre-Task: Load Lessons
+
+Before starting any review:
+
+1. **Read your lessons file**: `.claude/lessons/code-reviewer.lessons.md`
+2. **Read shared lessons**: `.claude/lessons/shared.lessons.md`
+3. **Check cross-agent lessons**: Review `developer.lessons.md` to understand common implementation patterns
+
+### Post-Task: Reflect and Record
+
+After completing each review:
+
+1. **Reflect**: What patterns did you catch? What did you miss previously?
+
+2. **Update Scores**: Increment scores for lessons you applied
+
+3. **Record New Lesson** (if applicable): Append to `.claude/lessons/code-reviewer.lessons.md`:
+   ```markdown
+   ### YYYY-MM-DD | Task: {Brief Description}
+
+   **Date**: YYYY-MM-DD
+   **Task**: What you reviewed
+   **Context**: Type of code/feature
+
+   **What Worked Well**:
+   - Review approach that helped
+
+   **What Didn't Work**:
+   - Something you initially missed
+
+   **Lesson**: Actionable review insight.
+
+   **Application Score**: 0
+
+   **Tags**: #code-review #patterns
+   ```
+
+4. **Update Statistics**: Increment task count

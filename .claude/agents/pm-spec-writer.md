@@ -93,3 +93,16 @@ Create the docs/specs directory if it doesn't exist.
 - **Question assumptions** - If something seems obvious, spell it out anyway
 - **Invite feedback** - Use "Open Questions" liberally
 - **Stay user-focused** - Every requirement ties back to user value
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/pm-spec-writer.lessons.md` and `.claude/lessons/shared.lessons.md`
+2. **Cross-reference**: Check `architect.lessons.md` and `developer.lessons.md` for implementation feedback
+
+### Post-Task: Reflect and Record
+1. **Reflect**: Were requirements clear enough? What caused confusion during implementation?
+2. **Update Scores**: Increment scores for spec patterns that led to smooth implementation
+3. **Record New Lesson**: Append to `.claude/lessons/pm-spec-writer.lessons.md` with tags like `#specs #requirements #product`

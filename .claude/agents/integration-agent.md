@@ -122,3 +122,16 @@ Issues Found: X (all resolved)
 
 Ready for: Production / Next Phase
 ```
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/integration-agent.lessons.md` and `.claude/lessons/shared.lessons.md`
+2. **Cross-reference**: Check lessons from `api-agent`, `frontend-agent`, and `qa-test-engineer`
+
+### Post-Task: Reflect and Record
+1. **Reflect**: What integration issues occurred? What E2E patterns worked?
+2. **Update Scores**: Increment scores for integration approaches that caught issues early
+3. **Record New Lesson**: Append to `.claude/lessons/integration-agent.lessons.md` with tags like `#integration #e2e #deployment`

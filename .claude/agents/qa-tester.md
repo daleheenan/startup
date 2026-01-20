@@ -175,3 +175,16 @@ Write test results to: `docs/specs/QA_REPORT.md`
 - Network disconnection
 - Session expiration
 ```
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/qa-tester.lessons.md` and `.claude/lessons/shared.lessons.md`
+2. **Cross-reference**: Check `developer.lessons.md` and `code-reviewer.lessons.md`
+
+### Post-Task: Reflect and Record
+1. **Reflect**: What edge cases caught bugs? What testing approaches were most effective?
+2. **Update Scores**: Increment scores for testing techniques that found real defects
+3. **Record New Lesson**: Append to `.claude/lessons/qa-tester.lessons.md` with tags like `#testing #qa #edge-cases`

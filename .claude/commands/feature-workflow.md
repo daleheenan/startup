@@ -84,3 +84,55 @@ Have the **qa-tester** agent:
 - All documentation is saved in `docs/specs/`
 - Review loops continue until approval is granted
 - The workflow can be paused and resumed at any phase
+
+---
+
+## How to Spawn Agents (CRITICAL)
+
+**You MUST use the Task tool to spawn agents. NEVER use Bash commands with CLI flags.**
+
+### Correct Way - Use Task Tool
+When this workflow says "Have the **agent** agent...", you MUST use the Task tool:
+- `subagent_type`: The agent name (e.g., "pm-spec-writer", "architect", "developer")
+- `prompt`: The detailed task instructions
+- `description`: A short 3-5 word summary
+
+**Example - Phase 1 (PM Spec Writer):**
+```
+Task tool call:
+- subagent_type: "pm-spec-writer"
+- prompt: "Create a comprehensive specification for: [feature description]. Write the spec to docs/specs/FEATURE_SPEC.md. Include user stories, acceptance criteria, requirements, edge cases, and scope boundaries."
+- description: "Create feature specification"
+```
+
+**Example - Phase 2 (Architect):**
+```
+Task tool call:
+- subagent_type: "architect"
+- prompt: "Read the specification from docs/specs/FEATURE_SPEC.md. Create a technical design document at docs/specs/TECHNICAL_DESIGN.md. Break the work into numbered implementation tasks at docs/specs/IMPLEMENTATION_TASKS.md."
+- description: "Create technical design"
+```
+
+**Example - Phase 3 (Developer & Reviewer):**
+```
+Task tool call:
+- subagent_type: "developer"
+- prompt: "Implement task [N] from docs/specs/IMPLEMENTATION_TASKS.md. Follow the technical design in docs/specs/TECHNICAL_DESIGN.md."
+- description: "Implement feature task"
+```
+
+### WRONG Way - Never Do This
+```
+# WRONG - Will fail with "unknown option --prompt"
+Bash: claude agent run --agent pm-spec-writer --prompt "create spec"
+
+# WRONG - CLI doesn't support this
+Bash: npx claude --agent developer --task "implement feature"
+```
+
+### Agent Names for subagent_type
+- `pm-spec-writer` - Phase 1: Specification
+- `architect` - Phase 2: Technical design
+- `developer` - Phase 3a: Implementation
+- `code-reviewer` - Phase 3b: Code review
+- `qa-tester` - Phase 4: QA testing

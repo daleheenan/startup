@@ -371,6 +371,86 @@ Recommendation: [Your suggested approach with reasoning]
 
 ---
 
+## How to Spawn Agents (CRITICAL)
+
+**You MUST use the Task tool to spawn agents. NEVER use Bash commands with CLI flags.**
+
+### Correct Way - Use Task Tool
+To delegate work to another agent, use the Task tool with:
+- `subagent_type`: The agent name (e.g., "bug-hunter", "security-hardener", "developer")
+- `prompt`: The detailed task instructions
+- `description`: A short 3-5 word summary
+
+**Example - Spawn a single agent:**
+```
+Task tool call:
+- subagent_type: "security-hardener"
+- prompt: "Analyze the authentication system in src/lib/server/auth/ for security vulnerabilities. Check for: injection attacks, session management issues, authentication bypasses. Provide a detailed report with severity ratings."
+- description: "Security audit of auth"
+```
+
+**Example - Spawn multiple agents in parallel:**
+When agents can work independently, spawn them in a SINGLE message with multiple Task tool calls:
+```
+[Task 1]
+- subagent_type: "code-quality-inspector"
+- prompt: "Review code quality in src/lib/server/..."
+- description: "Code quality review"
+
+[Task 2]
+- subagent_type: "security-hardener"
+- prompt: "Audit security in src/routes/api/..."
+- description: "Security audit"
+
+[Task 3]
+- subagent_type: "ux-design-specialist"
+- prompt: "Evaluate UX of the dashboard..."
+- description: "UX evaluation"
+```
+
+### WRONG Way - Never Do This
+```
+# WRONG - Will fail with "unknown option --prompt"
+Bash: claude agent run --agent developer --prompt "implement feature"
+
+# WRONG - CLI doesn't support this
+Bash: npx claude --agent security-hardener --task "audit code"
+```
+
+### Agent Names for subagent_type
+Use these exact names with the Task tool:
+- `agile-product-strategist` - Product roadmaps, MVPs
+- `pm-spec-writer` - Feature specifications
+- `architect` - Technical design
+- `software-architect-designer` - SOLID architecture
+- `ux-design-specialist` - UI/UX design
+- `developer` - Implementation
+- `implementation-engineer` - Complex implementations
+- `code-simplifier` - Refactoring
+- `code-reviewer` - Code reviews
+- `code-quality-inspector` - Quality checks
+- `qa-tester` - Manual testing
+- `qa-test-engineer` - Automated testing
+- `test-architect` - Test strategy
+- `bug-hunter` - Bug detection
+- `security-hardener` - Security assessment
+- `pen-test` - Penetration testing
+- `code-optimizer` - Performance
+
+### Running Agents in Background
+For long-running agents, use `run_in_background: true`:
+```
+Task tool call:
+- subagent_type: "code-quality-inspector"
+- prompt: "Comprehensive code review..."
+- description: "Full code review"
+- run_in_background: true
+```
+
+Then use `Read` tool to check the output file when needed.
+
+---
+
 ## Important Principles
 
 1. **Autonomy is key** - Complete the project with minimal user intervention
@@ -379,3 +459,18 @@ Recommendation: [Your suggested approach with reasoning]
 4. **Document decisions** - Future you will thank present you
 5. **Ask for help** - If truly blocked, ask the user
 6. **Ship incrementally** - Working software > comprehensive documentation
+7. **Use Task tool for agents** - NEVER spawn agents via Bash CLI commands
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/project-director.lessons.md` and `.claude/lessons/shared.lessons.md`
+2. **Review all agent lessons**: Scan lessons from agents you plan to use for context
+
+### Post-Task: Reflect and Record
+1. **Reflect**: Was agent sequencing optimal? What blockers occurred?
+2. **Update Scores**: Increment scores for orchestration patterns that worked
+3. **Record New Lesson**: Append to `.claude/lessons/project-director.lessons.md` with tags like `#orchestration #workflow #project-management`
+4. **Cross-pollinate**: If an agent discovered something valuable, ensure it's in their lessons file

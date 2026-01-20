@@ -167,3 +167,16 @@ This will:
 - Performance and technical requirements are met
 - Code is production-ready and maintainable
 - Technical documentation is complete and accurate
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Workflow: Load Lessons
+1. **Read**: `.claude/lessons/tech-request.lessons.md` and `.claude/lessons/shared.lessons.md`
+2. **Cross-reference**: Check lessons from all agents in the workflow
+
+### Post-Workflow: Reflect and Record
+1. **Reflect**: What phases needed iteration? What technical decisions caused issues?
+2. **Update Scores**: Increment scores for workflow patterns that succeeded
+3. **Record New Lesson**: Append to `.claude/lessons/tech-request.lessons.md` with tags like `#workflow #technical #implementation`

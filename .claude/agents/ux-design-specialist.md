@@ -123,3 +123,16 @@ When reviewing designs or providing recommendations:
 ### Wireframe/Mockup
 [ASCII or description of improved layout if applicable]
 ```
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/ux-design-specialist.lessons.md` and `.claude/lessons/shared.lessons.md`
+2. **Cross-reference**: Check `developer.lessons.md` for implementation constraints
+
+### Post-Task: Reflect and Record
+1. **Reflect**: Were designs implementable? What usability issues arose during testing?
+2. **Update Scores**: Increment scores for design patterns that worked well
+3. **Record New Lesson**: Append to `.claude/lessons/ux-design-specialist.lessons.md` with tags like `#ux #design #accessibility`

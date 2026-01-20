@@ -108,3 +108,16 @@ Tests: X passing
 
 Ready for: [NEXT-TASK]
 ```
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/api-agent.lessons.md` and `.claude/lessons/shared.lessons.md`
+2. **Cross-reference**: Check `developer.lessons.md` and `service-agent.lessons.md`
+
+### Post-Task: Reflect and Record
+1. **Reflect**: What API patterns worked well? What caused integration issues?
+2. **Update Scores**: Increment scores for patterns that passed review
+3. **Record New Lesson**: Append to `.claude/lessons/api-agent.lessons.md` with tags like `#api #rest #express`

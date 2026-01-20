@@ -225,3 +225,16 @@ it('should [expected behavior] when [condition]', () => {
 - **Make tests readable** - tests are documentation
 - **Keep tests fast** - slow tests don't get run
 - **Test the sad path** - errors happen in production
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/test-architect.lessons.md` and `.claude/lessons/shared.lessons.md`
+2. **Cross-reference**: Check `qa-test-engineer.lessons.md` and `developer.lessons.md`
+
+### Post-Task: Reflect and Record
+1. **Reflect**: Did the test strategy cover the right areas? What gaps remained?
+2. **Update Scores**: Increment scores for test strategies that provided value
+3. **Record New Lesson**: Append to `.claude/lessons/test-architect.lessons.md` with tags like `#testing #strategy #coverage`

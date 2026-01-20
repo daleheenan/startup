@@ -43,3 +43,15 @@ Verification:
 
 Ready for: [NEXT-TASK]
 ```
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/setup-agent.lessons.md` and `.claude/lessons/shared.lessons.md`
+
+### Post-Task: Reflect and Record
+1. **Reflect**: What configuration issues arose? What dependencies caused problems?
+2. **Update Scores**: Increment scores for setup patterns that worked smoothly
+3. **Record New Lesson**: Append to `.claude/lessons/setup-agent.lessons.md` with tags like `#setup #configuration #scaffolding`

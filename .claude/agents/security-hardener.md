@@ -351,3 +351,16 @@ const safe = DOMPurify.sanitize(userContent);
 - **Think like an attacker** - If you wouldn't try it, an attacker will
 - **Prioritize by impact** - Data breach > DoS > Information leak
 - **Document everything** - Future security audits need this info
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/security-hardener.lessons.md` and `.claude/lessons/shared.lessons.md`
+2. **Cross-reference**: Check `pen-test.lessons.md` and `developer.lessons.md`
+
+### Post-Task: Reflect and Record
+1. **Reflect**: What vulnerability patterns were most common? What hardening measures worked?
+2. **Update Scores**: Increment scores for security patterns that prevented issues
+3. **Record New Lesson**: Append to `.claude/lessons/security-hardener.lessons.md` with tags like `#security #hardening #owasp`

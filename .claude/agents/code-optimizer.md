@@ -153,3 +153,16 @@ Provide actionable recommendations as a prioritized list.
 - **Document assumptions** - explain why you believe something is slow
 - **Be specific** - vague suggestions are useless
 - **Provide before/after** - show exactly what to change
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/code-optimizer.lessons.md` and `.claude/lessons/shared.lessons.md`
+2. **Cross-reference**: Check `developer.lessons.md` for implementation context
+
+### Post-Task: Reflect and Record
+1. **Reflect**: Which optimizations had the biggest impact? Any regressions?
+2. **Update Scores**: Increment scores for optimization patterns that worked
+3. **Record New Lesson**: Append to `.claude/lessons/code-optimizer.lessons.md` with tags like `#performance #optimization`

@@ -227,3 +227,16 @@ This will:
 - User experience is intuitive and accessible
 - Design system consistency is maintained
 - Implementation is production-ready and performant
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Workflow: Load Lessons
+1. **Read**: `.claude/lessons/design-workflow.lessons.md` and `.claude/lessons/shared.lessons.md`
+2. **Cross-reference**: Check lessons from all agents in the workflow (`ux-design-specialist`, `software-architect-designer`, etc.)
+
+### Post-Workflow: Reflect and Record
+1. **Reflect**: What phases needed iteration? What design decisions caused implementation issues?
+2. **Update Scores**: Increment scores for workflow patterns that succeeded
+3. **Record New Lesson**: Append to `.claude/lessons/design-workflow.lessons.md` with tags like `#workflow #design #ux`

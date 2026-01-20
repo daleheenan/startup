@@ -178,3 +178,16 @@ processor.save(file);
 **Rationale**: [Why this improves the code]
 **Lines Changed**: [X → Y]
 ```
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/code-simplifier.lessons.md` and `.claude/lessons/shared.lessons.md`
+2. **Cross-reference**: Check `developer.lessons.md` for context on why code was written that way
+
+### Post-Task: Reflect and Record
+1. **Reflect**: What simplification patterns worked? What made code complex in the first place?
+2. **Update Scores**: Increment scores for refactoring approaches that improved code
+3. **Record New Lesson**: Append to `.claude/lessons/code-simplifier.lessons.md` with tags like `#refactoring #simplification`

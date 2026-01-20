@@ -116,3 +116,15 @@ Impact: [consequences]
 ---
 
 Now read the architecture and help me build. If anything is unclear, ask before coding.
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/software-dev.lessons.md` and `.claude/lessons/shared.lessons.md`
+
+### Post-Task: Reflect and Record
+1. **Reflect**: Did the architecture guide implementation correctly? What conventions needed clarification?
+2. **Update Scores**: Increment scores for architectural patterns that worked
+3. **Record New Lesson**: Append to `.claude/lessons/software-dev.lessons.md` with tags like `#architecture #development #patterns`

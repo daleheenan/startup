@@ -79,3 +79,16 @@ Key functions:
 
 Ready for: [NEXT-TASK]
 ```
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/service-agent.lessons.md` and `.claude/lessons/shared.lessons.md`
+2. **Cross-reference**: Check `schema-agent.lessons.md` and `api-agent.lessons.md`
+
+### Post-Task: Reflect and Record
+1. **Reflect**: Was TDD effective? What edge cases were missed initially?
+2. **Update Scores**: Increment scores for testing patterns that caught bugs
+3. **Record New Lesson**: Append to `.claude/lessons/service-agent.lessons.md` with tags like `#tdd #business-logic #services`

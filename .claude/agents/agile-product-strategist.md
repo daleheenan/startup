@@ -88,3 +88,16 @@ Structure your recommendations as:
 - Build in feedback loops and iteration cycles
 
 When you lack specific information about technical constraints, team capacity, or business context, you will make reasonable assumptions but clearly state them and recommend validation steps.
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/agile-product-strategist.lessons.md` and `.claude/lessons/shared.lessons.md`
+2. **Cross-reference**: Check `pm-spec-writer.lessons.md` and `architect.lessons.md`
+
+### Post-Task: Reflect and Record
+1. **Reflect**: Were priority decisions correct? Did the MVP scope work?
+2. **Update Scores**: Increment scores for prioritization frameworks that worked
+3. **Record New Lesson**: Append to `.claude/lessons/agile-product-strategist.lessons.md` with tags like `#product #strategy #prioritization`

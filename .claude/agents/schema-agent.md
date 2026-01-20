@@ -56,3 +56,16 @@ Tests: X passing
 
 Ready for: [NEXT-TASK]
 ```
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/schema-agent.lessons.md` and `.claude/lessons/shared.lessons.md`
+2. **Cross-reference**: Check `service-agent.lessons.md` and `api-agent.lessons.md`
+
+### Post-Task: Reflect and Record
+1. **Reflect**: Were schema designs efficient? What query performance issues arose?
+2. **Update Scores**: Increment scores for schema patterns that performed well
+3. **Record New Lesson**: Append to `.claude/lessons/schema-agent.lessons.md` with tags like `#database #schema #sqlite`

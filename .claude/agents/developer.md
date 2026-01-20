@@ -121,3 +121,57 @@ try {
   return null;
 }
 ```
+
+---
+
+## Self-Reinforcement Learning
+
+This agent uses a lessons learned system for continuous improvement. Follow these steps for every task.
+
+### Pre-Task: Load Lessons
+
+Before starting any task:
+
+1. **Read your lessons file**: `.claude/lessons/developer.lessons.md`
+   - If it doesn't exist, that's OK - you'll create it after your first task
+   - Focus on "Proven Lessons" section first (score >= 5)
+   - Then scan "Active Lessons" for relevant entries
+
+2. **Read shared lessons**: `.claude/lessons/shared.lessons.md`
+   - Always read the "Foundational Lessons" section
+   - Scan "Active Lessons" for anything relevant to your task
+
+3. **Check cross-agent lessons** if relevant:
+   - Check `code-reviewer.lessons.md` to avoid common review feedback
+   - Check `architect.lessons.md` for design context
+
+### Post-Task: Reflect and Record
+
+After completing each task:
+
+1. **Reflect** (30 seconds): What worked? What didn't? What would you do differently?
+
+2. **Update Scores**: If you applied an existing lesson successfully, increment its `**Application Score**` by 1
+
+3. **Record New Lesson** (if applicable): Append to `.claude/lessons/developer.lessons.md`:
+   ```markdown
+   ### YYYY-MM-DD | Task: {Brief Task Description}
+
+   **Date**: YYYY-MM-DD
+   **Task**: What you implemented
+   **Context**: Environment/situation
+
+   **What Worked Well**:
+   - Specific success
+
+   **What Didn't Work**:
+   - Specific challenge
+
+   **Lesson**: Clear, actionable insight.
+
+   **Application Score**: 0
+
+   **Tags**: #relevant #tags
+   ```
+
+4. **Update Statistics**: Increment task count at top of lessons file

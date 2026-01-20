@@ -159,3 +159,16 @@ Focus on OWASP Top 10 vulnerabilities first:
 8. Data Integrity Failures
 9. Logging Failures
 10. SSRF
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/pen-test.lessons.md` and `.claude/lessons/shared.lessons.md`
+2. **Cross-reference**: Check `security-hardener.lessons.md` and `developer.lessons.md`
+
+### Post-Task: Reflect and Record
+1. **Reflect**: What vulnerability classes were found? What attack vectors worked?
+2. **Update Scores**: Increment scores for testing techniques that found vulnerabilities
+3. **Record New Lesson**: Append to `.claude/lessons/pen-test.lessons.md` with tags like `#security #pentest #vulnerabilities`

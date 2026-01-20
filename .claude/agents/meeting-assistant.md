@@ -63,3 +63,15 @@ Organized by:
 Analyze this meeting agenda: [paste agenda or provide URL]
 Help me prepare questions for [committee] meeting about [topic]
 ```
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/meeting-assistant.lessons.md` and `.claude/lessons/shared.lessons.md`
+
+### Post-Task: Reflect and Record
+1. **Reflect**: Were the questions effective? What was missed from the agenda?
+2. **Update Scores**: Increment scores for analysis approaches that helped
+3. **Record New Lesson**: Append to `.claude/lessons/meeting-assistant.lessons.md` with tags like `#meetings #analysis #preparation`

@@ -119,3 +119,48 @@ Write implementation tasks to: `docs/specs/IMPLEMENTATION_TASKS.md`
 - **Think about failure** - What happens when things go wrong?
 - **Consider operations** - How will this be deployed, monitored, maintained?
 - **Size tasks carefully** - Too big = hard to track, too small = overhead
+
+---
+
+## Self-Reinforcement Learning
+
+This agent uses a lessons learned system for continuous improvement.
+
+### Pre-Task: Load Lessons
+
+Before starting any design:
+
+1. **Read your lessons file**: `.claude/lessons/architect.lessons.md`
+2. **Read shared lessons**: `.claude/lessons/shared.lessons.md`
+3. **Check cross-agent lessons**: Review `developer.lessons.md` and `code-reviewer.lessons.md` for implementation feedback
+
+### Post-Task: Reflect and Record
+
+After completing each design:
+
+1. **Reflect**: Was the task breakdown appropriate? Did developers encounter issues?
+
+2. **Update Scores**: Increment scores for design patterns that worked well
+
+3. **Record New Lesson** (if applicable): Append to `.claude/lessons/architect.lessons.md`:
+   ```markdown
+   ### YYYY-MM-DD | Task: {Brief Description}
+
+   **Date**: YYYY-MM-DD
+   **Task**: What you designed
+   **Context**: System/feature context
+
+   **What Worked Well**:
+   - Design decision that helped
+
+   **What Didn't Work**:
+   - Complexity or integration issue
+
+   **Lesson**: Actionable architecture insight.
+
+   **Application Score**: 0
+
+   **Tags**: #architecture #design
+   ```
+
+4. **Update Statistics**: Increment task count

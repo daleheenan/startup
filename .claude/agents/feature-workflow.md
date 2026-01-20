@@ -163,3 +163,68 @@ This will:
 - All features pass QA testing
 - Integration with existing system is verified
 - Code is production-ready and maintainable
+
+---
+
+## How to Spawn Agents (CRITICAL)
+
+**You MUST use the Task tool to spawn agents. NEVER use Bash commands with CLI flags.**
+
+### Correct Way - Use Task Tool
+When launching agents in this workflow, use the Task tool with:
+- `subagent_type`: The agent name
+- `prompt`: The detailed task instructions
+- `description`: A short 3-5 word summary
+
+**Example for Phase 1 (Product Specification):**
+```
+Task tool call:
+- subagent_type: "agile-product-strategist"
+- prompt: "Create a comprehensive product specification for: [feature description]. Requirements: Define user stories and acceptance criteria, identify business value and success metrics, specify functional and non-functional requirements, consider edge cases and error scenarios, provide clear scope and boundaries."
+- description: "Create product specification"
+```
+
+**Example for Phase 2 (Technical Design):**
+```
+Task tool call:
+- subagent_type: "software-architect-designer"
+- prompt: "Based on the product specification: [spec]. Create a comprehensive technical design including: system architecture, database schema changes, API endpoints, security considerations. Break into small tasks completable in 1-2 hours."
+- description: "Create technical design"
+```
+
+**Example for Phase 3a (Development):**
+```
+Task tool call:
+- subagent_type: "implementation-engineer"
+- prompt: "Implement the following task: [task]. Context: Product Spec: [spec], Technical Design: [design]. Follow design specs, write clean code, include error handling."
+- description: "Implement feature task"
+```
+
+### WRONG Way - Never Do This
+```
+# WRONG - Will fail with "unknown option --prompt"
+Bash: claude agent run --agent developer --prompt "implement feature"
+
+# WRONG - CLI doesn't support this
+Bash: npx claude --agent implementation-engineer --task "build API"
+```
+
+### Agent Names for subagent_type
+- `agile-product-strategist` - Phase 1: Product specification
+- `software-architect-designer` - Phase 2: Technical design
+- `implementation-engineer` - Phase 3a: Development
+- `code-quality-inspector` - Phase 3b: Code review
+- `qa-test-engineer` - Phase 3c: QA testing
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Workflow: Load Lessons
+1. **Read**: `.claude/lessons/feature-workflow.lessons.md` and `.claude/lessons/shared.lessons.md`
+2. **Cross-reference**: Check lessons from all agents in the workflow
+
+### Post-Workflow: Reflect and Record
+1. **Reflect**: What phases needed iteration? What caused rework?
+2. **Update Scores**: Increment scores for workflow patterns that succeeded
+3. **Record New Lesson**: Append to `.claude/lessons/feature-workflow.lessons.md` with tags like `#workflow #feature #development`
