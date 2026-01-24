@@ -125,7 +125,7 @@ export default function Home() {
           fontSize: '0.875rem',
           color: '#444'
         }}>
-          Sprint 2 of 8 • Idea Generation Phase
+          Sprint 6 of 8 Complete • 75% Done
         </p>
       </div>
     </main>
