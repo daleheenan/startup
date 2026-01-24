@@ -1,6 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { getToken, logout } from '../lib/auth';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 interface Project {
   id: string;
@@ -12,24 +16,56 @@ interface Project {
   updated_at: string;
 }
 
+interface QueueStats {
+  queue: {
+    pending: number;
+    running: number;
+    completed: number;
+    failed: number;
+  };
+  session: {
+    isActive: boolean;
+    requestsThisSession: number;
+    timeRemaining: string;
+    resetTime: string | null;
+  };
+}
+
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [queueStats, setQueueStats] = useState<QueueStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeNav, setActiveNav] = useState('projects');
 
   useEffect(() => {
     fetchProjects();
+    fetchQueueStats();
+    // Refresh stats every 30 seconds
+    const interval = setInterval(fetchQueueStats, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchProjects = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/projects');
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/projects`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
       if (!response.ok) {
+        if (response.status === 401) {
+          logout();
+          window.location.href = '/login';
+          return;
+        }
         throw new Error('Failed to fetch projects');
       }
 
       const data = await response.json();
-      setProjects(data.projects);
+      setProjects(data.projects || []);
     } catch (err: any) {
       console.error('Error fetching projects:', err);
       setError(err.message || 'Failed to load projects');
@@ -38,23 +74,44 @@ export default function ProjectsPage() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'setup': return '#667eea';
-      case 'generating': return '#f59e0b';
-      case 'completed': return '#10b981';
-      default: return '#888';
+  const fetchQueueStats = async () => {
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/queue/stats`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setQueueStats(data);
+      }
+    } catch (err) {
+      console.error('Error fetching queue stats:', err);
     }
   };
 
-  const getStatusLabel = (status: string) => {
+  const handleLogout = () => {
+    logout();
+    window.location.href = '/';
+  };
+
+  const getStatusColor = (status: string) => {
     switch (status) {
-      case 'setup': return 'Setup';
-      case 'generating': return 'Generating';
-      case 'completed': return 'Completed';
-      default: return status;
+      case 'setup': return '#667eea';
+      case 'generating': return '#F59E0B';
+      case 'completed': return '#10B981';
+      default: return '#64748B';
     }
   };
+
+  const navItems = [
+    { id: 'projects', icon: '🏗️', label: 'Architect', href: '/projects' },
+    { id: 'bible', icon: '📖', label: 'Bible', href: '#' },
+    { id: 'engine', icon: '⚙️', label: 'Engine', href: '#' },
+    { id: 'exports', icon: '📦', label: 'Exports', href: '#' },
+  ];
 
   if (isLoading) {
     return (
@@ -62,196 +119,402 @@ export default function ProjectsPage() {
         minHeight: '100vh',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
+        background: '#F8FAFC',
       }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{
             display: 'inline-block',
-            width: '50px',
-            height: '50px',
-            border: '4px solid rgba(102, 126, 234, 0.3)',
+            width: '48px',
+            height: '48px',
+            border: '3px solid #E2E8F0',
             borderTopColor: '#667eea',
             borderRadius: '50%',
             animation: 'spin 1s linear infinite'
           }} />
-          <p style={{ marginTop: '1rem', color: '#888' }}>Loading projects...</p>
+          <p style={{ marginTop: '1rem', color: '#64748B' }}>Loading...</p>
         </div>
+        <style jsx>{`
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
       </div>
     );
   }
 
   return (
-    <main style={{
+    <div style={{
+      display: 'flex',
       minHeight: '100vh',
-      padding: '2rem',
+      background: '#F8FAFC',
     }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        {/* Header */}
+      {/* Left Sidebar */}
+      <aside style={{
+        width: '72px',
+        background: '#FFFFFF',
+        borderRight: '1px solid #E2E8F0',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: '1.5rem 0',
+      }}>
+        {/* Logo */}
         <div style={{
+          width: '40px',
+          height: '40px',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          borderRadius: '10px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
           marginBottom: '2rem',
+          color: '#FFFFFF',
+          fontWeight: '700',
+          fontSize: '1.25rem',
+        }}>
+          N
+        </div>
+
+        {/* Nav Icons */}
+        <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {navItems.map((item) => (
+            <Link
+              key={item.id}
+              href={item.href}
+              onClick={() => setActiveNav(item.id)}
+              style={{
+                width: '48px',
+                height: '48px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '12px',
+                fontSize: '1.25rem',
+                textDecoration: 'none',
+                background: activeNav === item.id ? '#F1F5F9' : 'transparent',
+                transition: 'all 0.2s',
+              }}
+              title={item.label}
+            >
+              {item.icon}
+            </Link>
+          ))}
+        </nav>
+
+        {/* Logout */}
+        <button
+          onClick={handleLogout}
+          style={{
+            width: '48px',
+            height: '48px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '12px',
+            fontSize: '1.25rem',
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+          }}
+          title="Logout"
+        >
+          🚪
+        </button>
+      </aside>
+
+      {/* Main Content */}
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        {/* Top Bar */}
+        <header style={{
+          padding: '1rem 2rem',
+          background: '#FFFFFF',
+          borderBottom: '1px solid #E2E8F0',
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
         }}>
           <div>
             <h1 style={{
-              fontSize: '2.5rem',
-              marginBottom: '0.5rem',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text'
+              fontSize: '1.5rem',
+              fontWeight: '700',
+              color: '#1A1A2E',
+              margin: 0,
             }}>
-              Your Projects
+              Story Architect
             </h1>
-            <p style={{ fontSize: '1.125rem', color: '#888' }}>
-              {projects.length === 0 ? 'No projects yet' : `${projects.length} project${projects.length === 1 ? '' : 's'}`}
+            <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
+              Create and manage your novel projects
             </p>
           </div>
-          <a
-            href="/new"
-            style={{
-              display: 'inline-block',
-              padding: '0.75rem 1.5rem',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              border: 'none',
-              borderRadius: '8px',
-              color: '#fff',
-              fontSize: '1rem',
-              fontWeight: 600,
-              textDecoration: 'none',
-              transition: 'all 0.2s',
-            }}
-          >
-            + New Project
-          </a>
-        </div>
 
-        {/* Error Message */}
-        {error && (
-          <div style={{
-            background: 'rgba(239, 68, 68, 0.1)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-            borderRadius: '8px',
-            padding: '1rem',
-            marginBottom: '2rem',
-            color: '#ef4444'
-          }}>
-            {error}
-          </div>
-        )}
+          {/* Claude Max Status */}
+          {queueStats && (
+            <div style={{
+              display: 'flex',
+              gap: '1rem',
+              alignItems: 'center',
+            }}>
+              <div style={{
+                padding: '0.75rem 1rem',
+                background: '#F1F5F9',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+              }}>
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  background: `conic-gradient(#667eea ${(queueStats.session.requestsThisSession / 45) * 100}%, #E2E8F0 0%)`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <div style={{
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    background: '#F1F5F9',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.625rem',
+                    fontWeight: '600',
+                    color: '#667eea',
+                  }}>
+                    {queueStats.session.requestsThisSession}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748B' }}>Claude Max</div>
+                  <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1A1A2E' }}>
+                    Reset in {queueStats.session.timeRemaining || '5h 0m'}
+                  </div>
+                </div>
+              </div>
 
-        {/* Projects List */}
-        {projects.length === 0 ? (
+              <div style={{
+                padding: '0.75rem 1rem',
+                background: '#F1F5F9',
+                borderRadius: '8px',
+              }}>
+                <div style={{ fontSize: '0.75rem', color: '#64748B' }}>Job Queue</div>
+                <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1A1A2E' }}>
+                  PENDING: {queueStats.queue.pending}
+                </div>
+              </div>
+            </div>
+          )}
+        </header>
+
+        {/* Content Area */}
+        <div style={{ flex: 1, padding: '2rem', overflow: 'auto' }}>
+          {/* Error Message */}
+          {error && (
+            <div style={{
+              background: '#FEF2F2',
+              border: '1px solid #FECACA',
+              borderRadius: '12px',
+              padding: '1rem 1.5rem',
+              marginBottom: '1.5rem',
+              color: '#DC2626',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+            }}>
+              <span>⚠️</span>
+              {error}
+            </div>
+          )}
+
+          {/* New Project Button */}
           <div style={{
-            textAlign: 'center',
-            padding: '4rem 2rem',
-            background: 'rgba(255, 255, 255, 0.05)',
-            borderRadius: '12px',
-            border: '1px dashed rgba(255, 255, 255, 0.1)'
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '1.5rem',
           }}>
-            <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>📖</div>
-            <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem', color: '#ededed' }}>
-              No Projects Yet
+            <h2 style={{
+              fontSize: '1.125rem',
+              fontWeight: '600',
+              color: '#374151',
+              margin: 0,
+            }}>
+              Your Projects ({projects.length})
             </h2>
-            <p style={{ fontSize: '1rem', color: '#888', marginBottom: '2rem' }}>
-              Create your first novel project to get started
-            </p>
-            <a
+            <Link
               href="/new"
               style={{
-                display: 'inline-block',
-                padding: '1rem 2rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.75rem 1.25rem',
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                border: 'none',
+                color: '#FFFFFF',
                 borderRadius: '8px',
-                color: '#fff',
-                fontSize: '1rem',
-                fontWeight: 600,
                 textDecoration: 'none',
+                fontWeight: '600',
+                fontSize: '0.875rem',
+                boxShadow: '0 4px 14px rgba(102, 126, 234, 0.3)',
               }}
             >
-              Create Your First Novel
-            </a>
+              <span>+</span>
+              New Project
+            </Link>
           </div>
-        ) : (
-          <div style={{
-            display: 'grid',
-            gap: '1rem'
-          }}>
-            {projects.map(project => (
-              <a
-                key={project.id}
-                href={`/projects/${project.id}`}
+
+          {/* Projects Grid */}
+          {projects.length === 0 ? (
+            <div style={{
+              textAlign: 'center',
+              padding: '4rem 2rem',
+              background: '#FFFFFF',
+              borderRadius: '16px',
+              border: '2px dashed #E2E8F0',
+            }}>
+              <div style={{
+                width: '64px',
+                height: '64px',
+                margin: '0 auto 1.5rem',
+                background: '#F1F5F9',
+                borderRadius: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '2rem',
+              }}>
+                📖
+              </div>
+              <h3 style={{
+                fontSize: '1.25rem',
+                fontWeight: '600',
+                color: '#1A1A2E',
+                marginBottom: '0.5rem',
+              }}>
+                No Projects Yet
+              </h3>
+              <p style={{
+                fontSize: '0.875rem',
+                color: '#64748B',
+                marginBottom: '1.5rem',
+                maxWidth: '300px',
+                margin: '0 auto 1.5rem',
+              }}>
+                Start by creating your first novel. Choose a genre, build characters, and let AI write your story.
+              </p>
+              <Link
+                href="/new"
                 style={{
-                  display: 'block',
-                  padding: '1.5rem',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: '12px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.875rem 1.5rem',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: '#FFFFFF',
+                  borderRadius: '8px',
                   textDecoration: 'none',
-                  transition: 'all 0.2s',
+                  fontWeight: '600',
+                  boxShadow: '0 4px 14px rgba(102, 126, 234, 0.4)',
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                  <div style={{ flex: 1 }}>
+                Create Your First Novel
+              </Link>
+            </div>
+          ) : (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+              gap: '1rem',
+            }}>
+              {projects.map(project => (
+                <Link
+                  key={project.id}
+                  href={`/projects/${project.id}`}
+                  style={{
+                    display: 'block',
+                    padding: '1.5rem',
+                    background: '#FFFFFF',
+                    border: '1px solid #E2E8F0',
+                    borderRadius: '12px',
+                    textDecoration: 'none',
+                    transition: 'all 0.2s',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                  }}
+                >
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'start',
+                    marginBottom: '1rem',
+                  }}>
                     <h3 style={{
-                      fontSize: '1.5rem',
-                      marginBottom: '0.5rem',
-                      color: '#ededed'
+                      fontSize: '1.125rem',
+                      fontWeight: '600',
+                      color: '#1A1A2E',
+                      margin: 0,
                     }}>
                       {project.title}
                     </h3>
-                    <div style={{
-                      display: 'flex',
-                      gap: '1rem',
-                      fontSize: '0.875rem',
-                      color: '#888'
+                    <span style={{
+                      padding: '0.25rem 0.75rem',
+                      background: `${getStatusColor(project.status)}15`,
+                      color: getStatusColor(project.status),
+                      borderRadius: '20px',
+                      fontSize: '0.75rem',
+                      fontWeight: '500',
+                      textTransform: 'capitalize',
                     }}>
-                      <span>{project.genre}</span>
-                      <span>•</span>
-                      <span style={{ textTransform: 'capitalize' }}>{project.type}</span>
-                      <span>•</span>
-                      <span>Created {new Date(project.created_at).toLocaleDateString()}</span>
-                    </div>
+                      {project.status}
+                    </span>
                   </div>
-                  <div style={{
-                    padding: '0.5rem 1rem',
-                    background: `${getStatusColor(project.status)}20`,
-                    border: `1px solid ${getStatusColor(project.status)}`,
-                    borderRadius: '6px',
-                    color: getStatusColor(project.status),
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                  }}>
-                    {getStatusLabel(project.status)}
-                  </div>
-                </div>
-              </a>
-            ))}
-          </div>
-        )}
 
-        {/* Back Link */}
-        <div style={{ marginTop: '2rem', textAlign: 'center' }}>
-          <a
-            href="/"
-            style={{
-              color: '#667eea',
-              textDecoration: 'none',
-              fontSize: '0.875rem'
-            }}
-          >
-            ← Back to Home
-          </a>
+                  <div style={{
+                    display: 'flex',
+                    gap: '0.75rem',
+                    fontSize: '0.813rem',
+                    color: '#64748B',
+                  }}>
+                    <span style={{
+                      padding: '0.25rem 0.5rem',
+                      background: '#F1F5F9',
+                      borderRadius: '4px',
+                    }}>
+                      {project.genre}
+                    </span>
+                    <span style={{
+                      padding: '0.25rem 0.5rem',
+                      background: '#F1F5F9',
+                      borderRadius: '4px',
+                      textTransform: 'capitalize',
+                    }}>
+                      {project.type}
+                    </span>
+                  </div>
+
+                  <div style={{
+                    marginTop: '1rem',
+                    paddingTop: '1rem',
+                    borderTop: '1px solid #F1F5F9',
+                    fontSize: '0.75rem',
+                    color: '#94A3B8',
+                  }}>
+                    Created {new Date(project.created_at).toLocaleDateString()}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
-      </div>
+      </main>
 
       <style jsx>{`
         @keyframes spin {
           to { transform: rotate(360deg); }
         }
       `}</style>
-    </main>
+    </div>
   );
 }

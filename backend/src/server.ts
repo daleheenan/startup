@@ -31,7 +31,17 @@ const PORT = process.env.PORT || 3001;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 // Middleware
-app.use(cors({ origin: FRONTEND_URL }));
+app.use(cors({
+  origin: [
+    FRONTEND_URL,
+    'https://novelforge.daleheenan.com',
+    'https://novelforge-production.up.railway.app',
+    'http://localhost:3000'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 
 // Request logging
