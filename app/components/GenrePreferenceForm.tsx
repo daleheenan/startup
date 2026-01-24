@@ -414,6 +414,11 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
           Primary Genre <span style={{ color: '#DC2626' }}>*</span>
           <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Select 1-3)</span>
         </label>
+        <div style={{ fontSize: '0.75rem', color: '#64748B', marginBottom: '0.75rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+          <span>🔥 Hot = Trending now</span>
+          <span>📈 Rising = Growing popularity</span>
+          <span>✓ Popular = Consistently strong</span>
+        </div>
         <div style={{
           display: 'flex',
           flexWrap: 'wrap',

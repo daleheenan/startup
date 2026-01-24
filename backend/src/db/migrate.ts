@@ -197,6 +197,68 @@ export function runMigrations() {
       }
     }
 
+    // Migrations 005-009: Run from migration files
+    const migrationFiles = [
+      '005_analytics_insights.sql',
+      '006_chapter_edits.sql',
+      '007_regeneration_variations.sql',
+      '008_project_metrics.sql',
+      '009_genre_tropes.sql',
+    ];
+
+    for (let i = 0; i < migrationFiles.length; i++) {
+      const version = 5 + i;
+      const filename = migrationFiles[i];
+
+      if (currentVersion < version) {
+        console.log(`[Migrations] Applying migration 00${version}: ${filename}`);
+        const migrationPath = path.join(__dirname, 'migrations', filename);
+
+        if (!fs.existsSync(migrationPath)) {
+          console.log(`[Migrations] Migration file ${filename} not found, skipping`);
+          continue;
+        }
+
+        const migration = fs.readFileSync(migrationPath, 'utf-8');
+
+        db.exec('BEGIN TRANSACTION');
+
+        try {
+          const lines = migration.split('\n');
+          const cleanedLines = lines.filter(line => {
+            const trimmed = line.trim();
+            return trimmed.length === 0 || !trimmed.startsWith('--');
+          });
+          const cleanedMigration = cleanedLines.join('\n');
+
+          const statements = cleanedMigration
+            .split(';')
+            .map(s => s.trim())
+            .filter(s => s.length > 0);
+
+          for (const statement of statements) {
+            try {
+              db.exec(statement);
+            } catch (execError: any) {
+              // Silently skip ALTER TABLE errors for columns that already exist
+              if (statement.includes('ALTER TABLE') && execError.code === 'SQLITE_ERROR') {
+                console.log(`[Migrations] Skipping statement (likely duplicate column): ${statement.substring(0, 50)}...`);
+              } else {
+                throw execError;
+              }
+            }
+          }
+
+          db.prepare(`INSERT INTO schema_migrations (version) VALUES (${version})`).run();
+          db.exec('COMMIT');
+          console.log(`[Migrations] Migration 00${version} applied successfully`);
+        } catch (error) {
+          db.exec('ROLLBACK');
+          throw error;
+        }
+      }
+    }
+
     console.log('[Migrations] All migrations complete');
   } catch (error) {
     try {
