@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
+  // Removed standalone for simpler Railway deployment
 }
 
 module.exports = nextConfig
