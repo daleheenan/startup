@@ -24,6 +24,8 @@ import savedConceptsRouter from './routes/saved-concepts.js';
 import regenerationRouter from './routes/regeneration.js';
 import genreTropesRouter from './routes/genre-tropes.js';
 import genreConventionsRouter from './routes/genre-conventions.js';
+import proseStylesRouter from './routes/prose-styles.js';
+import analyticsRouter from './routes/analytics.js';
 
 // Load environment variables
 dotenv.config();
@@ -113,6 +115,8 @@ app.use('/api/saved-concepts', apiLimiter, requireAuth, savedConceptsRouter);
 app.use('/api/regeneration', apiLimiter, requireAuth, regenerationRouter);
 app.use('/api/genre-tropes', apiLimiter, requireAuth, genreTropesRouter);
 app.use('/api/genre-conventions', apiLimiter, requireAuth, genreConventionsRouter);
+app.use('/api/prose-styles', apiLimiter, requireAuth, proseStylesRouter);
+app.use('/api/analytics', apiLimiter, requireAuth, analyticsRouter);
 
 // Error handling
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

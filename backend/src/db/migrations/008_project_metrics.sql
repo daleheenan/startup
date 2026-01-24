@@ -28,9 +28,7 @@ CREATE TABLE IF NOT EXISTS project_metrics (
 
 CREATE INDEX IF NOT EXISTS idx_project_metrics_project ON project_metrics(project_id);
 
--- Add token tracking to chapters table for granular tracking
-ALTER TABLE chapters ADD COLUMN input_tokens INTEGER DEFAULT 0;
-ALTER TABLE chapters ADD COLUMN output_tokens INTEGER DEFAULT 0;
+-- Note: Column additions may fail if columns already exist - this is expected and safe to ignore
 
 -- Create trigger to update project metrics when chapters change
 CREATE TRIGGER IF NOT EXISTS update_project_metrics_on_chapter_change

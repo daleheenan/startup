@@ -420,3 +420,257 @@ export interface WorldTransitionChange {
   description: string;
   impact: string;
 }
+
+// Sprint 18: Advanced Prose Control Types
+
+export type SentenceLengthPreference = 'short' | 'medium' | 'long' | 'varied';
+export type SentenceComplexity = 'simple' | 'moderate' | 'complex' | 'varied';
+export type ReadingLevel = '8th_grade' | 'high_school' | 'general' | 'literary';
+export type FormalityLevel = 'casual' | 'moderate' | 'formal' | 'literary';
+export type VoiceTone = 'neutral' | 'intimate' | 'distant' | 'conversational';
+export type NarrativeDistance = 'close' | 'moderate' | 'distant';
+export type VocabularyComplexity = 'simple' | 'moderate' | 'sophisticated' | 'mixed';
+export type PacingPreference = 'slow' | 'moderate' | 'fast' | 'varied';
+export type TransitionStyle = 'abrupt' | 'smooth' | 'cinematic';
+export type ParagraphLengthPreference = 'short' | 'medium' | 'long' | 'varied';
+
+export interface ProseStyle {
+  id: string;
+  project_id: string;
+  name: string;
+  is_default: boolean;
+
+  // Sentence structure
+  sentence_length_preference: SentenceLengthPreference;
+  sentence_complexity: SentenceComplexity;
+  sentence_variety_score: number; // 0-1
+
+  // Readability
+  target_reading_level: ReadingLevel;
+  flesch_kincaid_target: number; // 0-100
+
+  // Voice
+  formality_level: FormalityLevel;
+  voice_tone: VoiceTone;
+  narrative_distance: NarrativeDistance;
+
+  // Vocabulary
+  vocabulary_complexity: VocabularyComplexity;
+  use_metaphors: boolean;
+  use_similes: boolean;
+
+  // Pacing
+  default_pacing: PacingPreference;
+  scene_transition_style: TransitionStyle;
+
+  // Paragraph structure
+  paragraph_length_preference: ParagraphLengthPreference;
+
+  // Advanced
+  custom_preferences?: Record<string, any>;
+
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VoiceSample {
+  id: string;
+  prose_style_id: string;
+  sample_text: string;
+  sample_source?: string;
+
+  // Extracted metrics
+  avg_sentence_length?: number;
+  sentence_length_variance?: number;
+  flesch_kincaid_score?: number;
+  complex_word_ratio?: number;
+
+  // Patterns
+  extracted_patterns?: {
+    common_sentence_structures: string[];
+    word_patterns: string[];
+    rhythm_notes: string[];
+  };
+
+  created_at: string;
+}
+
+export interface StylePreset {
+  id: string;
+  genre: string;
+  subgenre?: string;
+  preset_name: string;
+  description?: string;
+
+  // All prose style fields
+  sentence_length_preference: SentenceLengthPreference;
+  sentence_complexity: SentenceComplexity;
+  sentence_variety_score: number;
+  target_reading_level: ReadingLevel;
+  flesch_kincaid_target: number;
+  formality_level: FormalityLevel;
+  voice_tone: VoiceTone;
+  narrative_distance: NarrativeDistance;
+  vocabulary_complexity: VocabularyComplexity;
+  use_metaphors: boolean;
+  use_similes: boolean;
+  default_pacing: PacingPreference;
+  scene_transition_style: TransitionStyle;
+  paragraph_length_preference: ParagraphLengthPreference;
+  custom_preferences?: Record<string, any>;
+
+  is_system_preset: boolean;
+  usage_count: number;
+
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StyleTemplate {
+  id: string;
+  user_id?: string;
+  template_name: string;
+  description?: string;
+  tags?: string[];
+
+  configuration: ProseStyle; // Complete prose style config
+
+  is_public: boolean;
+  times_used: number;
+
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StyleConsistencyDeviation {
+  type: string;
+  severity: 'minor' | 'moderate' | 'major';
+  location: string;
+  description: string;
+}
+
+export interface StyleCheck {
+  id: string;
+  chapter_id: string;
+  prose_style_id: string;
+
+  overall_consistency_score: number; // 0-100
+  sentence_consistency: number;
+  vocabulary_consistency: number;
+  pacing_consistency: number;
+
+  deviations: StyleConsistencyDeviation[];
+  recommendations: string[];
+
+  checked_at: string;
+}
+
+// Sprint 19: Analytics & Insights Types
+
+export interface ChapterAnalytics {
+  id: string;
+  chapter_id: string;
+
+  // Pacing
+  pacing_score?: number; // 0-100
+  pacing_data?: {
+    scene_pacing: Array<{
+      scene: string;
+      pace: 'slow' | 'medium' | 'fast';
+      word_count: number;
+    }>;
+  };
+
+  // Character metrics
+  character_screen_time?: Record<string, {
+    appearances: number;
+    word_count: number;
+    pov_time: number;
+  }>;
+
+  // Dialogue
+  dialogue_percentage?: number; // 0-100
+  dialogue_word_count?: number;
+  narrative_word_count?: number;
+
+  // Readability
+  readability_score?: number; // Flesch-Kincaid
+  avg_sentence_length?: number;
+  complex_word_percentage?: number;
+
+  // Tension
+  tension_score?: number; // 0-100
+  tension_arc?: {
+    points: Array<{
+      position: number; // 0-100 percentage through chapter
+      tension: number; // 0-100
+    }>;
+  };
+
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BookAnalytics {
+  id: string;
+  book_id: string;
+
+  // Pacing
+  avg_pacing_score?: number;
+  pacing_consistency?: number;
+
+  // Characters
+  character_balance?: {
+    characters: Array<{
+      name: string;
+      total_appearances: number;
+      total_word_count: number;
+      chapters_appeared_in: number[];
+    }>;
+  };
+
+  // Dialogue
+  avg_dialogue_percentage?: number;
+
+  // Readability
+  avg_readability_score?: number;
+
+  // Tension
+  overall_tension_arc?: {
+    chapters: Array<{
+      chapter_number: number;
+      avg_tension: number;
+    }>;
+  };
+
+  // Genre comparison
+  genre_comparison?: {
+    genre: string;
+    pacing_vs_norm: number;
+    dialogue_vs_norm: number;
+    readability_vs_norm: number;
+  };
+
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GenreBenchmark {
+  id: string;
+  genre: string;
+
+  typical_pacing_score: number;
+  typical_dialogue_percentage: number;
+  typical_readability_score: number;
+  typical_tension_pattern: {
+    pattern: string;
+  };
+
+  typical_character_count: number;
+  typical_pov_structure: {
+    common: string;
+  };
+
+  created_at: string;
+  updated_at: string;
+}
