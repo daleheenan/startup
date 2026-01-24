@@ -1,8 +1,9 @@
 [build]
 builder = "nixpacks"
+buildCommand = "npm run build && cp -r public .next/standalone/ 2>/dev/null || true && cp -r .next/static .next/standalone/.next/"
 
 [deploy]
-startCommand = "npm start"
+startCommand = "node .next/standalone/server.js"
 healthcheckPath = "/"
 healthcheckTimeout = 100
 restartPolicyType = "ON_FAILURE"

@@ -17,17 +17,40 @@ interface FlagsSummaryData {
 }
 
 interface FlagsSummaryProps {
-  bookId: string;
+  bookId?: string;
+  projectId: string;
+  flags: {
+    total: number;
+    critical: number;
+    warning: number;
+    info: number;
+  };
 }
 
-export default function FlagsSummary({ bookId }: FlagsSummaryProps) {
+export default function FlagsSummary({ bookId, projectId, flags }: FlagsSummaryProps) {
   const [data, setData] = useState<FlagsSummaryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchSummary();
-  }, [bookId]);
+    if (bookId) {
+      fetchSummary();
+    } else {
+      // Use provided flags data
+      setData({
+        totalFlags: flags.total,
+        unresolvedFlags: flags.total - (flags.info || 0),
+        resolvedFlags: flags.info || 0,
+        flagsByType: {},
+        flagsBySeverity: {
+          critical: flags.critical || 0,
+          major: flags.warning || 0,
+        },
+        chapters: [],
+      });
+      setLoading(false);
+    }
+  }, [bookId, flags]);
 
   async function fetchSummary() {
     try {
@@ -185,6 +208,23 @@ export default function FlagsSummary({ bookId }: FlagsSummaryProps) {
             <p style={{ color: '#4ade80', fontSize: '0.875rem', margin: 0 }}>
               No flags! All chapters looking great.
             </p>
+          </div>
+        )}
+
+        {/* View All Link */}
+        {data.totalFlags > 0 && (
+          <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+            <a
+              href={`/projects/${projectId}/flags`}
+              style={{
+                color: '#667eea',
+                textDecoration: 'none',
+                fontSize: '0.875rem',
+                fontWeight: 'bold',
+              }}
+            >
+              View All Flagged Issues →
+            </a>
           </div>
         )}
       </div>

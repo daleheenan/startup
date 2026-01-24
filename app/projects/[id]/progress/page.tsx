@@ -48,6 +48,12 @@ interface ProgressData {
     warning: number;
     info: number;
   };
+  rateLimitStatus?: {
+    isActive: boolean;
+    requestsThisSession: number;
+    timeRemaining: string;
+    resetTime: string | null;
+  };
 }
 
 export default function ProgressPage() {
@@ -296,6 +302,42 @@ export default function ProgressPage() {
             </div>
           </div>
         </div>
+
+        {/* Rate Limit Status */}
+        {progress.rateLimitStatus && (
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.05)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '12px',
+            padding: '1.5rem'
+          }}>
+            <h3 style={{ fontSize: '1rem', color: '#888', marginBottom: '0.5rem' }}>Rate Limit</h3>
+            <div style={{ marginTop: '0.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <span style={{ color: '#888', fontSize: '0.875rem' }}>Status:</span>
+                <span style={{ color: progress.rateLimitStatus.isActive ? '#4ade80' : '#888', fontSize: '0.875rem', fontWeight: 'bold' }}>
+                  {progress.rateLimitStatus.isActive ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+              {progress.rateLimitStatus.isActive && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                    <span style={{ color: '#888', fontSize: '0.875rem' }}>Requests:</span>
+                    <span style={{ color: '#ededed', fontSize: '0.875rem' }}>
+                      {progress.rateLimitStatus.requestsThisSession}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#888', fontSize: '0.875rem' }}>Resets in:</span>
+                    <span style={{ color: '#667eea', fontSize: '0.875rem', fontWeight: 'bold' }}>
+                      {progress.rateLimitStatus.timeRemaining}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Current Activity */}
         {progress.currentActivity && (

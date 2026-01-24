@@ -223,6 +223,12 @@ export interface GenerationProgress {
     status: ChapterStatus;
   };
   recentEvents: ProgressEvent[];
+  rateLimitStatus?: {
+    isActive: boolean;
+    requestsThisSession: number;
+    timeRemaining: string;
+    resetTime: string | null;
+  };
 }
 
 export interface ProgressEvent {

@@ -1,5 +1,6 @@
 import db from '../db/connection.js';
 import type { GenerationProgress, ProgressEvent } from '../../../shared/types/index.js';
+import { sessionTracker } from './session-tracker.js';
 
 /**
  * ProgressTrackingService tracks chapter generation progress and provides estimates
@@ -61,6 +62,9 @@ export class ProgressTrackingService {
     // Get recent events
     const recentEvents = this.getRecentEvents(bookId);
 
+    // Get rate limit status
+    const rateLimitStatus = sessionTracker.getSessionStats();
+
     return {
       chaptersCompleted,
       chaptersTotal,
@@ -77,6 +81,7 @@ export class ProgressTrackingService {
           }
         : undefined,
       recentEvents,
+      rateLimitStatus,
     };
   }
 
@@ -137,6 +142,9 @@ export class ProgressTrackingService {
     // Get recent events across all books
     const recentEvents = this.getRecentEventsForProject(projectId);
 
+    // Get rate limit status
+    const rateLimitStatus = sessionTracker.getSessionStats();
+
     return {
       totalBooks: bookStats.total_books || 0,
       completedBooks: bookStats.completed_books || 0,
@@ -150,6 +158,7 @@ export class ProgressTrackingService {
         estimatedTimeRemaining,
         sessionsUsed,
         recentEvents,
+        rateLimitStatus,
       },
     };
   }
@@ -303,6 +312,8 @@ export class ProgressTrackingService {
    * Get empty progress object
    */
   private getEmptyProgress(): GenerationProgress {
+    const rateLimitStatus = sessionTracker.getSessionStats();
+
     return {
       chaptersCompleted: 0,
       chaptersTotal: 0,
@@ -313,6 +324,7 @@ export class ProgressTrackingService {
       estimatedTimeRemaining: 0,
       sessionsUsed: 0,
       recentEvents: [],
+      rateLimitStatus,
     };
   }
 
