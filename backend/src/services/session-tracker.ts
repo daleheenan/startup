@@ -1,5 +1,5 @@
 import db from '../db/connection.js';
-import type { SessionTracking } from '../../shared/types/index.js';
+import type { SessionTracking } from '../shared/types/index.js';
 
 /**
  * SessionTracker manages Claude Max subscription session tracking.

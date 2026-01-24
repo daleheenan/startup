@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import db from '../db/connection.js';
 import { randomUUID } from 'crypto';
-import type { Chapter } from '../../shared/types/index.js';
+import type { Chapter } from '../shared/types/index.js';
 import { chapterOrchestratorService } from '../services/chapter-orchestrator.service.js';
 
 const router = Router();

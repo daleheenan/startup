@@ -1,6 +1,6 @@
 import { claudeService } from './claude.service.js';
 import db from '../db/connection.js';
-import type { Chapter, Flag } from '../../shared/types/index.js';
+import type { Chapter, Flag } from '../shared/types/index.js';
 
 /**
  * EditResult captures the output of an editing pass

@@ -10,7 +10,7 @@ import type {
   StoryDNA,
   Character,
   WorldElements,
-} from '../../shared/types/index.js';
+} from '../shared/types/index.js';
 import { getStructureTemplate } from './structure-templates.js';
 
 dotenv.config();

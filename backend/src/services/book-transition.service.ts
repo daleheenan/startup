@@ -6,7 +6,7 @@ import type {
   BookEndingState,
   CharacterTransitionChange,
   WorldTransitionChange,
-} from '../../shared/types/index.js';
+} from '../shared/types/index.js';
 import { claudeService } from './claude.service.js';
 
 /**

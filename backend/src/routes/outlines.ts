@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import db from '../db/connection.js';
 import { randomUUID } from 'crypto';
-import type { Outline, StoryStructure, Project, Book } from '../../shared/types/index.js';
+import type { Outline, StoryStructure, Project, Book } from '../shared/types/index.js';
 import { generateOutline, type OutlineContext } from '../services/outline-generator.js';
 import { getAllStructureTemplates } from '../services/structure-templates.js';
 

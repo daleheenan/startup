@@ -10,7 +10,7 @@ import type {
   SeriesMystery,
   StoryBible,
   BookEndingState,
-} from '../../shared/types/index.js';
+} from '../shared/types/index.js';
 
 /**
  * SeriesBibleGeneratorService creates aggregated trilogy data

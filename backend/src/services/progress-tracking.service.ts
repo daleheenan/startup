@@ -1,5 +1,5 @@
 import db from '../db/connection.js';
-import type { GenerationProgress, ProgressEvent } from '../../shared/types/index.js';
+import type { GenerationProgress, ProgressEvent } from '../shared/types/index.js';
 import { sessionTracker } from './session-tracker.js';
 
 /**

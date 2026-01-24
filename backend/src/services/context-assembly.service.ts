@@ -6,7 +6,7 @@ import type {
   Chapter,
   Book,
   Project,
-} from '../../shared/types/index.js';
+} from '../shared/types/index.js';
 
 /**
  * ContextAssemblyService builds minimal, targeted prompts for chapter generation.
