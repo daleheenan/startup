@@ -2,6 +2,22 @@
 
 Based on comprehensive code reviews by 8 specialized agents, here are the prioritized recommendations for future sprints.
 
+---
+
+## 🚨 HIGH PRIORITY - Next Sprint (Sprint 12)
+
+These items were identified as critical gaps during Project Director verification:
+
+| Item | Priority | Reason |
+|------|----------|--------|
+| **Automated Test Suite** | CRITICAL | Zero test coverage - build passes but no automated verification |
+| **Mystery Tracking** | HIGH | Framework exists in SeriesBibleGeneratorService but not implemented |
+
+**Estimated Points:** 40-50
+**Recommended Agents:** qa-test-engineer, developer
+
+---
+
 ## Completed in This Session
 
 ### Critical Bug Fixes (5)
@@ -23,38 +39,67 @@ Based on comprehensive code reviews by 8 specialized agents, here are the priori
 
 ---
 
-## Sprint 12: Code Quality & TypeScript Strictness
+## Sprint 12: Testing & Missing Features (HIGH PRIORITY)
 
-### Priority 1 - TypeScript (Code Quality Review)
+> **Note:** These items were identified as gaps during Project Director verification on 2026-01-24.
+
+### Priority 1 - Automated Test Suite (CRITICAL)
+- [ ] Add Jest + Supertest as dev dependencies
+- [ ] Create test configuration (jest.config.js)
+- [ ] Write unit tests for core services:
+  - [ ] CrossBookContinuityService
+  - [ ] SeriesBibleGeneratorService
+  - [ ] BookTransitionService
+  - [ ] ChapterGenerationService
+  - [ ] EditingPipelineService
+- [ ] Write integration tests for trilogy API endpoints
+- [ ] Write E2E test for complete trilogy generation workflow
+- [ ] Add `npm test` script to package.json
+- [ ] Target 70%+ coverage on business logic
+
+### Priority 2 - Mystery Tracking Implementation (HIGH)
+- [ ] Implement Claude-based mystery analysis in SeriesBibleGeneratorService
+- [ ] Extract questions raised from chapter content
+- [ ] Track answers revealed with book/chapter references
+- [ ] Track outstanding mysteries at series level
+- [ ] Add API endpoint for mystery tracking status
+- [ ] Update series bible export to include mysteries section
+
+### Priority 3 - TypeScript Strictness (Code Quality Review)
 - [ ] Enable `noImplicitAny: true` in backend tsconfig
 - [ ] Fix all 114 `any` type usages across 25 backend files
 - [ ] Share types between frontend and backend (monorepo setup)
 
-### Priority 2 - Input Validation
+### Priority 4 - Input Validation
 - [ ] Add Zod validation to all API routes
 - [ ] Create validation schemas for all request bodies
 - [ ] Centralize error response format
 
-### Priority 3 - Environment Validation
+### Priority 5 - Environment Validation
 - [ ] Validate all environment variables at startup
 - [ ] Enforce minimum JWT_SECRET length (32 chars)
 - [ ] Block startup if required vars are missing
 
 ---
 
-## Sprint 13: Testing Infrastructure
+## Sprint 13: Frontend Testing & Additional Backend Tests
 
-### Test Coverage (Code Quality + Test Strategy Reviews)
-- [ ] Add Vitest or Jest as dev dependency
+> **Note:** Core backend testing moved to Sprint 12 (HIGH PRIORITY). This sprint extends coverage.
+
+### Backend Test Extensions
 - [ ] Write tests for auth middleware
 - [ ] Write tests for queue worker state machine
 - [ ] Write tests for chapter orchestration workflow
-- [ ] Target 70%+ coverage on business logic
+- [ ] Add tests for rate limit handling
+- [ ] Add tests for checkpoint recovery
 
 ### Frontend Testing
 - [ ] Add React Testing Library
+- [ ] Add Vitest for frontend
 - [ ] Write tests for components with useEffect
 - [ ] Add error boundary tests
+- [ ] Test real-time progress stream components
+- [ ] Test trilogy management UI flows
 
 ---
 

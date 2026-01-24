@@ -1,0 +1,150 @@
+import { jest } from '@jest/globals';
+import { ChapterOrchestratorService } from '../chapter-orchestrator.service.js';
+
+jest.mock('../../db/connection.js');
+jest.mock('../../queue/worker.js');
+
+describe('ChapterOrchestratorService', () => {
+  let service: ChapterOrchestratorService;
+  let mockDb: any;
+  let mockQueueWorker: any;
+
+  beforeEach(async () => {
+    const dbModule = await import('../../db/connection.js');
+    const queueModule = await import('../../queue/worker.js');
+
+    mockDb = dbModule.default;
+    mockQueueWorker = queueModule.QueueWorker;
+
+    service = new ChapterOrchestratorService();
+    jest.clearAllMocks();
+  });
+
+  describe('queueBookGeneration', () => {
+    it('should queue all pending chapters for a book', () => {
+      const mockChapters = [
+        { id: 'chapter-1', chapter_number: 1 },
+        { id: 'chapter-2', chapter_number: 2 },
+        { id: 'chapter-3', chapter_number: 3 },
+      ];
+
+      const mockPrepare = jest.fn();
+      mockDb.prepare = mockPrepare;
+
+      const getChaptersStmt = { all: jest.fn().mockReturnValue(mockChapters) };
+      mockPrepare.mockReturnValueOnce(getChaptersStmt);
+
+      mockQueueWorker.createJob = jest.fn().mockReturnValue('job-123');
+
+      const result = service.queueBookGeneration('book-1');
+
+      expect(result.chaptersQueued).toBe(3);
+      expect(result.jobsCreated).toBe(21); // 3 chapters × 7 jobs each
+      expect(mockQueueWorker.createJob).toHaveBeenCalledTimes(21);
+    });
+
+    it('should return zeros when no pending chapters', () => {
+      const mockPrepare = jest.fn();
+      mockDb.prepare = mockPrepare;
+
+      const getChaptersStmt = { all: jest.fn().mockReturnValue([]) };
+      mockPrepare.mockReturnValueOnce(getChaptersStmt);
+
+      const result = service.queueBookGeneration('book-1');
+
+      expect(result.chaptersQueued).toBe(0);
+      expect(result.jobsCreated).toBe(0);
+    });
+  });
+
+  describe('queueChapterWorkflow', () => {
+    it('should queue complete workflow for a chapter', () => {
+      let jobIdCounter = 1;
+      mockQueueWorker.createJob = jest.fn().mockImplementation(() => {
+        return `job-${jobIdCounter++}`;
+      });
+
+      const result = service.queueChapterWorkflow('chapter-1');
+
+      expect(result).toEqual({
+        generateJobId: 'job-1',
+        devEditJobId: 'job-2',
+        lineEditJobId: 'job-3',
+        continuityJobId: 'job-4',
+        copyEditJobId: 'job-5',
+        summaryJobId: 'job-6',
+        statesJobId: 'job-7',
+      });
+
+      expect(mockQueueWorker.createJob).toHaveBeenNthCalledWith(1, 'generate_chapter', 'chapter-1');
+      expect(mockQueueWorker.createJob).toHaveBeenNthCalledWith(2, 'dev_edit', 'chapter-1');
+      expect(mockQueueWorker.createJob).toHaveBeenNthCalledWith(3, 'line_edit', 'chapter-1');
+      expect(mockQueueWorker.createJob).toHaveBeenNthCalledWith(4, 'continuity_check', 'chapter-1');
+      expect(mockQueueWorker.createJob).toHaveBeenNthCalledWith(5, 'copy_edit', 'chapter-1');
+      expect(mockQueueWorker.createJob).toHaveBeenNthCalledWith(6, 'generate_summary', 'chapter-1');
+      expect(mockQueueWorker.createJob).toHaveBeenNthCalledWith(7, 'update_states', 'chapter-1');
+    });
+  });
+
+  describe('regenerateChapter', () => {
+    it('should reset chapter and queue workflow', () => {
+      const mockPrepare = jest.fn();
+      mockDb.prepare = mockPrepare;
+
+      const resetStmt = { run: jest.fn() };
+      mockPrepare.mockReturnValueOnce(resetStmt);
+
+      mockQueueWorker.createJob = jest.fn().mockReturnValue('job-123');
+
+      const result = service.regenerateChapter('chapter-1');
+
+      expect(resetStmt.run).toHaveBeenCalledWith(
+        expect.any(String),
+        'chapter-1'
+      );
+
+      expect(result).toHaveProperty('generateJobId');
+      expect(result).toHaveProperty('summaryJobId');
+      expect(result).toHaveProperty('statesJobId');
+    });
+  });
+
+  describe('getChapterWorkflowStatus', () => {
+    it('should return chapter status and jobs', () => {
+      const mockChapter = { status: 'generating' };
+      const mockJobs = [
+        { type: 'generate_chapter', status: 'completed', error: null },
+        { type: 'dev_edit', status: 'processing', error: null },
+        { type: 'line_edit', status: 'pending', error: null },
+      ];
+
+      const mockPrepare = jest.fn();
+      mockDb.prepare = mockPrepare;
+
+      const chapterStmt = { get: jest.fn().mockReturnValue(mockChapter) };
+      const jobsStmt = { all: jest.fn().mockReturnValue(mockJobs) };
+
+      mockPrepare
+        .mockReturnValueOnce(chapterStmt)
+        .mockReturnValueOnce(jobsStmt);
+
+      const result = service.getChapterWorkflowStatus('chapter-1');
+
+      expect(result.chapterStatus).toBe('generating');
+      expect(result.jobs).toHaveLength(3);
+      expect(result.jobs[0].type).toBe('generate_chapter');
+    });
+
+    it('should throw error if chapter not found', () => {
+      const mockPrepare = jest.fn();
+      mockDb.prepare = mockPrepare;
+
+      const chapterStmt = { get: jest.fn().mockReturnValue(null) };
+      mockPrepare.mockReturnValueOnce(chapterStmt);
+
+      expect(() => service.getChapterWorkflowStatus('nonexistent')).toThrow(
+        'Chapter not found: nonexistent'
+      );
+    });
+  });
+});
