@@ -2,6 +2,14 @@ import Anthropic from '@anthropic-ai/sdk';
 import { sessionTracker } from './session-tracker.js';
 import { RateLimitError } from '../queue/rate-limit-handler.js';
 
+export interface ClaudeResponse {
+  content: string;
+  usage: {
+    input_tokens: number;
+    output_tokens: number;
+  };
+}
+
 /**
  * ClaudeService wraps the Anthropic SDK with session tracking and error handling
  */
@@ -29,6 +37,7 @@ export class ClaudeService {
 
   /**
    * Create a completion with automatic session tracking
+   * @deprecated Use createCompletionWithUsage() to get token usage data
    */
   async createCompletion(params: {
     system: string;
@@ -36,6 +45,19 @@ export class ClaudeService {
     maxTokens?: number;
     temperature?: number;
   }): Promise<string> {
+    const response = await this.createCompletionWithUsage(params);
+    return response.content;
+  }
+
+  /**
+   * Create a completion with automatic session tracking and return token usage
+   */
+  async createCompletionWithUsage(params: {
+    system: string;
+    messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+    maxTokens?: number;
+    temperature?: number;
+  }): Promise<ClaudeResponse> {
     if (!this.client) {
       throw new Error('Claude API not configured. Set ANTHROPIC_API_KEY in .env file');
     }
@@ -58,7 +80,13 @@ export class ClaudeService {
         .map((block) => (block as any).text)
         .join('\n');
 
-      return textContent;
+      return {
+        content: textContent,
+        usage: {
+          input_tokens: response.usage.input_tokens,
+          output_tokens: response.usage.output_tokens,
+        },
+      };
     } catch (error: any) {
       // Check for rate limit error
       if (error?.status === 429 || error?.error?.type === 'rate_limit_error') {

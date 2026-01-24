@@ -6,6 +6,28 @@ import { getToken, logout } from '../lib/auth';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+interface ProjectMetrics {
+  tokens: {
+    input: string;
+    output: string;
+    display: string;
+  };
+  cost: {
+    usd: string;
+    gbp: string;
+    display: string;
+  };
+  content: {
+    chapters: number;
+    words: number;
+    display: string;
+  };
+  reading: {
+    minutes: number;
+    display: string;
+  };
+}
+
 interface Project {
   id: string;
   title: string;
@@ -14,6 +36,7 @@ interface Project {
   status: string;
   created_at: string;
   updated_at: string;
+  metrics?: ProjectMetrics | null;
 }
 
 interface QueueStats {
@@ -497,6 +520,7 @@ export default function ProjectsPage() {
                     gap: '0.75rem',
                     fontSize: '0.813rem',
                     color: '#64748B',
+                    marginBottom: '0.75rem',
                   }}>
                     <span style={{
                       padding: '0.25rem 0.5rem',
@@ -515,9 +539,72 @@ export default function ProjectsPage() {
                     </span>
                   </div>
 
+                  {/* Metrics Display */}
+                  {project.metrics && (project.metrics.content.chapters > 0 || project.metrics.cost.usd !== '$0.00') && (
+                    <div style={{
+                      padding: '0.75rem',
+                      background: '#F8FAFC',
+                      borderRadius: '8px',
+                      fontSize: '0.75rem',
+                      marginBottom: '0.75rem',
+                    }}>
+                      {/* Content Metrics */}
+                      {project.metrics.content.chapters > 0 && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          color: '#475569',
+                          marginBottom: '0.5rem',
+                        }}>
+                          <span style={{ fontSize: '0.875rem' }}>📚</span>
+                          <span style={{ fontWeight: '500' }}>{project.metrics.content.display}</span>
+                        </div>
+                      )}
+
+                      {/* Reading Time */}
+                      {project.metrics.reading.minutes > 0 && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          color: '#475569',
+                          marginBottom: '0.5rem',
+                        }}>
+                          <span style={{ fontSize: '0.875rem' }}>⏱️</span>
+                          <span>{project.metrics.reading.display}</span>
+                        </div>
+                      )}
+
+                      {/* Token Usage */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        color: '#64748B',
+                        marginBottom: '0.25rem',
+                      }}>
+                        <span style={{ fontSize: '0.875rem' }}>🔢</span>
+                        <span>Tokens: {project.metrics.tokens.display}</span>
+                      </div>
+
+                      {/* Cost */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        color: '#667eea',
+                        fontWeight: '600',
+                      }}>
+                        <span style={{ fontSize: '0.875rem' }}>💰</span>
+                        <span>Cost: {project.metrics.cost.display}</span>
+                      </div>
+                    </div>
+                  )}
+
                   <div style={{
-                    marginTop: '1rem',
-                    paddingTop: '1rem',
+                    marginTop: '0.75rem',
+                    paddingTop: '0.75rem',
                     borderTop: '1px solid #F1F5F9',
                     fontSize: '0.75rem',
                     color: '#94A3B8',

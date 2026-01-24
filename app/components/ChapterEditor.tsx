@@ -1,7 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getToken, logout } from '../lib/auth';
+import VariationPicker from './VariationPicker';
+import RegenerationToolbar from './RegenerationToolbar';
+import RegenerationHistory from './RegenerationHistory';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -41,6 +44,16 @@ export default function ChapterEditor({ chapterId, onClose }: ChapterEditorProps
   const [wordCount, setWordCount] = useState(0);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [editMode, setEditMode] = useState(false);
+
+  // Sprint 17: Regeneration features
+  const [showRegenerationHistory, setShowRegenerationHistory] = useState(false);
+  const [selectionStart, setSelectionStart] = useState<number | null>(null);
+  const [selectionEnd, setSelectionEnd] = useState<number | null>(null);
+  const [selectionText, setSelectionText] = useState('');
+  const [toolbarPosition, setToolbarPosition] = useState({ top: 0, left: 0 });
+  const [variationData, setVariationData] = useState<any>(null);
+  const [generatingVariations, setGeneratingVariations] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const fetchChapterData = useCallback(async () => {
     try {
@@ -203,6 +216,96 @@ export default function ChapterEditor({ chapterId, onClose }: ChapterEditorProps
     setHasUnsavedChanges(true);
   };
 
+  // Sprint 17: Handle text selection
+  const handleTextSelection = () => {
+    if (!textareaRef.current) return;
+
+    const start = textareaRef.current.selectionStart;
+    const end = textareaRef.current.selectionEnd;
+
+    if (start !== end && end - start > 10) {
+      // User has selected text (at least 10 characters)
+      setSelectionStart(start);
+      setSelectionEnd(end);
+      setSelectionText(content.substring(start, end));
+
+      // Calculate toolbar position (simplified - place below selection)
+      setToolbarPosition({
+        top: 200, // Fixed position for simplicity
+        left: 50,
+      });
+    } else {
+      // Clear selection
+      setSelectionStart(null);
+      setSelectionEnd(null);
+      setSelectionText('');
+    }
+  };
+
+  // Sprint 17: Generate variations
+  const handleGenerateVariations = async (mode: 'general' | 'dialogue' | 'description') => {
+    if (selectionStart === null || selectionEnd === null) return;
+
+    setGeneratingVariations(true);
+    try {
+      const token = getToken();
+      const res = await fetch(
+        `${API_BASE_URL}/api/regeneration/chapters/${chapterId}/regenerate-selection`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            selectionStart,
+            selectionEnd,
+            mode,
+            contextTokens: 500,
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        if (res.status === 401) {
+          logout();
+          window.location.href = '/login';
+          return;
+        }
+        throw new Error('Failed to generate variations');
+      }
+
+      const data = await res.json();
+      setVariationData(data);
+
+      // Clear selection toolbar
+      setSelectionStart(null);
+      setSelectionEnd(null);
+      setSelectionText('');
+    } catch (error) {
+      console.error('Error generating variations:', error);
+      alert('Failed to generate variations');
+    } finally {
+      setGeneratingVariations(false);
+    }
+  };
+
+  // Sprint 17: Handle variation applied
+  const handleVariationApplied = (updatedContent: string) => {
+    setContent(updatedContent);
+    calculateWordCount(updatedContent);
+    setHasUnsavedChanges(true);
+    setVariationData(null);
+
+    // Refresh chapter data
+    fetchChapterData();
+  };
+
+  // Sprint 17: Close variation picker
+  const handleCloseVariationPicker = () => {
+    setVariationData(null);
+  };
+
   if (loading) {
     return (
       <div style={styles.loading}>
@@ -263,6 +366,13 @@ export default function ChapterEditor({ chapterId, onClose }: ChapterEditorProps
             {isLocked ? '🔒 Locked' : '🔓 Unlocked'}
           </button>
 
+          <button
+            onClick={() => setShowRegenerationHistory(!showRegenerationHistory)}
+            style={{...styles.button, ...styles.buttonSecondary}}
+          >
+            {showRegenerationHistory ? 'Hide History' : 'Show History'}
+          </button>
+
           {onClose && (
             <button onClick={onClose} style={styles.button}>
               Close
@@ -279,12 +389,25 @@ export default function ChapterEditor({ chapterId, onClose }: ChapterEditorProps
 
       {editMode ? (
         <div style={styles.editorContainer}>
-          <textarea
-            value={content}
-            onChange={handleContentChange}
-            style={styles.textarea}
-            placeholder="Start editing..."
-          />
+          <div style={{ position: 'relative' }}>
+            <textarea
+              ref={textareaRef}
+              value={content}
+              onChange={handleContentChange}
+              onSelect={handleTextSelection}
+              style={styles.textarea}
+              placeholder="Start editing..."
+            />
+            {selectionStart !== null && selectionEnd !== null && selectionText && (
+              <RegenerationToolbar
+                selectionStart={selectionStart}
+                selectionEnd={selectionEnd}
+                selectionText={selectionText}
+                onRegenerate={handleGenerateVariations}
+                position={toolbarPosition}
+              />
+            )}
+          </div>
 
           <div style={styles.notesContainer}>
             <label style={styles.label}>
@@ -310,7 +433,20 @@ export default function ChapterEditor({ chapterId, onClose }: ChapterEditorProps
               </p>
             ))}
           </div>
+
+          {showRegenerationHistory && (
+            <RegenerationHistory chapterId={chapterId} />
+          )}
         </div>
+      )}
+
+      {variationData && (
+        <VariationPicker
+          chapterId={chapterId}
+          variationData={variationData}
+          onApply={handleVariationApplied}
+          onClose={handleCloseVariationPicker}
+        />
       )}
     </div>
   );

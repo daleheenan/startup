@@ -21,6 +21,9 @@ import editingRouter from './routes/editing.js';
 import exportRouter from './routes/export.js';
 import trilogyRouter from './routes/trilogy.js';
 import savedConceptsRouter from './routes/saved-concepts.js';
+import regenerationRouter from './routes/regeneration.js';
+import genreTropesRouter from './routes/genre-tropes.js';
+import genreConventionsRouter from './routes/genre-conventions.js';
 
 // Load environment variables
 dotenv.config();
@@ -107,6 +110,9 @@ app.use('/api/editing', apiLimiter, requireAuth, editingRouter);
 app.use('/api/export', apiLimiter, requireAuth, exportRouter);
 app.use('/api/trilogy', apiLimiter, requireAuth, trilogyRouter);
 app.use('/api/saved-concepts', apiLimiter, requireAuth, savedConceptsRouter);
+app.use('/api/regeneration', apiLimiter, requireAuth, regenerationRouter);
+app.use('/api/genre-tropes', apiLimiter, requireAuth, genreTropesRouter);
+app.use('/api/genre-conventions', apiLimiter, requireAuth, genreConventionsRouter);
 
 // Error handling
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

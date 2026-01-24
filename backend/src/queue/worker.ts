@@ -195,6 +195,7 @@ export class QueueWorker {
     // Import services (dynamic to avoid circular dependencies)
     const { contextAssemblyService } = await import('../services/context-assembly.service.js');
     const { claudeService } = await import('../services/claude.service.js');
+    const { metricsService } = await import('../services/metrics.service.js');
 
     // Save checkpoint: started
     checkpointManager.saveCheckpoint(job.id, 'started', { chapterId });
@@ -221,18 +222,26 @@ export class QueueWorker {
         estimatedTokens: context.estimatedTokens,
       });
 
-      // Step 3: Generate chapter with Claude
+      // Step 3: Generate chapter with Claude (with token tracking)
       console.log(`[Job:generate_chapter] Generating chapter content with Claude`);
-      const chapterContent = await claudeService.createCompletion({
+      const response = await claudeService.createCompletionWithUsage({
         system: context.system,
         messages: [{ role: 'user', content: context.userPrompt }],
         maxTokens: 4096, // Max output length
         temperature: 1.0, // Creative writing benefits from higher temperature
       });
 
+      const chapterContent = response.content;
+
+      // Track token usage
+      console.log(`[Job:generate_chapter] Tracking tokens: ${response.usage.input_tokens} in / ${response.usage.output_tokens} out`);
+      metricsService.trackChapterTokens(chapterId, response.usage.input_tokens, response.usage.output_tokens);
+
       checkpointManager.saveCheckpoint(job.id, 'content_generated', {
         chapterId,
         wordCount: chapterContent.split(/\s+/).length,
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
       });
 
       // Step 4: Save chapter content
@@ -274,12 +283,19 @@ export class QueueWorker {
 
     // Import editing service
     const { editingService } = await import('../services/editing.service.js');
+    const { metricsService } = await import('../services/metrics.service.js');
 
     checkpointManager.saveCheckpoint(job.id, 'started', { chapterId });
 
     try {
       // Run developmental edit
       const result = await editingService.developmentalEdit(chapterId);
+
+      // Track token usage
+      if (result.usage) {
+        console.log(`[Job:dev_edit] Tracking tokens: ${result.usage.input_tokens} in / ${result.usage.output_tokens} out`);
+        metricsService.trackChapterTokens(chapterId, result.usage.input_tokens, result.usage.output_tokens);
+      }
 
       checkpointManager.saveCheckpoint(job.id, 'dev_edit_complete', {
         chapterId,
@@ -324,6 +340,7 @@ export class QueueWorker {
     const chapterId = job.target_id;
 
     const { editingService } = await import('../services/editing.service.js');
+    const { metricsService } = await import('../services/metrics.service.js');
 
     checkpointManager.saveCheckpoint(job.id, 'started', { chapterId });
 
@@ -344,7 +361,11 @@ export class QueueWorker {
       const { devEditResult } = JSON.parse(devEditJob.checkpoint);
 
       // Run author revision
-      const revisedContent = await editingService.authorRevision(chapterId, devEditResult);
+      const revisionResult = await editingService.authorRevision(chapterId, devEditResult);
+
+      // Track token usage
+      console.log(`[Job:author_revision] Tracking tokens: ${revisionResult.usage.input_tokens} in / ${revisionResult.usage.output_tokens} out`);
+      metricsService.trackChapterTokens(chapterId, revisionResult.usage.input_tokens, revisionResult.usage.output_tokens);
 
       checkpointManager.saveCheckpoint(job.id, 'revision_complete', { chapterId });
 
@@ -354,7 +375,7 @@ export class QueueWorker {
         SET content = ?, updated_at = ?
         WHERE id = ?
       `);
-      updateStmt.run(revisedContent, new Date().toISOString(), chapterId);
+      updateStmt.run(revisionResult.content, new Date().toISOString(), chapterId);
 
       console.log(`[Job:author_revision] Revision complete`);
 
@@ -373,11 +394,18 @@ export class QueueWorker {
     const chapterId = job.target_id;
 
     const { editingService } = await import('../services/editing.service.js');
+    const { metricsService } = await import('../services/metrics.service.js');
 
     checkpointManager.saveCheckpoint(job.id, 'started', { chapterId });
 
     try {
       const result = await editingService.lineEdit(chapterId);
+
+      // Track token usage
+      if (result.usage) {
+        console.log(`[Job:line_edit] Tracking tokens: ${result.usage.input_tokens} in / ${result.usage.output_tokens} out`);
+        metricsService.trackChapterTokens(chapterId, result.usage.input_tokens, result.usage.output_tokens);
+      }
 
       checkpointManager.saveCheckpoint(job.id, 'line_edit_complete', {
         chapterId,
@@ -403,11 +431,18 @@ export class QueueWorker {
     const chapterId = job.target_id;
 
     const { editingService } = await import('../services/editing.service.js');
+    const { metricsService } = await import('../services/metrics.service.js');
 
     checkpointManager.saveCheckpoint(job.id, 'started', { chapterId });
 
     try {
       const result = await editingService.continuityEdit(chapterId);
+
+      // Track token usage
+      if (result.usage) {
+        console.log(`[Job:continuity_check] Tracking tokens: ${result.usage.input_tokens} in / ${result.usage.output_tokens} out`);
+        metricsService.trackChapterTokens(chapterId, result.usage.input_tokens, result.usage.output_tokens);
+      }
 
       checkpointManager.saveCheckpoint(job.id, 'continuity_check_complete', {
         chapterId,
@@ -434,11 +469,18 @@ export class QueueWorker {
     const chapterId = job.target_id;
 
     const { editingService } = await import('../services/editing.service.js');
+    const { metricsService } = await import('../services/metrics.service.js');
 
     checkpointManager.saveCheckpoint(job.id, 'started', { chapterId });
 
     try {
       const result = await editingService.copyEdit(chapterId);
+
+      // Track token usage
+      if (result.usage) {
+        console.log(`[Job:copy_edit] Tracking tokens: ${result.usage.input_tokens} in / ${result.usage.output_tokens} out`);
+        metricsService.trackChapterTokens(chapterId, result.usage.input_tokens, result.usage.output_tokens);
+      }
 
       checkpointManager.saveCheckpoint(job.id, 'copy_edit_complete', { chapterId });
 
@@ -477,6 +519,7 @@ export class QueueWorker {
 
     // Import services
     const { claudeService } = await import('../services/claude.service.js');
+    const { metricsService } = await import('../services/metrics.service.js');
 
     // Save checkpoint
     checkpointManager.saveCheckpoint(job.id, 'started', { chapterId });
@@ -513,12 +556,16 @@ ${chapter.content}
 
 Write the summary now:`;
 
-      const summary = await claudeService.createCompletion({
+      const apiResponse = await claudeService.createCompletionWithUsage({
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
         maxTokens: 500,
         temperature: 0.7,
       });
+
+      // Track token usage
+      console.log(`[Job:generate_summary] Tracking tokens: ${apiResponse.usage.input_tokens} in / ${apiResponse.usage.output_tokens} out`);
+      metricsService.trackChapterTokens(chapterId, apiResponse.usage.input_tokens, apiResponse.usage.output_tokens);
 
       checkpointManager.saveCheckpoint(job.id, 'summary_generated', { chapterId });
 
@@ -529,7 +576,7 @@ Write the summary now:`;
         WHERE id = ?
       `);
 
-      updateSummaryStmt.run(summary.trim(), new Date().toISOString(), chapterId);
+      updateSummaryStmt.run(apiResponse.content.trim(), new Date().toISOString(), chapterId);
 
       console.log(`[Job:generate_summary] Summary saved for chapter ${chapter.chapter_number}`);
 

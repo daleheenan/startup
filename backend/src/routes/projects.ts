@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 import { generateStoryDNA } from '../services/story-dna-generator.js';
 import { generateProtagonist, generateSupportingCast } from '../services/character-generator.js';
 import { generateWorldElements } from '../services/world-generator.js';
+import { metricsService } from '../services/metrics.service.js';
 
 const router = Router();
 
@@ -20,11 +21,15 @@ router.get('/', (req, res) => {
 
     const projects = stmt.all();
 
-    // Parse JSON fields
+    // Get all metrics at once
+    const allMetrics = metricsService.getAllProjectMetrics();
+
+    // Parse JSON fields and attach metrics
     const parsedProjects = projects.map((p) => ({
       ...p,
       story_dna: p.story_dna ? JSON.parse(p.story_dna as any) : null,
       story_bible: p.story_bible ? JSON.parse(p.story_bible as any) : null,
+      metrics: allMetrics.get(p.id) || null,
     }));
 
     res.json({ projects: parsedProjects });
@@ -52,11 +57,12 @@ router.get('/:id', (req, res) => {
       });
     }
 
-    // Parse JSON fields
+    // Parse JSON fields and attach metrics
     const parsedProject = {
       ...project,
       story_dna: project.story_dna ? JSON.parse(project.story_dna as any) : null,
       story_bible: project.story_bible ? JSON.parse(project.story_bible as any) : null,
+      metrics: metricsService.getFormattedMetrics(project.id),
     };
 
     res.json(parsedProject);
@@ -594,6 +600,27 @@ Return ONLY the new name, nothing else. Just the full name.`;
     res.json({ characters: updatedCharacters });
   } catch (error: any) {
     console.error('[API] Error regenerating all character names:', error);
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * GET /api/projects/:id/metrics
+ * Get detailed metrics for a project
+ */
+router.get('/:id/metrics', (req, res) => {
+  try {
+    const metrics = metricsService.getFormattedMetrics(req.params.id);
+
+    if (!metrics) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project metrics not found' },
+      });
+    }
+
+    res.json(metrics);
+  } catch (error: any) {
+    console.error('[API] Error fetching project metrics:', error);
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });

@@ -19,28 +19,73 @@ interface GenrePreferenceFormProps {
   isLoading: boolean;
 }
 
+// Market trend indicators (2026 data)
+const MARKET_TRENDS: Record<string, 'trending' | 'rising' | 'stable'> = {
+  'romantasy': 'trending',          // Extremely hot in 2024-2026
+  'cozy-fantasy': 'trending',       // Major growth in 2025-2026
+  'litrpg': 'rising',               // Steady growth, especially on Kindle Unlimited
+  'climate-fiction': 'rising',      // Growing interest due to real-world events
+  'afrofuturism': 'rising',         // Increasing representation and demand
+  'grimdark': 'stable',             // Consistent fanbase
+  'solarpunk': 'rising',            // Alternative to dystopian narratives
+  'romance': 'trending',            // Romance dominates market share
+  'fantasy': 'trending',            // Perennial bestseller
+  'thriller': 'stable',             // Consistently popular
+  'mystery': 'stable',              // Reliable genre
+};
+
 const GENRES = [
-  { value: 'fantasy', label: 'Fantasy' },
-  { value: 'science-fiction', label: 'Science Fiction' },
-  { value: 'mystery', label: 'Mystery' },
-  { value: 'thriller', label: 'Thriller' },
-  { value: 'romance', label: 'Romance' },
-  { value: 'horror', label: 'Horror' },
-  { value: 'literary', label: 'Literary Fiction' },
-  { value: 'historical', label: 'Historical Fiction' },
+  { value: 'afrofuturism', label: 'Afrofuturism', trend: MARKET_TRENDS.afrofuturism },
+  { value: 'climate-fiction', label: 'Climate Fiction (Cli-Fi)', trend: MARKET_TRENDS['climate-fiction'] },
   { value: 'contemporary', label: 'Contemporary Fiction' },
+  { value: 'cozy-fantasy', label: 'Cozy Fantasy', trend: MARKET_TRENDS['cozy-fantasy'] },
+  { value: 'fantasy', label: 'Fantasy', trend: MARKET_TRENDS.fantasy },
+  { value: 'grimdark', label: 'Grimdark', trend: MARKET_TRENDS.grimdark },
+  { value: 'historical', label: 'Historical Fiction' },
+  { value: 'horror', label: 'Horror' },
+  { value: 'legal-drama', label: 'Legal Drama' },
+  { value: 'literary', label: 'Literary Fiction' },
+  { value: 'litrpg', label: 'LitRPG / GameLit', trend: MARKET_TRENDS.litrpg },
+  { value: 'medical-drama', label: 'Medical Drama' },
+  { value: 'mystery', label: 'Mystery', trend: MARKET_TRENDS.mystery },
+  { value: 'new-weird', label: 'New Weird' },
+  { value: 'paranormal', label: 'Paranormal' },
+  { value: 'romance', label: 'Romance', trend: MARKET_TRENDS.romance },
+  { value: 'romantasy', label: 'Romantasy', trend: MARKET_TRENDS.romantasy },
+  { value: 'science-fiction', label: 'Science Fiction' },
+  { value: 'solarpunk', label: 'Solarpunk', trend: MARKET_TRENDS.solarpunk },
+  { value: 'sports-fiction', label: 'Sports Fiction' },
+  { value: 'steampunk', label: 'Steampunk' },
+  { value: 'thriller', label: 'Thriller', trend: MARKET_TRENDS.thriller },
+  { value: 'western', label: 'Western' },
+  { value: 'wuxia', label: 'Wuxia / Xianxia' },
 ];
 
 const SUBGENRES: Record<string, string[]> = {
-  fantasy: ['Epic Fantasy', 'Urban Fantasy', 'Dark Fantasy', 'High Fantasy', 'Low Fantasy', 'Sword & Sorcery'],
-  'science-fiction': ['Space Opera', 'Cyberpunk', 'Hard SF', 'Dystopian', 'Post-Apocalyptic', 'First Contact'],
-  mystery: ['Cozy Mystery', 'Police Procedural', 'Detective', 'Noir', 'Whodunit', 'Legal Mystery'],
-  thriller: ['Psychological Thriller', 'Action Thriller', 'Legal Thriller', 'Medical Thriller', 'Spy Thriller'],
-  romance: ['Contemporary Romance', 'Historical Romance', 'Paranormal Romance', 'Romantic Comedy', 'Slow Burn'],
-  horror: ['Supernatural Horror', 'Psychological Horror', 'Gothic Horror', 'Cosmic Horror', 'Body Horror'],
-  literary: ['Contemporary Literary', 'Experimental', 'Philosophical', 'Character-Driven', 'Magical Realism'],
-  historical: ['Ancient History', 'Medieval', 'Victorian Era', 'World War Era', '20th Century', 'Alternate History'],
+  afrofuturism: ['Afrofuturist SF', 'Afrofuturist Fantasy', 'Afro-Cyberpunk', 'African Mythology SF', 'Black Space Opera', 'Afrofuturist Horror'],
+  'climate-fiction': ['Near Future Climate', 'Climate Disaster', 'Eco-Thriller', 'Solarpunk Utopia', 'Post-Climate Collapse', 'Climate Mystery'],
   contemporary: ['Family Drama', 'Coming of Age', 'Social Issues', 'Workplace Drama', 'Slice of Life'],
+  'cozy-fantasy': ['Slice of Life Fantasy', 'Cozy Mystery Fantasy', 'Cozy Romance Fantasy', 'Low Stakes Adventure', 'Found Family Fantasy', 'Cottage Core Fantasy'],
+  fantasy: ['Epic Fantasy', 'Urban Fantasy', 'Dark Fantasy', 'High Fantasy', 'Low Fantasy', 'Sword & Sorcery'],
+  grimdark: ['Grimdark Fantasy', 'Grimdark Sci-Fi', 'Military Grimdark', 'Cosmic Grimdark', 'Historical Grimdark', 'Post-Apocalyptic Grimdark'],
+  historical: ['Ancient History', 'Medieval', 'Victorian Era', 'World War Era', '20th Century', 'Alternate History'],
+  horror: ['Supernatural Horror', 'Psychological Horror', 'Gothic Horror', 'Cosmic Horror', 'Body Horror'],
+  'legal-drama': ['Courtroom Drama', 'Legal Thriller', 'Criminal Defense', 'Corporate Law', 'Legal Mystery', 'Legal Romance'],
+  literary: ['Contemporary Literary', 'Experimental', 'Philosophical', 'Character-Driven', 'Magical Realism'],
+  litrpg: ['Dungeon Core', 'GameLit', 'Virtual Reality', 'System Apocalypse', 'Progression Fantasy', 'Cultivation'],
+  'medical-drama': ['Hospital Drama', 'Medical Thriller', 'Medical Mystery', 'Medical Romance', 'Emergency Medicine', 'Medical Horror'],
+  mystery: ['Cozy Mystery', 'Police Procedural', 'Detective', 'Noir', 'Whodunit', 'Legal Mystery'],
+  'new-weird': ['Urban Weird', 'Weird Horror', 'Weird Fantasy', 'Slipstream', 'Bizarro Fiction', 'Surreal Fiction'],
+  paranormal: ['Paranormal Mystery', 'Paranormal Thriller', 'Paranormal Investigation', 'Ghost Stories', 'Supernatural Drama', 'Paranormal Action'],
+  romance: ['Contemporary Romance', 'Historical Romance', 'Paranormal Romance', 'Romantic Comedy', 'Slow Burn'],
+  romantasy: ['Fae Romance', 'Witch Romance', 'Dragon Romance', 'Vampire Romance', 'Magical Royalty Romance', 'Court Intrigue Romance'],
+  'science-fiction': ['Space Opera', 'Cyberpunk', 'Hard SF', 'Dystopian', 'Post-Apocalyptic', 'First Contact'],
+  solarpunk: ['Eco-Utopia', 'Green Tech SF', 'Sustainable Future', 'Hopeful Climate Fiction', 'Community-Focused SF', 'Biomimicry Fiction'],
+  'sports-fiction': ['Sports Drama', 'Sports Romance', 'Underdog Sports', 'Professional Sports', 'College Sports', 'Fantasy Sports'],
+  steampunk: ['Victorian Steampunk', 'Dieselpunk', 'Clockpunk', 'Gaslamp Fantasy', 'Steampunk Romance', 'Post-Apocalyptic Steampunk'],
+  thriller: ['Psychological Thriller', 'Action Thriller', 'Legal Thriller', 'Medical Thriller', 'Spy Thriller'],
+  western: ['Classic Western', 'Weird West', 'Space Western', 'Contemporary Western', 'Western Romance', 'Revisionist Western'],
+  wuxia: ['Classical Wuxia', 'Xianxia Cultivation', 'Modern Wuxia', 'Wuxia Romance', 'Historical Wuxia', 'Mythological Wuxia'],
 };
 
 // Genre modifiers that can combine with any genre
@@ -278,6 +323,48 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
     whiteSpace: 'nowrap',
   });
 
+  const getTrendBadge = (trend?: 'trending' | 'rising' | 'stable') => {
+    if (!trend) return null;
+
+    const styles: Record<string, React.CSSProperties> = {
+      trending: {
+        background: '#EF4444',
+        color: '#FFFFFF',
+        animation: 'pulse 2s infinite',
+      },
+      rising: {
+        background: '#F59E0B',
+        color: '#FFFFFF',
+      },
+      stable: {
+        background: '#10B981',
+        color: '#FFFFFF',
+      },
+    };
+
+    const labels: Record<string, string> = {
+      trending: '🔥 Hot',
+      rising: '📈 Rising',
+      stable: '✓ Popular',
+    };
+
+    return (
+      <span
+        style={{
+          ...styles[trend],
+          fontSize: '0.625rem',
+          fontWeight: 600,
+          padding: '0.125rem 0.375rem',
+          borderRadius: '4px',
+          marginLeft: '0.375rem',
+          textTransform: 'uppercase',
+        }}
+      >
+        {labels[trend]}
+      </span>
+    );
+  };
+
   return (
     <form onSubmit={handleSubmit} style={{ width: '100%' }}>
       {/* Genre Preview */}
@@ -338,9 +425,15 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
               type="button"
               onClick={() => handleGenreToggle(g.value)}
               disabled={isLoading || (!genres.includes(g.value) && genres.length >= 3)}
-              style={chipStyle(genres.includes(g.value), isLoading || (!genres.includes(g.value) && genres.length >= 3))}
+              style={{
+                ...chipStyle(genres.includes(g.value), isLoading || (!genres.includes(g.value) && genres.length >= 3)),
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+              }}
             >
-              {g.label}
+              <span>{g.label}</span>
+              {getTrendBadge(g.trend)}
             </button>
           ))}
         </div>

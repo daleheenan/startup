@@ -12,6 +12,10 @@ export interface EditResult {
   suggestions: EditorSuggestion[];
   flags: Flag[];
   approved: boolean;
+  usage?: {
+    input_tokens: number;
+    output_tokens: number;
+  };
 }
 
 export interface EditorSuggestion {
@@ -97,7 +101,7 @@ Provide your analysis in this JSON format:
 
 Output only valid JSON, no commentary:`;
 
-    const response = await claudeService.createCompletion({
+    const apiResponse = await claudeService.createCompletionWithUsage({
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 2000,
@@ -105,7 +109,7 @@ Output only valid JSON, no commentary:`;
     });
 
     // Parse response
-    const analysis = this.parseEditorResponse(response);
+    const analysis = this.parseEditorResponse(apiResponse.content);
 
     // Store suggestions and flags
     const suggestions: EditorSuggestion[] = analysis.suggestions || [];
@@ -128,6 +132,7 @@ Output only valid JSON, no commentary:`;
       suggestions,
       flags,
       approved: !analysis.needsRevision,
+      usage: apiResponse.usage,
     };
   }
 
@@ -168,7 +173,7 @@ Return the edited chapter content, making direct improvements to prose while pre
 
 Output the edited chapter text:`;
 
-    const editedContent = await claudeService.createCompletion({
+    const apiResponse = await claudeService.createCompletionWithUsage({
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 4096,
@@ -176,17 +181,18 @@ Output the edited chapter text:`;
     });
 
     // Extract any [NEEDS AUTHOR: ...] markers as flags
-    const flags = this.extractAuthorFlags(editedContent);
+    const flags = this.extractAuthorFlags(apiResponse.content);
 
     console.log(`[EditingService] Line edit complete: ${flags.length} flags for author review`);
 
     return {
       editorType: 'line',
       originalContent: chapterData.content,
-      editedContent: editedContent.trim(),
+      editedContent: apiResponse.content.trim(),
       suggestions: [],
       flags,
       approved: true,
+      usage: apiResponse.usage,
     };
   }
 
@@ -253,14 +259,14 @@ Provide your analysis in this JSON format:
 
 Output only valid JSON, no commentary:`;
 
-    const response = await claudeService.createCompletion({
+    const apiResponse = await claudeService.createCompletionWithUsage({
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 2000,
       temperature: 0.5,
     });
 
-    const analysis = this.parseEditorResponse(response);
+    const analysis = this.parseEditorResponse(apiResponse.content);
 
     const suggestions: EditorSuggestion[] = (analysis.errors || []).map((e: any) => ({
       type: 'continuity',
@@ -288,6 +294,7 @@ Output only valid JSON, no commentary:`;
       suggestions,
       flags,
       approved: flags.length === 0,
+      usage: apiResponse.usage,
     };
   }
 
@@ -327,7 +334,7 @@ Return the copy-edited chapter with all corrections applied.
 
 Output the corrected chapter text:`;
 
-    const editedContent = await claudeService.createCompletion({
+    const apiResponse = await claudeService.createCompletionWithUsage({
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 4096,
@@ -339,17 +346,18 @@ Output the corrected chapter text:`;
     return {
       editorType: 'copy',
       originalContent: chapterData.content,
-      editedContent: editedContent.trim(),
+      editedContent: apiResponse.content.trim(),
       suggestions: [],
       flags: [],
       approved: true,
+      usage: apiResponse.usage,
     };
   }
 
   /**
    * Author Revision - Author Agent revises chapter based on developmental feedback
    */
-  async authorRevision(chapterId: string, devEditResult: EditResult): Promise<string> {
+  async authorRevision(chapterId: string, devEditResult: EditResult): Promise<{ content: string; usage: { input_tokens: number; output_tokens: number } }> {
     console.log(`[EditingService] Running author revision for chapter ${chapterId}`);
 
     const chapterData = this.getChapterData(chapterId);
@@ -384,7 +392,7 @@ Rewrite the chapter, addressing the editor's feedback while maintaining the stor
 
 Output the revised chapter:`;
 
-    const revisedContent = await claudeService.createCompletion({
+    const apiResponse = await claudeService.createCompletionWithUsage({
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 4096,
@@ -393,7 +401,7 @@ Output the revised chapter:`;
 
     console.log(`[EditingService] Author revision complete`);
 
-    return revisedContent.trim();
+    return { content: apiResponse.content.trim(), usage: apiResponse.usage };
   }
 
   /**
