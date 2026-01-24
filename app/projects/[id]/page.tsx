@@ -180,21 +180,125 @@ export default function ProjectDetailPage() {
           </div>
         </div>
 
-        {/* Placeholder for future features */}
+        {/* Story DNA Section */}
         <div style={{
-          textAlign: 'center',
-          padding: '4rem 2rem',
           background: 'rgba(255, 255, 255, 0.05)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
           borderRadius: '12px',
-          border: '1px dashed rgba(255, 255, 255, 0.1)'
+          padding: '2rem',
+          marginBottom: '1rem'
         }}>
-          <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🚧</div>
-          <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem', color: '#ededed' }}>
-            Project Setup In Progress
+          <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#ededed' }}>
+            Story DNA
           </h2>
-          <p style={{ fontSize: '1rem', color: '#888' }}>
-            World building and outline generation features coming in Sprint 3-4
-          </p>
+          {project.story_dna ? (
+            <div style={{ display: 'grid', gap: '1rem', color: '#888' }}>
+              <div>
+                <strong style={{ color: '#ededed' }}>Tone:</strong> {project.story_dna.tone}
+              </div>
+              <div>
+                <strong style={{ color: '#ededed' }}>Themes:</strong> {project.story_dna.themes?.join(', ')}
+              </div>
+              <div>
+                <strong style={{ color: '#ededed' }}>Point of View:</strong> {project.story_dna.proseStyle?.pointOfView}
+              </div>
+            </div>
+          ) : (
+            <p style={{ color: '#888' }}>Story DNA will be generated when you set up characters.</p>
+          )}
+        </div>
+
+        {/* Story Bible Section */}
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '12px',
+          padding: '2rem',
+          marginBottom: '1rem'
+        }}>
+          <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#ededed' }}>
+            Story Bible
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+            <div style={{
+              padding: '1.5rem',
+              background: 'rgba(102, 126, 234, 0.1)',
+              border: '1px solid rgba(102, 126, 234, 0.3)',
+              borderRadius: '8px',
+              textAlign: 'center'
+            }}>
+              <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>👥</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.25rem', color: '#ededed' }}>
+                {project.story_bible?.characters?.length || 0}
+              </div>
+              <div style={{ fontSize: '0.875rem', color: '#888' }}>Characters</div>
+            </div>
+            <div style={{
+              padding: '1.5rem',
+              background: 'rgba(102, 126, 234, 0.1)',
+              border: '1px solid rgba(102, 126, 234, 0.3)',
+              borderRadius: '8px',
+              textAlign: 'center'
+            }}>
+              <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🌍</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.25rem', color: '#ededed' }}>
+                {project.story_bible?.world?.length || 0}
+              </div>
+              <div style={{ fontSize: '0.875rem', color: '#888' }}>World Elements</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Next Steps */}
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '12px',
+          padding: '2rem'
+        }}>
+          <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#ededed' }}>
+            Next Steps
+          </h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <a
+              href={`/projects/${project.id}/characters`}
+              style={{
+                display: 'block',
+                padding: '1rem',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                border: 'none',
+                borderRadius: '8px',
+                color: '#fff',
+                textAlign: 'center',
+                textDecoration: 'none',
+                fontSize: '1rem',
+                fontWeight: 600,
+              }}
+            >
+              {project.story_bible?.characters?.length > 0 ? 'Edit Characters' : 'Generate Characters'} →
+            </a>
+            {project.story_bible?.characters?.length > 0 && (
+              <a
+                href={`/projects/${project.id}/world`}
+                style={{
+                  display: 'block',
+                  padding: '1rem',
+                  background: project.story_bible?.world?.length > 0
+                    ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                    : 'rgba(102, 126, 234, 0.5)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  textAlign: 'center',
+                  textDecoration: 'none',
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                }}
+              >
+                {project.story_bible?.world?.length > 0 ? 'Edit World' : 'Generate World'} →
+              </a>
+            )}
+          </div>
         </div>
 
         {/* Back Link */}
