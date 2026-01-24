@@ -130,11 +130,20 @@ export function runMigrations() {
       db.exec('BEGIN TRANSACTION');
 
       try {
+        // Remove comment-only lines but preserve inline comments in statements
+        const lines = migration.split('\n');
+        const cleanedLines = lines.filter(line => {
+          const trimmed = line.trim();
+          // Keep lines that are not purely comments
+          return trimmed.length === 0 || !trimmed.startsWith('--');
+        });
+        const cleanedMigration = cleanedLines.join('\n');
+
         // Split by semicolons and execute each statement
-        const statements = migration
+        const statements = cleanedMigration
           .split(';')
           .map(s => s.trim())
-          .filter(s => s.length > 0 && !s.startsWith('--'));
+          .filter(s => s.length > 0);
 
         for (const statement of statements) {
           db.exec(statement);
