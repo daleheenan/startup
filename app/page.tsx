@@ -125,7 +125,7 @@ export default function Home() {
           fontSize: '0.875rem',
           color: '#444'
         }}>
-          Sprint 6 of 8 Complete • 75% Done
+          All 8 Sprints Complete • 100% Done
         </p>
       </div>
     </main>
