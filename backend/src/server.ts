@@ -8,6 +8,8 @@ import queueRouter from './routes/queue.js';
 import conceptsRouter from './routes/concepts.js';
 import outlinesRouter from './routes/outlines.js';
 import booksRouter from './routes/books.js';
+import chaptersRouter from './routes/chapters.js';
+import generationRouter from './routes/generation.js';
 
 // Load environment variables
 dotenv.config();
@@ -41,6 +43,8 @@ app.use('/api/queue', queueRouter);
 app.use('/api/concepts', conceptsRouter);
 app.use('/api/outlines', outlinesRouter);
 app.use('/api/books', booksRouter);
+app.use('/api/chapters', chaptersRouter);
+app.use('/api/generation', generationRouter);
 
 // Error handling
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
