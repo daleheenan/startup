@@ -1,6 +1,6 @@
 import db from '../db/connection.js';
 import { sessionTracker } from '../services/session-tracker.js';
-import type { Job } from '../../../shared/types/index.js';
+import type { Job } from '../../shared/types/index.js';
 
 /**
  * Custom error class for rate limit errors

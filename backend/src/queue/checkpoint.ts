@@ -1,5 +1,5 @@
 import db from '../db/connection.js';
-import type { Checkpoint, Job } from '../../../shared/types/index.js';
+import type { Checkpoint, Job } from '../../shared/types/index.js';
 
 /**
  * CheckpointManager handles job state persistence for recovery.

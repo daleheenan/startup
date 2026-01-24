@@ -1,4 +1,7 @@
 # NovelForge Backend Dockerfile
+# NOTE: Requires shared folder to be copied to backend/shared before build
+# Railway: Set root directory to "" (repo root) and use Dockerfile.backend instead
+
 FROM node:20-slim
 
 # Install build dependencies for better-sqlite3 and curl for healthcheck
@@ -17,10 +20,10 @@ COPY package*.json ./
 # Install ALL dependencies (need devDeps for TypeScript build)
 RUN npm ci
 
-# Copy source code
+# Copy source code and shared types
 COPY . .
 
-# Build TypeScript
+# Build TypeScript (expects shared folder to exist at ../shared relative to backend)
 RUN npm run build
 
 # Remove devDependencies after build to reduce image size

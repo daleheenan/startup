@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import db from '../db/connection.js';
-import type { Project } from '../../../shared/types/index.js';
+import type { Project } from '../../shared/types/index.js';
 import { randomUUID } from 'crypto';
 import { generateStoryDNA } from '../services/story-dna-generator.js';
 import { generateProtagonist, generateSupportingCast } from '../services/character-generator.js';

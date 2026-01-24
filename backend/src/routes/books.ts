@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import db from '../db/connection.js';
 import { randomUUID } from 'crypto';
-import type { Book } from '../../../shared/types/index.js';
+import type { Book } from '../../shared/types/index.js';
 
 const router = Router();
 

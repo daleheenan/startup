@@ -1,4 +1,4 @@
-import type { StructureTemplate, Beat } from '../../../shared/types/index.js';
+import type { StructureTemplate, Beat } from '../../shared/types/index.js';
 
 /**
  * Story Structure Templates

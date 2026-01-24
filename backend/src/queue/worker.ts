@@ -1,7 +1,7 @@
 import db from '../db/connection.js';
 import { checkpointManager } from './checkpoint.js';
 import { rateLimitHandler, RateLimitHandler } from './rate-limit-handler.js';
-import type { Job, JobType, JobStatus } from '../../../shared/types/index.js';
+import type { Job, JobType, JobStatus } from '../../shared/types/index.js';
 import { randomUUID } from 'crypto';
 
 /**

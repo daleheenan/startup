@@ -7,7 +7,7 @@ import type {
   StoryBible,
   Character,
   WorldElements,
-} from '../../../shared/types/index.js';
+} from '../../shared/types/index.js';
 import { claudeService } from './claude.service.js';
 
 /**
