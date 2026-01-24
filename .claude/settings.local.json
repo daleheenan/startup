@@ -2,7 +2,22 @@
   "permissions": {
     "allow": [
       "Bash(git add:*)",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd self-reinforcement learning system for agents\n\nImplement file-based lessons learned system enabling agents to:\n- Read accumulated lessons before starting tasks\n- Reflect and record insights after completing tasks\n- Score lessons based on successful application\n- Cross-reference lessons from related agents\n\nNew files:\n- .claude/lessons/_template.md - Template for new lesson files\n- .claude/lessons/_maintenance.md - Maintenance guide \\(pruning, scoring, search\\)\n- .claude/lessons/_agent-learning-section.md - Reference section\n- .claude/lessons/shared.lessons.md - 15 cross-cutting lessons\n- .claude/lessons/developer.lessons.md - Sample lesson file\n\nUpdated all 34 agents with Self-Reinforcement Learning sections including:\n- Pre-task lesson loading instructions\n- Post-task reflection and recording process\n- Cross-agent lesson references\n- Tag-based lesson categorization\n\nFeatures:\n- Scoring system \\(0-4 active, 5-9 proven, 10+ foundational\\)\n- Automatic pruning \\(max 50 lessons per file\\)\n- Tag-based search via grep\n- Quarterly maintenance procedures\n- Statistics tracking per agent\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd self-reinforcement learning system for agents\n\nImplement file-based lessons learned system enabling agents to:\n- Read accumulated lessons before starting tasks\n- Reflect and record insights after completing tasks\n- Score lessons based on successful application\n- Cross-reference lessons from related agents\n\nNew files:\n- .claude/lessons/_template.md - Template for new lesson files\n- .claude/lessons/_maintenance.md - Maintenance guide \\(pruning, scoring, search\\)\n- .claude/lessons/_agent-learning-section.md - Reference section\n- .claude/lessons/shared.lessons.md - 15 cross-cutting lessons\n- .claude/lessons/developer.lessons.md - Sample lesson file\n\nUpdated all 34 agents with Self-Reinforcement Learning sections including:\n- Pre-task lesson loading instructions\n- Post-task reflection and recording process\n- Cross-agent lesson references\n- Tag-based lesson categorization\n\nFeatures:\n- Scoring system \\(0-4 active, 5-9 proven, 10+ foundational\\)\n- Automatic pruning \\(max 50 lessons per file\\)\n- Tag-based search via grep\n- Quarterly maintenance procedures\n- Statistics tracking per agent\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "mcp__mcp-registry__search_mcp_registry",
+      "Bash(railway whoami:*)",
+      "Bash(railway status:*)",
+      "Bash(railway list:*)",
+      "Bash(git remote:*)",
+      "Bash(railway init:*)",
+      "Bash(dir:*)",
+      "Bash(unzip:*)",
+      "Bash(railway add:*)",
+      "Bash(railway variables:*)",
+      "Bash(railway variable set:*)",
+      "Bash(git push:*)",
+      "Bash(railway variable list:*)",
+      "Bash(railway:*)",
+      "Bash(git commit:*)"
     ]
   }
 }
