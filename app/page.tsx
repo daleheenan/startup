@@ -1,5 +1,3 @@
-import StatusPanel from './components/StatusPanel';
-
 export default function Home() {
   return (
     <main style={{
@@ -39,10 +37,10 @@ export default function Home() {
           marginBottom: '2rem'
         }}>
           <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem', color: '#ededed' }}>
-            🚧 Under Construction
+            Private Application
           </h2>
           <p style={{ color: '#888', lineHeight: 1.6 }}>
-            NovelForge is being built to transform your story ideas into professionally
+            NovelForge transforms your story ideas into professionally
             crafted novels with minimal intervention. Powered by Claude AI with specialized
             editing agents for developmental, line, continuity, and copy editing.
           </p>
@@ -73,11 +71,7 @@ export default function Home() {
           ))}
         </div>
 
-        <div style={{ marginTop: '3rem' }}>
-          <StatusPanel />
-        </div>
-
-        {/* Call to Action */}
+        {/* Login CTA - will link to auth when implemented */}
         <div style={{
           marginTop: '3rem',
           display: 'flex',
@@ -85,7 +79,7 @@ export default function Home() {
           justifyContent: 'center'
         }}>
           <a
-            href="/new"
+            href="/login"
             style={{
               display: 'inline-block',
               padding: '1rem 2rem',
@@ -99,24 +93,7 @@ export default function Home() {
               transition: 'all 0.2s',
             }}
           >
-            Create New Novel
-          </a>
-          <a
-            href="/projects"
-            style={{
-              display: 'inline-block',
-              padding: '1rem 2rem',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '8px',
-              color: '#ededed',
-              fontSize: '1.125rem',
-              fontWeight: 500,
-              textDecoration: 'none',
-              transition: 'all 0.2s',
-            }}
-          >
-            View Projects
+            Sign In
           </a>
         </div>
 
