@@ -3,6 +3,15 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
+
+// Load environment variables first
+dotenv.config();
+
+console.log('[Server] Starting NovelForge Backend...');
+console.log('[Server] NODE_ENV:', process.env.NODE_ENV);
+console.log('[Server] DATABASE_PATH:', process.env.DATABASE_PATH);
+
+// Import database and migrations after env is loaded
 import { runMigrations } from './db/migrate.js';
 import { queueWorker } from './queue/worker.js';
 import { requireAuth } from './middleware/auth.js';
@@ -27,11 +36,15 @@ import genreConventionsRouter from './routes/genre-conventions.js';
 import proseStylesRouter from './routes/prose-styles.js';
 import analyticsRouter from './routes/analytics.js';
 
-// Load environment variables
-dotenv.config();
-
 // Run database migrations
-runMigrations();
+try {
+  console.log('[Server] Running migrations...');
+  runMigrations();
+  console.log('[Server] Migrations complete');
+} catch (error) {
+  console.error('[Server] Migration failed:', error);
+  process.exit(1);
+}
 
 // Create Express app
 const app = express();
