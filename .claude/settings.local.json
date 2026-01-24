@@ -25,7 +25,11 @@
       "Bash(npm install:*)",
       "Bash(npm run migrate:*)",
       "Bash(npm run cli:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(curl:*)",
+      "Bash(python:*)",
+      "Bash(npx tsx:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

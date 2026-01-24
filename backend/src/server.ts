@@ -10,6 +10,7 @@ import outlinesRouter from './routes/outlines.js';
 import booksRouter from './routes/books.js';
 import chaptersRouter from './routes/chapters.js';
 import generationRouter from './routes/generation.js';
+import editingRouter from './routes/editing.js';
 
 // Load environment variables
 dotenv.config();
@@ -45,6 +46,7 @@ app.use('/api/outlines', outlinesRouter);
 app.use('/api/books', booksRouter);
 app.use('/api/chapters', chaptersRouter);
 app.use('/api/generation', generationRouter);
+app.use('/api/editing', editingRouter);
 
 // Error handling
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

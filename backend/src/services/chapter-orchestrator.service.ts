@@ -35,7 +35,8 @@ export class ChapterOrchestratorService {
     // Queue jobs for each chapter
     for (const chapter of chapters) {
       this.queueChapterWorkflow(chapter.id);
-      jobsCreated += 3; // generate_chapter, generate_summary, update_states
+      jobsCreated += 7; // generate_chapter, dev_edit, line_edit, continuity_check, copy_edit, generate_summary, update_states
+      // Note: +1 additional job (author_revision) may be created dynamically if dev editor requires it
     }
 
     console.log(`[ChapterOrchestrator] Queued ${chapters.length} chapters (${jobsCreated} jobs) for book ${bookId}`);
@@ -48,24 +49,50 @@ export class ChapterOrchestratorService {
 
   /**
    * Queue the complete workflow for a single chapter
+   *
+   * Pipeline:
+   * 1. generate_chapter - Author Agent writes initial draft
+   * 2. dev_edit - Developmental Editor reviews (may queue author_revision)
+   * 3. line_edit - Line Editor polishes prose
+   * 4. continuity_check - Continuity Editor checks consistency
+   * 5. copy_edit - Copy Editor fixes grammar/style
+   * 6. generate_summary - Create summary for next chapter
+   * 7. update_states - Update character states
    */
   queueChapterWorkflow(chapterId: string): {
     generateJobId: string;
+    devEditJobId: string;
+    lineEditJobId: string;
+    continuityJobId: string;
+    copyEditJobId: string;
     summaryJobId: string;
     statesJobId: string;
   } {
-    // Create jobs in sequence
+    // Create jobs in sequence (worker processes them in order)
     const generateJobId = QueueWorker.createJob('generate_chapter', chapterId);
+    const devEditJobId = QueueWorker.createJob('dev_edit', chapterId);
+    // Note: author_revision job may be created dynamically by dev_edit if needed
+    const lineEditJobId = QueueWorker.createJob('line_edit', chapterId);
+    const continuityJobId = QueueWorker.createJob('continuity_check', chapterId);
+    const copyEditJobId = QueueWorker.createJob('copy_edit', chapterId);
     const summaryJobId = QueueWorker.createJob('generate_summary', chapterId);
     const statesJobId = QueueWorker.createJob('update_states', chapterId);
 
-    console.log(`[ChapterOrchestrator] Queued workflow for chapter ${chapterId}`);
+    console.log(`[ChapterOrchestrator] Queued full workflow for chapter ${chapterId}`);
     console.log(`  - Generate: ${generateJobId}`);
+    console.log(`  - Dev Edit: ${devEditJobId}`);
+    console.log(`  - Line Edit: ${lineEditJobId}`);
+    console.log(`  - Continuity: ${continuityJobId}`);
+    console.log(`  - Copy Edit: ${copyEditJobId}`);
     console.log(`  - Summary: ${summaryJobId}`);
     console.log(`  - States: ${statesJobId}`);
 
     return {
       generateJobId,
+      devEditJobId,
+      lineEditJobId,
+      continuityJobId,
+      copyEditJobId,
       summaryJobId,
       statesJobId,
     };

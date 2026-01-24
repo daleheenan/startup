@@ -119,6 +119,8 @@ export class QueueWorker {
         return await this.generateChapter(job);
       case 'dev_edit':
         return await this.developmentalEdit(job);
+      case 'author_revision':
+        return await this.authorRevision(job);
       case 'line_edit':
         return await this.lineEdit(job);
       case 'continuity_check':
@@ -215,35 +217,206 @@ export class QueueWorker {
   }
 
   /**
-   * Developmental edit (placeholder - will be implemented in Sprint 6)
+   * Developmental edit - Analyze chapter structure, pacing, character arcs
    */
   private async developmentalEdit(job: Job): Promise<void> {
     console.log(`[Job:dev_edit] Processing chapter ${job.target_id}`);
-    await this.sleep(100);
+    const chapterId = job.target_id;
+
+    // Import editing service
+    const { editingService } = await import('../services/editing.service.js');
+
+    checkpointManager.saveCheckpoint(job.id, 'started', { chapterId });
+
+    try {
+      // Run developmental edit
+      const result = await editingService.developmentalEdit(chapterId);
+
+      checkpointManager.saveCheckpoint(job.id, 'dev_edit_complete', {
+        chapterId,
+        suggestionsCount: result.suggestions.length,
+        flagsCount: result.flags.length,
+        needsRevision: !result.approved,
+      });
+
+      // Apply the result (update flags)
+      await editingService.applyEditResult(chapterId, result);
+
+      // If developmental editor says revision needed, queue author revision
+      if (!result.approved) {
+        console.log(`[Job:dev_edit] Chapter needs revision, queueing author_revision job`);
+
+        // Queue author revision job
+        QueueWorker.createJob('author_revision' as any, chapterId);
+
+        // Store dev edit result for revision job to use
+        const storeStmt = db.prepare(`
+          UPDATE jobs
+          SET checkpoint = ?
+          WHERE id = ?
+        `);
+        storeStmt.run(JSON.stringify({ devEditResult: result }), job.id);
+      }
+
+      console.log(`[Job:dev_edit] Complete: ${result.flags.length} flags, approved: ${result.approved}`);
+
+      checkpointManager.saveCheckpoint(job.id, 'completed', { chapterId });
+    } catch (error) {
+      console.error(`[Job:dev_edit] Error:`, error);
+      throw error;
+    }
   }
 
   /**
-   * Line edit (placeholder - will be implemented in Sprint 6)
+   * Author revision - Revise chapter based on developmental feedback
+   */
+  private async authorRevision(job: Job): Promise<void> {
+    console.log(`[Job:author_revision] Processing chapter ${job.target_id}`);
+    const chapterId = job.target_id;
+
+    const { editingService } = await import('../services/editing.service.js');
+
+    checkpointManager.saveCheckpoint(job.id, 'started', { chapterId });
+
+    try {
+      // Get dev edit result from previous job
+      const getDevEditStmt = db.prepare<[string], { checkpoint: string | null }>(`
+        SELECT checkpoint FROM jobs
+        WHERE target_id = ? AND type = 'dev_edit'
+        ORDER BY created_at DESC
+        LIMIT 1
+      `);
+
+      const devEditJob = getDevEditStmt.get(chapterId);
+      if (!devEditJob || !devEditJob.checkpoint) {
+        throw new Error('No developmental edit feedback found for revision');
+      }
+
+      const { devEditResult } = JSON.parse(devEditJob.checkpoint);
+
+      // Run author revision
+      const revisedContent = await editingService.authorRevision(chapterId, devEditResult);
+
+      checkpointManager.saveCheckpoint(job.id, 'revision_complete', { chapterId });
+
+      // Update chapter with revised content
+      const updateStmt = db.prepare(`
+        UPDATE chapters
+        SET content = ?, updated_at = ?
+        WHERE id = ?
+      `);
+      updateStmt.run(revisedContent, new Date().toISOString(), chapterId);
+
+      console.log(`[Job:author_revision] Revision complete`);
+
+      checkpointManager.saveCheckpoint(job.id, 'completed', { chapterId });
+    } catch (error) {
+      console.error(`[Job:author_revision] Error:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Line edit - Polish prose, dialogue, sensory details
    */
   private async lineEdit(job: Job): Promise<void> {
     console.log(`[Job:line_edit] Processing chapter ${job.target_id}`);
-    await this.sleep(100);
+    const chapterId = job.target_id;
+
+    const { editingService } = await import('../services/editing.service.js');
+
+    checkpointManager.saveCheckpoint(job.id, 'started', { chapterId });
+
+    try {
+      const result = await editingService.lineEdit(chapterId);
+
+      checkpointManager.saveCheckpoint(job.id, 'line_edit_complete', {
+        chapterId,
+        flagsCount: result.flags.length,
+      });
+
+      await editingService.applyEditResult(chapterId, result);
+
+      console.log(`[Job:line_edit] Complete: ${result.flags.length} flags`);
+
+      checkpointManager.saveCheckpoint(job.id, 'completed', { chapterId });
+    } catch (error) {
+      console.error(`[Job:line_edit] Error:`, error);
+      throw error;
+    }
   }
 
   /**
-   * Continuity check (placeholder - will be implemented in Sprint 6)
+   * Continuity check - Verify consistency with story bible and previous chapters
    */
   private async continuityCheck(job: Job): Promise<void> {
     console.log(`[Job:continuity_check] Processing chapter ${job.target_id}`);
-    await this.sleep(100);
+    const chapterId = job.target_id;
+
+    const { editingService } = await import('../services/editing.service.js');
+
+    checkpointManager.saveCheckpoint(job.id, 'started', { chapterId });
+
+    try {
+      const result = await editingService.continuityEdit(chapterId);
+
+      checkpointManager.saveCheckpoint(job.id, 'continuity_check_complete', {
+        chapterId,
+        suggestionsCount: result.suggestions.length,
+        flagsCount: result.flags.length,
+      });
+
+      await editingService.applyEditResult(chapterId, result);
+
+      console.log(`[Job:continuity_check] Complete: ${result.suggestions.length} issues, ${result.flags.length} flags`);
+
+      checkpointManager.saveCheckpoint(job.id, 'completed', { chapterId });
+    } catch (error) {
+      console.error(`[Job:continuity_check] Error:`, error);
+      throw error;
+    }
   }
 
   /**
-   * Copy edit (placeholder - will be implemented in Sprint 6)
+   * Copy edit - Grammar, punctuation, style consistency
    */
   private async copyEdit(job: Job): Promise<void> {
     console.log(`[Job:copy_edit] Processing chapter ${job.target_id}`);
-    await this.sleep(100);
+    const chapterId = job.target_id;
+
+    const { editingService } = await import('../services/editing.service.js');
+
+    checkpointManager.saveCheckpoint(job.id, 'started', { chapterId });
+
+    try {
+      const result = await editingService.copyEdit(chapterId);
+
+      checkpointManager.saveCheckpoint(job.id, 'copy_edit_complete', { chapterId });
+
+      await editingService.applyEditResult(chapterId, result);
+
+      // After copy edit (final editing step), update word count
+      const getContentStmt = db.prepare<[string], { content: string }>(`
+        SELECT content FROM chapters WHERE id = ?
+      `);
+      const chapter = getContentStmt.get(chapterId);
+      if (chapter && chapter.content) {
+        const wordCount = chapter.content.split(/\s+/).length;
+        const updateWordCountStmt = db.prepare(`
+          UPDATE chapters
+          SET word_count = ?, updated_at = ?
+          WHERE id = ?
+        `);
+        updateWordCountStmt.run(wordCount, new Date().toISOString(), chapterId);
+      }
+
+      console.log(`[Job:copy_edit] Complete`);
+
+      checkpointManager.saveCheckpoint(job.id, 'completed', { chapterId });
+    } catch (error) {
+      console.error(`[Job:copy_edit] Error:`, error);
+      throw error;
+    }
   }
 
   /**
@@ -357,6 +530,8 @@ Write the summary now:`;
 
       if (!storyBible || !storyBible.characters) {
         console.log(`[Job:update_states] No story bible found, skipping state update`);
+        // Still mark chapter as completed
+        this.markChapterComplete(chapterId);
         return;
       }
 
@@ -368,6 +543,8 @@ Write the summary now:`;
 
       if (characterNames.size === 0) {
         console.log(`[Job:update_states] No characters to update`);
+        // Still mark chapter as completed
+        this.markChapterComplete(chapterId);
         return;
       }
 
@@ -422,7 +599,8 @@ Output only valid JSON, no commentary:`;
       } catch (parseError) {
         console.error(`[Job:update_states] Failed to parse state updates:`, parseError);
         console.log(`[Job:update_states] Raw response:`, response);
-        // Don't fail the job, just skip the update
+        // Don't fail the job, just skip the update and mark chapter complete
+        this.markChapterComplete(chapterId);
         return;
       }
 
@@ -449,11 +627,27 @@ Output only valid JSON, no commentary:`;
 
       console.log(`[Job:update_states] Character states updated`);
 
+      // Mark chapter as completed (this is the final job in the pipeline)
+      this.markChapterComplete(chapterId);
+
       checkpointManager.saveCheckpoint(job.id, 'completed', { chapterId });
     } catch (error) {
       console.error(`[Job:update_states] Error updating states:`, error);
       throw error;
     }
+  }
+
+  /**
+   * Mark a chapter as completed
+   */
+  private markChapterComplete(chapterId: string): void {
+    const stmt = db.prepare(`
+      UPDATE chapters
+      SET status = 'completed', updated_at = ?
+      WHERE id = ?
+    `);
+    stmt.run(new Date().toISOString(), chapterId);
+    console.log(`[Worker] Chapter ${chapterId} marked as completed`);
   }
 
   /**

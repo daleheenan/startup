@@ -151,6 +151,7 @@ export interface Flag {
 export type JobType =
   | 'generate_chapter'
   | 'dev_edit'
+  | 'author_revision'
   | 'line_edit'
   | 'continuity_check'
   | 'copy_edit'
