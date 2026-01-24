@@ -11,6 +11,8 @@ interface Character {
   id: string;
   name: string;
   role: string;
+  ethnicity?: string;
+  nationality?: string;
   physicalDescription: string;
   personality: string[];
   voiceSample: string;
@@ -471,6 +473,30 @@ function CharacterEditor({
             onChange={(e) => handleChange('name', e.target.value)}
             style={inputStyle}
           />
+        </div>
+
+        {/* Ethnicity & Nationality */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div>
+            <label style={labelStyle}>Ethnicity / Cultural Background</label>
+            <input
+              type="text"
+              value={editedChar.ethnicity || ''}
+              onChange={(e) => handleChange('ethnicity', e.target.value)}
+              placeholder="e.g., East Asian, Mediterranean, Nordic..."
+              style={inputStyle}
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>Nationality / Region of Origin</label>
+            <input
+              type="text"
+              value={editedChar.nationality || ''}
+              onChange={(e) => handleChange('nationality', e.target.value)}
+              placeholder="e.g., Japanese, Italian, fictional region..."
+              style={inputStyle}
+            />
+          </div>
         </div>
 
         {/* Physical Description */}

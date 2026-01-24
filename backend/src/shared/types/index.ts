@@ -36,6 +36,8 @@ export interface Character {
   id: string;
   name: string;
   role: string;
+  ethnicity?: string;          // Cultural/ethnic background
+  nationality?: string;        // Country/region of origin
   physicalDescription?: string;
   personalityTraits: string[];
   voiceSample: string;
@@ -417,4 +419,52 @@ export interface WorldTransitionChange {
   type: string;
   description: string;
   impact: string;
+}
+
+// Sprint 16: Interactive Editing Workspace Types
+
+export interface ChapterEdit {
+  id: string;
+  chapter_id: string;
+  user_id: string | null;
+  edited_content: string;
+  word_count: number;
+  is_locked: number;  // SQLite BOOLEAN (1 = true, 0 = false)
+  edit_notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChapterEditResponse {
+  chapterId: string;
+  hasEdit: boolean;
+  edit: ChapterEdit | null;
+  original: {
+    content: string;
+    wordCount: number;
+  };
+}
+
+export interface VersionComparison {
+  original: {
+    content: string;
+    wordCount: number;
+    generatedAt: string;
+  };
+  edited: {
+    content: string;
+    wordCount: number;
+    lastEditedAt: string;
+  } | null;
+  diff: {
+    addedWords: number;
+    removedWords: number;
+    percentChanged: number;
+  } | null;
+}
+
+export interface DiffStats {
+  addedWords: number;
+  removedWords: number;
+  percentChanged: number;
 }

@@ -126,6 +126,33 @@ export default function ConceptsPage() {
     }
   };
 
+  const handleSaveConcept = async (conceptId: string) => {
+    try {
+      const concept = concepts.find(c => c.id === conceptId);
+      if (!concept) return;
+
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/saved-concepts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ concept, preferences }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Failed to save concept');
+      }
+
+      alert(`"${concept.title}" has been saved! You can find it in your Saved Concepts.`);
+    } catch (err: any) {
+      console.error('Error saving concept:', err);
+      setError(err.message || 'Failed to save concept');
+    }
+  };
+
   if (concepts.length === 0) {
     return (
       <div style={{
@@ -270,6 +297,7 @@ export default function ConceptsPage() {
                   concept={concept}
                   isSelected={selectedConcept === concept.id}
                   onSelect={() => setSelectedConcept(concept.id)}
+                  onSave={() => handleSaveConcept(concept.id)}
                   disabled={isCreating || isRegenerating}
                 />
               ))}

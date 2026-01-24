@@ -14,6 +14,8 @@ export interface Character {
   id: string;
   name: string;
   role: CharacterRole;
+  ethnicity?: string;          // Cultural/ethnic background
+  nationality?: string;        // Country/region of origin
   physicalDescription: string;
   personality: string[];
   voiceSample: string;
@@ -138,7 +140,9 @@ Create a protagonist who:
 5. Feels authentic and three-dimensional
 
 Provide:
-- **name**: Full name (first and last)
+- **name**: Full name (first and last, culturally appropriate)
+- **ethnicity**: Cultural/ethnic background (e.g., East Asian, Mediterranean, West African, Nordic, etc.)
+- **nationality**: Country or region of origin (can be fictional for fantasy/sci-fi)
 - **physicalDescription**: Brief physical description (2-3 sentences)
 - **personality**: 5-7 key personality traits
 - **voiceSample**: A 150-word sample in the character's voice (first-person internal monologue about their current situation)
@@ -159,6 +163,8 @@ The voice sample is CRITICAL - it should showcase:
 Return ONLY a JSON object in this format:
 {
   "name": "...",
+  "ethnicity": "...",
+  "nationality": "...",
   "physicalDescription": "...",
   "personality": ["trait1", "trait2", ...],
   "voiceSample": "...",
@@ -202,8 +208,10 @@ Create 4-6 supporting characters with these roles:
 5. **Supporting Characters** (1-2): Other important characters (rival, family member, etc.)
 
 For EACH character, provide the same structure as the protagonist:
-- name
+- name (culturally appropriate)
 - role (one of: antagonist, mentor, sidekick, love_interest, supporting)
+- ethnicity (cultural/ethnic background)
+- nationality (country or region, can be fictional)
 - physicalDescription
 - personality (5-7 traits)
 - voiceSample (100-150 words in their voice)
@@ -225,6 +233,8 @@ Return ONLY a JSON array of character objects:
   {
     "name": "...",
     "role": "antagonist",
+    "ethnicity": "...",
+    "nationality": "...",
     "physicalDescription": "...",
     "personality": [...],
     "voiceSample": "...",

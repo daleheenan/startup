@@ -36,6 +36,8 @@ export interface Character {
   id: string;
   name: string;
   role: string;
+  ethnicity?: string;          // Cultural/ethnic background
+  nationality?: string;        // Country/region of origin
   physicalDescription?: string;
   personalityTraits: string[];
   voiceSample: string;

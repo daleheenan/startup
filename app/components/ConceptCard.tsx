@@ -14,10 +14,11 @@ interface ConceptCardProps {
   concept: StoryConcept;
   isSelected: boolean;
   onSelect: () => void;
+  onSave?: () => void;
   disabled: boolean;
 }
 
-export default function ConceptCard({ concept, isSelected, onSelect, disabled }: ConceptCardProps) {
+export default function ConceptCard({ concept, isSelected, onSelect, onSave, disabled }: ConceptCardProps) {
   return (
     <div
       onClick={disabled ? undefined : onSelect}
@@ -132,6 +133,7 @@ export default function ConceptCard({ concept, isSelected, onSelect, disabled }:
         gap: '1rem',
         flexWrap: 'wrap',
         fontSize: '0.875rem',
+        marginBottom: onSave ? '1rem' : 0,
       }}>
         <div>
           <span style={{ color: '#64748B' }}>Protagonist:</span>{' '}
@@ -144,6 +146,35 @@ export default function ConceptCard({ concept, isSelected, onSelect, disabled }:
           </span>
         </div>
       </div>
+
+      {/* Save Button */}
+      {onSave && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onSave();
+          }}
+          disabled={disabled}
+          style={{
+            width: '100%',
+            padding: '0.625rem',
+            background: 'transparent',
+            border: '1px solid #E2E8F0',
+            borderRadius: '6px',
+            color: '#64748B',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            transition: 'all 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem',
+          }}
+        >
+          <span>Save for Later</span>
+        </button>
+      )}
     </div>
   );
 }
