@@ -356,24 +356,44 @@ export default function WorldPage() {
                     ))}
                   </div>
 
-                  <button
-                    onClick={handleContinue}
-                    style={{
-                      marginTop: '2rem',
-                      width: '100%',
-                      padding: '1rem',
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      border: 'none',
-                      borderRadius: '8px',
-                      color: '#fff',
-                      fontSize: '1rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 14px rgba(102, 126, 234, 0.3)',
-                    }}
-                  >
-                    Continue to Outline →
-                  </button>
+                  <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <button
+                      onClick={handleContinue}
+                      style={{
+                        width: '100%',
+                        padding: '1rem',
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        border: 'none',
+                        borderRadius: '8px',
+                        color: '#fff',
+                        fontSize: '1rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 14px rgba(102, 126, 234, 0.3)',
+                      }}
+                    >
+                      Continue to Outline →
+                    </button>
+                    <Link
+                      href={`/projects/${projectId}/characters`}
+                      style={{
+                        width: '100%',
+                        padding: '1rem',
+                        background: '#FFFFFF',
+                        border: '1px solid #E2E8F0',
+                        borderRadius: '8px',
+                        color: '#64748B',
+                        fontSize: '0.875rem',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                        textDecoration: 'none',
+                        display: 'block',
+                      }}
+                    >
+                      ← Back to Characters
+                    </Link>
+                  </div>
                 </div>
 
                 {/* Element Details */}

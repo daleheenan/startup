@@ -381,6 +381,224 @@ router.put('/:id/characters/:characterId', (req, res) => {
 });
 
 /**
+ * POST /api/projects/:id/characters/:characterId/regenerate-name
+ * Regenerate a character's name using AI
+ */
+router.post('/:id/characters/:characterId/regenerate-name', async (req, res) => {
+  try {
+    const { id: projectId, characterId } = req.params;
+
+    // Get current project and story bible
+    const getStmt = db.prepare<[string], Project>(`
+      SELECT * FROM projects WHERE id = ?
+    `);
+    const project = getStmt.get(projectId);
+
+    if (!project?.story_bible) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Story bible not found' },
+      });
+    }
+
+    const storyBible = JSON.parse(project.story_bible as any);
+    const storyDNA = project.story_dna ? JSON.parse(project.story_dna as any) : null;
+
+    // Find the character
+    const charIndex = storyBible.characters.findIndex((c: any) => c.id === characterId);
+    if (charIndex === -1) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Character not found' },
+      });
+    }
+
+    const character = storyBible.characters[charIndex];
+
+    // Build prompt for name generation
+    const prompt = `You are a creative naming expert. Generate a new name for this character that fits their background and the story's genre.
+
+**Story Genre:** ${storyDNA?.genre || project.genre}
+**Tone:** ${storyDNA?.tone || 'dramatic'}
+
+**Character Details:**
+- Role: ${character.role}
+- Ethnicity/Background: ${character.ethnicity || 'not specified'}
+- Nationality: ${character.nationality || 'not specified'}
+- Personality: ${character.personality?.join(', ') || 'not specified'}
+
+**Current Name:** ${character.name}
+
+Generate a new, culturally appropriate name that:
+1. Matches the character's ethnicity and nationality
+2. Fits the genre and tone
+3. Is memorable and distinct
+4. Feels authentic to the character's background
+
+Return ONLY the new name, nothing else. Just the full name.`;
+
+    // Call Claude API
+    const Anthropic = (await import('@anthropic-ai/sdk')).default;
+    const anthropic = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+    });
+
+    const message = await anthropic.messages.create({
+      model: 'claude-opus-4-5-20251101',
+      max_tokens: 100,
+      temperature: 0.9,
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+    });
+
+    const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
+    const newName = responseText.trim();
+
+    // Update character with new name
+    storyBible.characters[charIndex] = {
+      ...character,
+      name: newName,
+    };
+
+    // Update relationships in other characters
+    storyBible.characters.forEach((char: any, idx: number) => {
+      if (idx !== charIndex && char.relationships) {
+        char.relationships = char.relationships.map((rel: any) => ({
+          ...rel,
+          characterName: rel.characterId === characterId ? newName : rel.characterName,
+        }));
+      }
+    });
+
+    // Save to database
+    const updateStmt = db.prepare(`
+      UPDATE projects
+      SET story_bible = ?, updated_at = ?
+      WHERE id = ?
+    `);
+
+    updateStmt.run(JSON.stringify(storyBible), new Date().toISOString(), projectId);
+
+    res.json(storyBible.characters[charIndex]);
+  } catch (error: any) {
+    console.error('[API] Error regenerating character name:', error);
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * POST /api/projects/:id/characters/regenerate-all-names
+ * Regenerate all character names using AI
+ */
+router.post('/:id/characters/regenerate-all-names', async (req, res) => {
+  try {
+    const { id: projectId } = req.params;
+
+    // Get current project and story bible
+    const getStmt = db.prepare<[string], Project>(`
+      SELECT * FROM projects WHERE id = ?
+    `);
+    const project = getStmt.get(projectId);
+
+    if (!project?.story_bible) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Story bible not found' },
+      });
+    }
+
+    const storyBible = JSON.parse(project.story_bible as any);
+    const storyDNA = project.story_dna ? JSON.parse(project.story_dna as any) : null;
+
+    if (!storyBible.characters || storyBible.characters.length === 0) {
+      return res.status(400).json({
+        error: { code: 'NO_CHARACTERS', message: 'No characters to regenerate names for' },
+      });
+    }
+
+    const Anthropic = (await import('@anthropic-ai/sdk')).default;
+    const anthropic = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+    });
+
+    // Regenerate names for all characters
+    const updatedCharacters: any[] = [];
+    for (const character of storyBible.characters) {
+      const prompt = `You are a creative naming expert. Generate a new name for this character that fits their background and the story's genre.
+
+**Story Genre:** ${storyDNA?.genre || project.genre}
+**Tone:** ${storyDNA?.tone || 'dramatic'}
+
+**Character Details:**
+- Role: ${character.role}
+- Ethnicity/Background: ${character.ethnicity || 'not specified'}
+- Nationality: ${character.nationality || 'not specified'}
+- Personality: ${character.personality?.join(', ') || 'not specified'}
+
+**Current Name:** ${character.name}
+
+Generate a new, culturally appropriate name that:
+1. Matches the character's ethnicity and nationality
+2. Fits the genre and tone
+3. Is memorable and distinct
+4. Feels authentic to the character's background
+
+Return ONLY the new name, nothing else. Just the full name.`;
+
+      const message = await anthropic.messages.create({
+        model: 'claude-opus-4-5-20251101',
+        max_tokens: 100,
+        temperature: 0.9,
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+      });
+
+      const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
+      const newName = responseText.trim();
+
+      updatedCharacters.push({
+        ...character,
+        name: newName,
+      });
+    }
+
+    // Update relationships with new names
+    updatedCharacters.forEach((char, idx) => {
+      if (char.relationships) {
+        char.relationships = char.relationships.map((rel: any) => {
+          const relatedChar = updatedCharacters.find((c: any) => c.id === rel.characterId);
+          return {
+            ...rel,
+            characterName: relatedChar ? relatedChar.name : rel.characterName,
+          };
+        });
+      }
+    });
+
+    // Save to database
+    storyBible.characters = updatedCharacters;
+
+    const updateStmt = db.prepare(`
+      UPDATE projects
+      SET story_bible = ?, updated_at = ?
+      WHERE id = ?
+    `);
+
+    updateStmt.run(JSON.stringify(storyBible), new Date().toISOString(), projectId);
+
+    res.json({ characters: updatedCharacters });
+  } catch (error: any) {
+    console.error('[API] Error regenerating all character names:', error);
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
  * PUT /api/projects/:id/world/:elementId
  * Update a world element
  */

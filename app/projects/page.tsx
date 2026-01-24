@@ -345,25 +345,46 @@ export default function ProjectsPage() {
             }}>
               Your Projects ({projects.length})
             </h2>
-            <Link
-              href="/new"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.75rem 1.25rem',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                color: '#FFFFFF',
-                borderRadius: '8px',
-                textDecoration: 'none',
-                fontWeight: '600',
-                fontSize: '0.875rem',
-                boxShadow: '0 4px 14px rgba(102, 126, 234, 0.3)',
-              }}
-            >
-              <span>+</span>
-              New Project
-            </Link>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <Link
+                href="/saved-concepts"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.75rem 1.25rem',
+                  background: '#FFFFFF',
+                  color: '#374151',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '8px',
+                  textDecoration: 'none',
+                  fontWeight: '600',
+                  fontSize: '0.875rem',
+                }}
+              >
+                <span>💡</span>
+                Saved Concepts
+              </Link>
+              <Link
+                href="/new"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.75rem 1.25rem',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: '#FFFFFF',
+                  borderRadius: '8px',
+                  textDecoration: 'none',
+                  fontWeight: '600',
+                  fontSize: '0.875rem',
+                  boxShadow: '0 4px 14px rgba(102, 126, 234, 0.3)',
+                }}
+              >
+                <span>+</span>
+                New Project
+              </Link>
+            </div>
           </div>
 
           {/* Projects Grid */}

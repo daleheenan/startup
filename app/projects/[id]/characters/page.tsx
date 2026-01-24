@@ -156,6 +156,76 @@ export default function CharactersPage() {
     }
   };
 
+  const handleRegenerateName = async (characterId: string) => {
+    try {
+      const token = getToken();
+      const response = await fetch(
+        `${API_BASE_URL}/api/projects/${projectId}/characters/${characterId}/regenerate-name`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: { message: 'Failed to regenerate name' } }));
+        throw new Error(errorData.error?.message || 'Failed to regenerate name');
+      }
+
+      const updated = await response.json();
+      setCharacters(chars => chars.map(c => c.id === updated.id ? updated : c));
+      if (selectedCharacter?.id === updated.id) {
+        setSelectedCharacter(updated);
+      }
+    } catch (err: any) {
+      console.error('Error regenerating name:', err);
+      setError(err.message);
+    }
+  };
+
+  const handleRegenerateAllNames = async () => {
+    if (!confirm('Regenerate names for all characters? This will replace all existing names.')) {
+      return;
+    }
+
+    setIsGenerating(true);
+    setError(null);
+
+    try {
+      const token = getToken();
+      const response = await fetch(
+        `${API_BASE_URL}/api/projects/${projectId}/characters/regenerate-all-names`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: { message: 'Failed to regenerate names' } }));
+        throw new Error(errorData.error?.message || 'Failed to regenerate names');
+      }
+
+      const data = await response.json();
+      setCharacters(data.characters);
+      if (selectedCharacter && data.characters.length > 0) {
+        const updatedSelected = data.characters.find((c: Character) => c.id === selectedCharacter.id);
+        setSelectedCharacter(updatedSelected || data.characters[0]);
+      }
+    } catch (err: any) {
+      console.error('Error regenerating all names:', err);
+      setError(err.message);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleContinue = () => {
     router.push(`/projects/${projectId}/world`);
   };
@@ -347,24 +417,62 @@ export default function CharactersPage() {
                     ))}
                   </div>
 
-                  <button
-                    onClick={handleContinue}
-                    style={{
-                      marginTop: '2rem',
-                      width: '100%',
-                      padding: '1rem',
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      border: 'none',
-                      borderRadius: '8px',
-                      color: '#fff',
-                      fontSize: '1rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 14px rgba(102, 126, 234, 0.3)',
-                    }}
-                  >
-                    Continue to World →
-                  </button>
+                  <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <button
+                      onClick={handleRegenerateAllNames}
+                      disabled={isGenerating}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 1rem',
+                        background: '#FFFFFF',
+                        border: '1px solid #E2E8F0',
+                        borderRadius: '8px',
+                        color: '#667eea',
+                        fontSize: '0.875rem',
+                        fontWeight: 500,
+                        cursor: isGenerating ? 'not-allowed' : 'pointer',
+                        opacity: isGenerating ? 0.5 : 1,
+                      }}
+                    >
+                      🔄 Regenerate All Names
+                    </button>
+                    <button
+                      onClick={handleContinue}
+                      style={{
+                        width: '100%',
+                        padding: '1rem',
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        border: 'none',
+                        borderRadius: '8px',
+                        color: '#fff',
+                        fontSize: '1rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 14px rgba(102, 126, 234, 0.3)',
+                      }}
+                    >
+                      Continue to World →
+                    </button>
+                    <Link
+                      href={`/projects/${projectId}`}
+                      style={{
+                        width: '100%',
+                        padding: '1rem',
+                        background: '#FFFFFF',
+                        border: '1px solid #E2E8F0',
+                        borderRadius: '8px',
+                        color: '#64748B',
+                        fontSize: '0.875rem',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                        textDecoration: 'none',
+                        display: 'block',
+                      }}
+                    >
+                      ← Back to Project Overview
+                    </Link>
+                  </div>
                 </div>
 
                 {/* Character Details */}
@@ -372,6 +480,7 @@ export default function CharactersPage() {
                   <CharacterEditor
                     character={selectedCharacter}
                     onSave={handleSaveCharacter}
+                    onRegenerateName={handleRegenerateName}
                     isSaving={isSaving}
                   />
                 )}
@@ -387,10 +496,12 @@ export default function CharactersPage() {
 function CharacterEditor({
   character,
   onSave,
+  onRegenerateName,
   isSaving,
 }: {
   character: Character;
   onSave: (char: Character) => void;
+  onRegenerateName: (characterId: string) => void;
   isSaving: boolean;
 }) {
   const [editedChar, setEditedChar] = useState(character);
@@ -467,12 +578,31 @@ function CharacterEditor({
         {/* Name */}
         <div>
           <label style={labelStyle}>Name</label>
-          <input
-            type="text"
-            value={editedChar.name}
-            onChange={(e) => handleChange('name', e.target.value)}
-            style={inputStyle}
-          />
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <input
+              type="text"
+              value={editedChar.name}
+              onChange={(e) => handleChange('name', e.target.value)}
+              style={{ ...inputStyle, flex: 1 }}
+            />
+            <button
+              onClick={() => onRegenerateName(character.id)}
+              style={{
+                padding: '0.75rem 1rem',
+                background: '#FFFFFF',
+                border: '1px solid #E2E8F0',
+                borderRadius: '6px',
+                color: '#667eea',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+              title="Regenerate character name"
+            >
+              🔄 Regenerate
+            </button>
+          </div>
         </div>
 
         {/* Ethnicity & Nationality */}

@@ -205,14 +205,15 @@ export default function OutlinePage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to generate outline');
+        const errorData = await response.json().catch(() => ({ error: { message: 'Failed to generate outline' } }));
+        throw new Error(errorData.error?.message || `Failed to generate outline (${response.status})`);
       }
 
       const outlineData = await response.json();
       setOutline(outlineData);
     } catch (err: any) {
       console.error('Error generating outline:', err);
-      setError(err.message);
+      setError(err.message || 'An unexpected error occurred while generating the outline');
     } finally {
       setIsGenerating(false);
     }
@@ -463,26 +464,47 @@ export default function OutlinePage() {
                   </p>
                 </div>
 
-                <button
-                  onClick={generateOutline}
-                  disabled={isGenerating}
-                  style={{
-                    width: '100%',
-                    padding: '1rem',
-                    background: isGenerating
-                      ? '#94A3B8'
-                      : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    border: 'none',
-                    borderRadius: '8px',
-                    color: '#fff',
-                    fontSize: '1rem',
-                    fontWeight: 600,
-                    cursor: isGenerating ? 'not-allowed' : 'pointer',
-                    boxShadow: isGenerating ? 'none' : '0 4px 14px rgba(102, 126, 234, 0.4)',
-                  }}
-                >
-                  {isGenerating ? 'Generating Outline...' : 'Generate Outline'}
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <button
+                    onClick={generateOutline}
+                    disabled={isGenerating}
+                    style={{
+                      width: '100%',
+                      padding: '1rem',
+                      background: isGenerating
+                        ? '#94A3B8'
+                        : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      border: 'none',
+                      borderRadius: '8px',
+                      color: '#fff',
+                      fontSize: '1rem',
+                      fontWeight: 600,
+                      cursor: isGenerating ? 'not-allowed' : 'pointer',
+                      boxShadow: isGenerating ? 'none' : '0 4px 14px rgba(102, 126, 234, 0.4)',
+                    }}
+                  >
+                    {isGenerating ? 'Generating Outline...' : 'Generate Outline'}
+                  </button>
+                  <Link
+                    href={`/projects/${projectId}/world`}
+                    style={{
+                      width: '100%',
+                      padding: '1rem',
+                      background: '#FFFFFF',
+                      border: '1px solid #E2E8F0',
+                      borderRadius: '8px',
+                      color: '#64748B',
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      textDecoration: 'none',
+                      display: 'block',
+                    }}
+                  >
+                    ← Back to World
+                  </Link>
+                </div>
               </div>
             ) : (
               <>
