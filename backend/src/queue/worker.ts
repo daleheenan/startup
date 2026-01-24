@@ -1,6 +1,6 @@
 import db from '../db/connection.js';
 import { checkpointManager } from './checkpoint.js';
-import { rateLimitHandler, RateLimitError } from './rate-limit-handler.js';
+import { rateLimitHandler, RateLimitHandler } from './rate-limit-handler.js';
 import type { Job, JobType, JobStatus } from '../../../shared/types/index.js';
 import { randomUUID } from 'crypto';
 
@@ -70,7 +70,7 @@ export class QueueWorker {
       this.markCompleted(job.id);
       console.log(`[QueueWorker] Completed job ${job.id}`);
     } catch (error) {
-      if (RateLimitError.isRateLimitError(error)) {
+      if (RateLimitHandler.isRateLimitError(error)) {
         // Handle rate limit
         console.log('[QueueWorker] Rate limit detected, pausing queue');
         await rateLimitHandler.handleRateLimit(job);

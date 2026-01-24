@@ -1,0 +1,146 @@
+'use client';
+
+interface StoryConcept {
+  id: string;
+  title: string;
+  logline: string;
+  synopsis: string;
+  hook: string;
+  protagonistHint: string;
+  conflictType: string;
+}
+
+interface ConceptCardProps {
+  concept: StoryConcept;
+  isSelected: boolean;
+  onSelect: () => void;
+  disabled: boolean;
+}
+
+export default function ConceptCard({ concept, isSelected, onSelect, disabled }: ConceptCardProps) {
+  return (
+    <div
+      onClick={disabled ? undefined : onSelect}
+      style={{
+        background: isSelected
+          ? 'linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%)'
+          : 'rgba(255, 255, 255, 0.05)',
+        border: isSelected
+          ? '2px solid rgba(102, 126, 234, 0.5)'
+          : '1px solid rgba(255, 255, 255, 0.1)',
+        borderRadius: '12px',
+        padding: '1.5rem',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        transition: 'all 0.2s',
+        opacity: disabled ? 0.6 : 1,
+        position: 'relative',
+      }}
+    >
+      {/* Selection Indicator */}
+      {isSelected && (
+        <div style={{
+          position: 'absolute',
+          top: '1rem',
+          right: '1rem',
+          width: '24px',
+          height: '24px',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#fff',
+          fontSize: '14px',
+        }}>
+          ✓
+        </div>
+      )}
+
+      {/* Title */}
+      <h3 style={{
+        fontSize: '1.5rem',
+        marginBottom: '1rem',
+        color: '#ededed',
+        paddingRight: '2rem',
+      }}>
+        {concept.title}
+      </h3>
+
+      {/* Logline */}
+      <div style={{
+        marginBottom: '1rem',
+        padding: '0.75rem',
+        background: 'rgba(102, 126, 234, 0.1)',
+        borderLeft: '3px solid #667eea',
+        borderRadius: '4px',
+      }}>
+        <p style={{
+          fontSize: '0.95rem',
+          color: '#ededed',
+          fontStyle: 'italic',
+          lineHeight: 1.5,
+          margin: 0,
+        }}>
+          {concept.logline}
+        </p>
+      </div>
+
+      {/* Synopsis */}
+      <div style={{ marginBottom: '1rem' }}>
+        <p style={{
+          fontSize: '0.9rem',
+          color: '#bbb',
+          lineHeight: 1.6,
+          margin: 0,
+          whiteSpace: 'pre-wrap',
+        }}>
+          {concept.synopsis}
+        </p>
+      </div>
+
+      {/* Hook */}
+      <div style={{
+        marginBottom: '1rem',
+        padding: '0.75rem',
+        background: 'rgba(118, 75, 162, 0.1)',
+        borderRadius: '6px',
+      }}>
+        <div style={{
+          fontSize: '0.75rem',
+          color: '#888',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+          marginBottom: '0.25rem',
+        }}>
+          Unique Hook
+        </div>
+        <p style={{
+          fontSize: '0.875rem',
+          color: '#ededed',
+          margin: 0,
+        }}>
+          {concept.hook}
+        </p>
+      </div>
+
+      {/* Metadata */}
+      <div style={{
+        display: 'flex',
+        gap: '1rem',
+        flexWrap: 'wrap',
+        fontSize: '0.875rem',
+      }}>
+        <div>
+          <span style={{ color: '#888' }}>Protagonist:</span>{' '}
+          <span style={{ color: '#ededed' }}>{concept.protagonistHint}</span>
+        </div>
+        <div>
+          <span style={{ color: '#888' }}>Conflict:</span>{' '}
+          <span style={{ color: '#ededed', textTransform: 'capitalize' }}>
+            {concept.conflictType}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}

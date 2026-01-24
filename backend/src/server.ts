@@ -5,6 +5,7 @@ import { runMigrations } from './db/migrate.js';
 import { queueWorker } from './queue/worker.js';
 import projectsRouter from './routes/projects.js';
 import queueRouter from './routes/queue.js';
+import conceptsRouter from './routes/concepts.js';
 
 // Load environment variables
 dotenv.config();
@@ -35,6 +36,7 @@ app.get('/health', (req, res) => {
 // API Routes
 app.use('/api/projects', projectsRouter);
 app.use('/api/queue', queueRouter);
+app.use('/api/concepts', conceptsRouter);
 
 // Error handling
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

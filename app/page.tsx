@@ -77,12 +77,55 @@ export default function Home() {
           <StatusPanel />
         </div>
 
+        {/* Call to Action */}
+        <div style={{
+          marginTop: '3rem',
+          display: 'flex',
+          gap: '1rem',
+          justifyContent: 'center'
+        }}>
+          <a
+            href="/new"
+            style={{
+              display: 'inline-block',
+              padding: '1rem 2rem',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              border: 'none',
+              borderRadius: '8px',
+              color: '#fff',
+              fontSize: '1.125rem',
+              fontWeight: 600,
+              textDecoration: 'none',
+              transition: 'all 0.2s',
+            }}
+          >
+            Create New Novel
+          </a>
+          <a
+            href="/projects"
+            style={{
+              display: 'inline-block',
+              padding: '1rem 2rem',
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '8px',
+              color: '#ededed',
+              fontSize: '1.125rem',
+              fontWeight: 500,
+              textDecoration: 'none',
+              transition: 'all 0.2s',
+            }}
+          >
+            View Projects
+          </a>
+        </div>
+
         <p style={{
           marginTop: '2rem',
           fontSize: '0.875rem',
           color: '#444'
         }}>
-          Sprint 1 of 8 • Foundation Phase
+          Sprint 2 of 8 • Idea Generation Phase
         </p>
       </div>
     </main>

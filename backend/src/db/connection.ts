@@ -17,7 +17,7 @@ if (!fs.existsSync(dataDir)) {
 }
 
 // Create database connection
-const db = new Database(DATABASE_PATH, {
+const db: Database.Database = new Database(DATABASE_PATH, {
   verbose: process.env.NODE_ENV === 'development' ? console.log : undefined,
 });
 
