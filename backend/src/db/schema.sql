@@ -77,3 +77,18 @@ CREATE TABLE IF NOT EXISTS session_tracking (
 -- Insert initial session tracking row
 INSERT OR IGNORE INTO session_tracking (id, is_active, requests_this_session)
 VALUES (1, 0, 0);
+
+-- Outlines table (Sprint 4: Story structure and chapter outlines)
+CREATE TABLE IF NOT EXISTS outlines (
+    id TEXT PRIMARY KEY,
+    book_id TEXT NOT NULL,
+    structure_type TEXT NOT NULL CHECK(structure_type IN ('three_act', 'save_the_cat', 'heros_journey', 'seven_point', 'freytag')),
+    structure TEXT NOT NULL,       -- JSON: Complete StoryStructure with acts and chapters
+    total_chapters INTEGER NOT NULL,
+    target_word_count INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_outlines_book ON outlines(book_id);

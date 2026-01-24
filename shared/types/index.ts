@@ -125,15 +125,17 @@ export interface Chapter {
 }
 
 export interface SceneCard {
-  sceneNumber: number;
-  povCharacter: string;
+  id: string;
+  order: number;
   location: string;
-  charactersPresent: string[];
+  characters: string[];
+  povCharacter: string;
   timeOfDay?: string;
   goal: string;
   conflict: string;
   outcome: string;
   emotionalBeat: string;
+  notes?: string;
 }
 
 export interface Flag {
@@ -222,4 +224,66 @@ export interface ProgressEvent {
   type: string;
   description: string;
   chapterNumber?: number;
+}
+
+// Story Structure Types
+export type StoryStructureType = 'three_act' | 'save_the_cat' | 'heros_journey' | 'seven_point' | 'freytag';
+
+export interface StoryStructure {
+  type: StoryStructureType;
+  acts: Act[];
+}
+
+export interface Act {
+  number: number;
+  name: string;
+  description: string;
+  beats: Beat[];
+  targetWordCount: number;
+  chapters: ChapterOutline[];
+}
+
+export interface Beat {
+  name: string;
+  description: string;
+  percentagePoint: number; // Where in the story this beat occurs (0-100)
+}
+
+export interface ChapterOutline {
+  number: number;
+  title: string;
+  summary: string;
+  actNumber: number;
+  beatName?: string;
+  povCharacter: string;
+  wordCountTarget: number;
+  scenes: SceneCard[];
+}
+
+// Outline Types
+export interface Outline {
+  id: string;
+  book_id: string;
+  structure_type: StoryStructureType;
+  structure: StoryStructure;
+  total_chapters: number;
+  target_word_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Structure Templates
+export interface StructureTemplate {
+  type: StoryStructureType;
+  name: string;
+  description: string;
+  acts: ActTemplate[];
+}
+
+export interface ActTemplate {
+  number: number;
+  name: string;
+  description: string;
+  percentageOfStory: number;
+  beats: Beat[];
 }

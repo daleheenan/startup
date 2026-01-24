@@ -298,6 +298,25 @@ export default function ProjectDetailPage() {
                 {project.story_bible?.world?.length > 0 ? 'Edit World' : 'Generate World'} →
               </a>
             )}
+            {project.story_bible?.characters?.length > 0 && project.story_bible?.world?.length > 0 && (
+              <a
+                href={`/projects/${project.id}/outline`}
+                style={{
+                  display: 'block',
+                  padding: '1rem',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  textAlign: 'center',
+                  textDecoration: 'none',
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                }}
+              >
+                Create Story Outline →
+              </a>
+            )}
           </div>
         </div>
 

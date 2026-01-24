@@ -6,6 +6,8 @@ import { queueWorker } from './queue/worker.js';
 import projectsRouter from './routes/projects.js';
 import queueRouter from './routes/queue.js';
 import conceptsRouter from './routes/concepts.js';
+import outlinesRouter from './routes/outlines.js';
+import booksRouter from './routes/books.js';
 
 // Load environment variables
 dotenv.config();
@@ -37,6 +39,8 @@ app.get('/health', (req, res) => {
 app.use('/api/projects', projectsRouter);
 app.use('/api/queue', queueRouter);
 app.use('/api/concepts', conceptsRouter);
+app.use('/api/outlines', outlinesRouter);
+app.use('/api/books', booksRouter);
 
 // Error handling
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
