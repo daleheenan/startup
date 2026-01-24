@@ -279,9 +279,11 @@ Based on competitor positioning and market trends:
 
 ---
 
-## Sprint 16-20: Foundation for Growth
+## Sprint 16-20: Foundation for Growth (Reordered by Priority)
 
-### Sprint 16: Interactive Editing Workspace (45 points)
+> **Priority Adjustment (2026-01-24):** Sprints reordered based on business value. Visual enhancements, publishing tools, mobile UI, and collaboration moved to later sprints. Revenue infrastructure and analytics moved up.
+
+### Sprint 16: Interactive Editing Workspace (45 points) - HIGH PRIORITY
 
 **Goal:** Allow users to edit generated content before continuing generation
 
@@ -317,7 +319,7 @@ Based on competitor positioning and market trends:
 
 ---
 
-### Sprint 17: Regeneration & Variation Tools (38 points)
+### Sprint 17: Regeneration & Variation Tools (38 points) - HIGH PRIORITY
 
 **Goal:** Enable users to regenerate specific elements without full chapter regeneration
 
@@ -352,44 +354,9 @@ Based on competitor positioning and market trends:
 
 ---
 
-### Sprint 18: Visual Enhancements & Character Portraits (42 points)
+### Sprint 18: Advanced Prose Control (40 points) - HIGH PRIORITY
 
-**Goal:** Add visual elements to enhance story immersion and marketing
-
-**Key Deliverables:**
-- AI-generated character portraits
-- Location/scene images
-- Cover art generation
-- Visual story bible
-- Image export in manuscripts
-
-**Tasks:**
-
-| Task | Points | Priority | Description |
-|------|--------|----------|-------------|
-| 18.1 Image Generation Service | 8 | P0 | Integrate DALL-E or Stable Diffusion API |
-| 18.2 Character Portrait Generator | 8 | P0 | Generate portraits from character descriptions |
-| 18.3 Portrait Gallery UI | 5 | P0 | Display and manage character images |
-| 18.4 Location Image Generator | 5 | P1 | Generate images for key locations |
-| 18.5 Scene Illustration | 5 | P1 | Optional scene header images |
-| 18.6 Cover Art Generator | 5 | P1 | Generate book cover concepts |
-| 18.7 Visual Story Bible Export | 3 | P1 | Include images in bible PDF |
-| 18.8 Image Style Consistency | 3 | P2 | Maintain consistent art style across images |
-
-**Success Criteria:**
-- Characters have AI-generated portraits
-- Portraits match character descriptions
-- Can regenerate portraits if not satisfied
-- Images export to visual story bible
-- Cover art concepts useful for marketing
-
-**Dependencies:** Image generation API (DALL-E, Midjourney, or Stable Diffusion)
-
-**Recommended Agent:** developer + ux-design-specialist
-
----
-
-### Sprint 19: Advanced Prose Control (40 points)
+> **Moved from Sprint 19** - Prose quality is a key differentiator
 
 **Goal:** Give users fine-grained control over prose style and voice
 
@@ -404,14 +371,14 @@ Based on competitor positioning and market trends:
 
 | Task | Points | Priority | Description |
 |------|--------|----------|-------------|
-| 19.1 Prose Style Editor UI | 8 | P0 | Visual controls for style parameters |
-| 19.2 Voice Sample Analyzer | 8 | P0 | Extract style patterns from user-provided text |
-| 19.3 Readability Target Setting | 5 | P0 | Control reading level (8th grade to literary) |
-| 19.4 Sentence Structure Controls | 5 | P0 | Preferences for length, variety, complexity |
-| 19.5 Genre Style Presets | 5 | P1 | Pre-built styles for 20+ subgenres |
-| 19.6 Custom Style Templates | 5 | P1 | Save and reuse custom style configurations |
-| 19.7 Style Consistency Checker | 5 | P1 | Verify chapters match target style |
-| 19.8 Style Transfer Tool | 3 | P2 | Apply new style to existing chapters |
+| 18.1 Prose Style Editor UI | 8 | P0 | Visual controls for style parameters |
+| 18.2 Voice Sample Analyzer | 8 | P0 | Extract style patterns from user-provided text |
+| 18.3 Readability Target Setting | 5 | P0 | Control reading level (8th grade to literary) |
+| 18.4 Sentence Structure Controls | 5 | P0 | Preferences for length, variety, complexity |
+| 18.5 Genre Style Presets | 5 | P1 | Pre-built styles for 20+ subgenres |
+| 18.6 Custom Style Templates | 5 | P1 | Save and reuse custom style configurations |
+| 18.7 Style Consistency Checker | 5 | P1 | Verify chapters match target style |
+| 18.8 Style Transfer Tool | 3 | P2 | Apply new style to existing chapters |
 
 **Success Criteria:**
 - Users can define custom prose style
@@ -424,7 +391,160 @@ Based on competitor positioning and market trends:
 
 ---
 
-### Sprint 20: Publishing & Marketing Tools (47 points)
+### Sprint 19: Analytics & Insights (38 points) - HIGH PRIORITY
+
+> **Moved from Sprint 23** - Data insights help users improve quality
+
+**Goal:** Provide writing analytics and quality metrics
+
+**Key Deliverables:**
+- Pacing heat map visualization
+- Character screen time tracker
+- Dialogue-to-narrative ratio
+- Readability scores per chapter
+- Tension arc graph
+- Genre benchmark comparison
+
+**Tasks:**
+
+| Task | Points | Priority | Description |
+|------|--------|----------|-------------|
+| 19.1 Pacing Heat Map | 8 | P0 | Visualize pacing across chapters |
+| 19.2 Character Screen Time | 5 | P0 | Track character appearances and POV time |
+| 19.3 Dialogue Ratio Analysis | 5 | P0 | Dialogue vs narrative percentage |
+| 19.4 Readability Scoring | 5 | P1 | Per-chapter readability metrics |
+| 19.5 Tension Arc Graph | 8 | P1 | Visualize rising/falling action |
+| 19.6 Genre Benchmarking | 5 | P1 | Compare against genre norms |
+| 19.7 Analytics Dashboard | 5 | P0 | Unified view of all metrics |
+
+**Success Criteria:**
+- Pacing visualization helps identify slow spots
+- Character balance visible at a glance
+- Readability scores guide revisions
+- Genre benchmarks validate structure
+
+**Recommended Agent:** developer + architect
+
+---
+
+### Sprint 20: Revenue Infrastructure (40 points) - HIGH PRIORITY
+
+> **Moved from Sprint 25** - Revenue critical for sustainability
+
+**Goal:** Enable subscription payments and usage tracking
+
+**Key Deliverables:**
+- Stripe payment integration
+- Subscription tier management
+- Usage quota tracking (words, novels)
+- Billing dashboard
+- Free trial system
+- Referral program
+
+**Tasks:**
+
+| Task | Points | Priority | Description |
+|------|--------|----------|-------------|
+| 20.1 Stripe Integration | 8 | P0 | Payment processing with webhooks |
+| 20.2 Subscription Tiers | 5 | P0 | Starter/Pro/Publisher tiers |
+| 20.3 Usage Quota Tracking | 8 | P0 | Track words, novels, API calls |
+| 20.4 Billing Dashboard | 5 | P0 | View invoices, upgrade/downgrade |
+| 20.5 Free Trial System | 5 | P1 | 7-day trial with limits |
+| 20.6 Referral Program | 5 | P1 | Earn credits for referrals |
+| 20.7 Usage Alerts | 3 | P1 | Notify when approaching limits |
+
+**Success Criteria:**
+- Can accept payments via Stripe
+- Subscription tiers enforce limits
+- Usage accurately tracked
+- Billing history visible
+- Trials convert to paid
+
+**Recommended Agent:** developer + architect
+
+---
+
+## Sprint 21-25: Deferred Features (Lower Priority)
+
+> **Note:** These sprints contain features marked as lower priority on 2026-01-24
+
+### Sprint 21: Custom AI Training (45 points)
+
+> **Moved from Sprint 24** - Personalization increases retention
+
+**Goal:** Allow users to train on their own writing
+
+**Tasks:**
+- Upload user manuscripts for analysis
+- Extract author's unique voice patterns
+- Fine-tuning service integration
+- Custom model management
+- Style transfer from uploaded text
+
+**Note:** Requires Claude fine-tuning API access or alternative approach
+
+---
+
+### Sprint 22: Series Management Suite (42 points)
+
+> **Moved from Sprint 26**
+
+**Tasks:**
+- Multi-series project organization
+- Series timeline visualizer
+- Character arc tracker across series
+- World state evolution tracker
+- Foreshadowing/payoff tracker
+- Series-wide search
+
+---
+
+### Sprint 23: Genre Expansion (35 points)
+
+> **Moved from Sprint 27**
+
+**Tasks:**
+- Add 15 new genre templates
+- Genre-specific tropes library
+- Subgenre blending tools
+- Genre conventions validator
+- Market trend integration
+
+---
+
+### Sprint 24: Visual Enhancements & Character Portraits (42 points) - LOW PRIORITY
+
+> **Moved from Sprint 18** - Nice-to-have, not core functionality
+
+**Goal:** Add visual elements to enhance story immersion and marketing
+
+**Key Deliverables:**
+- AI-generated character portraits
+- Location/scene images
+- Cover art generation
+- Visual story bible
+- Image export in manuscripts
+
+**Tasks:**
+
+| Task | Points | Priority | Description |
+|------|--------|----------|-------------|
+| 24.1 Image Generation Service | 8 | P0 | Integrate DALL-E or Stable Diffusion API |
+| 24.2 Character Portrait Generator | 8 | P0 | Generate portraits from character descriptions |
+| 24.3 Portrait Gallery UI | 5 | P0 | Display and manage character images |
+| 24.4 Location Image Generator | 5 | P1 | Generate images for key locations |
+| 24.5 Scene Illustration | 5 | P1 | Optional scene header images |
+| 24.6 Cover Art Generator | 5 | P1 | Generate book cover concepts |
+| 24.7 Visual Story Bible Export | 3 | P1 | Include images in bible PDF |
+| 24.8 Image Style Consistency | 3 | P2 | Maintain consistent art style across images |
+
+**Dependencies:** Image generation API (DALL-E, Midjourney, or Stable Diffusion)
+
+---
+
+### Sprint 25: Publishing & Marketing Tools (47 points) - LOW PRIORITY
+
+> **Moved from Sprint 20** - Users need core product first
 
 **Goal:** Support authors from manuscript to publication
 
@@ -440,30 +560,22 @@ Based on competitor positioning and market trends:
 
 | Task | Points | Priority | Description |
 |------|--------|----------|-------------|
-| 20.1 Blurb Generator Service | 8 | P0 | Generate compelling back-cover blurb |
-| 20.2 Blurb Variations | 5 | P0 | Multiple blurb styles (commercial, literary, etc.) |
-| 20.3 Query Letter Generator | 5 | P1 | Generate agent query letters |
-| 20.4 Series Synopsis Generator | 5 | P1 | Multi-book series description |
-| 20.5 Amazon Keyword Tool | 8 | P0 | Suggest SEO keywords for book listing |
-| 20.6 Comp Titles Suggester | 5 | P1 | Suggest comparable published titles |
-| 20.7 Metadata Manager | 5 | P0 | ISBN, categories, tags, copyright info |
-| 20.8 Marketing Copy Export | 3 | P1 | Export all marketing materials as package |
-| 20.9 Series Branding Guide | 3 | P2 | Visual consistency guide for series |
-
-**Success Criteria:**
-- Blurb generator creates compelling copy
-- Query letters follow industry format
-- Amazon keywords improve discoverability
-- Comp titles are accurate and helpful
-- All metadata managed in one place
-
-**Recommended Agent:** developer + seo-architect
+| 25.1 Blurb Generator Service | 8 | P0 | Generate compelling back-cover blurb |
+| 25.2 Blurb Variations | 5 | P0 | Multiple blurb styles (commercial, literary, etc.) |
+| 25.3 Query Letter Generator | 5 | P1 | Generate agent query letters |
+| 25.4 Series Synopsis Generator | 5 | P1 | Multi-book series description |
+| 25.5 Amazon Keyword Tool | 8 | P0 | Suggest SEO keywords for book listing |
+| 25.6 Comp Titles Suggester | 5 | P1 | Suggest comparable published titles |
+| 25.7 Metadata Manager | 5 | P0 | ISBN, categories, tags, copyright info |
+| 25.8 Marketing Copy Export | 3 | P1 | Export all marketing materials as package |
 
 ---
 
-## Sprint 21-25: Market Differentiation
+## Sprint 26-30: Expansion Features
 
-### Sprint 21: Mobile Responsive UI (35 points)
+### Sprint 26: Mobile Responsive UI (35 points) - LOW PRIORITY
+
+> **Moved from Sprint 21** - Desktop-first for power users
 
 **Goal:** Full mobile browser support for on-the-go management
 
@@ -476,7 +588,9 @@ Based on competitor positioning and market trends:
 
 ---
 
-### Sprint 22: Collaboration Features (40 points)
+### Sprint 27: Collaboration Features (40 points) - LOW PRIORITY
+
+> **Moved from Sprint 22** - Single-user focus first
 
 **Goal:** Enable teams and beta readers
 
@@ -489,7 +603,7 @@ Based on competitor positioning and market trends:
 
 ---
 
-### Sprint 23: Analytics & Insights (38 points)
+### Sprint 28: Publishing Platform Integration (38 points)
 
 **Goal:** Provide writing analytics and quality metrics
 
