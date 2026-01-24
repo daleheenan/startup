@@ -13,3 +13,4 @@ restartPolicyMaxRetries = 10
 [[mounts]]
 source = "novelforge_data"
 destination = "/data"
+
