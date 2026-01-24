@@ -38,34 +38,34 @@ const MARKET_TRENDS: Record<string, 'trending' | 'rising' | 'stable'> = {
 
 // Classic genres - traditional, well-established categories
 const CLASSIC_GENRES = [
-  { value: 'fantasy', label: 'Fantasy', trend: MARKET_TRENDS.fantasy },
-  { value: 'science-fiction', label: 'Science Fiction' },
-  { value: 'romance', label: 'Romance', trend: MARKET_TRENDS.romance },
-  { value: 'mystery', label: 'Mystery', trend: MARKET_TRENDS.mystery },
-  { value: 'thriller', label: 'Thriller', trend: MARKET_TRENDS.thriller },
-  { value: 'horror', label: 'Horror' },
-  { value: 'historical', label: 'Historical Fiction' },
-  { value: 'literary', label: 'Literary Fiction' },
-  { value: 'contemporary', label: 'Contemporary Fiction' },
-  { value: 'western', label: 'Western' },
+  { value: 'fantasy', label: 'Fantasy', description: 'Magic, mythical creatures, epic quests in imagined worlds', trend: MARKET_TRENDS.fantasy },
+  { value: 'science-fiction', label: 'Science Fiction', description: 'Future technology, space exploration, scientific speculation' },
+  { value: 'romance', label: 'Romance', description: 'Love stories, emotional connection, relationship journeys', trend: MARKET_TRENDS.romance },
+  { value: 'mystery', label: 'Mystery', description: 'Clues, investigation, puzzles to solve, whodunit revelations', trend: MARKET_TRENDS.mystery },
+  { value: 'thriller', label: 'Thriller', description: 'Suspense, danger, high stakes, and pulse-pounding tension', trend: MARKET_TRENDS.thriller },
+  { value: 'horror', label: 'Horror', description: 'Fear, terror, supernatural threats, and disturbing events' },
+  { value: 'historical', label: 'Historical Fiction', description: 'Past eras brought to life, period detail, real historical events' },
+  { value: 'literary', label: 'Literary Fiction', description: 'Character depth, beautiful prose, exploration of the human condition' },
+  { value: 'contemporary', label: 'Contemporary Fiction', description: 'Modern-day settings, relatable issues, realistic characters' },
+  { value: 'western', label: 'Western', description: 'Frontier life, cowboys, outlaws, and the American Old West' },
 ];
 
 // Specialist genres - niche, emerging, or cross-genre categories
 const SPECIALIST_GENRES = [
-  { value: 'romantasy', label: 'Romantasy', trend: MARKET_TRENDS.romantasy },
-  { value: 'cozy-fantasy', label: 'Cozy Fantasy', trend: MARKET_TRENDS['cozy-fantasy'] },
-  { value: 'grimdark', label: 'Grimdark', trend: MARKET_TRENDS.grimdark },
-  { value: 'litrpg', label: 'LitRPG / GameLit', trend: MARKET_TRENDS.litrpg },
-  { value: 'afrofuturism', label: 'Afrofuturism', trend: MARKET_TRENDS.afrofuturism },
-  { value: 'climate-fiction', label: 'Climate Fiction (Cli-Fi)', trend: MARKET_TRENDS['climate-fiction'] },
-  { value: 'solarpunk', label: 'Solarpunk', trend: MARKET_TRENDS.solarpunk },
-  { value: 'steampunk', label: 'Steampunk' },
-  { value: 'new-weird', label: 'New Weird' },
-  { value: 'paranormal', label: 'Paranormal' },
-  { value: 'wuxia', label: 'Wuxia / Xianxia' },
-  { value: 'legal-drama', label: 'Legal Drama' },
-  { value: 'medical-drama', label: 'Medical Drama' },
-  { value: 'sports-fiction', label: 'Sports Fiction' },
+  { value: 'romantasy', label: 'Romantasy', description: 'Fantasy with strong romantic subplot, often fae or magical courts', trend: MARKET_TRENDS.romantasy },
+  { value: 'cozy-fantasy', label: 'Cozy Fantasy', description: 'Low stakes, comfort, slice-of-life in magical settings', trend: MARKET_TRENDS['cozy-fantasy'] },
+  { value: 'grimdark', label: 'Grimdark', description: 'Morally grey characters, violence, cynicism, and bleak worldviews', trend: MARKET_TRENDS.grimdark },
+  { value: 'litrpg', label: 'LitRPG / GameLit', description: 'Game mechanics, leveling systems, stats, and RPG-style progression', trend: MARKET_TRENDS.litrpg },
+  { value: 'afrofuturism', label: 'Afrofuturism', description: 'African diaspora culture blended with sci-fi and fantasy elements', trend: MARKET_TRENDS.afrofuturism },
+  { value: 'climate-fiction', label: 'Climate Fiction (Cli-Fi)', description: 'Climate change impacts, environmental disasters, ecological themes', trend: MARKET_TRENDS['climate-fiction'] },
+  { value: 'solarpunk', label: 'Solarpunk', description: 'Optimistic futures, sustainable technology, eco-friendly societies', trend: MARKET_TRENDS.solarpunk },
+  { value: 'steampunk', label: 'Steampunk', description: 'Victorian era aesthetics, steam-powered technology, industrial revolution' },
+  { value: 'new-weird', label: 'New Weird', description: 'Surreal, transgressive, genre-blending with bizarre elements' },
+  { value: 'paranormal', label: 'Paranormal', description: 'Ghosts, psychics, supernatural abilities in modern settings' },
+  { value: 'wuxia', label: 'Wuxia / Xianxia', description: 'Chinese martial arts, cultivation, immortals, and Eastern fantasy' },
+  { value: 'legal-drama', label: 'Legal Drama', description: 'Courtrooms, lawyers, legal battles, and justice system conflicts' },
+  { value: 'medical-drama', label: 'Medical Drama', description: 'Hospitals, doctors, medical crises, and healthcare professionals' },
+  { value: 'sports-fiction', label: 'Sports Fiction', description: 'Athletic competition, training, teamwork, and sports culture' },
 ];
 
 // Combined for lookups
@@ -100,18 +100,18 @@ const SUBGENRES: Record<string, string[]> = {
 
 // Genre modifiers that can combine with any genre
 const GENRE_MODIFIERS = [
-  { value: 'political', label: 'Political' },
-  { value: 'military', label: 'Military' },
-  { value: 'espionage', label: 'Espionage' },
-  { value: 'heist', label: 'Heist' },
-  { value: 'action', label: 'Action' },
-  { value: 'adventure', label: 'Adventure' },
-  { value: 'romantic', label: 'Romantic' },
-  { value: 'comedic', label: 'Comedic' },
-  { value: 'dark', label: 'Dark' },
-  { value: 'epic', label: 'Epic' },
-  { value: 'survival', label: 'Survival' },
-  { value: 'psychological', label: 'Psychological' },
+  { value: 'political', label: 'Political', description: 'Power struggles, diplomacy, court intrigue, and ideological conflict' },
+  { value: 'military', label: 'Military', description: 'Warfare, combat tactics, soldier experiences, and chain of command' },
+  { value: 'espionage', label: 'Espionage', description: 'Spies, secret missions, double agents, and covert operations' },
+  { value: 'heist', label: 'Heist', description: 'Elaborate thefts, planning, teamwork, and high-stakes capers' },
+  { value: 'action', label: 'Action', description: 'Fast-paced sequences, physical confrontations, and adrenaline-fueled scenes' },
+  { value: 'adventure', label: 'Adventure', description: 'Exploration, discovery, quests, and journeys into the unknown' },
+  { value: 'romantic', label: 'Romantic', description: 'Love stories, emotional connections, and relationship development' },
+  { value: 'comedic', label: 'Comedic', description: 'Humor, wit, satire, and lighthearted moments throughout' },
+  { value: 'dark', label: 'Dark', description: 'Grim themes, moral ambiguity, disturbing content, and bleak atmosphere' },
+  { value: 'epic', label: 'Epic', description: 'Grand scale, sweeping narratives, world-changing events, and heroic journeys' },
+  { value: 'survival', label: 'Survival', description: 'Life-or-death stakes, resource scarcity, and struggle against the elements' },
+  { value: 'psychological', label: 'Psychological', description: 'Mental states, inner conflict, perception versus reality, and mind games' },
 ];
 
 // Tones with descriptions to help users understand each option
@@ -132,37 +132,37 @@ const TONES = [
 
 const COMMON_THEMES = [
   // Core Themes
-  'Power and Corruption',
-  'Love and Sacrifice',
-  'Revenge and Justice',
-  'Identity and Self-Discovery',
-  'Good vs Evil',
-  'Survival',
-  'Family and Loyalty',
-  'Freedom and Oppression',
-  'Betrayal and Trust',
-  'Redemption',
-  'Coming of Age',
-  'Nature vs Technology',
-  'War and Peace',
-  'Class and Society',
-  'Morality and Ethics',
+  { value: 'Power and Corruption', description: 'How authority corrupts and the temptation of control' },
+  { value: 'Love and Sacrifice', description: 'The things we give up for those we care about' },
+  { value: 'Revenge and Justice', description: 'Retribution, vengeance, and the price of justice' },
+  { value: 'Identity and Self-Discovery', description: 'Finding yourself, understanding who you truly are' },
+  { value: 'Good vs Evil', description: 'Moral absolutes, heroes versus villains, clear right and wrong' },
+  { value: 'Survival', description: 'Enduring against all odds, the will to live' },
+  { value: 'Family and Loyalty', description: 'Bonds of blood and chosen family, staying true to loved ones' },
+  { value: 'Freedom and Oppression', description: 'Fighting tyranny, liberation, the cost of liberty' },
+  { value: 'Betrayal and Trust', description: 'Broken faith, deception, and the fragility of loyalty' },
+  { value: 'Redemption', description: 'Second chances, atonement, earning forgiveness' },
+  { value: 'Coming of Age', description: 'Growing up, losing innocence, the transition to adulthood' },
+  { value: 'Nature vs Technology', description: 'Natural world versus artificial progress, balance or conflict' },
+  { value: 'War and Peace', description: 'Conflict and its aftermath, the cost of violence versus harmony' },
+  { value: 'Class and Society', description: 'Social hierarchies, inequality, revolution or acceptance' },
+  { value: 'Morality and Ethics', description: 'Right and wrong, difficult choices, philosophical dilemmas' },
   // Additional Themes
-  'Forbidden Love',
-  'Time and Mortality',
-  'Ambition and Hubris',
-  'Faith and Doubt',
-  'Memory and Forgetting',
-  'Isolation and Connection',
-  'Legacy and Heritage',
-  'Secrets and Lies',
-  'Hope and Despair',
-  'Transformation',
-  'Obsession',
-  'Fate vs Free Will',
-  'Truth and Deception',
-  'Innocence and Experience',
-  'Greed and Generosity',
+  { value: 'Forbidden Love', description: 'Romance that defies social rules or consequences' },
+  { value: 'Time and Mortality', description: 'Death, aging, legacy, and our finite existence' },
+  { value: 'Ambition and Hubris', description: 'The drive for greatness and the pride that destroys' },
+  { value: 'Faith and Doubt', description: 'Belief systems challenged, spiritual crisis and revelation' },
+  { value: 'Memory and Forgetting', description: 'The past haunting us, selective amnesia, what we choose to remember' },
+  { value: 'Isolation and Connection', description: 'Loneliness versus belonging, the human need for others' },
+  { value: 'Legacy and Heritage', description: 'What we inherit and what we leave behind' },
+  { value: 'Secrets and Lies', description: 'Hidden truths, deception, and the burden of knowledge' },
+  { value: 'Hope and Despair', description: 'Optimism in darkness, or surrender to hopelessness' },
+  { value: 'Transformation', description: 'Change, evolution, becoming something new' },
+  { value: 'Obsession', description: 'Unhealthy fixation, consuming passion, losing yourself to desire' },
+  { value: 'Fate vs Free Will', description: 'Destiny versus choice, predetermination or agency' },
+  { value: 'Truth and Deception', description: 'Seeking reality, manipulation, and hidden agendas' },
+  { value: 'Innocence and Experience', description: 'Loss of naivety, wisdom gained through hardship' },
+  { value: 'Greed and Generosity', description: 'Selfishness versus selflessness, material versus spiritual wealth' },
 ];
 
 export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePreferenceFormProps) {
@@ -421,9 +421,9 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
           <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Select up to 4)</span>
         </label>
         <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '0.5rem',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+          gap: '0.625rem',
         }}>
           {GENRE_MODIFIERS.map(mod => (
             <button
@@ -431,11 +431,37 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
               type="button"
               onClick={() => handleModifierToggle(mod.value)}
               disabled={isLoading || (!modifiers.includes(mod.value) && modifiers.length >= 4)}
-              style={chipStyle(modifiers.includes(mod.value), isLoading || (!modifiers.includes(mod.value) && modifiers.length >= 4))}
+              style={{
+                padding: '0.75rem 1rem',
+                background: modifiers.includes(mod.value)
+                  ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                  : '#F8FAFC',
+                border: modifiers.includes(mod.value)
+                  ? '1px solid #667eea'
+                  : '1px solid #E2E8F0',
+                borderRadius: '8px',
+                color: modifiers.includes(mod.value) ? '#FFFFFF' : '#374151',
+                cursor: isLoading || (!modifiers.includes(mod.value) && modifiers.length >= 4) ? 'not-allowed' : 'pointer',
+                opacity: isLoading || (!modifiers.includes(mod.value) && modifiers.length >= 4) ? 0.5 : 1,
+                transition: 'all 0.2s',
+                textAlign: 'left',
+              }}
             >
-              {mod.label}
+              <div style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.25rem' }}>
+                {mod.label}
+              </div>
+              <div style={{
+                fontSize: '0.75rem',
+                opacity: modifiers.includes(mod.value) ? 0.9 : 0.7,
+                lineHeight: 1.3,
+              }}>
+                {mod.description}
+              </div>
             </button>
           ))}
+        </div>
+        <div style={{ marginTop: '0.625rem', fontSize: '0.813rem', color: '#64748B' }}>
+          Selected: {modifiers.length}/4
         </div>
       </div>
 
@@ -457,9 +483,9 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
             Classic Genres
           </div>
           <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '0.5rem',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            gap: '0.625rem',
           }}>
             {CLASSIC_GENRES.map(g => (
               <button
@@ -468,14 +494,32 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
                 onClick={() => handleGenreToggle(g.value)}
                 disabled={isLoading || (!genres.includes(g.value) && genres.length >= 3)}
                 style={{
-                  ...chipStyle(genres.includes(g.value), isLoading || (!genres.includes(g.value) && genres.length >= 3)),
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.25rem',
+                  padding: '0.75rem 1rem',
+                  background: genres.includes(g.value)
+                    ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                    : '#F8FAFC',
+                  border: genres.includes(g.value)
+                    ? '1px solid #667eea'
+                    : '1px solid #E2E8F0',
+                  borderRadius: '8px',
+                  color: genres.includes(g.value) ? '#FFFFFF' : '#374151',
+                  cursor: isLoading || (!genres.includes(g.value) && genres.length >= 3) ? 'not-allowed' : 'pointer',
+                  opacity: isLoading || (!genres.includes(g.value) && genres.length >= 3) ? 0.5 : 1,
+                  transition: 'all 0.2s',
+                  textAlign: 'left',
                 }}
               >
-                <span>{g.label}</span>
-                {getTrendBadge(g.trend)}
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.25rem' }}>
+                  <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{g.label}</span>
+                  {getTrendBadge(g.trend)}
+                </div>
+                <div style={{
+                  fontSize: '0.75rem',
+                  opacity: genres.includes(g.value) ? 0.9 : 0.7,
+                  lineHeight: 1.3,
+                }}>
+                  {g.description}
+                </div>
               </button>
             ))}
           </div>
@@ -487,9 +531,9 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
             Specialist Genres
           </div>
           <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '0.5rem',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            gap: '0.625rem',
           }}>
             {SPECIALIST_GENRES.map(g => (
               <button
@@ -498,17 +542,38 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
                 onClick={() => handleGenreToggle(g.value)}
                 disabled={isLoading || (!genres.includes(g.value) && genres.length >= 3)}
                 style={{
-                  ...chipStyle(genres.includes(g.value), isLoading || (!genres.includes(g.value) && genres.length >= 3)),
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.25rem',
+                  padding: '0.75rem 1rem',
+                  background: genres.includes(g.value)
+                    ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                    : '#F8FAFC',
+                  border: genres.includes(g.value)
+                    ? '1px solid #667eea'
+                    : '1px solid #E2E8F0',
+                  borderRadius: '8px',
+                  color: genres.includes(g.value) ? '#FFFFFF' : '#374151',
+                  cursor: isLoading || (!genres.includes(g.value) && genres.length >= 3) ? 'not-allowed' : 'pointer',
+                  opacity: isLoading || (!genres.includes(g.value) && genres.length >= 3) ? 0.5 : 1,
+                  transition: 'all 0.2s',
+                  textAlign: 'left',
                 }}
               >
-                <span>{g.label}</span>
-                {getTrendBadge(g.trend)}
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.25rem' }}>
+                  <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{g.label}</span>
+                  {getTrendBadge(g.trend)}
+                </div>
+                <div style={{
+                  fontSize: '0.75rem',
+                  opacity: genres.includes(g.value) ? 0.9 : 0.7,
+                  lineHeight: 1.3,
+                }}>
+                  {g.description}
+                </div>
               </button>
             ))}
           </div>
+        </div>
+        <div style={{ marginTop: '0.625rem', fontSize: '0.813rem', color: '#64748B' }}>
+          Selected: {genres.length}/3
         </div>
         {errors.genres && <div style={errorStyle}>{errors.genres}</div>}
       </div>
@@ -604,34 +669,41 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
         </label>
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
           gap: '0.625rem',
         }}>
           {COMMON_THEMES.map(theme => (
             <button
-              key={theme}
+              key={theme.value}
               type="button"
-              onClick={() => handleThemeToggle(theme)}
-              disabled={isLoading || (!themes.includes(theme) && themes.length >= 5)}
+              onClick={() => handleThemeToggle(theme.value)}
+              disabled={isLoading || (!themes.includes(theme.value) && themes.length >= 5)}
               style={{
-                padding: '0.625rem 1rem',
-                background: themes.includes(theme)
+                padding: '0.75rem 1rem',
+                background: themes.includes(theme.value)
                   ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
                   : '#F8FAFC',
-                border: themes.includes(theme)
+                border: themes.includes(theme.value)
                   ? '1px solid #667eea'
                   : '1px solid #E2E8F0',
                 borderRadius: '8px',
-                color: themes.includes(theme) ? '#FFFFFF' : '#374151',
-                fontSize: '0.813rem',
-                fontWeight: 500,
-                cursor: isLoading || (!themes.includes(theme) && themes.length >= 5) ? 'not-allowed' : 'pointer',
-                opacity: isLoading || (!themes.includes(theme) && themes.length >= 5) ? 0.5 : 1,
+                color: themes.includes(theme.value) ? '#FFFFFF' : '#374151',
+                cursor: isLoading || (!themes.includes(theme.value) && themes.length >= 5) ? 'not-allowed' : 'pointer',
+                opacity: isLoading || (!themes.includes(theme.value) && themes.length >= 5) ? 0.5 : 1,
                 transition: 'all 0.2s',
-                textAlign: 'center',
+                textAlign: 'left',
               }}
             >
-              {theme}
+              <div style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.25rem' }}>
+                {theme.value}
+              </div>
+              <div style={{
+                fontSize: '0.75rem',
+                opacity: themes.includes(theme.value) ? 0.9 : 0.7,
+                lineHeight: 1.3,
+              }}>
+                {theme.description}
+              </div>
             </button>
           ))}
         </div>
