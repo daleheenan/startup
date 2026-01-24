@@ -1,0 +1,25 @@
+Design Principles & Requirements
+
+1. The "Fire-and-Forget" Dashboard (Right Panel)
+
+Session Lifecycle Widget: Unlike a static dashboard, this must prominently display the "Claude Max" session status, showing the precise time remaining until the next 5-hour reset.
+
+The Progress Orbit: A central visualization showing where the current chapter is in the 5-agent ensemble pipeline (Author → Developmental → Line → Continuity → Copy).
+
+DNA Snapshot: A small, read-only panel showing the core Story DNA (Genre, Tone, Themes) so the user can verify the "System Prompts" currently in use.
+
+2. Standalone Page Requirements
+Page Functional UX Requirement
+Story Architect. A "Step-by-Step" wizard for Phase 1 (Setup) including Concept selection and Outline editing.
+The Bible. A searchable "Entity Library" for Characters and World elements that the Continuity Editor references.
+Writing Engine. A live-streaming log of prose generation that checkpoints every job, allowing the user to "walk away" safely.
+Export Portal. A clean interface for downloading the final 80,000+ word manuscript in DOCX or PDF once the generation is complete.
+Visual Implementation Prompt. Use this prompt to generate the standalone NovelForge UI:
+
+Prompt: A high-fidelity standalone SaaS dashboard for 'NovelForge.' Layout: Light-themed left sidebar with navigation icons: 'Architect', 'Bible', 'Engine', and 'Exports'. Main Panel: Clean, light-themed workspace.
+
+Top Row: A 'Claude Max Status' card with a blue circular progress timer showing 'Reset in 2h 14m' and a 'Job Queue' count of 'PENDING: 36 Chapters'.
+
+Middle Area: A large 'Current Chapter' module showing Chapter 14. On the left of this module, a live text-streaming window; on the right, a vertical 'Agent Ensemble' checklist (Author: Complete, Developmental: Running, Line: Waiting).
+
+Bottom Row: Small status cards for 'Story DNA: Sci-Fi / Noir' and 'Project Status: Generating'. Minimalist aesthetic, ultra-modern typography, professional software interface.

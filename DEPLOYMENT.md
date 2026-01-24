@@ -98,6 +98,14 @@ railway variables set DATABASE_PATH=/data/novelforge.db
 railway variables set NODE_ENV=production
 railway variables set PORT=3001
 railway variables set FRONTEND_URL=https://your-frontend-url.railway.app
+railway variables set JWT_SECRET=$(openssl rand -base64 48)
+railway variables set OWNER_PASSWORD_HASH='$2b$10$...'
+```
+
+**Generate password hash:**
+```bash
+cd backend
+npm run hash-password "your-secure-password"
 ```
 
 #### Frontend Service (novelforge-web)
@@ -154,6 +162,8 @@ destination = "/data"
 |----------|---------|----------|-------------|
 | `ANTHROPIC_API_KEY` | Backend | Yes | Claude API key |
 | `DATABASE_PATH` | Backend | Yes | `/data/novelforge.db` |
+| `JWT_SECRET` | Backend | Yes | Random 64-char string for JWT signing |
+| `OWNER_PASSWORD_HASH` | Backend | Yes | Bcrypt hash of owner password |
 | `NODE_ENV` | Both | Yes | `production` |
 | `PORT` | Both | Yes | Backend: 3001, Frontend: 3000 |
 | `FRONTEND_URL` | Backend | Yes | Frontend's Railway URL |

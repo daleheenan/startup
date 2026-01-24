@@ -121,6 +121,34 @@ export function runMigrations() {
       }
     }
 
+    // Migration 003: Agent Learning System
+    if (currentVersion < 3) {
+      console.log('[Migrations] Applying migration 003: Agent Learning System');
+      const migrationPath = path.join(__dirname, 'migrations', '003_agent_learning.sql');
+      const migration = fs.readFileSync(migrationPath, 'utf-8');
+
+      db.exec('BEGIN TRANSACTION');
+
+      try {
+        // Split by semicolons and execute each statement
+        const statements = migration
+          .split(';')
+          .map(s => s.trim())
+          .filter(s => s.length > 0 && !s.startsWith('--'));
+
+        for (const statement of statements) {
+          db.exec(statement);
+        }
+
+        db.prepare(`INSERT INTO schema_migrations (version) VALUES (3)`).run();
+        db.exec('COMMIT');
+        console.log('[Migrations] Migration 003 applied successfully');
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+      }
+    }
+
     console.log('[Migrations] All migrations complete');
   } catch (error) {
     try {

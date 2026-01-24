@@ -1,0 +1,101 @@
+import express from 'express';
+import { reflectionsService } from '../services/reflections.js';
+
+const router = express.Router();
+
+/**
+ * GET /api/reflections
+ * Query reflections with optional filters
+ */
+router.get('/', async (req, res) => {
+  try {
+    const { agent_type, job_id, chapter_id, project_id, unpromoted, limit } = req.query;
+
+    const reflections = await reflectionsService.query({
+      agent_type: agent_type as string,
+      job_id: job_id as string,
+      chapter_id: chapter_id as string,
+      project_id: project_id as string,
+      unpromoted: unpromoted === 'true',
+      limit: limit ? Number(limit) : 100,
+    });
+
+    res.json(reflections);
+  } catch (error) {
+    console.error('[Reflections] Query error:', error);
+    res.status(500).json({ error: 'Failed to query reflections' });
+  }
+});
+
+/**
+ * GET /api/reflections/:id
+ * Get a single reflection by ID
+ */
+router.get('/:id', async (req, res) => {
+  try {
+    const reflection = await reflectionsService.getById(req.params.id);
+
+    if (!reflection) {
+      return res.status(404).json({ error: 'Reflection not found' });
+    }
+
+    res.json(reflection);
+  } catch (error) {
+    console.error('[Reflections] Get error:', error);
+    res.status(500).json({ error: 'Failed to get reflection' });
+  }
+});
+
+/**
+ * POST /api/reflections
+ * Create a new reflection
+ */
+router.post('/', async (req, res) => {
+  try {
+    const { job_id, agent_type, chapter_id, project_id, reflection } = req.body;
+
+    // Validation
+    if (!job_id || !agent_type || !reflection) {
+      return res.status(400).json({
+        error: 'Missing required fields: job_id, agent_type, reflection',
+      });
+    }
+
+    const created = await reflectionsService.create({
+      job_id,
+      agent_type,
+      chapter_id,
+      project_id,
+      reflection,
+    });
+
+    res.status(201).json(created);
+  } catch (error) {
+    console.error('[Reflections] Create error:', error);
+    res.status(500).json({ error: 'Failed to create reflection' });
+  }
+});
+
+/**
+ * PATCH /api/reflections/:id/promote
+ * Link a reflection to a lesson
+ */
+router.patch('/:id/promote', async (req, res) => {
+  try {
+    const { lesson_id } = req.body;
+
+    if (!lesson_id) {
+      return res.status(400).json({ error: 'lesson_id is required' });
+    }
+
+    await reflectionsService.linkToLesson(req.params.id, lesson_id);
+
+    const updated = await reflectionsService.getById(req.params.id);
+    res.json(updated);
+  } catch (error) {
+    console.error('[Reflections] Promote error:', error);
+    res.status(500).json({ error: 'Failed to promote reflection' });
+  }
+});
+
+export default router;

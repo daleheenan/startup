@@ -29,7 +29,13 @@
       "Bash(curl:*)",
       "Bash(python:*)",
       "Bash(npx tsx:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(nslookup:*)",
+      "Bash(ls:*)",
+      "Bash(claude agent --help:*)",
+      "Bash(MSYS_NO_PATHCONV=1 railway variables set:*)",
+      "Bash(find:*)",
+      "Bash(test:*)"
     ]
   }
 }

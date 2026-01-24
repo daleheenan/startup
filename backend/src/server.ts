@@ -3,6 +3,11 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { runMigrations } from './db/migrate.js';
 import { queueWorker } from './queue/worker.js';
+import { requireAuth } from './middleware/auth.js';
+import authRouter from './routes/auth.js';
+import progressRouter from './routes/progress.js';
+import lessonsRouter from './routes/lessons.js';
+import reflectionsRouter from './routes/reflections.js';
 import projectsRouter from './routes/projects.js';
 import queueRouter from './routes/queue.js';
 import conceptsRouter from './routes/concepts.js';
@@ -35,22 +40,28 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health check
+// Health check (public)
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// API Routes
-app.use('/api/projects', projectsRouter);
-app.use('/api/queue', queueRouter);
-app.use('/api/concepts', conceptsRouter);
-app.use('/api/outlines', outlinesRouter);
-app.use('/api/books', booksRouter);
-app.use('/api/chapters', chaptersRouter);
-app.use('/api/generation', generationRouter);
-app.use('/api/editing', editingRouter);
-app.use('/api/export', exportRouter);
-app.use('/api/trilogy', trilogyRouter);
+// Public API Routes
+app.use('/api/auth', authRouter);
+
+// Protected API Routes (require authentication)
+app.use('/api/progress', requireAuth, progressRouter);
+app.use('/api/lessons', requireAuth, lessonsRouter);
+app.use('/api/reflections', requireAuth, reflectionsRouter);
+app.use('/api/projects', requireAuth, projectsRouter);
+app.use('/api/queue', requireAuth, queueRouter);
+app.use('/api/concepts', requireAuth, conceptsRouter);
+app.use('/api/outlines', requireAuth, outlinesRouter);
+app.use('/api/books', requireAuth, booksRouter);
+app.use('/api/chapters', requireAuth, chaptersRouter);
+app.use('/api/generation', requireAuth, generationRouter);
+app.use('/api/editing', requireAuth, editingRouter);
+app.use('/api/export', requireAuth, exportRouter);
+app.use('/api/trilogy', requireAuth, trilogyRouter);
 
 // Error handling
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
