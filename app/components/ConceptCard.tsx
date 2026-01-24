@@ -1,5 +1,7 @@
 'use client';
 
+import { colors, gradients, borderRadius, shadows } from '../lib/constants';
+
 interface StoryConcept {
   id: string;
   title: string;
@@ -25,19 +27,17 @@ export default function ConceptCard({ concept, isSelected, onSelect, onSave, dis
       style={{
         background: isSelected
           ? 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)'
-          : '#FFFFFF',
+          : colors.surface,
         border: isSelected
-          ? '2px solid #667eea'
-          : '1px solid #E2E8F0',
-        borderRadius: '12px',
+          ? `2px solid ${colors.brandStart}`
+          : `1px solid ${colors.border}`,
+        borderRadius: borderRadius.lg,
         padding: '1.5rem',
         cursor: disabled ? 'not-allowed' : 'pointer',
         transition: 'all 0.2s',
         opacity: disabled ? 0.6 : 1,
         position: 'relative',
-        boxShadow: isSelected
-          ? '0 4px 14px rgba(102, 126, 234, 0.2)'
-          : '0 1px 3px rgba(0,0,0,0.05)',
+        boxShadow: isSelected ? shadows.md : shadows.sm,
       }}
     >
       {/* Selection Indicator */}
@@ -48,12 +48,12 @@ export default function ConceptCard({ concept, isSelected, onSelect, onSave, dis
           right: '1rem',
           width: '24px',
           height: '24px',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          borderRadius: '50%',
+          background: gradients.brand,
+          borderRadius: borderRadius.full,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          color: '#fff',
+          color: colors.surface,
           fontSize: '14px',
         }}>
           ✓
@@ -64,7 +64,7 @@ export default function ConceptCard({ concept, isSelected, onSelect, onSave, dis
       <h3 style={{
         fontSize: '1.5rem',
         marginBottom: '1rem',
-        color: '#1A1A2E',
+        color: colors.text,
         paddingRight: '2rem',
       }}>
         {concept.title}
@@ -74,9 +74,9 @@ export default function ConceptCard({ concept, isSelected, onSelect, onSave, dis
       <div style={{
         marginBottom: '1rem',
         padding: '0.75rem',
-        background: '#EEF2FF',
-        borderLeft: '3px solid #667eea',
-        borderRadius: '4px',
+        background: colors.brandLight,
+        borderLeft: `3px solid ${colors.brandStart}`,
+        borderRadius: borderRadius.sm,
       }}>
         <p style={{
           fontSize: '0.95rem',
@@ -159,9 +159,9 @@ export default function ConceptCard({ concept, isSelected, onSelect, onSave, dis
             width: '100%',
             padding: '0.625rem',
             background: 'transparent',
-            border: '1px solid #E2E8F0',
-            borderRadius: '6px',
-            color: '#64748B',
+            border: `1px solid ${colors.border}`,
+            borderRadius: borderRadius.sm,
+            color: colors.textSecondary,
             fontSize: '0.875rem',
             fontWeight: 500,
             cursor: disabled ? 'not-allowed' : 'pointer',

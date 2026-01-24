@@ -4,9 +4,12 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import ExportButtons from '../../components/ExportButtons';
-import { getToken, logout } from '../../lib/auth';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+import PageLayout from '../../components/shared/PageLayout';
+import LoadingState from '../../components/shared/LoadingState';
+import ErrorMessage from '../../components/shared/ErrorMessage';
+import { fetchJson } from '../../lib/fetch-utils';
+import { colors, gradients, borderRadius, shadows } from '../../lib/constants';
+import { card, statusBadge } from '../../lib/styles';
 
 interface Project {
   id: string;
@@ -36,23 +39,7 @@ export default function ProjectDetailPage() {
 
   const fetchProject = async () => {
     try {
-      const token = getToken();
-      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      if (!response.ok) {
-        if (response.status === 401) {
-          logout();
-          window.location.href = '/login';
-          return;
-        }
-        throw new Error('Failed to fetch project');
-      }
-
-      const data = await response.json();
+      const data = await fetchJson<Project>(`/api/projects/${projectId}`);
       setProject(data);
     } catch (err: any) {
       console.error('Error fetching project:', err);
@@ -62,43 +49,8 @@ export default function ProjectDetailPage() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'setup': return '#667eea';
-      case 'generating': return '#F59E0B';
-      case 'completed': return '#10B981';
-      default: return '#64748B';
-    }
-  };
-
   if (isLoading) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: '#F8FAFC',
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            display: 'inline-block',
-            width: '48px',
-            height: '48px',
-            border: '3px solid #E2E8F0',
-            borderTopColor: '#667eea',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite'
-          }} />
-          <p style={{ marginTop: '1rem', color: '#64748B' }}>Loading project...</p>
-        </div>
-        <style jsx>{`
-          @keyframes spin {
-            to { transform: rotate(360deg); }
-          }
-        `}</style>
-      </div>
-    );
+    return <LoadingState message="Loading project..." />;
   }
 
   if (error || !project) {
@@ -108,21 +60,21 @@ export default function ProjectDetailPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#F8FAFC',
+        background: colors.background,
         padding: '2rem'
       }}>
         <div style={{
           maxWidth: '600px',
           textAlign: 'center',
-          background: '#FEF2F2',
-          border: '1px solid #FECACA',
-          borderRadius: '12px',
+          background: colors.errorLight,
+          border: `1px solid ${colors.errorBorder}`,
+          borderRadius: borderRadius.lg,
           padding: '2rem'
         }}>
-          <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#DC2626' }}>
+          <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: colors.error }}>
             Error Loading Project
           </h2>
-          <p style={{ color: '#64748B', marginBottom: '2rem' }}>
+          <p style={{ color: colors.textSecondary, marginBottom: '2rem' }}>
             {error || 'Project not found'}
           </p>
           <Link
@@ -130,10 +82,10 @@ export default function ProjectDetailPage() {
             style={{
               display: 'inline-block',
               padding: '0.75rem 1.5rem',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              background: gradients.brand,
               border: 'none',
-              borderRadius: '8px',
-              color: '#fff',
+              borderRadius: borderRadius.md,
+              color: colors.surface,
               fontSize: '1rem',
               fontWeight: 600,
               textDecoration: 'none',
@@ -146,116 +98,34 @@ export default function ProjectDetailPage() {
     );
   }
 
-  return (
+  const subtitle = (
     <div style={{
       display: 'flex',
-      minHeight: '100vh',
-      background: '#F8FAFC',
+      gap: '0.75rem',
+      fontSize: '0.875rem',
+      color: colors.textSecondary,
+      alignItems: 'center',
     }}>
-      {/* Left Sidebar */}
-      <aside style={{
-        width: '72px',
-        background: '#FFFFFF',
-        borderRight: '1px solid #E2E8F0',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        padding: '1.5rem 0',
-      }}>
-        <Link
-          href="/projects"
-          style={{
-            width: '40px',
-            height: '40px',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            borderRadius: '10px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#FFFFFF',
-            fontWeight: '700',
-            fontSize: '1.25rem',
-            textDecoration: 'none',
-          }}
-        >
-          N
-        </Link>
-      </aside>
+      <span>{project.genre}</span>
+      <span>•</span>
+      <span style={{ textTransform: 'capitalize' }}>{project.type}</span>
+      <span>•</span>
+      <span style={statusBadge(project.status)}>
+        {project.status}
+      </span>
+    </div>
+  );
 
-      {/* Main Content */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        {/* Top Bar */}
-        <header style={{
-          padding: '1rem 2rem',
-          background: '#FFFFFF',
-          borderBottom: '1px solid #E2E8F0',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}>
-          <div>
-            <h1 style={{
-              fontSize: '1.5rem',
-              fontWeight: '700',
-              color: '#1A1A2E',
-              margin: 0,
-            }}>
-              {project.title}
-            </h1>
-            <div style={{
-              display: 'flex',
-              gap: '0.75rem',
-              fontSize: '0.875rem',
-              color: '#64748B',
-              alignItems: 'center',
-              marginTop: '0.25rem',
-            }}>
-              <span>{project.genre}</span>
-              <span>•</span>
-              <span style={{ textTransform: 'capitalize' }}>{project.type}</span>
-              <span>•</span>
-              <span style={{
-                padding: '0.25rem 0.75rem',
-                background: `${getStatusColor(project.status)}15`,
-                color: getStatusColor(project.status),
-                borderRadius: '20px',
-                fontSize: '0.75rem',
-                fontWeight: '500',
-                textTransform: 'capitalize',
-              }}>
-                {project.status}
-              </span>
-            </div>
-          </div>
-          <Link
-            href="/projects"
-            style={{
-              padding: '0.5rem 1rem',
-              color: '#64748B',
-              textDecoration: 'none',
-              fontSize: '0.875rem',
-            }}
-          >
-            ← Back to Projects
-          </Link>
-        </header>
-
-        {/* Content Area */}
-        <div style={{
-          flex: 1,
-          padding: '2rem',
-          overflow: 'auto',
-        }}>
-          <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+  return (
+    <PageLayout
+      title={project.title}
+      subtitle={subtitle as any}
+      backLink="/projects"
+      backText="← Back to Projects"
+    >
+      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
             {/* Project Details */}
-            <div style={{
-              background: '#FFFFFF',
-              border: '1px solid #E2E8F0',
-              borderRadius: '12px',
-              padding: '1.5rem',
-              marginBottom: '1rem',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            }}>
+            <div style={{ ...card, marginBottom: '1rem' }}>
               <h2 style={{ fontSize: '1.125rem', marginBottom: '1rem', color: '#1A1A2E', fontWeight: 600 }}>
                 Project Details
               </h2>
@@ -272,14 +142,7 @@ export default function ProjectDetailPage() {
             </div>
 
             {/* Story DNA Section */}
-            <div style={{
-              background: '#FFFFFF',
-              border: '1px solid #E2E8F0',
-              borderRadius: '12px',
-              padding: '1.5rem',
-              marginBottom: '1rem',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            }}>
+            <div style={{ ...card, marginBottom: '1rem' }}>
               <h2 style={{ fontSize: '1.125rem', marginBottom: '1rem', color: '#1A1A2E', fontWeight: 600 }}>
                 Story DNA
               </h2>
@@ -301,14 +164,7 @@ export default function ProjectDetailPage() {
             </div>
 
             {/* Story Bible Section */}
-            <div style={{
-              background: '#FFFFFF',
-              border: '1px solid #E2E8F0',
-              borderRadius: '12px',
-              padding: '1.5rem',
-              marginBottom: '1rem',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            }}>
+            <div style={{ ...card, marginBottom: '1rem' }}>
               <h2 style={{ fontSize: '1.125rem', marginBottom: '1rem', color: '#1A1A2E', fontWeight: 600 }}>
                 Story Bible
               </h2>
@@ -348,14 +204,7 @@ export default function ProjectDetailPage() {
             )}
 
             {/* Next Steps */}
-            <div style={{
-              background: '#FFFFFF',
-              border: '1px solid #E2E8F0',
-              borderRadius: '12px',
-              padding: '1.5rem',
-              marginTop: '1rem',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            }}>
+            <div style={{ ...card, marginTop: '1rem' }}>
               <h2 style={{ fontSize: '1.125rem', marginBottom: '1rem', color: '#1A1A2E', fontWeight: 600 }}>
                 Next Steps
               </h2>
@@ -420,15 +269,7 @@ export default function ProjectDetailPage() {
                 )}
               </div>
             </div>
-          </div>
-        </div>
-      </main>
-
-      <style jsx>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
-    </div>
+      </div>
+    </PageLayout>
   );
 }

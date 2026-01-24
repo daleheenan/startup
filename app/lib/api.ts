@@ -1,8 +1,7 @@
 // API client for NovelForge backend
 
 import { getToken } from './auth';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+import { API_BASE_URL } from './constants';
 
 /**
  * Get headers with authentication token if available

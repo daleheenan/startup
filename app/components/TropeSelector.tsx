@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { colors, borderRadius, API_BASE_URL } from '../lib/constants';
+import { getToken } from '../lib/auth';
 
 export interface GenreTrope {
   id: string;
@@ -54,8 +56,8 @@ export default function TropeSelector({
       setError(null);
 
       try {
-        const token = localStorage.getItem('auth_token');
-        const response = await fetch('http://localhost:3001/api/genre-tropes/recommended', {
+        const token = getToken();
+        const response = await fetch(`${API_BASE_URL}/api/genre-tropes/recommended`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -107,13 +109,13 @@ export default function TropeSelector({
   const getFrequencyColor = (frequency: string): string => {
     switch (frequency) {
       case 'common':
-        return '#10B981';
+        return colors.success;
       case 'moderate':
-        return '#F59E0B';
+        return colors.warning;
       case 'rare':
-        return '#6366F1';
+        return colors.info;
       default:
-        return '#64748B';
+        return colors.textSecondary;
     }
   };
 
@@ -155,10 +157,10 @@ export default function TropeSelector({
         style={{
           padding: '2rem',
           textAlign: 'center',
-          color: '#64748B',
-          background: '#F8FAFC',
-          borderRadius: '8px',
-          border: '1px dashed #CBD5E1',
+          color: colors.textSecondary,
+          background: colors.background,
+          borderRadius: borderRadius.md,
+          border: `1px dashed ${colors.borderHover}`,
         }}
       >
         Select genres above to see available tropes
@@ -172,7 +174,7 @@ export default function TropeSelector({
         style={{
           padding: '2rem',
           textAlign: 'center',
-          color: '#64748B',
+          color: colors.textSecondary,
         }}
       >
         Loading tropes...
@@ -185,10 +187,10 @@ export default function TropeSelector({
       <div
         style={{
           padding: '1rem',
-          background: '#FEF2F2',
-          border: '1px solid #FCA5A5',
-          borderRadius: '8px',
-          color: '#DC2626',
+          background: colors.errorLight,
+          border: `1px solid ${colors.errorBorder}`,
+          borderRadius: borderRadius.md,
+          color: colors.error,
         }}
       >
         {error}
@@ -241,10 +243,10 @@ export default function TropeSelector({
             onClick={() => setFilterType(type)}
             style={{
               padding: '0.5rem 1rem',
-              background: filterType === type ? '#667eea' : '#F8FAFC',
-              border: `1px solid ${filterType === type ? '#667eea' : '#E2E8F0'}`,
+              background: filterType === type ? colors.brandStart : colors.background,
+              border: `1px solid ${filterType === type ? colors.brandStart : colors.border}`,
               borderRadius: '20px',
-              color: filterType === type ? '#FFFFFF' : '#374151',
+              color: filterType === type ? colors.surface : '#374151',
               fontSize: '0.813rem',
               fontWeight: 500,
               cursor: 'pointer',
@@ -291,9 +293,9 @@ export default function TropeSelector({
                   <div
                     key={trope.id}
                     style={{
-                      background: '#FFFFFF',
-                      border: `2px solid ${selection ? '#667eea' : '#E2E8F0'}`,
-                      borderRadius: '8px',
+                      background: colors.surface,
+                      border: `2px solid ${selection ? colors.brandStart : colors.border}`,
+                      borderRadius: borderRadius.md,
                       padding: '1rem',
                       transition: 'all 0.2s',
                     }}
@@ -480,9 +482,9 @@ export default function TropeSelector({
           style={{
             marginTop: '1rem',
             padding: '1rem',
-            background: '#EEF2FF',
-            border: '1px solid #C7D2FE',
-            borderRadius: '8px',
+            background: colors.brandLight,
+            border: `1px solid ${colors.brandBorder}`,
+            borderRadius: borderRadius.md,
           }}
         >
           <div style={{ fontSize: '0.813rem', fontWeight: 600, color: '#374151', marginBottom: '0.5rem' }}>

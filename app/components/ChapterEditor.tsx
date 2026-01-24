@@ -1,12 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getToken, logout } from '../lib/auth';
+import { fetchWithAuth } from '../lib/fetch-utils';
+import { colors, borderRadius } from '../lib/constants';
 import VariationPicker from './VariationPicker';
 import RegenerationToolbar from './RegenerationToolbar';
 import RegenerationHistory from './RegenerationHistory';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 interface ChapterEditorProps {
   chapterId: string;
@@ -57,20 +56,9 @@ export default function ChapterEditor({ chapterId, onClose }: ChapterEditorProps
 
   const fetchChapterData = useCallback(async () => {
     try {
-      const token = getToken();
-      const res = await fetch(`${API_BASE_URL}/api/editing/chapters/${chapterId}/edit`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const res = await fetchWithAuth(`/api/editing/chapters/${chapterId}/edit`);
 
       if (!res.ok) {
-        if (res.status === 401) {
-          logout();
-          window.location.href = '/login';
-          return;
-        }
         throw new Error('Failed to fetch chapter');
       }
 
@@ -116,13 +104,8 @@ export default function ChapterEditor({ chapterId, onClose }: ChapterEditorProps
   const handleSave = async () => {
     setSaving(true);
     try {
-      const token = getToken();
-      const res = await fetch(`${API_BASE_URL}/api/editing/chapters/${chapterId}/edit`, {
+      const res = await fetchWithAuth(`/api/editing/chapters/${chapterId}/edit`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           content,
           isLocked,
@@ -145,20 +128,13 @@ export default function ChapterEditor({ chapterId, onClose }: ChapterEditorProps
   };
 
   const handleRevert = async () => {
-    const confirmed = window.confirm(
-      'Are you sure you want to revert to the original version? This will delete all your edits.'
-    );
-
-    if (!confirmed) return;
+    if (!window.confirm('Are you sure you want to revert to the original version? This will delete all your edits.')) {
+      return;
+    }
 
     try {
-      const token = getToken();
-      const res = await fetch(`${API_BASE_URL}/api/editing/chapters/${chapterId}/edit`, {
+      const res = await fetchWithAuth(`/api/editing/chapters/${chapterId}/edit`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
       });
 
       if (!res.ok) {
@@ -179,15 +155,10 @@ export default function ChapterEditor({ chapterId, onClose }: ChapterEditorProps
 
   const handleToggleLock = async () => {
     try {
-      const token = getToken();
       const newLockState = !isLocked;
 
-      const res = await fetch(`${API_BASE_URL}/api/editing/chapters/${chapterId}/lock`, {
+      const res = await fetchWithAuth(`/api/editing/chapters/${chapterId}/lock`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ isLocked: newLockState }),
       });
 
@@ -248,15 +219,10 @@ export default function ChapterEditor({ chapterId, onClose }: ChapterEditorProps
 
     setGeneratingVariations(true);
     try {
-      const token = getToken();
-      const res = await fetch(
-        `${API_BASE_URL}/api/regeneration/chapters/${chapterId}/regenerate-selection`,
+      const res = await fetchWithAuth(
+        `/api/regeneration/chapters/${chapterId}/regenerate-selection`,
         {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
           body: JSON.stringify({
             selectionStart,
             selectionEnd,
@@ -267,11 +233,6 @@ export default function ChapterEditor({ chapterId, onClose }: ChapterEditorProps
       );
 
       if (!res.ok) {
-        if (res.status === 401) {
-          logout();
-          window.location.href = '/login';
-          return;
-        }
         throw new Error('Failed to generate variations');
       }
 
@@ -454,15 +415,15 @@ export default function ChapterEditor({ chapterId, onClose }: ChapterEditorProps
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    backgroundColor: '#fff',
-    borderRadius: '8px',
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
     padding: '24px',
     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
   },
   loading: {
     textAlign: 'center',
     padding: '48px',
-    color: '#666',
+    color: colors.textTertiary,
   },
   header: {
     display: 'flex',
@@ -476,7 +437,7 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
     fontSize: '24px',
     fontWeight: 600,
-    color: '#1A1A2E',
+    color: colors.text,
   },
   toolbar: {
     display: 'flex',

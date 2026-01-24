@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { colors, borderRadius, API_BASE_URL } from '../lib/constants';
+import { card } from '../lib/styles';
 
 interface Flag {
   id: string;
@@ -27,7 +29,7 @@ export default function FlagsPanel({ chapterId, chapterNumber }: FlagsPanelProps
 
   async function fetchFlags() {
     try {
-      const response = await fetch(`http://localhost:3001/api/editing/chapters/${chapterId}/flags`);
+      const response = await fetch(`${API_BASE_URL}/api/editing/chapters/${chapterId}/flags`);
       if (!response.ok) throw new Error('Failed to fetch flags');
 
       const data = await response.json();
@@ -43,12 +45,11 @@ export default function FlagsPanel({ chapterId, chapterNumber }: FlagsPanelProps
   async function resolveFlag(flagId: string) {
     try {
       const response = await fetch(
-        `http://localhost:3001/api/editing/chapters/${chapterId}/flags/${flagId}/resolve`,
+        `${API_BASE_URL}/api/editing/chapters/${chapterId}/flags/${flagId}/resolve`,
         { method: 'POST' }
       );
       if (!response.ok) throw new Error('Failed to resolve flag');
 
-      // Refresh flags
       await fetchFlags();
     } catch (err: any) {
       console.error('Error resolving flag:', err);
@@ -56,15 +57,16 @@ export default function FlagsPanel({ chapterId, chapterNumber }: FlagsPanelProps
     }
   }
 
+  const panelStyle = {
+    ...card,
+    background: 'rgba(255, 255, 255, 0.05)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+  };
+
   if (loading) {
     return (
-      <div style={{
-        background: 'rgba(255, 255, 255, 0.05)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
-        borderRadius: '8px',
-        padding: '1.5rem',
-      }}>
-        <p style={{ color: '#888', margin: 0 }}>Loading flags...</p>
+      <div style={panelStyle}>
+        <p style={{ color: colors.textSecondary, margin: 0 }}>Loading flags...</p>
       </div>
     );
   }
@@ -72,12 +74,11 @@ export default function FlagsPanel({ chapterId, chapterNumber }: FlagsPanelProps
   if (error) {
     return (
       <div style={{
+        ...panelStyle,
         background: 'rgba(255, 100, 100, 0.1)',
         border: '1px solid rgba(255, 100, 100, 0.3)',
-        borderRadius: '8px',
-        padding: '1.5rem',
       }}>
-        <p style={{ color: '#ff6b6b', margin: 0 }}>{error}</p>
+        <p style={{ color: colors.red, margin: 0 }}>{error}</p>
       </div>
     );
   }
@@ -87,24 +88,19 @@ export default function FlagsPanel({ chapterId, chapterNumber }: FlagsPanelProps
 
   if (flags.length === 0) {
     return (
-      <div style={{
-        background: 'rgba(255, 255, 255, 0.05)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
-        borderRadius: '8px',
-        padding: '1.5rem',
-      }}>
+      <div style={panelStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
           <div style={{
             width: '8px',
             height: '8px',
-            borderRadius: '50%',
-            background: '#4ade80',
+            borderRadius: borderRadius.full,
+            background: colors.green,
           }} />
           <h3 style={{ fontSize: '1rem', margin: 0, color: '#ededed' }}>
             Chapter {chapterNumber} - Editor Flags
           </h3>
         </div>
-        <p style={{ color: '#888', fontSize: '0.875rem', margin: 0 }}>
+        <p style={{ color: colors.textSecondary, fontSize: '0.875rem', margin: 0 }}>
           No issues flagged. Chapter looks good!
         </p>
       </div>
@@ -112,29 +108,24 @@ export default function FlagsPanel({ chapterId, chapterNumber }: FlagsPanelProps
   }
 
   return (
-    <div style={{
-      background: 'rgba(255, 255, 255, 0.05)',
-      border: '1px solid rgba(255, 255, 255, 0.1)',
-      borderRadius: '8px',
-      padding: '1.5rem',
-    }}>
+    <div style={panelStyle}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <div style={{
             width: '8px',
             height: '8px',
-            borderRadius: '50%',
-            background: unresolvedFlags.length > 0 ? '#fbbf24' : '#4ade80',
+            borderRadius: borderRadius.full,
+            background: unresolvedFlags.length > 0 ? colors.yellow : colors.green,
           }} />
           <h3 style={{ fontSize: '1rem', margin: 0, color: '#ededed' }}>
             Chapter {chapterNumber} - Editor Flags
           </h3>
         </div>
         <div style={{ display: 'flex', gap: '1rem', fontSize: '0.75rem' }}>
-          <span style={{ color: '#fbbf24' }}>
+          <span style={{ color: colors.yellow }}>
             {unresolvedFlags.length} unresolved
           </span>
-          <span style={{ color: '#4ade80' }}>
+          <span style={{ color: colors.green }}>
             {resolvedFlags.length} resolved
           </span>
         </div>
