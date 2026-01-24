@@ -4,7 +4,9 @@ import { useState } from 'react';
 
 export interface StoryPreferences {
   genre: string;
-  subgenre: string;
+  genres: string[]; // Support multi-genre
+  subgenres: string[]; // Support multi-subgenre
+  modifiers: string[]; // Genre modifiers like Political, Military
   tone: string;
   themes: string[];
   targetLength: number;
@@ -29,16 +31,32 @@ const GENRES = [
 ];
 
 const SUBGENRES: Record<string, string[]> = {
-  fantasy: ['Epic Fantasy', 'Urban Fantasy', 'Dark Fantasy', 'High Fantasy', 'Low Fantasy'],
-  'science-fiction': ['Space Opera', 'Cyberpunk', 'Hard SF', 'Dystopian', 'Post-Apocalyptic'],
-  mystery: ['Cozy Mystery', 'Police Procedural', 'Detective', 'Noir', 'Whodunit'],
-  thriller: ['Psychological Thriller', 'Action Thriller', 'Legal Thriller', 'Medical Thriller'],
-  romance: ['Contemporary Romance', 'Historical Romance', 'Paranormal Romance', 'Romantic Comedy'],
-  horror: ['Supernatural Horror', 'Psychological Horror', 'Gothic Horror', 'Cosmic Horror'],
-  literary: ['Contemporary Literary', 'Experimental', 'Philosophical', 'Character-Driven'],
-  historical: ['Ancient History', 'Medieval', 'Victorian Era', 'World War Era', '20th Century'],
-  contemporary: ['Family Drama', 'Coming of Age', 'Social Issues', 'Workplace Drama'],
+  fantasy: ['Epic Fantasy', 'Urban Fantasy', 'Dark Fantasy', 'High Fantasy', 'Low Fantasy', 'Sword & Sorcery'],
+  'science-fiction': ['Space Opera', 'Cyberpunk', 'Hard SF', 'Dystopian', 'Post-Apocalyptic', 'First Contact'],
+  mystery: ['Cozy Mystery', 'Police Procedural', 'Detective', 'Noir', 'Whodunit', 'Legal Mystery'],
+  thriller: ['Psychological Thriller', 'Action Thriller', 'Legal Thriller', 'Medical Thriller', 'Spy Thriller'],
+  romance: ['Contemporary Romance', 'Historical Romance', 'Paranormal Romance', 'Romantic Comedy', 'Slow Burn'],
+  horror: ['Supernatural Horror', 'Psychological Horror', 'Gothic Horror', 'Cosmic Horror', 'Body Horror'],
+  literary: ['Contemporary Literary', 'Experimental', 'Philosophical', 'Character-Driven', 'Magical Realism'],
+  historical: ['Ancient History', 'Medieval', 'Victorian Era', 'World War Era', '20th Century', 'Alternate History'],
+  contemporary: ['Family Drama', 'Coming of Age', 'Social Issues', 'Workplace Drama', 'Slice of Life'],
 };
+
+// Genre modifiers that can combine with any genre
+const GENRE_MODIFIERS = [
+  { value: 'political', label: 'Political' },
+  { value: 'military', label: 'Military' },
+  { value: 'espionage', label: 'Espionage' },
+  { value: 'heist', label: 'Heist' },
+  { value: 'action', label: 'Action' },
+  { value: 'adventure', label: 'Adventure' },
+  { value: 'romantic', label: 'Romantic' },
+  { value: 'comedic', label: 'Comedic' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'epic', label: 'Epic' },
+  { value: 'survival', label: 'Survival' },
+  { value: 'psychological', label: 'Psychological' },
+];
 
 const TONES = [
   'Dark and Gritty',
@@ -49,6 +67,8 @@ const TONES = [
   'Hopeful and Uplifting',
   'Satirical and Witty',
   'Melancholic and Reflective',
+  'Tense and Fast-Paced',
+  'Morally Complex',
 ];
 
 const COMMON_THEMES = [
@@ -64,16 +84,52 @@ const COMMON_THEMES = [
   'Redemption',
   'Coming of Age',
   'Nature vs Technology',
+  'War and Peace',
+  'Class and Society',
+  'Morality and Ethics',
 ];
 
 export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePreferenceFormProps) {
-  const [genre, setGenre] = useState('');
-  const [subgenre, setSubgenre] = useState('');
+  const [genres, setGenres] = useState<string[]>([]);
+  const [subgenres, setSubgenres] = useState<string[]>([]);
+  const [modifiers, setModifiers] = useState<string[]>([]);
   const [tone, setTone] = useState('');
   const [themes, setThemes] = useState<string[]>([]);
   const [targetLength, setTargetLength] = useState(80000);
   const [additionalNotes, setAdditionalNotes] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const handleGenreToggle = (genreValue: string) => {
+    if (genres.includes(genreValue)) {
+      setGenres(genres.filter(g => g !== genreValue));
+      // Remove subgenres that belong to the deselected genre
+      setSubgenres(subgenres.filter(sg => !SUBGENRES[genreValue]?.includes(sg)));
+    } else {
+      if (genres.length < 3) {
+        setGenres([...genres, genreValue]);
+      }
+    }
+  };
+
+  const handleSubgenreToggle = (subgenre: string) => {
+    if (subgenres.includes(subgenre)) {
+      setSubgenres(subgenres.filter(sg => sg !== subgenre));
+    } else {
+      if (subgenres.length < 3) {
+        setSubgenres([...subgenres, subgenre]);
+      }
+    }
+  };
+
+  const handleModifierToggle = (modifier: string) => {
+    if (modifiers.includes(modifier)) {
+      setModifiers(modifiers.filter(m => m !== modifier));
+    } else {
+      if (modifiers.length < 4) {
+        setModifiers([...modifiers, modifier]);
+      }
+    }
+  };
 
   const handleThemeToggle = (theme: string) => {
     if (themes.includes(theme)) {
@@ -85,11 +141,14 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
     }
   };
 
+  // Get available subgenres based on selected genres
+  const availableSubgenres = genres.flatMap(g => SUBGENRES[g] || []);
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!genre) newErrors.genre = 'Please select a genre';
-    if (!subgenre) newErrors.subgenre = 'Please select a subgenre';
+    if (genres.length === 0) newErrors.genres = 'Please select at least one genre';
+    if (subgenres.length === 0) newErrors.subgenres = 'Please select at least one subgenre';
     if (!tone) newErrors.tone = 'Please select a tone';
     if (themes.length === 0) newErrors.themes = 'Please select at least one theme';
     if (targetLength < 40000) newErrors.targetLength = 'Target length must be at least 40,000 words';
@@ -106,9 +165,16 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
       return;
     }
 
+    // Build combined genre string for backward compatibility
+    const genreLabels = genres.map(g => GENRES.find(genre => genre.value === g)?.label || g);
+    const modifierLabels = modifiers.map(m => GENRE_MODIFIERS.find(mod => mod.value === m)?.label || m);
+    const combinedGenre = [...modifierLabels, ...genreLabels].join(' ');
+
     const preferences: StoryPreferences = {
-      genre,
-      subgenre,
+      genre: combinedGenre,
+      genres,
+      subgenres,
+      modifiers,
       tone,
       themes,
       targetLength,
@@ -118,83 +184,186 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
     onSubmit(preferences);
   };
 
-  const inputStyle = {
-    width: '100%',
-    padding: '0.75rem',
-    background: 'rgba(255, 255, 255, 0.05)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    borderRadius: '6px',
-    color: '#ededed',
-    fontSize: '1rem',
+  // Build a preview of the genre combination
+  const genrePreview = () => {
+    const parts: string[] = [];
+    if (modifiers.length > 0) {
+      parts.push(modifiers.map(m => GENRE_MODIFIERS.find(mod => mod.value === m)?.label).join(', '));
+    }
+    if (genres.length > 0) {
+      parts.push(genres.map(g => GENRES.find(genre => genre.value === g)?.label).join(' + '));
+    }
+    if (subgenres.length > 0) {
+      parts.push(`(${subgenres.join(', ')})`);
+    }
+    return parts.join(' ') || 'Select genres and modifiers...';
   };
 
-  const labelStyle = {
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '0.875rem 1rem',
+    background: '#FFFFFF',
+    border: '1px solid #E2E8F0',
+    borderRadius: '8px',
+    color: '#1A1A2E',
+    fontSize: '1rem',
+    outline: 'none',
+    transition: 'border-color 0.2s, box-shadow 0.2s',
+    appearance: 'none',
+    WebkitAppearance: 'none',
+  };
+
+  const selectStyle: React.CSSProperties = {
+    ...inputStyle,
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2364748B' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E")`,
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 1rem center',
+    paddingRight: '2.5rem',
+    cursor: 'pointer',
+  };
+
+  const labelStyle: React.CSSProperties = {
     display: 'block',
     marginBottom: '0.5rem',
-    color: '#ededed',
-    fontWeight: 500,
+    color: '#374151',
+    fontWeight: 600,
+    fontSize: '0.875rem',
   };
 
-  const errorStyle = {
-    color: '#ef4444',
-    fontSize: '0.875rem',
-    marginTop: '0.25rem',
+  const errorStyle: React.CSSProperties = {
+    color: '#DC2626',
+    fontSize: '0.813rem',
+    marginTop: '0.375rem',
   };
+
+  const sectionStyle: React.CSSProperties = {
+    marginBottom: '1.75rem',
+  };
+
+  const chipStyle = (selected: boolean, disabled: boolean): React.CSSProperties => ({
+    padding: '0.5rem 1rem',
+    background: selected
+      ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      : '#F8FAFC',
+    border: selected
+      ? '1px solid #667eea'
+      : '1px solid #E2E8F0',
+    borderRadius: '20px',
+    color: selected ? '#FFFFFF' : '#374151',
+    fontSize: '0.813rem',
+    fontWeight: 500,
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    opacity: disabled ? 0.5 : 1,
+    transition: 'all 0.2s',
+    whiteSpace: 'nowrap',
+  });
 
   return (
     <form onSubmit={handleSubmit} style={{ width: '100%' }}>
-      {/* Genre Selection */}
-      <div style={{ marginBottom: '1.5rem' }}>
+      {/* Genre Preview */}
+      <div style={{
+        ...sectionStyle,
+        padding: '1rem',
+        background: '#EEF2FF',
+        border: '1px solid #C7D2FE',
+        borderRadius: '8px',
+      }}>
+        <div style={{ fontSize: '0.75rem', color: '#64748B', marginBottom: '0.25rem' }}>
+          Story Genre:
+        </div>
+        <div style={{ fontSize: '1.125rem', fontWeight: 600, color: '#1A1A2E' }}>
+          {genrePreview()}
+        </div>
+      </div>
+
+      {/* Genre Modifiers */}
+      <div style={sectionStyle}>
         <label style={labelStyle}>
-          Genre *
+          Genre Modifiers
+          <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Select up to 4)</span>
         </label>
-        <select
-          value={genre}
-          onChange={(e) => {
-            setGenre(e.target.value);
-            setSubgenre(''); // Reset subgenre when genre changes
-          }}
-          style={inputStyle}
-          disabled={isLoading}
-        >
-          <option value="">Select a genre...</option>
-          {GENRES.map(g => (
-            <option key={g.value} value={g.value}>{g.label}</option>
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '0.5rem',
+        }}>
+          {GENRE_MODIFIERS.map(mod => (
+            <button
+              key={mod.value}
+              type="button"
+              onClick={() => handleModifierToggle(mod.value)}
+              disabled={isLoading || (!modifiers.includes(mod.value) && modifiers.length >= 4)}
+              style={chipStyle(modifiers.includes(mod.value), isLoading || (!modifiers.includes(mod.value) && modifiers.length >= 4))}
+            >
+              {mod.label}
+            </button>
           ))}
-        </select>
-        {errors.genre && <div style={errorStyle}>{errors.genre}</div>}
+        </div>
+      </div>
+
+      {/* Primary Genre Selection */}
+      <div style={sectionStyle}>
+        <label style={labelStyle}>
+          Primary Genre <span style={{ color: '#DC2626' }}>*</span>
+          <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Select 1-3)</span>
+        </label>
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '0.5rem',
+        }}>
+          {GENRES.map(g => (
+            <button
+              key={g.value}
+              type="button"
+              onClick={() => handleGenreToggle(g.value)}
+              disabled={isLoading || (!genres.includes(g.value) && genres.length >= 3)}
+              style={chipStyle(genres.includes(g.value), isLoading || (!genres.includes(g.value) && genres.length >= 3))}
+            >
+              {g.label}
+            </button>
+          ))}
+        </div>
+        {errors.genres && <div style={errorStyle}>{errors.genres}</div>}
       </div>
 
       {/* Subgenre Selection */}
-      {genre && (
-        <div style={{ marginBottom: '1.5rem' }}>
+      {genres.length > 0 && (
+        <div style={sectionStyle}>
           <label style={labelStyle}>
-            Subgenre *
+            Subgenre <span style={{ color: '#DC2626' }}>*</span>
+            <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Select 1-3)</span>
           </label>
-          <select
-            value={subgenre}
-            onChange={(e) => setSubgenre(e.target.value)}
-            style={inputStyle}
-            disabled={isLoading}
-          >
-            <option value="">Select a subgenre...</option>
-            {SUBGENRES[genre]?.map(sg => (
-              <option key={sg} value={sg}>{sg}</option>
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '0.5rem',
+          }}>
+            {availableSubgenres.map(sg => (
+              <button
+                key={sg}
+                type="button"
+                onClick={() => handleSubgenreToggle(sg)}
+                disabled={isLoading || (!subgenres.includes(sg) && subgenres.length >= 3)}
+                style={chipStyle(subgenres.includes(sg), isLoading || (!subgenres.includes(sg) && subgenres.length >= 3))}
+              >
+                {sg}
+              </button>
             ))}
-          </select>
-          {errors.subgenre && <div style={errorStyle}>{errors.subgenre}</div>}
+          </div>
+          {errors.subgenres && <div style={errorStyle}>{errors.subgenres}</div>}
         </div>
       )}
 
       {/* Tone Selection */}
-      <div style={{ marginBottom: '1.5rem' }}>
+      <div style={sectionStyle}>
         <label style={labelStyle}>
-          Tone *
+          Tone <span style={{ color: '#DC2626' }}>*</span>
         </label>
         <select
           value={tone}
           onChange={(e) => setTone(e.target.value)}
-          style={inputStyle}
+          style={selectStyle}
           disabled={isLoading}
         >
           <option value="">Select a tone...</option>
@@ -206,14 +375,15 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
       </div>
 
       {/* Themes Selection */}
-      <div style={{ marginBottom: '1.5rem' }}>
+      <div style={sectionStyle}>
         <label style={labelStyle}>
-          Themes * (Select 1-5)
+          Themes <span style={{ color: '#DC2626' }}>*</span>
+          <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Select 1-5)</span>
         </label>
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-          gap: '0.5rem'
+          gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+          gap: '0.625rem',
         }}>
           {COMMON_THEMES.map(theme => (
             <button
@@ -222,35 +392,37 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
               onClick={() => handleThemeToggle(theme)}
               disabled={isLoading || (!themes.includes(theme) && themes.length >= 5)}
               style={{
-                padding: '0.5rem 1rem',
+                padding: '0.625rem 1rem',
                 background: themes.includes(theme)
                   ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                  : 'rgba(255, 255, 255, 0.05)',
+                  : '#F8FAFC',
                 border: themes.includes(theme)
-                  ? '1px solid rgba(102, 126, 234, 0.5)'
-                  : '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '6px',
-                color: '#ededed',
-                fontSize: '0.875rem',
+                  ? '1px solid #667eea'
+                  : '1px solid #E2E8F0',
+                borderRadius: '8px',
+                color: themes.includes(theme) ? '#FFFFFF' : '#374151',
+                fontSize: '0.813rem',
+                fontWeight: 500,
                 cursor: isLoading || (!themes.includes(theme) && themes.length >= 5) ? 'not-allowed' : 'pointer',
                 opacity: isLoading || (!themes.includes(theme) && themes.length >= 5) ? 0.5 : 1,
                 transition: 'all 0.2s',
+                textAlign: 'center',
               }}
             >
               {theme}
             </button>
           ))}
         </div>
-        <div style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#888' }}>
+        <div style={{ marginTop: '0.625rem', fontSize: '0.813rem', color: '#64748B' }}>
           Selected: {themes.length}/5
         </div>
         {errors.themes && <div style={errorStyle}>{errors.themes}</div>}
       </div>
 
       {/* Target Length */}
-      <div style={{ marginBottom: '1.5rem' }}>
+      <div style={sectionStyle}>
         <label style={labelStyle}>
-          Target Length (words) *
+          Target Length (words) <span style={{ color: '#DC2626' }}>*</span>
         </label>
         <input
           type="number"
@@ -262,16 +434,17 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
           style={inputStyle}
           disabled={isLoading}
         />
-        <div style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#888' }}>
+        <div style={{ marginTop: '0.5rem', fontSize: '0.813rem', color: '#64748B' }}>
           Typical novel: 70,000-100,000 words. Epic fantasy: 100,000-150,000 words.
         </div>
         {errors.targetLength && <div style={errorStyle}>{errors.targetLength}</div>}
       </div>
 
       {/* Additional Notes */}
-      <div style={{ marginBottom: '2rem' }}>
+      <div style={sectionStyle}>
         <label style={labelStyle}>
-          Additional Notes (Optional)
+          Additional Notes
+          <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Optional)</span>
         </label>
         <textarea
           value={additionalNotes}
@@ -295,15 +468,16 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
           width: '100%',
           padding: '1rem',
           background: isLoading
-            ? 'rgba(102, 126, 234, 0.3)'
+            ? '#94A3B8'
             : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
           border: 'none',
           borderRadius: '8px',
-          color: '#fff',
-          fontSize: '1.125rem',
+          color: '#FFFFFF',
+          fontSize: '1rem',
           fontWeight: 600,
           cursor: isLoading ? 'not-allowed' : 'pointer',
           transition: 'all 0.2s',
+          boxShadow: isLoading ? 'none' : '0 4px 14px rgba(102, 126, 234, 0.4)',
         }}
       >
         {isLoading ? 'Generating Concepts...' : 'Generate Story Concepts'}

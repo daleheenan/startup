@@ -17,6 +17,8 @@ export class QueueWorker {
   private isRunning = false;
   private currentJob: Job | null = null;
   private pollIntervalMs = 1000; // Check queue every second
+  private shutdownPromise: Promise<void> | null = null;
+  private shutdownResolve: (() => void) | null = null;
 
   /**
    * Start the queue worker
@@ -43,11 +45,38 @@ export class QueueWorker {
   }
 
   /**
-   * Stop the queue worker
+   * Stop the queue worker gracefully
+   * Waits for the current job to complete before resolving
    */
-  stop(): void {
+  stop(): Promise<void> {
+    if (this.shutdownPromise) {
+      return this.shutdownPromise;
+    }
+
     this.isRunning = false;
     console.log('[QueueWorker] Stopping...');
+
+    // If no job is running, resolve immediately
+    if (!this.currentJob) {
+      console.log('[QueueWorker] No active job, stopped immediately');
+      return Promise.resolve();
+    }
+
+    // Wait for current job to finish
+    this.shutdownPromise = new Promise((resolve) => {
+      this.shutdownResolve = resolve;
+      console.log(`[QueueWorker] Waiting for job ${this.currentJob?.id} to complete...`);
+
+      // Timeout after 60 seconds
+      setTimeout(() => {
+        if (this.currentJob) {
+          console.warn(`[QueueWorker] Timeout waiting for job ${this.currentJob.id}, forcing shutdown`);
+        }
+        resolve();
+      }, 60000);
+    });
+
+    return this.shutdownPromise;
   }
 
   /**
@@ -80,34 +109,51 @@ export class QueueWorker {
       }
     } finally {
       this.currentJob = null;
+      // Signal shutdown if waiting
+      if (this.shutdownResolve && !this.isRunning) {
+        console.log('[QueueWorker] Job complete, shutdown proceeding');
+        this.shutdownResolve();
+      }
     }
   }
 
   /**
-   * Pick up the next pending job from the queue
+   * Pick up the next pending job from the queue atomically
+   * Uses a transaction with status check to prevent race conditions
    */
   private pickupJob(): Job | null {
-    const stmt = db.prepare<[], Job>(`
-      SELECT * FROM jobs
-      WHERE status = 'pending'
-      ORDER BY created_at ASC
-      LIMIT 1
-    `);
+    const now = new Date().toISOString();
 
-    const job = stmt.get();
-    if (!job) return null;
+    // Use transaction to ensure atomic SELECT + UPDATE
+    const transaction = db.transaction(() => {
+      const stmt = db.prepare<[], Job>(`
+        SELECT * FROM jobs
+        WHERE status = 'pending'
+        ORDER BY created_at ASC
+        LIMIT 1
+      `);
 
-    // Mark as running
-    const updateStmt = db.prepare(`
-      UPDATE jobs
-      SET status = 'running', started_at = ?
-      WHERE id = ?
-    `);
+      const job = stmt.get();
+      if (!job) return null;
 
-    updateStmt.run(new Date().toISOString(), job.id);
+      // Atomically update only if status is still 'pending'
+      // This prevents race conditions with other workers
+      const updateStmt = db.prepare(`
+        UPDATE jobs
+        SET status = 'running', started_at = ?
+        WHERE id = ? AND status = 'pending'
+      `);
 
-    // Return updated job
-    return { ...job, status: 'running', started_at: new Date().toISOString() };
+      const result = updateStmt.run(now, job.id);
+
+      // If no rows updated, another worker got it first
+      if (result.changes === 0) return null;
+
+      // Return updated job
+      return { ...job, status: 'running' as const, started_at: now };
+    });
+
+    return transaction();
   }
 
   /**

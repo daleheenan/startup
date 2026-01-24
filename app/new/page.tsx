@@ -2,7 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import GenrePreferenceForm from '../components/GenrePreferenceForm';
+import { getToken } from '../lib/auth';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function NewProjectPage() {
   const router = useRouter();
@@ -14,10 +18,13 @@ export default function NewProjectPage() {
     setError(null);
 
     try {
-      // Generate concepts via backend API
-      const response = await fetch('http://localhost:3001/api/concepts/generate', {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/concepts/generate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify({ preferences }),
       });
 
@@ -40,100 +47,159 @@ export default function NewProjectPage() {
   };
 
   return (
-    <main style={{
-      minHeight: '100vh',
+    <div style={{
       display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      padding: '2rem',
+      minHeight: '100vh',
+      background: '#F8FAFC',
     }}>
-      <div style={{ maxWidth: '800px', width: '100%' }}>
-        {/* Header */}
-        <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
-          <h1 style={{
-            fontSize: '2.5rem',
-            marginBottom: '0.5rem',
+      {/* Left Sidebar */}
+      <aside style={{
+        width: '72px',
+        background: '#FFFFFF',
+        borderRight: '1px solid #E2E8F0',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: '1.5rem 0',
+      }}>
+        <Link
+          href="/projects"
+          style={{
+            width: '40px',
+            height: '40px',
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text'
-          }}>
-            Create New Novel
-          </h1>
-          <p style={{ fontSize: '1.125rem', color: '#888' }}>
-            Tell us about your story, and we'll generate 5 unique concepts for you to choose from
-          </p>
-        </div>
+            borderRadius: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#FFFFFF',
+            fontWeight: '700',
+            fontSize: '1.25rem',
+            textDecoration: 'none',
+          }}
+        >
+          N
+        </Link>
+      </aside>
 
-        {/* Error Message */}
-        {error && (
-          <div style={{
-            background: 'rgba(239, 68, 68, 0.1)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-            borderRadius: '8px',
-            padding: '1rem',
-            marginBottom: '2rem',
-            color: '#ef4444'
-          }}>
-            {error}
-          </div>
-        )}
-
-        {/* Form */}
-        <GenrePreferenceForm
-          onSubmit={handleSubmit}
-          isLoading={isGenerating}
-        />
-
-        {/* Progress Indicator */}
-        {isGenerating && (
-          <div style={{
-            marginTop: '2rem',
-            padding: '1.5rem',
-            background: 'rgba(102, 126, 234, 0.1)',
-            border: '1px solid rgba(102, 126, 234, 0.3)',
-            borderRadius: '8px',
-            textAlign: 'center'
-          }}>
-            <div style={{
-              display: 'inline-block',
-              width: '40px',
-              height: '40px',
-              border: '4px solid rgba(102, 126, 234, 0.3)',
-              borderTopColor: '#667eea',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite',
-              marginBottom: '1rem'
-            }} />
-            <p style={{ color: '#667eea', fontWeight: 500 }}>
-              Generating story concepts with Claude AI...
-            </p>
-            <p style={{ color: '#888', fontSize: '0.875rem', marginTop: '0.5rem' }}>
-              This may take up to 2 minutes
+      {/* Main Content */}
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        {/* Top Bar */}
+        <header style={{
+          padding: '1rem 2rem',
+          background: '#FFFFFF',
+          borderBottom: '1px solid #E2E8F0',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}>
+          <div>
+            <h1 style={{
+              fontSize: '1.5rem',
+              fontWeight: '700',
+              color: '#1A1A2E',
+              margin: 0,
+            }}>
+              Create New Novel
+            </h1>
+            <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
+              Tell us about your story and we'll generate concepts
             </p>
           </div>
-        )}
-
-        {/* Back Link */}
-        <div style={{ marginTop: '2rem', textAlign: 'center' }}>
-          <a
-            href="/"
+          <Link
+            href="/projects"
             style={{
-              color: '#667eea',
+              padding: '0.5rem 1rem',
+              color: '#64748B',
               textDecoration: 'none',
-              fontSize: '0.875rem'
+              fontSize: '0.875rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
             }}
           >
-            ← Back to Home
-          </a>
+            ← Back to Projects
+          </Link>
+        </header>
+
+        {/* Content Area */}
+        <div style={{
+          flex: 1,
+          padding: '2rem',
+          overflow: 'auto',
+          display: 'flex',
+          justifyContent: 'center',
+        }}>
+          <div style={{ maxWidth: '700px', width: '100%' }}>
+            {/* Error Message */}
+            {error && (
+              <div style={{
+                background: '#FEF2F2',
+                border: '1px solid #FECACA',
+                borderRadius: '12px',
+                padding: '1rem 1.5rem',
+                marginBottom: '1.5rem',
+                color: '#DC2626',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+              }}>
+                <span>⚠️</span>
+                {error}
+              </div>
+            )}
+
+            {/* Form Card */}
+            <div style={{
+              background: '#FFFFFF',
+              border: '1px solid #E2E8F0',
+              borderRadius: '16px',
+              padding: '2rem',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+            }}>
+              <GenrePreferenceForm
+                onSubmit={handleSubmit}
+                isLoading={isGenerating}
+              />
+            </div>
+
+            {/* Progress Indicator */}
+            {isGenerating && (
+              <div style={{
+                marginTop: '1.5rem',
+                padding: '1.5rem',
+                background: '#EEF2FF',
+                border: '1px solid #C7D2FE',
+                borderRadius: '12px',
+                textAlign: 'center',
+              }}>
+                <div style={{
+                  display: 'inline-block',
+                  width: '40px',
+                  height: '40px',
+                  border: '3px solid #E0E7FF',
+                  borderTopColor: '#667eea',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                  marginBottom: '1rem',
+                }} />
+                <p style={{ color: '#4F46E5', fontWeight: 600, margin: 0 }}>
+                  Generating story concepts with Claude AI...
+                </p>
+                <p style={{ color: '#6366F1', fontSize: '0.875rem', marginTop: '0.5rem' }}>
+                  This may take up to 2 minutes
+                </p>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      </main>
 
       <style jsx>{`
         @keyframes spin {
           to { transform: rotate(360deg); }
         }
       `}</style>
-    </main>
+    </div>
   );
 }

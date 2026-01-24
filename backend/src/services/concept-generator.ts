@@ -9,7 +9,10 @@ const anthropic = new Anthropic({
 
 export interface StoryPreferences {
   genre: string;
-  subgenre: string;
+  genres?: string[];
+  subgenre?: string;
+  subgenres?: string[];
+  modifiers?: string[];
   tone: string;
   themes: string[];
   targetLength: number;
@@ -77,15 +80,20 @@ export async function generateConcepts(
  * Build the prompt for concept generation
  */
 function buildConceptPrompt(preferences: StoryPreferences): string {
-  const { genre, subgenre, tone, themes, targetLength, additionalNotes } = preferences;
+  const { genre, genres, subgenre, subgenres, modifiers, tone, themes, targetLength, additionalNotes } = preferences;
+
+  // Support both old single-genre format and new multi-genre format
+  const genreText = genre || (genres && genres.length > 0 ? genres.join(' + ') : 'Not specified');
+  const subgenreText = subgenre || (subgenres && subgenres.length > 0 ? subgenres.join(', ') : 'Not specified');
+  const modifiersText = modifiers && modifiers.length > 0 ? modifiers.join(', ') : null;
 
   const themesText = themes.join(', ');
   const wordCountContext = getWordCountContext(targetLength);
 
   return `You are a master storyteller and concept developer. Generate 5 diverse, compelling story concepts based on these preferences:
 
-**Genre:** ${genre}
-**Subgenre:** ${subgenre}
+**Genre:** ${genreText}${modifiersText ? ` (with ${modifiersText} elements)` : ''}
+**Subgenre:** ${subgenreText}
 **Tone:** ${tone}
 **Themes:** ${themesText}
 **Target Length:** ${targetLength.toLocaleString()} words (${wordCountContext})
@@ -127,6 +135,106 @@ Return ONLY a JSON array of 5 concepts in this exact format:
   },
   ...
 ]`;
+}
+
+/**
+ * Refine existing concepts based on user feedback
+ */
+export async function refineConcepts(
+  preferences: StoryPreferences,
+  existingConcepts: StoryConcept[],
+  feedback: string
+): Promise<StoryConcept[]> {
+  const { genre, genres, subgenre, subgenres, modifiers, tone, themes, targetLength, additionalNotes } = preferences;
+
+  // Support both old single-genre format and new multi-genre format
+  const genreText = genre || (genres && genres.length > 0 ? genres.join(' + ') : 'Not specified');
+  const subgenreText = subgenre || (subgenres && subgenres.length > 0 ? subgenres.join(', ') : 'Not specified');
+  const modifiersText = modifiers && modifiers.length > 0 ? modifiers.join(', ') : null;
+
+  const themesText = themes.join(', ');
+  const wordCountContext = getWordCountContext(targetLength);
+
+  const existingConceptsSummary = existingConcepts.map(c =>
+    `- "${c.title}": ${c.logline}`
+  ).join('\n');
+
+  const prompt = `You are a master storyteller and concept developer. The user has reviewed these story concepts and wants NEW concepts based on their feedback.
+
+**Original Preferences:**
+- Genre: ${genreText}${modifiersText ? ` (with ${modifiersText} elements)` : ''}
+- Subgenre: ${subgenreText}
+- Tone: ${tone}
+- Themes: ${themesText}
+- Target Length: ${targetLength.toLocaleString()} words (${wordCountContext})
+${additionalNotes ? `- Additional Notes: ${additionalNotes}` : ''}
+
+**Previous Concepts Generated:**
+${existingConceptsSummary}
+
+**User Feedback:**
+${feedback}
+
+Based on this feedback, generate 5 NEW story concepts that:
+1. Address the user's specific feedback and desires
+2. Are DIFFERENT from the previous concepts
+3. Still fit the genre and theme requirements
+4. Incorporate any new elements the user mentioned
+
+For EACH concept, provide:
+- **title**: A compelling, genre-appropriate title
+- **logline**: A one-sentence hook (25-40 words)
+- **synopsis**: A 3-paragraph synopsis covering setup, conflict, and stakes (150-200 words)
+- **hook**: What makes this story unique and compelling (1-2 sentences)
+- **protagonistHint**: Brief description of the protagonist (name, role, key trait)
+- **conflictType**: The primary conflict type (internal, external, both)
+
+Return ONLY a JSON array of 5 concepts in this exact format:
+[
+  {
+    "id": "concept-1",
+    "title": "...",
+    "logline": "...",
+    "synopsis": "...",
+    "hook": "...",
+    "protagonistHint": "...",
+    "conflictType": "both"
+  },
+  ...
+]`;
+
+  console.log('[ConceptGenerator] Calling Claude API for refinement...');
+
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-opus-4-5-20251101',
+      max_tokens: 4000,
+      temperature: 1.0,
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+    });
+
+    const responseText = message.content[0].type === 'text'
+      ? message.content[0].text
+      : '';
+
+    const concepts = parseConceptsResponse(responseText);
+
+    if (!concepts || concepts.length === 0) {
+      throw new Error('Failed to parse refined concepts from Claude response');
+    }
+
+    console.log(`[ConceptGenerator] Successfully generated ${concepts.length} refined concepts`);
+
+    return concepts;
+  } catch (error: any) {
+    console.error('[ConceptGenerator] Refinement error:', error);
+    throw error;
+  }
 }
 
 /**

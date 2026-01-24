@@ -35,7 +35,15 @@
       "Bash(claude agent --help:*)",
       "Bash(MSYS_NO_PATHCONV=1 railway variables set:*)",
       "Bash(find:*)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Bash(npm test)",
+      "Bash(node:*)",
+      "Bash(timeout 10 npm start)",
+      "Bash(timeout 8 npm start)",
+      "Bash(taskkill:*)",
+      "Bash(sqlite3:*)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoib3duZXIiLCJ0eXBlIjoiYXV0aCIsImlhdCI6MTc2OTI2OTc3OCwiZXhwIjoxNzY5ODc0NTc4fQ.O1FMyp7Thx3Jh6JhmhCuOqlj1Yfh2CHhPwHNnJb36OE\")",
+      "Bash(git reset:*)"
     ]
   }
 }

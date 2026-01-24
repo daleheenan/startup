@@ -1,6 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { getToken, logout } from '../lib/auth';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 interface Chapter {
   id: string;
@@ -27,15 +30,24 @@ export default function ChaptersList({ projectId }: ChaptersListProps) {
   const [loading, setLoading] = useState(true);
   const [regeneratingChapter, setRegeneratingChapter] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchChapters();
-  }, [projectId]);
-
-  async function fetchChapters() {
+  const fetchChapters = useCallback(async () => {
     try {
+      const token = getToken();
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      };
+
       // Get books for project
-      const booksRes = await fetch(`http://localhost:3001/api/projects/${projectId}/books`);
-      if (!booksRes.ok) throw new Error('Failed to fetch books');
+      const booksRes = await fetch(`${API_BASE_URL}/api/projects/${projectId}/books`, { headers });
+      if (!booksRes.ok) {
+        if (booksRes.status === 401) {
+          logout();
+          window.location.href = '/login';
+          return;
+        }
+        throw new Error('Failed to fetch books');
+      }
 
       const booksData = await booksRes.json();
       const fetchedBooks = booksData.books || [];
@@ -43,7 +55,7 @@ export default function ChaptersList({ projectId }: ChaptersListProps) {
       // Get chapters for each book
       const booksWithChapters: Book[] = [];
       for (const book of fetchedBooks) {
-        const chaptersRes = await fetch(`http://localhost:3001/api/chapters/book/${book.id}`);
+        const chaptersRes = await fetch(`${API_BASE_URL}/api/chapters/book/${book.id}`, { headers });
         if (!chaptersRes.ok) continue;
 
         const chaptersData = await chaptersRes.json();
@@ -59,7 +71,11 @@ export default function ChaptersList({ projectId }: ChaptersListProps) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [projectId]);
+
+  useEffect(() => {
+    fetchChapters();
+  }, [fetchChapters]);
 
   async function regenerateChapter(chapterId: string, chapterNumber: number) {
     const confirmed = window.confirm(
@@ -71,8 +87,13 @@ export default function ChaptersList({ projectId }: ChaptersListProps) {
     setRegeneratingChapter(chapterId);
 
     try {
-      const res = await fetch(`http://localhost:3001/api/chapters/${chapterId}/regenerate`, {
+      const token = getToken();
+      const res = await fetch(`${API_BASE_URL}/api/chapters/${chapterId}/regenerate`, {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
       });
 
       if (!res.ok) throw new Error('Failed to regenerate chapter');
@@ -90,44 +111,46 @@ export default function ChaptersList({ projectId }: ChaptersListProps) {
   if (loading) {
     return (
       <div style={{
-        background: 'rgba(255, 255, 255, 0.05)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
+        background: '#FFFFFF',
+        border: '1px solid #E2E8F0',
         borderRadius: '12px',
         padding: '2rem',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
       }}>
-        <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#ededed' }}>
+        <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#1A1A2E' }}>
           Chapters
         </h2>
-        <p style={{ color: '#888' }}>Loading chapters...</p>
+        <p style={{ color: '#64748B' }}>Loading chapters...</p>
       </div>
     );
   }
 
   return (
     <div style={{
-      background: 'rgba(255, 255, 255, 0.05)',
-      border: '1px solid rgba(255, 255, 255, 0.1)',
+      background: '#FFFFFF',
+      border: '1px solid #E2E8F0',
       borderRadius: '12px',
       padding: '2rem',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
     }}>
-      <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#ededed' }}>
+      <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#1A1A2E' }}>
         Chapters
       </h2>
 
       {books.length === 0 ? (
-        <p style={{ color: '#888' }}>No chapters generated yet.</p>
+        <p style={{ color: '#64748B' }}>No chapters generated yet.</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           {books.map((book) => (
             <div key={book.id}>
               {books.length > 1 && (
-                <h3 style={{ fontSize: '1.25rem', marginBottom: '1rem', color: '#888' }}>
+                <h3 style={{ fontSize: '1.25rem', marginBottom: '1rem', color: '#374151' }}>
                   Book {book.book_number}: {book.title}
                 </h3>
               )}
 
               {book.chapters.length === 0 ? (
-                <p style={{ color: '#666', fontSize: '0.875rem' }}>No chapters yet.</p>
+                <p style={{ color: '#64748B', fontSize: '0.875rem' }}>No chapters yet.</p>
               ) : (
                 <div style={{ display: 'grid', gap: '0.5rem' }}>
                   {book.chapters.map((chapter) => (
@@ -138,18 +161,18 @@ export default function ChaptersList({ projectId }: ChaptersListProps) {
                         justifyContent: 'space-between',
                         alignItems: 'center',
                         padding: '1rem',
-                        background: 'rgba(255, 255, 255, 0.03)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        background: '#F8FAFC',
+                        border: '1px solid #E2E8F0',
                         borderRadius: '8px',
                       }}
                     >
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
-                          <span style={{ fontSize: '1rem', fontWeight: 'bold', color: '#ededed' }}>
+                          <span style={{ fontSize: '1rem', fontWeight: 'bold', color: '#1A1A2E' }}>
                             Chapter {chapter.chapter_number}
                           </span>
                           {chapter.title && (
-                            <span style={{ fontSize: '0.875rem', color: '#888' }}>
+                            <span style={{ fontSize: '0.875rem', color: '#64748B' }}>
                               {chapter.title}
                             </span>
                           )}
@@ -160,25 +183,25 @@ export default function ChaptersList({ projectId }: ChaptersListProps) {
                               fontSize: '0.75rem',
                               background:
                                 chapter.status === 'completed'
-                                  ? 'rgba(74, 222, 128, 0.2)'
+                                  ? '#DCFCE7'
                                   : chapter.status === 'writing' || chapter.status === 'editing'
-                                  ? 'rgba(96, 165, 250, 0.2)'
-                                  : 'rgba(251, 191, 36, 0.2)',
+                                  ? '#DBEAFE'
+                                  : '#FEF3C7',
                               color:
                                 chapter.status === 'completed'
-                                  ? '#4ade80'
+                                  ? '#15803D'
                                   : chapter.status === 'writing' || chapter.status === 'editing'
-                                  ? '#60a5fa'
-                                  : '#fbbf24',
+                                  ? '#1D4ED8'
+                                  : '#B45309',
                             }}
                           >
                             {chapter.status}
                           </span>
                         </div>
-                        <div style={{ display: 'flex', gap: '1rem', fontSize: '0.75rem', color: '#666' }}>
+                        <div style={{ display: 'flex', gap: '1rem', fontSize: '0.75rem', color: '#64748B' }}>
                           <span>{chapter.word_count.toLocaleString()} words</span>
                           {chapter.flags && chapter.flags.length > 0 && (
-                            <span style={{ color: '#fbbf24' }}>
+                            <span style={{ color: '#B45309' }}>
                               {chapter.flags.filter((f: any) => !f.resolved).length} flags
                             </span>
                           )}

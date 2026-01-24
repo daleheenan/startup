@@ -35,19 +35,24 @@ export function runMigrations() {
 
       db.exec('BEGIN TRANSACTION');
 
-      // Split by semicolons and execute each statement
-      const statements = schema
-        .split(';')
-        .map(s => s.trim())
-        .filter(s => s.length > 0);
+      try {
+        // Split by semicolons and execute each statement
+        const statements = schema
+          .split(';')
+          .map(s => s.trim())
+          .filter(s => s.length > 0);
 
-      for (const statement of statements) {
-        db.exec(statement);
+        for (const statement of statements) {
+          db.exec(statement);
+        }
+
+        db.prepare(`INSERT INTO schema_migrations (version) VALUES (1)`).run();
+        db.exec('COMMIT');
+        console.log('[Migrations] Migration 001 applied successfully');
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
       }
-
-      db.prepare(`INSERT INTO schema_migrations (version) VALUES (1)`).run();
-      db.exec('COMMIT');
-      console.log('[Migrations] Migration 001 applied successfully');
     }
 
     // Migration 002: Trilogy support
@@ -152,6 +157,40 @@ export function runMigrations() {
         db.prepare(`INSERT INTO schema_migrations (version) VALUES (3)`).run();
         db.exec('COMMIT');
         console.log('[Migrations] Migration 003 applied successfully');
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+      }
+    }
+
+    // Migration 004: Saved Concepts
+    if (currentVersion < 4) {
+      console.log('[Migrations] Applying migration 004: Saved Concepts');
+      const migrationPath = path.join(__dirname, 'migrations', '004_saved_concepts.sql');
+      const migration = fs.readFileSync(migrationPath, 'utf-8');
+
+      db.exec('BEGIN TRANSACTION');
+
+      try {
+        const lines = migration.split('\n');
+        const cleanedLines = lines.filter(line => {
+          const trimmed = line.trim();
+          return trimmed.length === 0 || !trimmed.startsWith('--');
+        });
+        const cleanedMigration = cleanedLines.join('\n');
+
+        const statements = cleanedMigration
+          .split(';')
+          .map(s => s.trim())
+          .filter(s => s.length > 0);
+
+        for (const statement of statements) {
+          db.exec(statement);
+        }
+
+        db.prepare(`INSERT INTO schema_migrations (version) VALUES (4)`).run();
+        db.exec('COMMIT');
+        console.log('[Migrations] Migration 004 applied successfully');
       } catch (error) {
         db.exec('ROLLBACK');
         throw error;

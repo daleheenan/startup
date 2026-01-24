@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getToken } from './auth';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -61,7 +61,8 @@ export function useProgressStream(): ProgressStreamState & { reconnect: () => vo
   const [currentProgress, setCurrentProgress] = useState<ChapterProgress>();
   const [sessionStatus, setSessionStatus] = useState<SessionUpdate>();
   const [queueStats, setQueueStats] = useState<QueueStats>();
-  const [eventSource, setEventSource] = useState<EventSource | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const connect = useCallback(() => {
     const token = getToken();
@@ -70,9 +71,15 @@ export function useProgressStream(): ProgressStreamState & { reconnect: () => vo
       return;
     }
 
+    // Clear any pending reconnect
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+
     // Close existing connection
-    if (eventSource) {
-      eventSource.close();
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
     }
 
     // Note: EventSource doesn't support custom headers directly
@@ -87,7 +94,10 @@ export function useProgressStream(): ProgressStreamState & { reconnect: () => vo
 
     es.addEventListener('job:update', (e) => {
       const job: JobUpdate = JSON.parse(e.data);
-      setJobUpdates((prev) => [...prev.slice(-49), job]); // Keep last 50
+      setJobUpdates((prev) => {
+        const updated = [...prev, job];
+        return updated.length > 50 ? updated.slice(-50) : updated;
+      });
     });
 
     es.addEventListener('chapter:complete', (e) => {
@@ -116,24 +126,27 @@ export function useProgressStream(): ProgressStreamState & { reconnect: () => vo
       es.close();
 
       // Auto-reconnect after 5 seconds
-      setTimeout(() => {
+      reconnectTimeoutRef.current = setTimeout(() => {
         console.log('[ProgressStream] Reconnecting...');
         connect();
       }, 5000);
     };
 
-    setEventSource(es);
-  }, [eventSource]);
+    eventSourceRef.current = es;
+  }, []); // No dependencies - uses refs instead of state
 
   useEffect(() => {
     connect();
 
     return () => {
-      if (eventSource) {
-        eventSource.close();
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
       }
     };
-  }, []);
+  }, [connect]);
 
   return {
     connected,

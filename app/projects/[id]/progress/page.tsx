@@ -2,7 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import FlagsSummary from '../../../components/FlagsSummary';
+import { getToken, logout } from '../../../lib/auth';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 interface ProgressData {
   project: {
@@ -22,8 +26,8 @@ interface ProgressData {
     averagePerChapter: number;
   };
   timeEstimates: {
-    averageChapterTime: number; // milliseconds
-    estimatedRemaining: number; // milliseconds
+    averageChapterTime: number;
+    estimatedRemaining: number;
   };
   queue: {
     pending: number;
@@ -67,7 +71,6 @@ export default function ProgressPage() {
   useEffect(() => {
     if (projectId) {
       fetchProgress();
-      // Poll every 5 seconds
       const interval = setInterval(fetchProgress, 5000);
       return () => clearInterval(interval);
     }
@@ -75,18 +78,37 @@ export default function ProgressPage() {
 
   const fetchProgress = async () => {
     try {
-      const response = await fetch(`http://localhost:3001/api/projects/${projectId}/progress`);
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/progress`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
       if (!response.ok) {
-        // If endpoint doesn't exist, construct progress from available data
-        const projectRes = await fetch(`http://localhost:3001/api/projects/${projectId}`);
-        const queueRes = await fetch(`http://localhost:3001/api/queue/stats`);
+        if (response.status === 401) {
+          logout();
+          window.location.href = '/login';
+          return;
+        }
+        const projectRes = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        const queueRes = await fetch(`${API_BASE_URL}/api/queue/stats`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
 
         if (!projectRes.ok) throw new Error('Failed to fetch project');
 
         const project = await projectRes.json();
         const queue = queueRes.ok ? await queueRes.json() : { queue: { pending: 0, running: 0, completed: 0, paused: 0 } };
 
-        // Construct basic progress data
         setProgress({
           project: {
             id: project.id,
@@ -153,263 +175,323 @@ export default function ProgressPage() {
         minHeight: '100vh',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
+        background: '#F8FAFC',
       }}>
-        <p style={{ color: '#888' }}>Loading progress...</p>
+        <p style={{ color: '#64748B' }}>Loading progress...</p>
       </div>
     );
   }
 
   if (error || !progress) {
     return (
-      <div style={{ minHeight: '100vh', padding: '2rem' }}>
-        <p style={{ color: '#ef4444' }}>Error: {error || 'No progress data'}</p>
+      <div style={{
+        minHeight: '100vh',
+        padding: '2rem',
+        background: '#F8FAFC',
+      }}>
+        <p style={{ color: '#DC2626' }}>Error: {error || 'No progress data'}</p>
       </div>
     );
   }
 
   return (
-    <main style={{
+    <div style={{
+      display: 'flex',
       minHeight: '100vh',
-      padding: '2rem',
+      background: '#F8FAFC',
     }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        {/* Header */}
-        <div style={{ marginBottom: '2rem' }}>
-          <h1 style={{
-            fontSize: '2.5rem',
-            marginBottom: '0.5rem',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text'
-          }}>
-            {progress.project.title}
-          </h1>
-          <p style={{ fontSize: '1.25rem', color: '#888' }}>Generation Progress</p>
-        </div>
-
-        {/* Overall Progress Bar */}
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.05)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          borderRadius: '12px',
-          padding: '2rem',
-          marginBottom: '1rem'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h2 style={{ fontSize: '1.5rem', color: '#ededed', margin: 0 }}>Overall Progress</h2>
-            <span style={{ fontSize: '2rem', fontWeight: 'bold', color: '#667eea' }}>{percentComplete}%</span>
-          </div>
-          <div style={{
-            width: '100%',
+      {/* Left Sidebar */}
+      <aside style={{
+        width: '72px',
+        background: '#FFFFFF',
+        borderRight: '1px solid #E2E8F0',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: '1.5rem 0',
+      }}>
+        <Link
+          href="/projects"
+          style={{
+            width: '40px',
             height: '40px',
-            background: 'rgba(255, 255, 255, 0.1)',
-            borderRadius: '20px',
-            overflow: 'hidden'
-          }}>
-            <div style={{
-              width: `${percentComplete}%`,
-              height: '100%',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              transition: 'width 0.5s ease'
-            }} />
-          </div>
-        </div>
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            borderRadius: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#FFFFFF',
+            fontWeight: '700',
+            fontSize: '1.25rem',
+            textDecoration: 'none',
+          }}
+        >
+          N
+        </Link>
+      </aside>
 
-        {/* Stats Grid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-          gap: '1rem',
-          marginBottom: '1rem'
+      {/* Main Content */}
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        {/* Top Bar */}
+        <header style={{
+          padding: '1rem 2rem',
+          background: '#FFFFFF',
+          borderBottom: '1px solid #E2E8F0',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
         }}>
-          {/* Chapters */}
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: '12px',
-            padding: '1.5rem'
-          }}>
-            <h3 style={{ fontSize: '1rem', color: '#888', marginBottom: '0.5rem' }}>Chapters</h3>
-            <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#ededed', margin: 0 }}>
-              {progress.chapters.completed} / {progress.chapters.total}
-            </p>
-            <p style={{ fontSize: '0.875rem', color: '#888', marginTop: '0.5rem' }}>
-              {progress.chapters.inProgress} in progress, {progress.chapters.pending} pending
+          <div>
+            <h1 style={{
+              fontSize: '1.5rem',
+              fontWeight: '700',
+              color: '#1A1A2E',
+              margin: 0,
+            }}>
+              {progress.project.title}
+            </h1>
+            <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
+              Generation Progress
             </p>
           </div>
-
-          {/* Word Count */}
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: '12px',
-            padding: '1.5rem'
-          }}>
-            <h3 style={{ fontSize: '1rem', color: '#888', marginBottom: '0.5rem' }}>Word Count</h3>
-            <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#ededed', margin: 0 }}>
-              {progress.wordCount.current.toLocaleString()}
-            </p>
-            <p style={{ fontSize: '0.875rem', color: '#888', marginTop: '0.5rem' }}>
-              Target: {progress.wordCount.target.toLocaleString()}
-            </p>
-          </div>
-
-          {/* Time Estimates */}
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: '12px',
-            padding: '1.5rem'
-          }}>
-            <h3 style={{ fontSize: '1rem', color: '#888', marginBottom: '0.5rem' }}>Time Remaining</h3>
-            <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#ededed', margin: 0 }}>
-              {formatDuration(progress.timeEstimates.estimatedRemaining)}
-            </p>
-            <p style={{ fontSize: '0.875rem', color: '#888', marginTop: '0.5rem' }}>
-              Avg: {formatDuration(progress.timeEstimates.averageChapterTime)}/chapter
-            </p>
-          </div>
-
-          {/* Queue Status */}
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: '12px',
-            padding: '1.5rem'
-          }}>
-            <h3 style={{ fontSize: '1rem', color: '#888', marginBottom: '0.5rem' }}>Queue Status</h3>
-            <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-              <div>
-                <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#fbbf24', margin: 0 }}>
-                  {progress.queue.pending}
-                </p>
-                <p style={{ fontSize: '0.75rem', color: '#888' }}>Pending</p>
-              </div>
-              <div>
-                <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#60a5fa', margin: 0 }}>
-                  {progress.queue.running}
-                </p>
-                <p style={{ fontSize: '0.75rem', color: '#888' }}>Running</p>
-              </div>
-              <div>
-                <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#4ade80', margin: 0 }}>
-                  {progress.queue.completed}
-                </p>
-                <p style={{ fontSize: '0.75rem', color: '#888' }}>Done</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Rate Limit Status */}
-        {progress.rateLimitStatus && (
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: '12px',
-            padding: '1.5rem'
-          }}>
-            <h3 style={{ fontSize: '1rem', color: '#888', marginBottom: '0.5rem' }}>Rate Limit</h3>
-            <div style={{ marginTop: '0.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ color: '#888', fontSize: '0.875rem' }}>Status:</span>
-                <span style={{ color: progress.rateLimitStatus.isActive ? '#4ade80' : '#888', fontSize: '0.875rem', fontWeight: 'bold' }}>
-                  {progress.rateLimitStatus.isActive ? 'Active' : 'Inactive'}
-                </span>
-              </div>
-              {progress.rateLimitStatus.isActive && (
-                <>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <span style={{ color: '#888', fontSize: '0.875rem' }}>Requests:</span>
-                    <span style={{ color: '#ededed', fontSize: '0.875rem' }}>
-                      {progress.rateLimitStatus.requestsThisSession}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#888', fontSize: '0.875rem' }}>Resets in:</span>
-                    <span style={{ color: '#667eea', fontSize: '0.875rem', fontWeight: 'bold' }}>
-                      {progress.rateLimitStatus.timeRemaining}
-                    </span>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Current Activity */}
-        {progress.currentActivity && (
-          <div style={{
-            background: 'rgba(102, 126, 234, 0.1)',
-            border: '1px solid rgba(102, 126, 234, 0.3)',
-            borderRadius: '12px',
-            padding: '1.5rem',
-            marginBottom: '1rem'
-          }}>
-            <h3 style={{ fontSize: '1.25rem', color: '#ededed', marginBottom: '0.5rem' }}>
-              Current Activity
-            </h3>
-            <p style={{ color: '#888', margin: 0 }}>
-              {progress.currentActivity.jobType} on Chapter {progress.currentActivity.chapterNumber}
-            </p>
-            <p style={{ fontSize: '0.875rem', color: '#666', marginTop: '0.5rem' }}>
-              Started {new Date(progress.currentActivity.startedAt).toLocaleTimeString()}
-            </p>
-          </div>
-        )}
-
-        {/* Flagged Issues Summary */}
-        {progress.flags.total > 0 && (
-          <FlagsSummary projectId={projectId} flags={progress.flags} />
-        )}
-
-        {/* Recent Events */}
-        {progress.recentEvents.length > 0 && (
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: '12px',
-            padding: '1.5rem'
-          }}>
-            <h3 style={{ fontSize: '1.25rem', color: '#ededed', marginBottom: '1rem' }}>
-              Recent Activity
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {progress.recentEvents.slice(0, 10).map((event, i) => (
-                <div key={i} style={{
-                  padding: '0.75rem',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  borderRadius: '6px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}>
-                  <span style={{ color: '#ededed' }}>{event.message}</span>
-                  <span style={{ fontSize: '0.75rem', color: '#666' }}>
-                    {new Date(event.timestamp).toLocaleTimeString()}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Back Link */}
-        <div style={{ marginTop: '2rem', textAlign: 'center' }}>
-          <a
+          <Link
             href={`/projects/${projectId}`}
             style={{
-              color: '#667eea',
+              padding: '0.5rem 1rem',
+              color: '#64748B',
               textDecoration: 'none',
-              fontSize: '0.875rem'
+              fontSize: '0.875rem',
             }}
           >
             ← Back to Project
-          </a>
+          </Link>
+        </header>
+
+        {/* Content Area */}
+        <div style={{
+          flex: 1,
+          padding: '2rem',
+          overflow: 'auto',
+        }}>
+          <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+            {/* Overall Progress Bar */}
+            <div style={{
+              background: '#FFFFFF',
+              border: '1px solid #E2E8F0',
+              borderRadius: '12px',
+              padding: '1.5rem',
+              marginBottom: '1rem',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h2 style={{ fontSize: '1.25rem', color: '#1A1A2E', margin: 0, fontWeight: 600 }}>Overall Progress</h2>
+                <span style={{ fontSize: '2rem', fontWeight: 'bold', color: '#667eea' }}>{percentComplete}%</span>
+              </div>
+              <div style={{
+                width: '100%',
+                height: '40px',
+                background: '#E2E8F0',
+                borderRadius: '20px',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  width: `${percentComplete}%`,
+                  height: '100%',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  transition: 'width 0.5s ease'
+                }} />
+              </div>
+            </div>
+
+            {/* Stats Grid */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+              gap: '1rem',
+              marginBottom: '1rem'
+            }}>
+              {/* Chapters */}
+              <div style={{
+                background: '#FFFFFF',
+                border: '1px solid #E2E8F0',
+                borderRadius: '12px',
+                padding: '1.5rem',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              }}>
+                <h3 style={{ fontSize: '0.875rem', color: '#64748B', marginBottom: '0.5rem', fontWeight: 500 }}>Chapters</h3>
+                <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1A1A2E', margin: 0 }}>
+                  {progress.chapters.completed} / {progress.chapters.total}
+                </p>
+                <p style={{ fontSize: '0.813rem', color: '#64748B', marginTop: '0.5rem' }}>
+                  {progress.chapters.inProgress} in progress, {progress.chapters.pending} pending
+                </p>
+              </div>
+
+              {/* Word Count */}
+              <div style={{
+                background: '#FFFFFF',
+                border: '1px solid #E2E8F0',
+                borderRadius: '12px',
+                padding: '1.5rem',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              }}>
+                <h3 style={{ fontSize: '0.875rem', color: '#64748B', marginBottom: '0.5rem', fontWeight: 500 }}>Word Count</h3>
+                <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1A1A2E', margin: 0 }}>
+                  {progress.wordCount.current.toLocaleString()}
+                </p>
+                <p style={{ fontSize: '0.813rem', color: '#64748B', marginTop: '0.5rem' }}>
+                  Target: {progress.wordCount.target.toLocaleString()}
+                </p>
+              </div>
+
+              {/* Time Estimates */}
+              <div style={{
+                background: '#FFFFFF',
+                border: '1px solid #E2E8F0',
+                borderRadius: '12px',
+                padding: '1.5rem',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              }}>
+                <h3 style={{ fontSize: '0.875rem', color: '#64748B', marginBottom: '0.5rem', fontWeight: 500 }}>Time Remaining</h3>
+                <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1A1A2E', margin: 0 }}>
+                  {formatDuration(progress.timeEstimates.estimatedRemaining)}
+                </p>
+                <p style={{ fontSize: '0.813rem', color: '#64748B', marginTop: '0.5rem' }}>
+                  Avg: {formatDuration(progress.timeEstimates.averageChapterTime)}/chapter
+                </p>
+              </div>
+
+              {/* Queue Status */}
+              <div style={{
+                background: '#FFFFFF',
+                border: '1px solid #E2E8F0',
+                borderRadius: '12px',
+                padding: '1.5rem',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              }}>
+                <h3 style={{ fontSize: '0.875rem', color: '#64748B', marginBottom: '0.5rem', fontWeight: 500 }}>Queue Status</h3>
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                  <div>
+                    <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#F59E0B', margin: 0 }}>
+                      {progress.queue.pending}
+                    </p>
+                    <p style={{ fontSize: '0.75rem', color: '#64748B' }}>Pending</p>
+                  </div>
+                  <div>
+                    <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#3B82F6', margin: 0 }}>
+                      {progress.queue.running}
+                    </p>
+                    <p style={{ fontSize: '0.75rem', color: '#64748B' }}>Running</p>
+                  </div>
+                  <div>
+                    <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#10B981', margin: 0 }}>
+                      {progress.queue.completed}
+                    </p>
+                    <p style={{ fontSize: '0.75rem', color: '#64748B' }}>Done</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Rate Limit Status */}
+            {progress.rateLimitStatus && (
+              <div style={{
+                background: '#FFFFFF',
+                border: '1px solid #E2E8F0',
+                borderRadius: '12px',
+                padding: '1.5rem',
+                marginBottom: '1rem',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              }}>
+                <h3 style={{ fontSize: '0.875rem', color: '#64748B', marginBottom: '0.5rem', fontWeight: 500 }}>Rate Limit</h3>
+                <div style={{ marginTop: '0.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                    <span style={{ color: '#64748B', fontSize: '0.875rem' }}>Status:</span>
+                    <span style={{ color: progress.rateLimitStatus.isActive ? '#10B981' : '#64748B', fontSize: '0.875rem', fontWeight: 'bold' }}>
+                      {progress.rateLimitStatus.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  {progress.rateLimitStatus.isActive && (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <span style={{ color: '#64748B', fontSize: '0.875rem' }}>Requests:</span>
+                        <span style={{ color: '#1A1A2E', fontSize: '0.875rem' }}>
+                          {progress.rateLimitStatus.requestsThisSession}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#64748B', fontSize: '0.875rem' }}>Resets in:</span>
+                        <span style={{ color: '#667eea', fontSize: '0.875rem', fontWeight: 'bold' }}>
+                          {progress.rateLimitStatus.timeRemaining}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Current Activity */}
+            {progress.currentActivity && (
+              <div style={{
+                background: '#EEF2FF',
+                border: '1px solid #C7D2FE',
+                borderRadius: '12px',
+                padding: '1.5rem',
+                marginBottom: '1rem',
+              }}>
+                <h3 style={{ fontSize: '1.125rem', color: '#1A1A2E', marginBottom: '0.5rem', fontWeight: 600 }}>
+                  Current Activity
+                </h3>
+                <p style={{ color: '#64748B', margin: 0 }}>
+                  {progress.currentActivity.jobType} on Chapter {progress.currentActivity.chapterNumber}
+                </p>
+                <p style={{ fontSize: '0.813rem', color: '#94A3B8', marginTop: '0.5rem' }}>
+                  Started {new Date(progress.currentActivity.startedAt).toLocaleTimeString()}
+                </p>
+              </div>
+            )}
+
+            {/* Flagged Issues Summary */}
+            {progress.flags.total > 0 && (
+              <FlagsSummary projectId={projectId} flags={progress.flags} />
+            )}
+
+            {/* Recent Events */}
+            {progress.recentEvents.length > 0 && (
+              <div style={{
+                background: '#FFFFFF',
+                border: '1px solid #E2E8F0',
+                borderRadius: '12px',
+                padding: '1.5rem',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              }}>
+                <h3 style={{ fontSize: '1.125rem', color: '#1A1A2E', marginBottom: '1rem', fontWeight: 600 }}>
+                  Recent Activity
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {progress.recentEvents.slice(0, 10).map((event, i) => (
+                    <div key={i} style={{
+                      padding: '0.75rem',
+                      background: '#F8FAFC',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}>
+                      <span style={{ color: '#374151', fontSize: '0.875rem' }}>{event.message}</span>
+                      <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>
+                        {new Date(event.timestamp).toLocaleTimeString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

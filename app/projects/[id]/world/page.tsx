@@ -2,6 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { getToken, logout } from '../../../lib/auth';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 interface WorldElement {
   id: string;
@@ -31,8 +35,21 @@ export default function WorldPage() {
 
   const fetchWorldElements = async () => {
     try {
-      const response = await fetch(`http://localhost:3001/api/projects/${projectId}`);
-      if (!response.ok) throw new Error('Failed to fetch project');
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) {
+        if (response.status === 401) {
+          logout();
+          window.location.href = '/login';
+          return;
+        }
+        throw new Error('Failed to fetch project');
+      }
 
       const project = await response.json();
       if (project.story_bible?.world) {
@@ -54,12 +71,16 @@ export default function WorldPage() {
     setError(null);
 
     try {
-      // Get project details for context
-      const projectResponse = await fetch(`http://localhost:3001/api/projects/${projectId}`);
+      const token = getToken();
+      const projectResponse = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
       if (!projectResponse.ok) throw new Error('Failed to fetch project');
       const project = await projectResponse.json();
 
-      // Get protagonist name from characters
       const protagonist = project.story_bible?.characters?.find(
         (c: any) => c.role === 'protagonist'
       );
@@ -74,10 +95,12 @@ export default function WorldPage() {
         protagonistName: protagonist?.name || 'the protagonist',
       };
 
-      // Generate world elements
-      const response = await fetch(`http://localhost:3001/api/projects/${projectId}/world`, {
+      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/world`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify({ context }),
       });
 
@@ -99,11 +122,15 @@ export default function WorldPage() {
   const handleSaveElement = async (updatedElement: WorldElement) => {
     setIsSaving(true);
     try {
+      const token = getToken();
       const response = await fetch(
-        `http://localhost:3001/api/projects/${projectId}/world/${updatedElement.id}`,
+        `${API_BASE_URL}/api/projects/${projectId}/world/${updatedElement.id}`,
         {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
           body: JSON.stringify(updatedElement),
         }
       );
@@ -141,18 +168,24 @@ export default function WorldPage() {
 
   if (isLoading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#F8FAFC',
+      }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{
             display: 'inline-block',
-            width: '50px',
-            height: '50px',
-            border: '4px solid rgba(102, 126, 234, 0.3)',
+            width: '48px',
+            height: '48px',
+            border: '3px solid #E2E8F0',
             borderTopColor: '#667eea',
             borderRadius: '50%',
             animation: 'spin 1s linear infinite'
           }} />
-          <p style={{ marginTop: '1rem', color: '#888' }}>Loading world...</p>
+          <p style={{ marginTop: '1rem', color: '#64748B' }}>Loading world...</p>
         </div>
         <style jsx>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
@@ -160,143 +193,203 @@ export default function WorldPage() {
   }
 
   return (
-    <main style={{ minHeight: '100vh', padding: '2rem' }}>
-      <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-        {/* Header */}
-        <div style={{ marginBottom: '2rem' }}>
-          <h1 style={{
-            fontSize: '2.5rem',
-            marginBottom: '0.5rem',
+    <div style={{
+      display: 'flex',
+      minHeight: '100vh',
+      background: '#F8FAFC',
+    }}>
+      {/* Left Sidebar */}
+      <aside style={{
+        width: '72px',
+        background: '#FFFFFF',
+        borderRight: '1px solid #E2E8F0',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: '1.5rem 0',
+      }}>
+        <Link
+          href="/projects"
+          style={{
+            width: '40px',
+            height: '40px',
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text'
-          }}>
-            World Building
-          </h1>
-          <p style={{ color: '#888' }}>Create and edit locations, factions, and systems</p>
-        </div>
+            borderRadius: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#FFFFFF',
+            fontWeight: '700',
+            fontSize: '1.25rem',
+            textDecoration: 'none',
+          }}
+        >
+          N
+        </Link>
+      </aside>
 
-        {error && (
-          <div style={{
-            background: 'rgba(239, 68, 68, 0.1)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-            borderRadius: '8px',
-            padding: '1rem',
-            marginBottom: '1rem',
-            color: '#ef4444'
-          }}>
-            {error}
-          </div>
-        )}
-
-        {worldElements.length === 0 ? (
-          <div style={{
-            textAlign: 'center',
-            padding: '4rem 2rem',
-            background: 'rgba(255, 255, 255, 0.05)',
-            borderRadius: '12px',
-            border: '1px dashed rgba(255, 255, 255, 0.1)'
-          }}>
-            <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🌍</div>
-            <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#ededed' }}>
-              No World Elements Yet
-            </h2>
-            <p style={{ fontSize: '1rem', color: '#888', marginBottom: '2rem' }}>
-              Generate your story's world with locations, factions, and systems
+      {/* Main Content */}
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        {/* Top Bar */}
+        <header style={{
+          padding: '1rem 2rem',
+          background: '#FFFFFF',
+          borderBottom: '1px solid #E2E8F0',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}>
+          <div>
+            <h1 style={{
+              fontSize: '1.5rem',
+              fontWeight: '700',
+              color: '#1A1A2E',
+              margin: 0,
+            }}>
+              World Building
+            </h1>
+            <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
+              Create and edit locations, factions, and systems
             </p>
-            <button
-              onClick={handleGenerate}
-              disabled={isGenerating}
-              style={{
-                padding: '1rem 2rem',
-                background: isGenerating
-                  ? 'rgba(102, 126, 234, 0.5)'
-                  : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                border: 'none',
-                borderRadius: '8px',
-                color: '#fff',
-                fontSize: '1rem',
-                fontWeight: 600,
-                cursor: isGenerating ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {isGenerating ? 'Generating World...' : 'Generate World'}
-            </button>
           </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '2rem' }}>
-            {/* Element List */}
-            <div>
-              <h3 style={{ fontSize: '1.25rem', marginBottom: '1rem', color: '#ededed' }}>Elements</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {worldElements.map(elem => (
+          <Link
+            href={`/projects/${projectId}/characters`}
+            style={{
+              padding: '0.5rem 1rem',
+              color: '#64748B',
+              textDecoration: 'none',
+              fontSize: '0.875rem',
+            }}
+          >
+            ← Back to Characters
+          </Link>
+        </header>
+
+        {/* Content Area */}
+        <div style={{
+          flex: 1,
+          padding: '2rem',
+          overflow: 'auto',
+        }}>
+          <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+            {error && (
+              <div style={{
+                background: '#FEF2F2',
+                border: '1px solid #FECACA',
+                borderRadius: '12px',
+                padding: '1rem 1.5rem',
+                marginBottom: '1.5rem',
+                color: '#DC2626',
+              }}>
+                {error}
+              </div>
+            )}
+
+            {worldElements.length === 0 ? (
+              <div style={{
+                textAlign: 'center',
+                padding: '4rem 2rem',
+                background: '#FFFFFF',
+                borderRadius: '12px',
+                border: '2px dashed #E2E8F0',
+              }}>
+                <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🌍</div>
+                <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#1A1A2E' }}>
+                  No World Elements Yet
+                </h2>
+                <p style={{ fontSize: '1rem', color: '#64748B', marginBottom: '2rem' }}>
+                  Generate your story's world with locations, factions, and systems
+                </p>
+                <button
+                  onClick={handleGenerate}
+                  disabled={isGenerating}
+                  style={{
+                    padding: '1rem 2rem',
+                    background: isGenerating
+                      ? '#94A3B8'
+                      : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    color: '#fff',
+                    fontSize: '1rem',
+                    fontWeight: 600,
+                    cursor: isGenerating ? 'not-allowed' : 'pointer',
+                    boxShadow: isGenerating ? 'none' : '0 4px 14px rgba(102, 126, 234, 0.4)',
+                  }}
+                >
+                  {isGenerating ? 'Generating World...' : 'Generate World'}
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '2rem' }}>
+                {/* Element List */}
+                <div>
+                  <h3 style={{ fontSize: '1.125rem', marginBottom: '1rem', color: '#1A1A2E', fontWeight: 600 }}>Elements</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {worldElements.map(elem => (
+                      <button
+                        key={elem.id}
+                        onClick={() => setSelectedElement(elem)}
+                        style={{
+                          padding: '1rem',
+                          background: selectedElement?.id === elem.id
+                            ? '#EEF2FF'
+                            : '#FFFFFF',
+                          border: selectedElement?.id === elem.id
+                            ? '1px solid #667eea'
+                            : '1px solid #E2E8F0',
+                          borderRadius: '8px',
+                          color: '#1A1A2E',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                          <span>{getTypeIcon(elem.type)}</span>
+                          <span style={{ fontWeight: 600 }}>{elem.name}</span>
+                        </div>
+                        <div style={{ fontSize: '0.875rem', color: '#64748B' }}>
+                          {getTypeLabel(elem.type)}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
                   <button
-                    key={elem.id}
-                    onClick={() => setSelectedElement(elem)}
+                    onClick={handleContinue}
                     style={{
+                      marginTop: '2rem',
+                      width: '100%',
                       padding: '1rem',
-                      background: selectedElement?.id === elem.id
-                        ? 'rgba(102, 126, 234, 0.2)'
-                        : 'rgba(255, 255, 255, 0.05)',
-                      border: selectedElement?.id === elem.id
-                        ? '1px solid rgba(102, 126, 234, 0.5)'
-                        : '1px solid rgba(255, 255, 255, 0.1)',
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      border: 'none',
                       borderRadius: '8px',
-                      color: '#ededed',
-                      textAlign: 'left',
+                      color: '#fff',
+                      fontSize: '1rem',
+                      fontWeight: 600,
                       cursor: 'pointer',
+                      boxShadow: '0 4px 14px rgba(102, 126, 234, 0.3)',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                      <span>{getTypeIcon(elem.type)}</span>
-                      <span style={{ fontWeight: 600 }}>{elem.name}</span>
-                    </div>
-                    <div style={{ fontSize: '0.875rem', color: '#888' }}>
-                      {getTypeLabel(elem.type)}
-                    </div>
+                    Continue to Outline →
                   </button>
-                ))}
+                </div>
+
+                {/* Element Details */}
+                {selectedElement && (
+                  <WorldElementEditor
+                    element={selectedElement}
+                    onSave={handleSaveElement}
+                    isSaving={isSaving}
+                  />
+                )}
               </div>
-
-              <button
-                onClick={handleContinue}
-                style={{
-                  marginTop: '2rem',
-                  width: '100%',
-                  padding: '1rem',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: '#fff',
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                Continue to Outline →
-              </button>
-            </div>
-
-            {/* Element Details */}
-            {selectedElement && (
-              <WorldElementEditor
-                element={selectedElement}
-                onSave={handleSaveElement}
-                isSaving={isSaving}
-              />
             )}
           </div>
-        )}
-
-        {/* Back Link */}
-        <div style={{ marginTop: '2rem', textAlign: 'center' }}>
-          <a href={`/projects/${projectId}/characters`} style={{ color: '#667eea', textDecoration: 'none', fontSize: '0.875rem' }}>
-            ← Back to Characters
-          </a>
         </div>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
 
@@ -331,23 +424,42 @@ function WorldElementEditor({
     onSave(editedElem);
   };
 
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '0.75rem',
+    background: '#FFFFFF',
+    border: '1px solid #E2E8F0',
+    borderRadius: '6px',
+    color: '#1A1A2E',
+    fontSize: '1rem',
+  };
+
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    marginBottom: '0.5rem',
+    color: '#374151',
+    fontWeight: 600,
+    fontSize: '0.875rem',
+  };
+
   return (
     <div style={{
-      background: 'rgba(255, 255, 255, 0.05)',
-      border: '1px solid rgba(255, 255, 255, 0.1)',
+      background: '#FFFFFF',
+      border: '1px solid #E2E8F0',
       borderRadius: '12px',
       padding: '2rem',
       maxHeight: '80vh',
-      overflowY: 'auto'
+      overflowY: 'auto',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <h3 style={{ fontSize: '1.5rem', color: '#ededed' }}>Edit World Element</h3>
+        <h3 style={{ fontSize: '1.25rem', color: '#1A1A2E', fontWeight: 600 }}>Edit World Element</h3>
         <button
           onClick={handleSave}
           disabled={isSaving}
           style={{
             padding: '0.75rem 1.5rem',
-            background: isSaving ? 'rgba(102, 126, 234, 0.5)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: isSaving ? '#94A3B8' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             border: 'none',
             borderRadius: '8px',
             color: '#fff',
@@ -363,36 +475,24 @@ function WorldElementEditor({
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         {/* Name */}
         <div>
-          <label style={{ display: 'block', marginBottom: '0.5rem', color: '#ededed', fontWeight: 600 }}>
-            Name
-          </label>
+          <label style={labelStyle}>Name</label>
           <input
             type="text"
             value={editedElem.name}
             onChange={(e) => handleChange('name', e.target.value)}
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '6px',
-              color: '#ededed',
-              fontSize: '1rem',
-            }}
+            style={inputStyle}
           />
         </div>
 
         {/* Type Badge */}
         <div>
-          <label style={{ display: 'block', marginBottom: '0.5rem', color: '#ededed', fontWeight: 600 }}>
-            Type
-          </label>
+          <label style={labelStyle}>Type</label>
           <div style={{
             padding: '0.75rem',
-            background: 'rgba(102, 126, 234, 0.2)',
-            border: '1px solid rgba(102, 126, 234, 0.5)',
+            background: '#EEF2FF',
+            border: '1px solid #C7D2FE',
             borderRadius: '6px',
-            color: '#ededed',
+            color: '#374151',
             textTransform: 'capitalize',
             display: 'inline-block'
           }}>
@@ -402,54 +502,30 @@ function WorldElementEditor({
 
         {/* Description */}
         <div>
-          <label style={{ display: 'block', marginBottom: '0.5rem', color: '#ededed', fontWeight: 600 }}>
-            Description
-          </label>
+          <label style={labelStyle}>Description</label>
           <textarea
             value={editedElem.description}
             onChange={(e) => handleChange('description', e.target.value)}
             rows={6}
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '6px',
-              color: '#ededed',
-              fontSize: '1rem',
-              resize: 'vertical',
-            }}
+            style={{ ...inputStyle, resize: 'vertical' }}
           />
         </div>
 
         {/* Significance */}
         <div>
-          <label style={{ display: 'block', marginBottom: '0.5rem', color: '#ededed', fontWeight: 600 }}>
-            Significance to Story
-          </label>
+          <label style={labelStyle}>Significance to Story</label>
           <textarea
             value={editedElem.significance}
             onChange={(e) => handleChange('significance', e.target.value)}
             rows={4}
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '6px',
-              color: '#ededed',
-              fontSize: '1rem',
-              resize: 'vertical',
-            }}
+            style={{ ...inputStyle, resize: 'vertical' }}
           />
         </div>
 
         {/* Rules (for systems) */}
         {editedElem.rules && editedElem.rules.length > 0 && (
           <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', color: '#ededed', fontWeight: 600 }}>
-              Rules & Limitations
-            </label>
+            <label style={labelStyle}>Rules & Limitations</label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {editedElem.rules.map((rule, i) => (
                 <input
@@ -457,14 +533,7 @@ function WorldElementEditor({
                   type="text"
                   value={rule}
                   onChange={(e) => handleRuleChange(i, e.target.value)}
-                  style={{
-                    padding: '0.75rem',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '6px',
-                    color: '#ededed',
-                    fontSize: '1rem',
-                  }}
+                  style={inputStyle}
                 />
               ))}
             </div>
@@ -474,23 +543,12 @@ function WorldElementEditor({
         {/* History */}
         {editedElem.history && (
           <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', color: '#ededed', fontWeight: 600 }}>
-              History
-            </label>
+            <label style={labelStyle}>History</label>
             <textarea
               value={editedElem.history}
               onChange={(e) => handleChange('history', e.target.value)}
               rows={4}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '6px',
-                color: '#ededed',
-                fontSize: '1rem',
-                resize: 'vertical',
-              }}
+              style={{ ...inputStyle, resize: 'vertical' }}
             />
           </div>
         )}
