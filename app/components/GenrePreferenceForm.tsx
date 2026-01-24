@@ -7,8 +7,10 @@ export interface StoryPreferences {
   genres: string[]; // Support multi-genre
   subgenres: string[]; // Support multi-subgenre
   modifiers: string[]; // Genre modifiers like Political, Military
-  tone: string;
+  tone: string; // For backward compatibility (first selected tone)
+  tones: string[]; // Support multi-tone selection
   themes: string[];
+  customTheme?: string; // Free text custom theme
   targetLength: number;
   additionalNotes?: string;
   customIdeas?: string;
@@ -34,32 +36,40 @@ const MARKET_TRENDS: Record<string, 'trending' | 'rising' | 'stable'> = {
   'mystery': 'stable',              // Reliable genre
 };
 
-const GENRES = [
+// Classic genres - traditional, well-established categories
+const CLASSIC_GENRES = [
+  { value: 'fantasy', label: 'Fantasy', trend: MARKET_TRENDS.fantasy },
+  { value: 'science-fiction', label: 'Science Fiction' },
+  { value: 'romance', label: 'Romance', trend: MARKET_TRENDS.romance },
+  { value: 'mystery', label: 'Mystery', trend: MARKET_TRENDS.mystery },
+  { value: 'thriller', label: 'Thriller', trend: MARKET_TRENDS.thriller },
+  { value: 'horror', label: 'Horror' },
+  { value: 'historical', label: 'Historical Fiction' },
+  { value: 'literary', label: 'Literary Fiction' },
+  { value: 'contemporary', label: 'Contemporary Fiction' },
+  { value: 'western', label: 'Western' },
+];
+
+// Specialist genres - niche, emerging, or cross-genre categories
+const SPECIALIST_GENRES = [
+  { value: 'romantasy', label: 'Romantasy', trend: MARKET_TRENDS.romantasy },
+  { value: 'cozy-fantasy', label: 'Cozy Fantasy', trend: MARKET_TRENDS['cozy-fantasy'] },
+  { value: 'grimdark', label: 'Grimdark', trend: MARKET_TRENDS.grimdark },
+  { value: 'litrpg', label: 'LitRPG / GameLit', trend: MARKET_TRENDS.litrpg },
   { value: 'afrofuturism', label: 'Afrofuturism', trend: MARKET_TRENDS.afrofuturism },
   { value: 'climate-fiction', label: 'Climate Fiction (Cli-Fi)', trend: MARKET_TRENDS['climate-fiction'] },
-  { value: 'contemporary', label: 'Contemporary Fiction' },
-  { value: 'cozy-fantasy', label: 'Cozy Fantasy', trend: MARKET_TRENDS['cozy-fantasy'] },
-  { value: 'fantasy', label: 'Fantasy', trend: MARKET_TRENDS.fantasy },
-  { value: 'grimdark', label: 'Grimdark', trend: MARKET_TRENDS.grimdark },
-  { value: 'historical', label: 'Historical Fiction' },
-  { value: 'horror', label: 'Horror' },
-  { value: 'legal-drama', label: 'Legal Drama' },
-  { value: 'literary', label: 'Literary Fiction' },
-  { value: 'litrpg', label: 'LitRPG / GameLit', trend: MARKET_TRENDS.litrpg },
-  { value: 'medical-drama', label: 'Medical Drama' },
-  { value: 'mystery', label: 'Mystery', trend: MARKET_TRENDS.mystery },
+  { value: 'solarpunk', label: 'Solarpunk', trend: MARKET_TRENDS.solarpunk },
+  { value: 'steampunk', label: 'Steampunk' },
   { value: 'new-weird', label: 'New Weird' },
   { value: 'paranormal', label: 'Paranormal' },
-  { value: 'romance', label: 'Romance', trend: MARKET_TRENDS.romance },
-  { value: 'romantasy', label: 'Romantasy', trend: MARKET_TRENDS.romantasy },
-  { value: 'science-fiction', label: 'Science Fiction' },
-  { value: 'solarpunk', label: 'Solarpunk', trend: MARKET_TRENDS.solarpunk },
-  { value: 'sports-fiction', label: 'Sports Fiction' },
-  { value: 'steampunk', label: 'Steampunk' },
-  { value: 'thriller', label: 'Thriller', trend: MARKET_TRENDS.thriller },
-  { value: 'western', label: 'Western' },
   { value: 'wuxia', label: 'Wuxia / Xianxia' },
+  { value: 'legal-drama', label: 'Legal Drama' },
+  { value: 'medical-drama', label: 'Medical Drama' },
+  { value: 'sports-fiction', label: 'Sports Fiction' },
 ];
+
+// Combined for lookups
+const GENRES = [...CLASSIC_GENRES, ...SPECIALIST_GENRES];
 
 const SUBGENRES: Record<string, string[]> = {
   afrofuturism: ['Afrofuturist SF', 'Afrofuturist Fantasy', 'Afro-Cyberpunk', 'African Mythology SF', 'Black Space Opera', 'Afrofuturist Horror'],
@@ -104,17 +114,20 @@ const GENRE_MODIFIERS = [
   { value: 'psychological', label: 'Psychological' },
 ];
 
+// Tones with descriptions to help users understand each option
 const TONES = [
-  'Dark and Gritty',
-  'Light and Humorous',
-  'Epic and Grand',
-  'Intimate and Personal',
-  'Mysterious and Suspenseful',
-  'Hopeful and Uplifting',
-  'Satirical and Witty',
-  'Melancholic and Reflective',
-  'Tense and Fast-Paced',
-  'Morally Complex',
+  { value: 'Dark and Gritty', description: 'Harsh realities, moral ambiguity, unflinching portrayal of violence or hardship' },
+  { value: 'Light and Humorous', description: 'Comedic moments, witty dialogue, fun and entertaining atmosphere' },
+  { value: 'Epic and Grand', description: 'Large scale, sweeping narratives, world-changing stakes and heroic journeys' },
+  { value: 'Intimate and Personal', description: 'Character-focused, emotional depth, close relationships and inner journeys' },
+  { value: 'Mysterious and Suspenseful', description: 'Secrets, tension, unanswered questions that keep readers guessing' },
+  { value: 'Hopeful and Uplifting', description: 'Optimistic outlook, triumph over adversity, feel-good endings' },
+  { value: 'Satirical and Witty', description: 'Social commentary, clever humor, ironic observations about society' },
+  { value: 'Melancholic and Reflective', description: 'Thoughtful, bittersweet, contemplative exploration of loss or memory' },
+  { value: 'Tense and Fast-Paced', description: 'High stakes, quick action, page-turner momentum that builds urgency' },
+  { value: 'Morally Complex', description: 'Grey areas, difficult choices, characters who challenge simple right and wrong' },
+  { value: 'Romantic and Passionate', description: 'Emotional intensity, love-focused, deep connections and yearning' },
+  { value: 'Whimsical and Fantastical', description: 'Playful imagination, magical wonder, dreamlike and enchanting' },
 ];
 
 const COMMON_THEMES = [
@@ -156,8 +169,9 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
   const [genres, setGenres] = useState<string[]>([]);
   const [subgenres, setSubgenres] = useState<string[]>([]);
   const [modifiers, setModifiers] = useState<string[]>([]);
-  const [tone, setTone] = useState('');
+  const [tones, setTones] = useState<string[]>([]);
   const [themes, setThemes] = useState<string[]>([]);
+  const [customTheme, setCustomTheme] = useState('');
   const [targetLength, setTargetLength] = useState(80000);
   const [additionalNotes, setAdditionalNotes] = useState('');
   const [customIdeas, setCustomIdeas] = useState('');
@@ -205,6 +219,16 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
     }
   };
 
+  const handleToneToggle = (toneValue: string) => {
+    if (tones.includes(toneValue)) {
+      setTones(tones.filter(t => t !== toneValue));
+    } else {
+      if (tones.length < 3) {
+        setTones([...tones, toneValue]);
+      }
+    }
+  };
+
   // Get available subgenres based on selected genres
   const availableSubgenres = genres.flatMap(g => SUBGENRES[g] || []);
 
@@ -213,8 +237,8 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
 
     if (genres.length === 0) newErrors.genres = 'Please select at least one genre';
     if (subgenres.length === 0) newErrors.subgenres = 'Please select at least one subgenre';
-    if (!tone) newErrors.tone = 'Please select a tone';
-    if (themes.length === 0) newErrors.themes = 'Please select at least one theme';
+    if (tones.length === 0) newErrors.tones = 'Please select at least one tone';
+    if (themes.length === 0 && !customTheme.trim()) newErrors.themes = 'Please select at least one theme or add a custom theme';
     if (targetLength < 40000) newErrors.targetLength = 'Target length must be at least 40,000 words';
     if (targetLength > 150000) newErrors.targetLength = 'Target length must be at most 150,000 words';
 
@@ -234,13 +258,20 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
     const modifierLabels = modifiers.map(m => GENRE_MODIFIERS.find(mod => mod.value === m)?.label || m);
     const combinedGenre = [...modifierLabels, ...genreLabels].join(' ');
 
+    // Combine selected themes with custom theme if provided
+    const allThemes = customTheme.trim()
+      ? [...themes, customTheme.trim()]
+      : themes;
+
     const preferences: StoryPreferences = {
       genre: combinedGenre,
       genres,
       subgenres,
       modifiers,
-      tone,
-      themes,
+      tone: tones[0] || '', // First tone for backward compatibility
+      tones,
+      themes: allThemes,
+      customTheme: customTheme.trim() || undefined,
       targetLength,
       additionalNotes: additionalNotes.trim() || undefined,
       customIdeas: customIdeas.trim() || undefined,
@@ -419,28 +450,65 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
           <span>📈 Rising = Growing popularity</span>
           <span>✓ Popular = Consistently strong</span>
         </div>
-        <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '0.5rem',
-        }}>
-          {GENRES.map(g => (
-            <button
-              key={g.value}
-              type="button"
-              onClick={() => handleGenreToggle(g.value)}
-              disabled={isLoading || (!genres.includes(g.value) && genres.length >= 3)}
-              style={{
-                ...chipStyle(genres.includes(g.value), isLoading || (!genres.includes(g.value) && genres.length >= 3)),
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.25rem',
-              }}
-            >
-              <span>{g.label}</span>
-              {getTrendBadge(g.trend)}
-            </button>
-          ))}
+
+        {/* Classic Genres */}
+        <div style={{ marginBottom: '1rem' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748B', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Classic Genres
+          </div>
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '0.5rem',
+          }}>
+            {CLASSIC_GENRES.map(g => (
+              <button
+                key={g.value}
+                type="button"
+                onClick={() => handleGenreToggle(g.value)}
+                disabled={isLoading || (!genres.includes(g.value) && genres.length >= 3)}
+                style={{
+                  ...chipStyle(genres.includes(g.value), isLoading || (!genres.includes(g.value) && genres.length >= 3)),
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                }}
+              >
+                <span>{g.label}</span>
+                {getTrendBadge(g.trend)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Specialist Genres */}
+        <div>
+          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748B', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Specialist Genres
+          </div>
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '0.5rem',
+          }}>
+            {SPECIALIST_GENRES.map(g => (
+              <button
+                key={g.value}
+                type="button"
+                onClick={() => handleGenreToggle(g.value)}
+                disabled={isLoading || (!genres.includes(g.value) && genres.length >= 3)}
+                style={{
+                  ...chipStyle(genres.includes(g.value), isLoading || (!genres.includes(g.value) && genres.length >= 3)),
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                }}
+              >
+                <span>{g.label}</span>
+                {getTrendBadge(g.trend)}
+              </button>
+            ))}
+          </div>
         </div>
         {errors.genres && <div style={errorStyle}>{errors.genres}</div>}
       </div>
@@ -473,30 +541,66 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
         </div>
       )}
 
-      {/* Tone Selection */}
+      {/* Tone Selection - Multi-select with descriptions */}
       <div style={sectionStyle}>
         <label style={labelStyle}>
           Tone <span style={{ color: '#DC2626' }}>*</span>
+          <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Select 1-3 to combine)</span>
         </label>
-        <select
-          value={tone}
-          onChange={(e) => setTone(e.target.value)}
-          style={selectStyle}
-          disabled={isLoading}
-        >
-          <option value="">Select a tone...</option>
+        <div style={{ fontSize: '0.75rem', color: '#64748B', marginBottom: '0.75rem' }}>
+          Combine tones for richer storytelling - e.g., "Epic and Grand" + "Tense and Fast-Paced" for action-packed epics
+        </div>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+          gap: '0.625rem',
+        }}>
           {TONES.map(t => (
-            <option key={t} value={t}>{t}</option>
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => handleToneToggle(t.value)}
+              disabled={isLoading || (!tones.includes(t.value) && tones.length >= 3)}
+              style={{
+                padding: '0.75rem 1rem',
+                background: tones.includes(t.value)
+                  ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                  : '#F8FAFC',
+                border: tones.includes(t.value)
+                  ? '1px solid #667eea'
+                  : '1px solid #E2E8F0',
+                borderRadius: '8px',
+                color: tones.includes(t.value) ? '#FFFFFF' : '#374151',
+                cursor: isLoading || (!tones.includes(t.value) && tones.length >= 3) ? 'not-allowed' : 'pointer',
+                opacity: isLoading || (!tones.includes(t.value) && tones.length >= 3) ? 0.5 : 1,
+                transition: 'all 0.2s',
+                textAlign: 'left',
+              }}
+            >
+              <div style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.25rem' }}>
+                {t.value}
+              </div>
+              <div style={{
+                fontSize: '0.75rem',
+                opacity: tones.includes(t.value) ? 0.9 : 0.7,
+                lineHeight: 1.3,
+              }}>
+                {t.description}
+              </div>
+            </button>
           ))}
-        </select>
-        {errors.tone && <div style={errorStyle}>{errors.tone}</div>}
+        </div>
+        <div style={{ marginTop: '0.625rem', fontSize: '0.813rem', color: '#64748B' }}>
+          Selected: {tones.length}/3
+        </div>
+        {errors.tones && <div style={errorStyle}>{errors.tones}</div>}
       </div>
 
       {/* Themes Selection */}
       <div style={sectionStyle}>
         <label style={labelStyle}>
           Themes <span style={{ color: '#DC2626' }}>*</span>
-          <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Select 1-5)</span>
+          <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Select up to 5, or add your own)</span>
         </label>
         <div style={{
           display: 'grid',
@@ -533,6 +637,25 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
         </div>
         <div style={{ marginTop: '0.625rem', fontSize: '0.813rem', color: '#64748B' }}>
           Selected: {themes.length}/5
+        </div>
+
+        {/* Custom Theme Input */}
+        <div style={{ marginTop: '1rem' }}>
+          <label style={{ ...labelStyle, fontSize: '0.813rem' }}>
+            Add Your Own Theme
+            <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Optional)</span>
+          </label>
+          <input
+            type="text"
+            value={customTheme}
+            onChange={(e) => setCustomTheme(e.target.value)}
+            placeholder="e.g., 'Technology as liberation', 'Urban decay and renewal', 'Generational trauma'..."
+            style={inputStyle}
+            disabled={isLoading}
+          />
+          <div style={{ marginTop: '0.375rem', fontSize: '0.75rem', color: '#64748B' }}>
+            Describe a specific thematic focus not covered above. Be as specific as you like.
+          </div>
         </div>
         {errors.themes && <div style={errorStyle}>{errors.themes}</div>}
       </div>

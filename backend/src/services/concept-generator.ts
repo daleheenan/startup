@@ -14,8 +14,10 @@ export interface StoryPreferences {
   subgenre?: string;
   subgenres?: string[];
   modifiers?: string[];
-  tone: string;
+  tone: string; // For backward compatibility
+  tones?: string[]; // Multi-tone support
   themes: string[];
+  customTheme?: string; // Free text custom theme
   targetLength: number;
   additionalNotes?: string;
   customIdeas?: string;
@@ -83,13 +85,18 @@ export async function generateConcepts(
  * Build the prompt for concept generation
  */
 function buildConceptPrompt(preferences: StoryPreferences): string {
-  const { tone, themes, targetLength, additionalNotes, customIdeas, regenerationTimestamp } = preferences;
+  const { tone, tones, themes, customTheme, targetLength, additionalNotes, customIdeas, regenerationTimestamp } = preferences;
 
   const genreText = formatGenre(preferences);
   const subgenreText = formatSubgenre(preferences);
   const modifiersText = formatModifiers(preferences.modifiers);
 
-  const themesText = themes.join(', ');
+  // Support multi-tone (use tones array if available, fall back to single tone)
+  const toneText = tones && tones.length > 0 ? tones.join(' + ') : tone;
+
+  // Combine themes with custom theme if provided
+  const allThemes = customTheme ? [...themes, customTheme] : themes;
+  const themesText = allThemes.join(', ');
   const wordCountContext = getWordCountContext(targetLength);
 
   const uniqueSeed = regenerationTimestamp || Date.now();
@@ -101,7 +108,7 @@ ${seedHint}
 
 **Genre:** ${genreText}${modifiersText ? ` (with ${modifiersText} elements)` : ''}
 **Subgenre:** ${subgenreText}
-**Tone:** ${tone}
+**Tone:** ${toneText}
 **Themes:** ${themesText}
 **Target Length:** ${targetLength.toLocaleString()} words (${wordCountContext})
 ${additionalNotes ? `**Additional Notes:** ${additionalNotes}` : ''}
@@ -153,13 +160,18 @@ export async function refineConcepts(
   existingConcepts: StoryConcept[],
   feedback: string
 ): Promise<StoryConcept[]> {
-  const { tone, themes, targetLength, additionalNotes } = preferences;
+  const { tone, tones, themes, customTheme, targetLength, additionalNotes } = preferences;
 
   const genreText = formatGenre(preferences);
   const subgenreText = formatSubgenre(preferences);
   const modifiersText = formatModifiers(preferences.modifiers);
 
-  const themesText = themes.join(', ');
+  // Support multi-tone
+  const toneText = tones && tones.length > 0 ? tones.join(' + ') : tone;
+
+  // Combine themes with custom theme
+  const allThemes = customTheme ? [...themes, customTheme] : themes;
+  const themesText = allThemes.join(', ');
   const wordCountContext = getWordCountContext(targetLength);
 
   const existingConceptsSummary = existingConcepts.map(c =>
@@ -171,7 +183,7 @@ export async function refineConcepts(
 **Original Preferences:**
 - Genre: ${genreText}${modifiersText ? ` (with ${modifiersText} elements)` : ''}
 - Subgenre: ${subgenreText}
-- Tone: ${tone}
+- Tone: ${toneText}
 - Themes: ${themesText}
 - Target Length: ${targetLength.toLocaleString()} words (${wordCountContext})
 ${additionalNotes ? `- Additional Notes: ${additionalNotes}` : ''}
