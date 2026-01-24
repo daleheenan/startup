@@ -11,6 +11,7 @@ export interface StoryPreferences {
   themes: string[];
   targetLength: number;
   additionalNotes?: string;
+  customIdeas?: string;
 }
 
 interface GenrePreferenceFormProps {
@@ -72,6 +73,7 @@ const TONES = [
 ];
 
 const COMMON_THEMES = [
+  // Core Themes
   'Power and Corruption',
   'Love and Sacrifice',
   'Revenge and Justice',
@@ -87,6 +89,22 @@ const COMMON_THEMES = [
   'War and Peace',
   'Class and Society',
   'Morality and Ethics',
+  // Additional Themes
+  'Forbidden Love',
+  'Time and Mortality',
+  'Ambition and Hubris',
+  'Faith and Doubt',
+  'Memory and Forgetting',
+  'Isolation and Connection',
+  'Legacy and Heritage',
+  'Secrets and Lies',
+  'Hope and Despair',
+  'Transformation',
+  'Obsession',
+  'Fate vs Free Will',
+  'Truth and Deception',
+  'Innocence and Experience',
+  'Greed and Generosity',
 ];
 
 export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePreferenceFormProps) {
@@ -97,6 +115,7 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
   const [themes, setThemes] = useState<string[]>([]);
   const [targetLength, setTargetLength] = useState(80000);
   const [additionalNotes, setAdditionalNotes] = useState('');
+  const [customIdeas, setCustomIdeas] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleGenreToggle = (genreValue: string) => {
@@ -179,6 +198,7 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
       themes,
       targetLength,
       additionalNotes: additionalNotes.trim() || undefined,
+      customIdeas: customIdeas.trim() || undefined,
     };
 
     onSubmit(preferences);
@@ -440,6 +460,29 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
         {errors.targetLength && <div style={errorStyle}>{errors.targetLength}</div>}
       </div>
 
+      {/* Custom Story Ideas */}
+      <div style={sectionStyle}>
+        <label style={labelStyle}>
+          Your Story Ideas
+          <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Optional - describe concepts you want explored)</span>
+        </label>
+        <textarea
+          value={customIdeas}
+          onChange={(e) => setCustomIdeas(e.target.value)}
+          placeholder="Describe specific story ideas, character concepts, plot elements, or unique twists you want the AI to incorporate. For example: 'A librarian who discovers books can predict the future' or 'A heist involving magical artifacts in a steampunk city'..."
+          rows={4}
+          style={{
+            ...inputStyle,
+            resize: 'vertical',
+            minHeight: '100px',
+          }}
+          disabled={isLoading}
+        />
+        <div style={{ marginTop: '0.5rem', fontSize: '0.813rem', color: '#64748B' }}>
+          Be specific! The more detail you provide, the more tailored your concepts will be.
+        </div>
+      </div>
+
       {/* Additional Notes */}
       <div style={sectionStyle}>
         <label style={labelStyle}>
@@ -449,12 +492,12 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
         <textarea
           value={additionalNotes}
           onChange={(e) => setAdditionalNotes(e.target.value)}
-          placeholder="Any specific preferences, inspirations, or elements you'd like to include..."
-          rows={4}
+          placeholder="Any other preferences, inspirations, or style guidelines..."
+          rows={3}
           style={{
             ...inputStyle,
             resize: 'vertical',
-            minHeight: '100px',
+            minHeight: '80px',
           }}
           disabled={isLoading}
         />

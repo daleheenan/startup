@@ -94,7 +94,7 @@ describe('CrossBookContinuityService', () => {
         .mockReturnValueOnce(chapterStmt)  // Third call: get last chapter
         .mockReturnValueOnce(updateStmt);  // Fourth call: update book
 
-      mockClaudeService.createCompletion = jest
+      (mockClaudeService.createCompletion as jest.Mock) = jest
         .fn()
         .mockResolvedValue(JSON.stringify(mockEndingState));
 
@@ -180,7 +180,7 @@ describe('CrossBookContinuityService', () => {
         .mockReturnValueOnce(chaptersStmt)
         .mockReturnValueOnce(updateStmt);
 
-      mockClaudeService.createCompletion = jest.fn().mockResolvedValue(mockSummary);
+      (mockClaudeService.createCompletion as jest.Mock) = jest.fn().mockResolvedValue(mockSummary);
 
       const result = await service.generateBookSummary('book-123');
 
@@ -292,12 +292,11 @@ describe('CrossBookContinuityService', () => {
             id: 'char-1',
             name: 'John Doe',
             role: 'protagonist',
-            age: 30,
-            description: 'A hero',
-            personality: ['brave'],
-            background: 'From the village',
-            goals: ['Save the world'],
+            physicalDescription: 'A hero',
+            personalityTraits: ['brave'],
             voiceSample: 'I will not fail',
+            goals: ['Save the world'],
+            conflicts: [],
             currentState: {
               location: 'Village',
               emotionalState: 'Determined',
@@ -309,27 +308,10 @@ describe('CrossBookContinuityService', () => {
         ],
         world: {
           locations: [],
-          cultures: [],
-          magicSystem: null,
-          technology: '',
-          politics: '',
+          factions: [],
+          systems: [],
         },
         timeline: [],
-        themes: [],
-        toneGuidelines: {
-          overall: 'Heroic',
-          prose: 'Descriptive',
-          pacing: 'Moderate',
-          contentRating: 'PG-13',
-        },
-        storyDNA: {
-          coreTheme: 'Good vs Evil',
-          emotionalCore: 'Hope',
-          narrativeVoice: 'Third person',
-          characterFocus: 'Character-driven',
-          worldBuilding: 'Medium',
-          pacing: 'Moderate',
-        },
       };
 
       const previousState: BookEndingState = {
@@ -359,9 +341,9 @@ describe('CrossBookContinuityService', () => {
 
       const result = service.applyPreviousBookState(currentStoryBible, previousState);
 
-      expect(result.characters[0].currentState.location).toBe('The Castle');
-      expect(result.characters[0].currentState.emotionalState).toBe('Victorious');
-      expect(result.characters[0].currentState.goals).toEqual([
+      expect(result.characters[0]!.currentState!.location).toBe('The Castle');
+      expect(result.characters[0]!.currentState!.emotionalState).toBe('Victorious');
+      expect(result.characters[0]!.currentState!.goals).toEqual([
         'Protect artifact',
         'Return home',
       ]);
@@ -374,12 +356,11 @@ describe('CrossBookContinuityService', () => {
             id: 'char-2',
             name: 'Jane Smith',
             role: 'ally',
-            age: 25,
-            description: 'A new ally',
-            personality: ['clever'],
-            background: 'From the city',
-            goals: ['Help hero'],
+            physicalDescription: 'A new ally',
+            personalityTraits: ['clever'],
             voiceSample: 'Let me help',
+            goals: ['Help hero'],
+            conflicts: [],
             currentState: {
               location: 'City',
               emotionalState: 'Eager',
@@ -391,27 +372,10 @@ describe('CrossBookContinuityService', () => {
         ],
         world: {
           locations: [],
-          cultures: [],
-          magicSystem: null,
-          technology: '',
-          politics: '',
+          factions: [],
+          systems: [],
         },
         timeline: [],
-        themes: [],
-        toneGuidelines: {
-          overall: 'Heroic',
-          prose: 'Descriptive',
-          pacing: 'Moderate',
-          contentRating: 'PG-13',
-        },
-        storyDNA: {
-          coreTheme: 'Good vs Evil',
-          emotionalCore: 'Hope',
-          narrativeVoice: 'Third person',
-          characterFocus: 'Character-driven',
-          worldBuilding: 'Medium',
-          pacing: 'Moderate',
-        },
       };
 
       const previousState: BookEndingState = {
@@ -442,8 +406,8 @@ describe('CrossBookContinuityService', () => {
       const result = service.applyPreviousBookState(currentStoryBible, previousState);
 
       // Jane's state should be unchanged since she wasn't in previous book
-      expect(result.characters[0].currentState.location).toBe('City');
-      expect(result.characters[0].name).toBe('Jane Smith');
+      expect(result.characters[0]!.currentState!.location).toBe('City');
+      expect(result.characters[0]!.name).toBe('Jane Smith');
     });
   });
 });

@@ -53,10 +53,11 @@ describe('BookTransitionService', () => {
         project_id: 'project-1',
         book_number: 1,
         title: 'Book One',
-        target_chapters: 30,
+        word_count: 75000,
         status: 'completed',
-        ending_state: JSON.stringify(mockEndingState),
+        ending_state: mockEndingState,
         book_summary: 'Hero defeats initial threat and finds artifact',
+        timeline_end: 'End of Year 1',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -66,10 +67,11 @@ describe('BookTransitionService', () => {
         project_id: 'project-1',
         book_number: 2,
         title: 'Book Two',
-        target_chapters: 30,
-        status: 'planning',
+        word_count: 0,
+        status: 'setup',
         ending_state: null,
         book_summary: null,
+        timeline_end: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -114,7 +116,7 @@ describe('BookTransitionService', () => {
 
       mockPrepare.mockReturnValueOnce(bookStmt).mockReturnValueOnce(insertStmt);
 
-      mockClaudeService.createCompletion = jest
+      (mockClaudeService.createCompletion as jest.Mock) = jest
         .fn()
         .mockResolvedValue(JSON.stringify(mockTransitionData));
 
@@ -163,10 +165,11 @@ describe('BookTransitionService', () => {
         project_id: 'project-1',
         book_number: 1,
         title: 'Book One',
-        target_chapters: 30,
+        word_count: 75000,
         status: 'completed',
         ending_state: null,
         book_summary: null,
+        timeline_end: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -176,10 +179,11 @@ describe('BookTransitionService', () => {
         project_id: 'project-1',
         book_number: 2,
         title: 'Book Two',
-        target_chapters: 30,
-        status: 'planning',
+        word_count: 0,
+        status: 'setup',
         ending_state: null,
         book_summary: null,
+        timeline_end: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -203,10 +207,11 @@ describe('BookTransitionService', () => {
         project_id: 'project-1',
         book_number: 2,
         title: 'Book Two',
-        target_chapters: 30,
+        word_count: 75000,
         status: 'completed',
-        ending_state: '{}',
+        ending_state: { characters: [], world: { politicalChanges: [], physicalChanges: [], socialChanges: [], activeThreats: [], knownSecrets: [] }, timeline: '', unresolved: [] },
         book_summary: null,
+        timeline_end: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -216,10 +221,11 @@ describe('BookTransitionService', () => {
         project_id: 'project-1',
         book_number: 1,
         title: 'Book One',
-        target_chapters: 30,
+        word_count: 75000,
         status: 'completed',
         ending_state: null,
         book_summary: null,
+        timeline_end: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };

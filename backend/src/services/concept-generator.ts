@@ -17,6 +17,8 @@ export interface StoryPreferences {
   themes: string[];
   targetLength: number;
   additionalNotes?: string;
+  customIdeas?: string;
+  regenerationTimestamp?: number;
 }
 
 export interface StoryConcept {
@@ -80,7 +82,7 @@ export async function generateConcepts(
  * Build the prompt for concept generation
  */
 function buildConceptPrompt(preferences: StoryPreferences): string {
-  const { genre, genres, subgenre, subgenres, modifiers, tone, themes, targetLength, additionalNotes } = preferences;
+  const { genre, genres, subgenre, subgenres, modifiers, tone, themes, targetLength, additionalNotes, customIdeas, regenerationTimestamp } = preferences;
 
   // Support both old single-genre format and new multi-genre format
   const genreText = genre || (genres && genres.length > 0 ? genres.join(' + ') : 'Not specified');
@@ -90,7 +92,13 @@ function buildConceptPrompt(preferences: StoryPreferences): string {
   const themesText = themes.join(', ');
   const wordCountContext = getWordCountContext(targetLength);
 
+  // Generate a unique seed to ensure different concepts each time
+  const uniqueSeed = regenerationTimestamp || Date.now();
+  const seedHint = `[Generation ID: ${uniqueSeed}]`;
+
   return `You are a master storyteller and concept developer. Generate 5 diverse, compelling story concepts based on these preferences:
+
+${seedHint}
 
 **Genre:** ${genreText}${modifiersText ? ` (with ${modifiersText} elements)` : ''}
 **Subgenre:** ${subgenreText}
@@ -98,6 +106,7 @@ function buildConceptPrompt(preferences: StoryPreferences): string {
 **Themes:** ${themesText}
 **Target Length:** ${targetLength.toLocaleString()} words (${wordCountContext})
 ${additionalNotes ? `**Additional Notes:** ${additionalNotes}` : ''}
+${customIdeas ? `**Custom Ideas to Incorporate:** ${customIdeas}` : ''}
 
 Generate 5 DISTINCT story concepts that:
 1. Fit the genre and subgenre conventions

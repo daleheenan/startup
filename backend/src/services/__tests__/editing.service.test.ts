@@ -45,12 +45,12 @@ describe('EditingService', () => {
         revisionGuidance: null,
       };
 
-      // Mock service methods
-      service.getChapterData = jest.fn().mockReturnValue(mockChapterData);
-      service.parseEditorResponse = jest.fn().mockReturnValue(mockEditorResponse);
-      service.generateFlagId = jest.fn().mockReturnValue('flag-123');
+      // Mock service methods using jest.spyOn
+      jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
+      jest.spyOn(service as any, 'parseEditorResponse').mockReturnValue(mockEditorResponse);
+      jest.spyOn(service as any, 'generateFlagId').mockReturnValue('flag-123');
 
-      mockClaudeService.createCompletion = jest
+      (mockClaudeService.createCompletion as jest.Mock) = jest
         .fn()
         .mockResolvedValue(JSON.stringify(mockEditorResponse));
 
@@ -86,11 +86,11 @@ describe('EditingService', () => {
         revisionGuidance: 'Clarify character goals',
       };
 
-      service.getChapterData = jest.fn().mockReturnValue(mockChapterData);
-      service.parseEditorResponse = jest.fn().mockReturnValue(mockEditorResponse);
-      service.generateFlagId = jest.fn().mockReturnValue('flag-456');
+      jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
+      jest.spyOn(service as any, 'parseEditorResponse').mockReturnValue(mockEditorResponse);
+      jest.spyOn(service as any, 'generateFlagId').mockReturnValue('flag-456');
 
-      mockClaudeService.createCompletion = jest
+      (mockClaudeService.createCompletion as jest.Mock) = jest
         .fn()
         .mockResolvedValue(JSON.stringify(mockEditorResponse));
 
@@ -103,7 +103,7 @@ describe('EditingService', () => {
     });
 
     it('should throw error if chapter content not found', async () => {
-      service.getChapterData = jest.fn().mockReturnValue({ content: null });
+      jest.spyOn(service as any, 'getChapterData').mockReturnValue({ content: null });
 
       await expect(service.developmentalEdit('chapter-1')).rejects.toThrow(
         'Chapter content not found'
@@ -133,11 +133,11 @@ describe('EditingService', () => {
         flags: [],
       };
 
-      service.getChapterData = jest.fn().mockReturnValue(mockChapterData);
-      service.parseEditorResponse = jest.fn().mockReturnValue(mockEditorResponse);
-      service.generateFlagId = jest.fn().mockReturnValue('flag-789');
+      jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
+      jest.spyOn(service as any, 'parseEditorResponse').mockReturnValue(mockEditorResponse);
+      jest.spyOn(service as any, 'generateFlagId').mockReturnValue('flag-789');
 
-      mockClaudeService.createCompletion = jest
+      (mockClaudeService.createCompletion as jest.Mock) = jest
         .fn()
         .mockResolvedValue(JSON.stringify(mockEditorResponse));
 
@@ -150,7 +150,7 @@ describe('EditingService', () => {
     });
   });
 
-  describe('continuityCheck', () => {
+  describe('continuityEdit', () => {
     it('should verify consistency with story bible', async () => {
       const mockChapterData = {
         chapter_number: 5,
@@ -168,16 +168,16 @@ describe('EditingService', () => {
         approved: true,
       };
 
-      service.getChapterData = jest.fn().mockReturnValue(mockChapterData);
-      service.getStoryBibleContext = jest.fn().mockReturnValue(mockStoryBible);
-      service.parseEditorResponse = jest.fn().mockReturnValue(mockEditorResponse);
-      service.generateFlagId = jest.fn().mockReturnValue('flag-101');
+      jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
+      jest.spyOn(service as any, 'getStoryBibleContext').mockReturnValue(mockStoryBible);
+      jest.spyOn(service as any, 'parseEditorResponse').mockReturnValue(mockEditorResponse);
+      jest.spyOn(service as any, 'generateFlagId').mockReturnValue('flag-101');
 
-      mockClaudeService.createCompletion = jest
+      (mockClaudeService.createCompletion as jest.Mock) = jest
         .fn()
         .mockResolvedValue(JSON.stringify(mockEditorResponse));
 
-      const result = await service.continuityCheck('chapter-1');
+      const result = await service.continuityEdit('chapter-1');
 
       expect(result.editorType).toBe('continuity');
       expect(result.approved).toBe(true);
@@ -210,16 +210,16 @@ describe('EditingService', () => {
         approved: false,
       };
 
-      service.getChapterData = jest.fn().mockReturnValue(mockChapterData);
-      service.getStoryBibleContext = jest.fn().mockReturnValue({});
-      service.parseEditorResponse = jest.fn().mockReturnValue(mockEditorResponse);
-      service.generateFlagId = jest.fn().mockReturnValue('flag-102');
+      jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
+      jest.spyOn(service as any, 'getStoryBibleContext').mockReturnValue({});
+      jest.spyOn(service as any, 'parseEditorResponse').mockReturnValue(mockEditorResponse);
+      jest.spyOn(service as any, 'generateFlagId').mockReturnValue('flag-102');
 
-      mockClaudeService.createCompletion = jest
+      (mockClaudeService.createCompletion as jest.Mock) = jest
         .fn()
         .mockResolvedValue(JSON.stringify(mockEditorResponse));
 
-      const result = await service.continuityCheck('chapter-1');
+      const result = await service.continuityEdit('chapter-1');
 
       expect(result.approved).toBe(false);
       expect(result.flags).toHaveLength(1);
@@ -247,10 +247,10 @@ describe('EditingService', () => {
         ],
       };
 
-      service.getChapterData = jest.fn().mockReturnValue(mockChapterData);
-      service.parseEditorResponse = jest.fn().mockReturnValue(mockEditorResponse);
+      jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
+      jest.spyOn(service as any, 'parseEditorResponse').mockReturnValue(mockEditorResponse);
 
-      mockClaudeService.createCompletion = jest
+      (mockClaudeService.createCompletion as jest.Mock) = jest
         .fn()
         .mockResolvedValue(JSON.stringify(mockEditorResponse));
 

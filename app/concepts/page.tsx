@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ConceptCard from '../components/ConceptCard';
+import GenerationProgress from '../components/GenerationProgress';
 import { getToken } from '../lib/auth';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -26,6 +27,7 @@ export default function ConceptsPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentStep, setCurrentStep] = useState<string>('');
 
   useEffect(() => {
     // Load concepts and preferences from sessionStorage
@@ -95,16 +97,25 @@ export default function ConceptsPage() {
   const handleRegenerate = async () => {
     setIsRegenerating(true);
     setError(null);
+    setCurrentStep('Connecting to AI service...');
 
     try {
       const token = getToken();
+      setCurrentStep('Generating fresh story concepts...');
+
+      // Add timestamp to ensure unique concepts each time
+      const prefsWithTimestamp = {
+        ...preferences,
+        regenerationTimestamp: Date.now(),
+      };
+
       const response = await fetch(`${API_BASE_URL}/api/concepts/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ preferences }),
+        body: JSON.stringify({ preferences: prefsWithTimestamp }),
       });
 
       if (!response.ok) {
@@ -112,6 +123,7 @@ export default function ConceptsPage() {
         throw new Error(errorData.error?.message || 'Failed to regenerate concepts');
       }
 
+      setCurrentStep('Finalizing new concepts...');
       const data = await response.json();
       setConcepts(data.concepts);
       setSelectedConcept(null);
@@ -123,7 +135,14 @@ export default function ConceptsPage() {
       setError(err.message || 'Failed to regenerate concepts');
     } finally {
       setIsRegenerating(false);
+      setCurrentStep('');
     }
+  };
+
+  const handleCancelRegenerate = () => {
+    setIsRegenerating(false);
+    setError(null);
+    setCurrentStep('');
   };
 
   const handleSaveConcept = async (conceptId: string) => {
@@ -352,6 +371,17 @@ export default function ConceptsPage() {
           </div>
         </div>
       </main>
+
+      {/* Progress Indicator Modal */}
+      <GenerationProgress
+        isActive={isRegenerating}
+        title="Regenerating Concepts"
+        subtitle="Creating fresh story ideas based on your preferences"
+        currentStep={currentStep}
+        estimatedTime={90}
+        error={error}
+        onCancel={handleCancelRegenerate}
+      />
 
       <style jsx>{`
         @keyframes spin {
