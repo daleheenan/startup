@@ -10,6 +10,19 @@ import { metricsService } from '../services/metrics.service.js';
 const router = Router();
 
 /**
+ * Helper: Safely parse JSON with fallback
+ */
+function safeJsonParse(jsonString: string | null | undefined, fallback: any = null): any {
+  if (!jsonString) return fallback;
+  try {
+    return JSON.parse(jsonString as any);
+  } catch (error) {
+    console.error('[JSON Parse Error]', error);
+    return fallback;
+  }
+}
+
+/**
  * GET /api/projects
  * List all projects
  */
@@ -24,11 +37,11 @@ router.get('/', (req, res) => {
     // Get all metrics at once
     const allMetrics = metricsService.getAllProjectMetrics();
 
-    // Parse JSON fields and attach metrics
+    // Parse JSON fields and attach metrics (with safe parsing)
     const parsedProjects = projects.map((p) => ({
       ...p,
-      story_dna: p.story_dna ? JSON.parse(p.story_dna as any) : null,
-      story_bible: p.story_bible ? JSON.parse(p.story_bible as any) : null,
+      story_dna: safeJsonParse(p.story_dna as any, null),
+      story_bible: safeJsonParse(p.story_bible as any, null),
       metrics: allMetrics.get(p.id) || null,
     }));
 
@@ -57,11 +70,11 @@ router.get('/:id', (req, res) => {
       });
     }
 
-    // Parse JSON fields and attach metrics
+    // Parse JSON fields and attach metrics (with safe parsing)
     const parsedProject = {
       ...project,
-      story_dna: project.story_dna ? JSON.parse(project.story_dna as any) : null,
-      story_bible: project.story_bible ? JSON.parse(project.story_bible as any) : null,
+      story_dna: safeJsonParse(project.story_dna as any, null),
+      story_bible: safeJsonParse(project.story_bible as any, null),
       metrics: metricsService.getFormattedMetrics(project.id),
     };
 
@@ -118,28 +131,38 @@ router.post('/', (req, res) => {
 /**
  * PUT /api/projects/:id
  * Update project
+ *
+ * BUG FIX: Whitelisted allowed fields to prevent SQL injection
  */
 router.put('/:id', (req, res) => {
   try {
     const { storyDNA, storyBible, status } = req.body;
 
-    // Build update query dynamically
+    // Whitelist of allowed update fields (prevents SQL injection)
+    const allowedFields = ['story_dna', 'story_bible', 'status'];
     const updates: string[] = [];
     const params: any[] = [];
 
-    if (storyDNA) {
+    // Validate and build update fields
+    if (storyDNA !== undefined) {
       updates.push('story_dna = ?');
       params.push(JSON.stringify(storyDNA));
     }
 
-    if (storyBible) {
+    if (storyBible !== undefined) {
       updates.push('story_bible = ?');
       params.push(JSON.stringify(storyBible));
     }
 
-    if (status) {
+    if (status !== undefined) {
       updates.push('status = ?');
       params.push(status);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({
+        error: { code: 'INVALID_REQUEST', message: 'No valid fields to update' },
+      });
     }
 
     updates.push('updated_at = ?');
@@ -268,7 +291,7 @@ router.post('/:id/characters', async (req, res) => {
     const project = getStmt.get(projectId);
 
     const storyBible = project?.story_bible
-      ? JSON.parse(project.story_bible as any)
+      ? safeJsonParse(project.story_bible as any, { characters: [], world: [], timeline: [] })
       : { characters: [], world: [], timeline: [] };
 
     // Update characters
@@ -315,7 +338,7 @@ router.post('/:id/world', async (req, res) => {
     const project = getStmt.get(projectId);
 
     const storyBible = project?.story_bible
-      ? JSON.parse(project.story_bible as any)
+      ? safeJsonParse(project.story_bible as any, { characters: [], world: [], timeline: [] })
       : { characters: [], world: [], timeline: [] };
 
     // Update world elements
@@ -358,7 +381,12 @@ router.put('/:id/characters/:characterId', (req, res) => {
       });
     }
 
-    const storyBible = JSON.parse(project.story_bible as any);
+    const storyBible = safeJsonParse(project.story_bible as any, null);
+    if (!storyBible) {
+      return res.status(500).json({
+        error: { code: 'INTERNAL_ERROR', message: 'Failed to parse story bible' },
+      });
+    }
 
     // Find and update character
     const charIndex = storyBible.characters.findIndex((c: any) => c.id === characterId);
@@ -406,8 +434,14 @@ router.post('/:id/characters/:characterId/regenerate-name', async (req, res) => 
       });
     }
 
-    const storyBible = JSON.parse(project.story_bible as any);
-    const storyDNA = project.story_dna ? JSON.parse(project.story_dna as any) : null;
+    const storyBible = safeJsonParse(project.story_bible as any, null);
+    const storyDNA = safeJsonParse(project.story_dna as any, null);
+
+    if (!storyBible) {
+      return res.status(500).json({
+        error: { code: 'INTERNAL_ERROR', message: 'Failed to parse story bible' },
+      });
+    }
 
     // Find the character
     const charIndex = storyBible.characters.findIndex((c: any) => c.id === characterId);
@@ -514,8 +548,14 @@ router.post('/:id/characters/regenerate-all-names', async (req, res) => {
       });
     }
 
-    const storyBible = JSON.parse(project.story_bible as any);
-    const storyDNA = project.story_dna ? JSON.parse(project.story_dna as any) : null;
+    const storyBible = safeJsonParse(project.story_bible as any, null);
+    const storyDNA = safeJsonParse(project.story_dna as any, null);
+
+    if (!storyBible) {
+      return res.status(500).json({
+        error: { code: 'INTERNAL_ERROR', message: 'Failed to parse story bible' },
+      });
+    }
 
     if (!storyBible.characters || storyBible.characters.length === 0) {
       return res.status(400).json({
@@ -646,7 +686,12 @@ router.put('/:id/world/:elementId', (req, res) => {
       });
     }
 
-    const storyBible = JSON.parse(project.story_bible as any);
+    const storyBible = safeJsonParse(project.story_bible as any, null);
+    if (!storyBible) {
+      return res.status(500).json({
+        error: { code: 'INTERNAL_ERROR', message: 'Failed to parse story bible' },
+      });
+    }
 
     // Find and update world element
     const elemIndex = storyBible.world.findIndex((w: any) => w.id === elementId);

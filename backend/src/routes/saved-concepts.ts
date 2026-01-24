@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import db from '../db/connection.js';
 import { randomUUID } from 'crypto';
+import { sendBadRequest, sendNotFound, sendInternalError } from '../utils/response-helpers.js';
 
 const router = Router();
 
@@ -30,7 +31,6 @@ router.get('/', (req, res) => {
     `);
     const concepts = stmt.all(status);
 
-    // Parse preferences JSON for each concept
     const parsed = concepts.map(c => ({
       ...c,
       preferences: JSON.parse(c.preferences),
@@ -38,10 +38,7 @@ router.get('/', (req, res) => {
 
     res.json({ concepts: parsed });
   } catch (error: any) {
-    console.error('[API] Error fetching saved concepts:', error);
-    res.status(500).json({
-      error: { code: 'INTERNAL_ERROR', message: error.message }
-    });
+    sendInternalError(res, error, 'fetching saved concepts');
   }
 });
 
@@ -51,9 +48,7 @@ router.post('/', (req, res) => {
     const { concept, preferences, notes } = req.body;
 
     if (!concept || !preferences) {
-      return res.status(400).json({
-        error: { code: 'INVALID_REQUEST', message: 'Missing concept or preferences' }
-      });
+      return sendBadRequest(res, 'Missing concept or preferences');
     }
 
     const id = randomUUID();
@@ -85,10 +80,7 @@ router.post('/', (req, res) => {
       preferences: JSON.parse(saved!.preferences),
     });
   } catch (error: any) {
-    console.error('[API] Error saving concept:', error);
-    res.status(500).json({
-      error: { code: 'INTERNAL_ERROR', message: error.message }
-    });
+    sendInternalError(res, error, 'saving concept');
   }
 });
 
@@ -112,9 +104,7 @@ router.patch('/:id', (req, res) => {
     }
 
     if (updates.length === 0) {
-      return res.status(400).json({
-        error: { code: 'INVALID_REQUEST', message: 'No updates provided' }
-      });
+      return sendBadRequest(res, 'No updates provided');
     }
 
     updates.push('updated_at = ?');
@@ -130,9 +120,7 @@ router.patch('/:id', (req, res) => {
     const updated = db.prepare<[string], SavedConcept>('SELECT * FROM saved_concepts WHERE id = ?').get(id);
 
     if (!updated) {
-      return res.status(404).json({
-        error: { code: 'NOT_FOUND', message: 'Concept not found' }
-      });
+      return sendNotFound(res, 'Concept');
     }
 
     res.json({
@@ -140,10 +128,7 @@ router.patch('/:id', (req, res) => {
       preferences: JSON.parse(updated.preferences),
     });
   } catch (error: any) {
-    console.error('[API] Error updating concept:', error);
-    res.status(500).json({
-      error: { code: 'INTERNAL_ERROR', message: error.message }
-    });
+    sendInternalError(res, error, 'updating concept');
   }
 });
 
@@ -156,17 +141,12 @@ router.delete('/:id', (req, res) => {
     const result = stmt.run(id);
 
     if (result.changes === 0) {
-      return res.status(404).json({
-        error: { code: 'NOT_FOUND', message: 'Concept not found' }
-      });
+      return sendNotFound(res, 'Concept');
     }
 
     res.json({ success: true });
   } catch (error: any) {
-    console.error('[API] Error deleting concept:', error);
-    res.status(500).json({
-      error: { code: 'INTERNAL_ERROR', message: error.message }
-    });
+    sendInternalError(res, error, 'deleting concept');
   }
 });
 

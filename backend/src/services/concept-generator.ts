@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import dotenv from 'dotenv';
+import { formatGenre, formatSubgenre, formatModifiers, getWordCountContext } from '../utils/genre-helpers.js';
 
 dotenv.config();
 
@@ -82,17 +83,15 @@ export async function generateConcepts(
  * Build the prompt for concept generation
  */
 function buildConceptPrompt(preferences: StoryPreferences): string {
-  const { genre, genres, subgenre, subgenres, modifiers, tone, themes, targetLength, additionalNotes, customIdeas, regenerationTimestamp } = preferences;
+  const { tone, themes, targetLength, additionalNotes, customIdeas, regenerationTimestamp } = preferences;
 
-  // Support both old single-genre format and new multi-genre format
-  const genreText = genre || (genres && genres.length > 0 ? genres.join(' + ') : 'Not specified');
-  const subgenreText = subgenre || (subgenres && subgenres.length > 0 ? subgenres.join(', ') : 'Not specified');
-  const modifiersText = modifiers && modifiers.length > 0 ? modifiers.join(', ') : null;
+  const genreText = formatGenre(preferences);
+  const subgenreText = formatSubgenre(preferences);
+  const modifiersText = formatModifiers(preferences.modifiers);
 
   const themesText = themes.join(', ');
   const wordCountContext = getWordCountContext(targetLength);
 
-  // Generate a unique seed to ensure different concepts each time
   const uniqueSeed = regenerationTimestamp || Date.now();
   const seedHint = `[Generation ID: ${uniqueSeed}]`;
 
@@ -154,12 +153,11 @@ export async function refineConcepts(
   existingConcepts: StoryConcept[],
   feedback: string
 ): Promise<StoryConcept[]> {
-  const { genre, genres, subgenre, subgenres, modifiers, tone, themes, targetLength, additionalNotes } = preferences;
+  const { tone, themes, targetLength, additionalNotes } = preferences;
 
-  // Support both old single-genre format and new multi-genre format
-  const genreText = genre || (genres && genres.length > 0 ? genres.join(' + ') : 'Not specified');
-  const subgenreText = subgenre || (subgenres && subgenres.length > 0 ? subgenres.join(', ') : 'Not specified');
-  const modifiersText = modifiers && modifiers.length > 0 ? modifiers.join(', ') : null;
+  const genreText = formatGenre(preferences);
+  const subgenreText = formatSubgenre(preferences);
+  const modifiersText = formatModifiers(preferences.modifiers);
 
   const themesText = themes.join(', ');
   const wordCountContext = getWordCountContext(targetLength);
@@ -243,21 +241,6 @@ Return ONLY a JSON array of 5 concepts in this exact format:
   } catch (error: any) {
     console.error('[ConceptGenerator] Refinement error:', error);
     throw error;
-  }
-}
-
-/**
- * Get context about the target word count
- */
-function getWordCountContext(targetLength: number): string {
-  if (targetLength < 60000) {
-    return 'novella or short novel';
-  } else if (targetLength < 90000) {
-    return 'standard novel';
-  } else if (targetLength < 120000) {
-    return 'longer novel';
-  } else {
-    return 'epic-length novel';
   }
 }
 

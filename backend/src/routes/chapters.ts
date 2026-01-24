@@ -3,8 +3,17 @@ import db from '../db/connection.js';
 import { randomUUID } from 'crypto';
 import type { Chapter } from '../shared/types/index.js';
 import { chapterOrchestratorService } from '../services/chapter-orchestrator.service.js';
+import { sendBadRequest, sendNotFound, sendInternalError } from '../utils/response-helpers.js';
 
 const router = Router();
+
+function parseChapterRow(row: any) {
+  return {
+    ...row,
+    scene_cards: row.scene_cards ? JSON.parse(row.scene_cards) : [],
+    flags: row.flags ? JSON.parse(row.flags) : [],
+  };
+}
 
 /**
  * GET /api/chapters/book/:bookId
@@ -15,19 +24,11 @@ router.get('/book/:bookId', (req, res) => {
     const stmt = db.prepare<[string], any>(`
       SELECT * FROM chapters WHERE book_id = ? ORDER BY chapter_number ASC
     `);
-
     const rows = stmt.all(req.params.bookId);
-
-    const chapters = rows.map((row) => ({
-      ...row,
-      scene_cards: row.scene_cards ? JSON.parse(row.scene_cards) : [],
-      flags: row.flags ? JSON.parse(row.flags) : [],
-    }));
-
+    const chapters = rows.map(parseChapterRow);
     res.json({ chapters });
   } catch (error: any) {
-    console.error('[API] Error fetching chapters:', error);
-    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+    sendInternalError(res, error, 'fetching chapters');
   }
 });
 
@@ -40,25 +41,15 @@ router.get('/:id', (req, res) => {
     const stmt = db.prepare<[string], any>(`
       SELECT * FROM chapters WHERE id = ?
     `);
-
     const row = stmt.get(req.params.id);
 
     if (!row) {
-      return res.status(404).json({
-        error: { code: 'NOT_FOUND', message: 'Chapter not found' },
-      });
+      return sendNotFound(res, 'Chapter');
     }
 
-    const chapter = {
-      ...row,
-      scene_cards: row.scene_cards ? JSON.parse(row.scene_cards) : [],
-      flags: row.flags ? JSON.parse(row.flags) : [],
-    };
-
-    res.json(chapter);
+    res.json(parseChapterRow(row));
   } catch (error: any) {
-    console.error('[API] Error fetching chapter:', error);
-    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+    sendInternalError(res, error, 'fetching chapter');
   }
 });
 
@@ -71,9 +62,7 @@ router.post('/', (req, res) => {
     const { bookId, chapterNumber, title, sceneCards } = req.body;
 
     if (!bookId || !chapterNumber) {
-      return res.status(400).json({
-        error: { code: 'INVALID_REQUEST', message: 'Missing required fields' },
-      });
+      return sendBadRequest(res, 'Missing required fields');
     }
 
     const chapterId = randomUUID();
@@ -111,8 +100,7 @@ router.post('/', (req, res) => {
       updated_at: now,
     });
   } catch (error: any) {
-    console.error('[API] Error creating chapter:', error);
-    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+    sendInternalError(res, error, 'creating chapter');
   }
 });
 
@@ -141,7 +129,6 @@ router.put('/:id', (req, res) => {
       updates.push('content = ?');
       params.push(content);
 
-      // Update word count if content is provided
       if (content) {
         const wordCount = content.split(/\s+/).length;
         updates.push('word_count = ?');
@@ -166,7 +153,6 @@ router.put('/:id', (req, res) => {
 
     updates.push('updated_at = ?');
     params.push(new Date().toISOString());
-
     params.push(req.params.id);
 
     const stmt = db.prepare(`
@@ -176,15 +162,12 @@ router.put('/:id', (req, res) => {
     const result = stmt.run(...params);
 
     if (result.changes === 0) {
-      return res.status(404).json({
-        error: { code: 'NOT_FOUND', message: 'Chapter not found' },
-      });
+      return sendNotFound(res, 'Chapter');
     }
 
     res.json({ success: true });
   } catch (error: any) {
-    console.error('[API] Error updating chapter:', error);
-    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+    sendInternalError(res, error, 'updating chapter');
   }
 });
 
@@ -194,22 +177,16 @@ router.put('/:id', (req, res) => {
  */
 router.delete('/:id', (req, res) => {
   try {
-    const stmt = db.prepare(`
-      DELETE FROM chapters WHERE id = ?
-    `);
-
+    const stmt = db.prepare(`DELETE FROM chapters WHERE id = ?`);
     const result = stmt.run(req.params.id);
 
     if (result.changes === 0) {
-      return res.status(404).json({
-        error: { code: 'NOT_FOUND', message: 'Chapter not found' },
-      });
+      return sendNotFound(res, 'Chapter');
     }
 
     res.status(204).send();
   } catch (error: any) {
-    console.error('[API] Error deleting chapter:', error);
-    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+    sendInternalError(res, error, 'deleting chapter');
   }
 });
 
@@ -220,15 +197,13 @@ router.delete('/:id', (req, res) => {
 router.post('/:id/regenerate', (req, res) => {
   try {
     const jobIds = chapterOrchestratorService.regenerateChapter(req.params.id);
-
     res.json({
       success: true,
       message: 'Chapter queued for regeneration',
       jobs: jobIds,
     });
   } catch (error: any) {
-    console.error('[API] Error regenerating chapter:', error);
-    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+    sendInternalError(res, error, 'regenerating chapter');
   }
 });
 
@@ -239,11 +214,9 @@ router.post('/:id/regenerate', (req, res) => {
 router.get('/:id/workflow-status', (req, res) => {
   try {
     const status = chapterOrchestratorService.getChapterWorkflowStatus(req.params.id);
-
     res.json(status);
   } catch (error: any) {
-    console.error('[API] Error fetching workflow status:', error);
-    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+    sendInternalError(res, error, 'fetching workflow status');
   }
 });
 
