@@ -21,7 +21,10 @@
       "Bash(git fetch:*)",
       "Bash(git ls-tree:*)",
       "Bash(git checkout:*)",
-      "Bash(git clone:*)"
+      "Bash(git clone:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run migrate:*)",
+      "Bash(npm run cli:*)"
     ]
   }
 }

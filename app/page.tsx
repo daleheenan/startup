@@ -1,3 +1,5 @@
+import StatusPanel from './components/StatusPanel';
+
 export default function Home() {
   return (
     <main style={{
@@ -71,8 +73,12 @@ export default function Home() {
           ))}
         </div>
 
+        <div style={{ marginTop: '3rem' }}>
+          <StatusPanel />
+        </div>
+
         <p style={{
-          marginTop: '3rem',
+          marginTop: '2rem',
           fontSize: '0.875rem',
           color: '#444'
         }}>
