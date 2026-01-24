@@ -1,0 +1,14 @@
+# Nixpacks configuration for NovelForge backend
+# Required for better-sqlite3 native compilation
+
+[phases.setup]
+nixPkgs = ["python3", "gcc", "gnumake"]
+
+[phases.install]
+cmds = ["npm install"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm start"
