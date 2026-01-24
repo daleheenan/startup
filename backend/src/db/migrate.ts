@@ -7,6 +7,79 @@ import { dirname } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+/**
+ * Parse SQL file into individual statements, properly handling:
+ * - TRIGGER/BEGIN...END blocks (which contain internal semicolons)
+ * - Single-line comments (--)
+ * - Multi-statement files
+ */
+function parseSqlStatements(sql: string): string[] {
+  const statements: string[] = [];
+  let current = '';
+  let inTrigger = false;
+
+  // Remove single-line comments but preserve the structure
+  const lines = sql.split('\n');
+  const cleanedLines = lines.map(line => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('--')) return '';
+    return line;
+  });
+  const cleanedSql = cleanedLines.join('\n');
+
+  // Split by semicolons but track BEGIN/END blocks
+  const chars = cleanedSql.split('');
+  let i = 0;
+
+  while (i < chars.length) {
+    const char = chars[i];
+
+    // Check for BEGIN keyword (start of trigger body)
+    if (!inTrigger && current.toUpperCase().includes('CREATE TRIGGER')) {
+      const remaining = cleanedSql.substring(i).toUpperCase();
+      if (remaining.startsWith('BEGIN')) {
+        inTrigger = true;
+      }
+    }
+
+    // Check for END keyword (end of trigger body)
+    if (inTrigger) {
+      const remaining = cleanedSql.substring(i).toUpperCase();
+      if (remaining.startsWith('END;') || remaining.startsWith('END ;')) {
+        // Include END and the semicolon
+        const endMatch = cleanedSql.substring(i).match(/^END\s*;/i);
+        if (endMatch) {
+          current += endMatch[0];
+          i += endMatch[0].length;
+          statements.push(current.trim());
+          current = '';
+          inTrigger = false;
+          continue;
+        }
+      }
+    }
+
+    if (char === ';' && !inTrigger) {
+      const trimmed = current.trim();
+      if (trimmed.length > 0) {
+        statements.push(trimmed);
+      }
+      current = '';
+    } else {
+      current += char;
+    }
+    i++;
+  }
+
+  // Add any remaining statement
+  const trimmed = current.trim();
+  if (trimmed.length > 0) {
+    statements.push(trimmed);
+  }
+
+  return statements.filter(s => s.length > 0);
+}
+
 export function runMigrations() {
   console.log('[Migrations] Running database migrations...');
 
@@ -197,13 +270,14 @@ export function runMigrations() {
       }
     }
 
-    // Migrations 005-009: Run from migration files
+    // Migrations 005-010: Run from migration files
     const migrationFiles = [
       '005_analytics_insights.sql',
       '006_chapter_edits.sql',
       '007_regeneration_variations.sql',
       '008_project_metrics.sql',
       '009_genre_tropes.sql',
+      '010_prose_style_control.sql',
     ];
 
     for (let i = 0; i < migrationFiles.length; i++) {
@@ -211,7 +285,7 @@ export function runMigrations() {
       const filename = migrationFiles[i];
 
       if (currentVersion < version) {
-        console.log(`[Migrations] Applying migration 00${version}: ${filename}`);
+        console.log(`[Migrations] Applying migration ${String(version).padStart(3, '0')}: ${filename}`);
         const migrationPath = path.join(__dirname, 'migrations', filename);
 
         if (!fs.existsSync(migrationPath)) {
@@ -224,34 +298,31 @@ export function runMigrations() {
         db.exec('BEGIN TRANSACTION');
 
         try {
-          const lines = migration.split('\n');
-          const cleanedLines = lines.filter(line => {
-            const trimmed = line.trim();
-            return trimmed.length === 0 || !trimmed.startsWith('--');
-          });
-          const cleanedMigration = cleanedLines.join('\n');
-
-          const statements = cleanedMigration
-            .split(';')
-            .map(s => s.trim())
-            .filter(s => s.length > 0);
+          // Parse SQL statements properly handling triggers and multi-statement blocks
+          const statements = parseSqlStatements(migration);
 
           for (const statement of statements) {
             try {
               db.exec(statement);
             } catch (execError: any) {
               // Silently skip ALTER TABLE errors for columns that already exist
-              if (statement.includes('ALTER TABLE') && execError.code === 'SQLITE_ERROR') {
-                console.log(`[Migrations] Skipping statement (likely duplicate column): ${statement.substring(0, 50)}...`);
-              } else {
-                throw execError;
+              // Also skip duplicate trigger/table/index errors
+              if (execError.code === 'SQLITE_ERROR') {
+                const msg = execError.message?.toLowerCase() || '';
+                if (statement.includes('ALTER TABLE') ||
+                    msg.includes('already exists') ||
+                    msg.includes('duplicate column')) {
+                  console.log(`[Migrations] Skipping (already exists): ${statement.substring(0, 60)}...`);
+                  continue;
+                }
               }
+              throw execError;
             }
           }
 
           db.prepare(`INSERT INTO schema_migrations (version) VALUES (${version})`).run();
           db.exec('COMMIT');
-          console.log(`[Migrations] Migration 00${version} applied successfully`);
+          console.log(`[Migrations] Migration ${String(version).padStart(3, '0')} applied successfully`);
         } catch (error) {
           db.exec('ROLLBACK');
           throw error;
