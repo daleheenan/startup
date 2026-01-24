@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { getToken, logout } from '../lib/auth';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -208,36 +209,62 @@ export default function ChaptersList({ projectId }: ChaptersListProps) {
                         </div>
                       </div>
 
-                      <button
-                        onClick={() => regenerateChapter(chapter.id, chapter.chapter_number)}
-                        disabled={regeneratingChapter === chapter.id}
-                        style={{
-                          padding: '0.5rem 1rem',
-                          background:
-                            regeneratingChapter === chapter.id
-                              ? 'rgba(102, 126, 234, 0.5)'
-                              : 'rgba(102, 126, 234, 0.2)',
-                          border: '1px solid rgba(102, 126, 234, 0.3)',
-                          borderRadius: '6px',
-                          color: regeneratingChapter === chapter.id ? '#888' : '#667eea',
-                          fontSize: '0.875rem',
-                          fontWeight: 600,
-                          cursor: regeneratingChapter === chapter.id ? 'not-allowed' : 'pointer',
-                          transition: 'all 0.2s',
-                        }}
-                        onMouseOver={(e) => {
-                          if (regeneratingChapter !== chapter.id) {
-                            e.currentTarget.style.background = 'rgba(102, 126, 234, 0.3)';
-                          }
-                        }}
-                        onMouseOut={(e) => {
-                          if (regeneratingChapter !== chapter.id) {
-                            e.currentTarget.style.background = 'rgba(102, 126, 234, 0.2)';
-                          }
-                        }}
-                      >
-                        {regeneratingChapter === chapter.id ? 'Regenerating...' : 'Regenerate'}
-                      </button>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <Link
+                          href={`/projects/${projectId}/chapters/${chapter.id}`}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            background: 'rgba(16, 185, 129, 0.2)',
+                            border: '1px solid rgba(16, 185, 129, 0.3)',
+                            borderRadius: '6px',
+                            color: '#10B981',
+                            fontSize: '0.875rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            textDecoration: 'none',
+                            display: 'inline-block',
+                            transition: 'all 0.2s',
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = 'rgba(16, 185, 129, 0.3)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)';
+                          }}
+                        >
+                          Edit
+                        </Link>
+                        <button
+                          onClick={() => regenerateChapter(chapter.id, chapter.chapter_number)}
+                          disabled={regeneratingChapter === chapter.id}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            background:
+                              regeneratingChapter === chapter.id
+                                ? 'rgba(102, 126, 234, 0.5)'
+                                : 'rgba(102, 126, 234, 0.2)',
+                            border: '1px solid rgba(102, 126, 234, 0.3)',
+                            borderRadius: '6px',
+                            color: regeneratingChapter === chapter.id ? '#888' : '#667eea',
+                            fontSize: '0.875rem',
+                            fontWeight: 600,
+                            cursor: regeneratingChapter === chapter.id ? 'not-allowed' : 'pointer',
+                            transition: 'all 0.2s',
+                          }}
+                          onMouseOver={(e) => {
+                            if (regeneratingChapter !== chapter.id) {
+                              e.currentTarget.style.background = 'rgba(102, 126, 234, 0.3)';
+                            }
+                          }}
+                          onMouseOut={(e) => {
+                            if (regeneratingChapter !== chapter.id) {
+                              e.currentTarget.style.background = 'rgba(102, 126, 234, 0.2)';
+                            }
+                          }}
+                        >
+                          {regeneratingChapter === chapter.id ? 'Regenerating...' : 'Regenerate'}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

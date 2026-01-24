@@ -12,11 +12,11 @@ MAINTENANCE RULES:
 
 ## Summary Statistics
 
-- **Total tasks completed**: 3
-- **Total lessons recorded**: 3
-- **Last updated**: 2026-01-20
+- **Total tasks completed**: 4
+- **Total lessons recorded**: 4
+- **Last updated**: 2026-01-24
 - **Proven lessons** (score >= 5): 0
-- **Top themes**: #typescript #testing #patterns
+- **Top themes**: #typescript #testing #patterns #frontend #backend
 
 ---
 
@@ -29,6 +29,31 @@ MAINTENANCE RULES:
 ---
 
 ## Active Lessons (Most Recent First)
+
+### 2026-01-24 | Task: Implementing Sprints 16 & 17 - Interactive Editing & Regeneration
+
+**Date**: 2026-01-24
+**Task**: Implementing interactive chapter editing workspace with regeneration tools
+**Context**: Full-stack feature spanning migrations, services, routes, and UI components
+
+**What Worked Well**:
+- Reading existing code first revealed that most backend infrastructure was already implemented
+- Leveraging existing components (ChapterEditor, VariationPicker, RegenerationToolbar) saved significant time
+- Creating a dedicated route for the chapter editor (/projects/[id]/chapters/[chapterId]) provided clean separation
+- Adding an "Edit" button to ChaptersList made the feature discoverable
+- Running builds after implementation verified everything compiled correctly
+
+**What Didn't Work**:
+- Initially didn't check if backend services existed before planning implementation
+- Could have saved time by checking component inventory first
+
+**Lesson**: For large features spanning frontend and backend, always inventory what already exists before writing new code. Check migrations, services, routes, and components systematically. Often, infrastructure is partially or fully implemented and just needs UI wiring.
+
+**Application Score**: 0
+
+**Tags**: #frontend #backend #fullstack #inventory #existing-code
+
+---
 
 ### 2026-01-20 | Task: Initial developer agent setup
 
