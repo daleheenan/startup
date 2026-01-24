@@ -17,7 +17,11 @@
       "Bash(git push:*)",
       "Bash(railway variable list:*)",
       "Bash(railway:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git fetch:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(git checkout:*)",
+      "Bash(git clone:*)"
     ]
   }
 }
