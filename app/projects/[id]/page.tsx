@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
+import ExportButtons from '../../components/ExportButtons';
 
 interface Project {
   id: string;
@@ -249,12 +250,18 @@ export default function ProjectDetailPage() {
           </div>
         </div>
 
+        {/* Export Section (show if project has chapters) */}
+        {project.status !== 'setup' && (
+          <ExportButtons projectId={project.id} />
+        )}
+
         {/* Next Steps */}
         <div style={{
           background: 'rgba(255, 255, 255, 0.05)',
           border: '1px solid rgba(255, 255, 255, 0.1)',
           borderRadius: '12px',
-          padding: '2rem'
+          padding: '2rem',
+          marginTop: '1rem'
         }}>
           <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#ededed' }}>
             Next Steps
