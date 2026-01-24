@@ -120,6 +120,7 @@ export class QueueWorker {
   /**
    * Pick up the next pending job from the queue atomically
    * Uses a transaction with status check to prevent race conditions
+   * Sprint 16: Skip jobs for locked chapters
    */
   private pickupJob(): Job | null {
     const now = new Date().toISOString();
@@ -127,9 +128,11 @@ export class QueueWorker {
     // Use transaction to ensure atomic SELECT + UPDATE
     const transaction = db.transaction(() => {
       const stmt = db.prepare<[], Job>(`
-        SELECT * FROM jobs
-        WHERE status = 'pending'
-        ORDER BY created_at ASC
+        SELECT j.* FROM jobs j
+        LEFT JOIN chapter_edits ce ON j.target_id = ce.chapter_id
+        WHERE j.status = 'pending'
+        AND (ce.is_locked IS NULL OR ce.is_locked = 0)
+        ORDER BY j.created_at ASC
         LIMIT 1
       `);
 

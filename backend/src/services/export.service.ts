@@ -22,6 +22,7 @@ export interface Project {
 export class ExportService {
   /**
    * Generate DOCX file for a project
+   * Sprint 16: Include edited versions when available
    */
   async generateDOCX(projectId: string): Promise<Buffer> {
     // Get project and chapters
@@ -30,9 +31,17 @@ export class ExportService {
       throw new Error('Project not found');
     }
 
+    // Get chapters with edited versions if available
     const chapters = db.prepare(`
-      SELECT c.* FROM chapters c
+      SELECT
+        c.id,
+        c.chapter_number,
+        c.title,
+        COALESCE(ce.edited_content, c.content) as content,
+        COALESCE(ce.word_count, c.word_count) as word_count
+      FROM chapters c
       JOIN books b ON c.book_id = b.id
+      LEFT JOIN chapter_edits ce ON ce.chapter_id = c.id
       WHERE b.project_id = ?
       ORDER BY b.book_number, c.chapter_number
     `).all(projectId) as Chapter[];
@@ -180,6 +189,7 @@ export class ExportService {
 
   /**
    * Generate PDF file for a project
+   * Sprint 16: Include edited versions when available
    */
   async generatePDF(projectId: string): Promise<Buffer> {
     return new Promise<Buffer>(async (resolve, reject) => {
@@ -190,9 +200,17 @@ export class ExportService {
           throw new Error('Project not found');
         }
 
+        // Get chapters with edited versions if available
         const chapters = db.prepare(`
-          SELECT c.* FROM chapters c
+          SELECT
+            c.id,
+            c.chapter_number,
+            c.title,
+            COALESCE(ce.edited_content, c.content) as content,
+            COALESCE(ce.word_count, c.word_count) as word_count
+          FROM chapters c
           JOIN books b ON c.book_id = b.id
+          LEFT JOIN chapter_edits ce ON ce.chapter_id = c.id
           WHERE b.project_id = ?
           ORDER BY b.book_number, c.chapter_number
         `).all(projectId) as Chapter[];
