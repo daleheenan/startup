@@ -300,6 +300,74 @@ sudo apt-get install -y build-essential python3
 sudo chown -R $USER:$USER ~/.npm
 ```
 
+## Railway Deployment
+
+NovelForge can be deployed to Railway with persistent storage for the SQLite database.
+
+### 1. Create Railway Project
+
+1. Sign up at railway.app
+2. Create new project
+3. Connect your GitHub repository
+
+### 2. Configure Environment Variables
+
+In Railway dashboard, add these variables:
+
+| Variable | Value |
+|----------|-------|
+| `ANTHROPIC_API_KEY` | Your Claude API key |
+| `DATABASE_PATH` | `/data/novelforge.db` |
+| `NODE_ENV` | `production` |
+| `FRONTEND_URL` | Your frontend URL (or `*` for any) |
+
+### 3. Volume Configuration
+
+The `railway.toml` file is pre-configured to mount a persistent volume:
+
+```toml
+[[mounts]]
+source = "novelforge_data"
+destination = "/data"
+```
+
+This ensures your database persists across:
+- Server restarts
+- New deployments
+- Container recreation
+
+### 4. Deploy
+
+Push to your connected branch:
+
+```bash
+git push origin main
+```
+
+Railway will automatically:
+1. Build the application
+2. Create/attach the volume
+3. Run database migrations
+4. Start the server
+
+### 5. Verify Deployment
+
+Check Railway logs for:
+```
+🚀 NovelForge Backend Server
+   Port: 3001
+   Environment: production
+
+✅ Server started successfully
+```
+
+### Railway Tips
+
+- **Scaling**: Railway handles auto-scaling automatically
+- **Logs**: View real-time logs in Railway dashboard
+- **Custom Domain**: Add in Settings > Domains
+- **Costs**: Pay-as-you-go, typically $5-20/month for light use
+
 ## Docker Setup (Advanced)
 
 **Dockerfile** (create in project root):
