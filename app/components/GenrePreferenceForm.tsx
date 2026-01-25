@@ -31,6 +31,28 @@ export interface StoryPreferences {
   targetLength: number;
   additionalNotes?: string;
   customIdeas?: string;
+  // Project structure
+  projectType: 'standalone' | 'trilogy' | 'series';
+  bookCount?: number; // For series (4+)
+  // Universe linking
+  universeId?: string; // Link to existing universe
+  sourceProjectId?: string; // Create universe from this project
+  timeGapFromSource?: string; // e.g., "5 years later"
+}
+
+interface SourceProject {
+  id: string;
+  title: string;
+  type: string;
+  genre: string;
+  universe_id: string | null;
+}
+
+interface Universe {
+  id: string;
+  name: string;
+  description: string | null;
+  root_project_id: string | null;
 }
 
 interface GenrePreferenceFormProps {
@@ -362,6 +384,20 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
   const [customIdeas, setCustomIdeas] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Project structure state
+  const [projectType, setProjectType] = useState<'standalone' | 'trilogy' | 'series'>('standalone');
+  const [bookCount, setBookCount] = useState(4); // For series
+
+  // Universe state
+  const [useExistingUniverse, setUseExistingUniverse] = useState(false);
+  const [universeSource, setUniverseSource] = useState<'universe' | 'project'>('project');
+  const [selectedUniverseId, setSelectedUniverseId] = useState<string>('');
+  const [selectedSourceProjectId, setSelectedSourceProjectId] = useState<string>('');
+  const [timeGapFromSource, setTimeGapFromSource] = useState('');
+  const [sourceProjects, setSourceProjects] = useState<SourceProject[]>([]);
+  const [universes, setUniverses] = useState<Universe[]>([]);
+  const [loadingUniverseData, setLoadingUniverseData] = useState(false);
+
   // Preset state
   const [presets, setPresets] = useState<BookStylePreset[]>([]);
   const [showSavePreset, setShowSavePreset] = useState(false);
@@ -369,10 +405,40 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
   const [presetDescription, setPresetDescription] = useState('');
   const [savingPreset, setSavingPreset] = useState(false);
 
-  // Load presets on mount
+  // Load presets and universe data on mount
   useEffect(() => {
     fetchPresets();
+    fetchUniverseData();
   }, []);
+
+  // Fetch available universes and source projects
+  const fetchUniverseData = async () => {
+    setLoadingUniverseData(true);
+    try {
+      const token = getToken();
+      const headers = { 'Authorization': `Bearer ${token}` };
+
+      // Fetch universes and source projects in parallel
+      const [universesRes, projectsRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/universes`, { headers }),
+        fetch(`${API_BASE_URL}/api/universes/source-projects`, { headers }),
+      ]);
+
+      if (universesRes.ok) {
+        const data = await universesRes.json();
+        setUniverses(data.universes || []);
+      }
+
+      if (projectsRes.ok) {
+        const data = await projectsRes.json();
+        setSourceProjects(data.projects || []);
+      }
+    } catch (err) {
+      console.error('Error fetching universe data:', err);
+    } finally {
+      setLoadingUniverseData(false);
+    }
+  };
 
   const fetchPresets = async () => {
     try {
@@ -562,6 +628,13 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
       targetLength,
       additionalNotes: additionalNotes.trim() || undefined,
       customIdeas: customIdeas.trim() || undefined,
+      // Project structure
+      projectType,
+      bookCount: projectType === 'series' ? bookCount : undefined,
+      // Universe linking
+      universeId: useExistingUniverse && universeSource === 'universe' ? selectedUniverseId : undefined,
+      sourceProjectId: useExistingUniverse && universeSource === 'project' ? selectedSourceProjectId : undefined,
+      timeGapFromSource: useExistingUniverse && timeGapFromSource.trim() ? timeGapFromSource.trim() : undefined,
     };
 
     onSubmit(preferences);
@@ -851,6 +924,248 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
             <span style={{ fontSize: '0.813rem', color: '#64748B', fontStyle: 'italic' }}>
               No presets yet. Save your selections above!
             </span>
+          )}
+        </div>
+      </div>
+
+      {/* Project Structure Selection */}
+      <div style={{
+        ...sectionStyle,
+        padding: '1rem',
+        background: '#FEF3C7',
+        border: '1px solid #FCD34D',
+        borderRadius: '8px',
+      }}>
+        <label style={{ ...labelStyle, marginBottom: '0.75rem' }}>
+          Project Structure
+          <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(How many books?)</span>
+        </label>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+          {[
+            { value: 'standalone', label: 'Single Novel', desc: 'One complete story' },
+            { value: 'trilogy', label: 'Trilogy', desc: '3 connected books' },
+            { value: 'series', label: 'Series', desc: '4+ books' },
+          ].map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setProjectType(option.value as 'standalone' | 'trilogy' | 'series')}
+              disabled={isLoading}
+              style={{
+                flex: '1 1 150px',
+                padding: '0.875rem 1rem',
+                background: projectType === option.value
+                  ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                  : '#FFFFFF',
+                border: projectType === option.value
+                  ? '1px solid #667eea'
+                  : '1px solid #E2E8F0',
+                borderRadius: '8px',
+                color: projectType === option.value ? '#FFFFFF' : '#374151',
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s',
+                textAlign: 'left',
+              }}
+            >
+              <div style={{ fontWeight: 600, fontSize: '0.938rem', marginBottom: '0.25rem' }}>
+                {option.label}
+              </div>
+              <div style={{
+                fontSize: '0.75rem',
+                opacity: projectType === option.value ? 0.9 : 0.7,
+              }}>
+                {option.desc}
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* Series book count */}
+        {projectType === 'series' && (
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ ...labelStyle, fontSize: '0.813rem' }}>
+              Planned Number of Books
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <input
+                type="number"
+                value={bookCount}
+                onChange={(e) => setBookCount(Math.max(4, parseInt(e.target.value) || 4))}
+                min={4}
+                max={20}
+                style={{
+                  ...inputStyle,
+                  width: '100px',
+                }}
+                disabled={isLoading}
+              />
+              <span style={{ fontSize: '0.813rem', color: '#64748B' }}>
+                books (you can add more later)
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Universe Selection */}
+        <div style={{
+          paddingTop: '1rem',
+          borderTop: '1px dashed #E2E8F0',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+            <input
+              type="checkbox"
+              id="useExistingUniverse"
+              checked={useExistingUniverse}
+              onChange={(e) => setUseExistingUniverse(e.target.checked)}
+              disabled={isLoading}
+              style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+            />
+            <label htmlFor="useExistingUniverse" style={{ ...labelStyle, marginBottom: 0, cursor: 'pointer' }}>
+              Build on an existing story universe
+              <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>
+                (inherit world, characters, timeline)
+              </span>
+            </label>
+          </div>
+
+          {useExistingUniverse && (
+            <div style={{
+              padding: '1rem',
+              background: '#FFFFFF',
+              border: '1px solid #E2E8F0',
+              borderRadius: '8px',
+            }}>
+              {loadingUniverseData ? (
+                <div style={{ textAlign: 'center', color: '#64748B', padding: '1rem' }}>
+                  Loading available universes...
+                </div>
+              ) : (
+                <>
+                  {/* Source selection */}
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label style={{ ...labelStyle, fontSize: '0.813rem' }}>Select Source</label>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => setUniverseSource('project')}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          background: universeSource === 'project' ? '#667eea' : '#F8FAFC',
+                          border: '1px solid ' + (universeSource === 'project' ? '#667eea' : '#E2E8F0'),
+                          borderRadius: '6px',
+                          color: universeSource === 'project' ? '#FFFFFF' : '#374151',
+                          fontSize: '0.813rem',
+                          fontWeight: 500,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        From Project
+                      </button>
+                      {universes.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setUniverseSource('universe')}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            background: universeSource === 'universe' ? '#667eea' : '#F8FAFC',
+                            border: '1px solid ' + (universeSource === 'universe' ? '#667eea' : '#E2E8F0'),
+                            borderRadius: '6px',
+                            color: universeSource === 'universe' ? '#FFFFFF' : '#374151',
+                            fontSize: '0.813rem',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          From Universe
+                        </button>
+                      )}
+                    </div>
+
+                    {universeSource === 'project' && (
+                      <select
+                        value={selectedSourceProjectId}
+                        onChange={(e) => setSelectedSourceProjectId(e.target.value)}
+                        style={{
+                          ...inputStyle,
+                          cursor: 'pointer',
+                        }}
+                        disabled={isLoading}
+                      >
+                        <option value="">Select a project...</option>
+                        {sourceProjects.map((project) => (
+                          <option key={project.id} value={project.id}>
+                            {project.title} ({project.genre})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+
+                    {universeSource === 'universe' && (
+                      <select
+                        value={selectedUniverseId}
+                        onChange={(e) => setSelectedUniverseId(e.target.value)}
+                        style={{
+                          ...inputStyle,
+                          cursor: 'pointer',
+                        }}
+                        disabled={isLoading}
+                      >
+                        <option value="">Select a universe...</option>
+                        {universes.map((universe) => (
+                          <option key={universe.id} value={universe.id}>
+                            {universe.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  {/* Time gap */}
+                  {(selectedSourceProjectId || selectedUniverseId) && (
+                    <div>
+                      <label style={{ ...labelStyle, fontSize: '0.813rem' }}>
+                        Time Gap from Previous Story
+                        <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(optional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={timeGapFromSource}
+                        onChange={(e) => setTimeGapFromSource(e.target.value)}
+                        placeholder="e.g., '5 years later', '100 years after', 'Same timeline'"
+                        style={inputStyle}
+                        disabled={isLoading}
+                      />
+                    </div>
+                  )}
+
+                  {/* Info about inherited elements */}
+                  {(selectedSourceProjectId || selectedUniverseId) && (
+                    <div style={{
+                      marginTop: '1rem',
+                      padding: '0.75rem',
+                      background: '#F0FDF4',
+                      border: '1px solid #BBF7D0',
+                      borderRadius: '6px',
+                      fontSize: '0.813rem',
+                      color: '#15803D',
+                    }}>
+                      <strong>Inherited elements (read-only):</strong> Characters, locations, factions, world systems, and timeline from the source will be available in your new project. You can add new elements but cannot modify inherited ones.
+                    </div>
+                  )}
+                </>
+              )}
+
+              {!loadingUniverseData && sourceProjects.length === 0 && universes.length === 0 && (
+                <div style={{
+                  textAlign: 'center',
+                  color: '#64748B',
+                  padding: '1rem',
+                  fontStyle: 'italic',
+                }}>
+                  No projects available yet. Complete a project first to use it as a universe source.
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>

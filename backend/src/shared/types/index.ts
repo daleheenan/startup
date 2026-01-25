@@ -1,7 +1,7 @@
 // Shared types for NovelForge
 
 // Project Types
-export type ProjectType = 'standalone' | 'trilogy';
+export type ProjectType = 'standalone' | 'trilogy' | 'series';
 export type ProjectStatus = 'setup' | 'generating' | 'completed';
 
 export interface Project {
@@ -14,8 +14,26 @@ export interface Project {
   story_bible: StoryBible | null;
   series_bible: SeriesBible | null;  // Sprint 8: Aggregated trilogy data
   book_count: number;                 // Sprint 8: Number of books in series
+  universe_id: string | null;         // Link to shared universe
+  is_universe_root: boolean;          // Is this the origin project for a universe?
   created_at: string;
   updated_at: string;
+}
+
+// Universe Types - for shared world-building across projects
+export interface Universe {
+  id: string;
+  name: string;
+  description: string | null;
+  root_project_id: string | null;
+  story_dna_template: StoryDNA | null;   // Shared genre/tone/themes
+  world_template: WorldElements | null;   // Shared world elements
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UniverseWithProjects extends Universe {
+  projects: Project[];
 }
 
 export interface StoryDNA {

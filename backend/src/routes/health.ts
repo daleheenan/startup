@@ -1,6 +1,7 @@
 import express from 'express';
 import Anthropic from '@anthropic-ai/sdk';
 import { createLogger } from '../services/logger.service.js';
+import db from '../db/connection.js';
 
 const router = express.Router();
 const log = createLogger('HealthRouter');
@@ -20,6 +21,64 @@ router.get('/', (req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString()
+  });
+});
+
+/**
+ * GET /api/health/detailed
+ *
+ * Detailed health check including database connectivity
+ *
+ * Response:
+ * {
+ *   "status": "ok" | "degraded" | "unhealthy",
+ *   "timestamp": "ISO 8601",
+ *   "checks": {
+ *     "database": { "status": "ok", "latency": 5 },
+ *     "memory": { "used": 50, "total": 512 }
+ *   }
+ * }
+ */
+router.get('/detailed', (req, res) => {
+  const checks: Record<string, any> = {};
+  let overallStatus = 'ok';
+
+  // Database check
+  try {
+    const dbStart = Date.now();
+    const result = db.prepare('SELECT 1 as test').get();
+    const dbLatency = Date.now() - dbStart;
+
+    if (result) {
+      checks.database = { status: 'ok', latency: dbLatency };
+    } else {
+      checks.database = { status: 'unhealthy', error: 'No result from database' };
+      overallStatus = 'unhealthy';
+    }
+  } catch (error: any) {
+    checks.database = { status: 'unhealthy', error: error.message };
+    overallStatus = 'unhealthy';
+  }
+
+  // Memory check
+  const memUsage = process.memoryUsage();
+  checks.memory = {
+    heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024),
+    heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024),
+    rss: Math.round(memUsage.rss / 1024 / 1024),
+  };
+
+  // Uptime
+  checks.uptime = Math.round(process.uptime());
+
+  // Environment
+  checks.environment = process.env.NODE_ENV || 'development';
+
+  const statusCode = overallStatus === 'ok' ? 200 : 503;
+  res.status(statusCode).json({
+    status: overallStatus,
+    timestamp: new Date().toISOString(),
+    checks,
   });
 });
 

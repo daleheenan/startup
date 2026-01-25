@@ -7,6 +7,7 @@ import { generateProtagonist, generateSupportingCast } from '../services/charact
 import { generateWorldElements } from '../services/world-generator.js';
 import { metricsService } from '../services/metrics.service.js';
 import { createLogger } from '../services/logger.service.js';
+import { universeService } from '../services/universe.service.js';
 
 const router = Router();
 const logger = createLogger('routes:projects');
@@ -90,6 +91,12 @@ router.get('/:id', (req, res) => {
 /**
  * POST /api/projects
  * Create new project
+ *
+ * Supports:
+ * - projectType: 'standalone' | 'trilogy' | 'series'
+ * - bookCount: number of books (3 for trilogy, 4+ for series)
+ * - universeId: ID of existing universe to link to
+ * - sourceProjectId: ID of project to create universe from
  */
 router.post('/', (req, res) => {
   try {
@@ -104,24 +111,56 @@ router.post('/', (req, res) => {
     const projectId = randomUUID();
     const now = new Date().toISOString();
 
+    // Determine project type and book count
+    const projectType = preferences.projectType || 'standalone';
+    let bookCount = 1;
+    if (projectType === 'trilogy') {
+      bookCount = 3;
+    } else if (projectType === 'series') {
+      bookCount = preferences.bookCount || 4;
+    }
+
+    // Handle universe linking
+    let universeId: string | null = null;
+
+    if (preferences.universeId) {
+      // Link to existing universe
+      universeId = preferences.universeId;
+    } else if (preferences.sourceProjectId) {
+      // Create or get universe from source project
+      universeId = universeService.getOrCreateUniverse(preferences.sourceProjectId);
+    }
+
     const stmt = db.prepare(`
-      INSERT INTO projects (id, title, type, genre, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO projects (id, title, type, genre, status, book_count, universe_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
       projectId,
       concept.title,
-      'standalone', // Default to standalone
+      projectType,
       preferences.genre,
       'setup',
+      bookCount,
+      universeId,
       now,
       now
     );
 
+    logger.info({
+      projectId,
+      projectType,
+      bookCount,
+      universeId,
+    }, 'Created new project');
+
     res.status(201).json({
       id: projectId,
       title: concept.title,
+      type: projectType,
+      book_count: bookCount,
+      universe_id: universeId,
       status: 'setup',
     });
   } catch (error: any) {

@@ -42,6 +42,7 @@ import proseStylesRouter from './routes/prose-styles.js';
 import analyticsRouter from './routes/analytics.js';
 import presetsRouter from './routes/presets.js';
 import mysteriesRouter from './routes/mysteries.js';
+import universesRouter from './routes/universes.js';
 
 // Run database migrations
 try {
@@ -137,6 +138,7 @@ app.use('/api/prose-styles', apiLimiter, requireAuth, proseStylesRouter);
 app.use('/api/analytics', apiLimiter, requireAuth, analyticsRouter);
 app.use('/api/presets', apiLimiter, requireAuth, presetsRouter);
 app.use('/api/mysteries', apiLimiter, requireAuth, mysteriesRouter);
+app.use('/api/universes', apiLimiter, requireAuth, universesRouter);
 
 // Sentry error handler - must be BEFORE custom error handlers
 app.use(sentryErrorHandler());

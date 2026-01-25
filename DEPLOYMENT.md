@@ -142,11 +142,11 @@ restartPolicyMaxRetries = 10
 ```toml
 [build]
 builder = "nixpacks"
-buildCommand = "npm install && npm run build"
+buildCommand = "npm ci && npm run build"
 
 [deploy]
 startCommand = "npm start"
-healthcheckPath = "/health"
+healthcheckPath = "/api/health"
 healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
@@ -155,6 +155,8 @@ restartPolicyMaxRetries = 10
 source = "novelforge_data"
 destination = "/data"
 ```
+
+**IMPORTANT:** The health check path is `/api/health` (not `/health`). The backend health routes are mounted at `/api/health`.
 
 ## Environment Variables Reference
 
@@ -173,19 +175,41 @@ destination = "/data"
 
 ### Healthcheck Failures
 
-1. **Check the health endpoint exists:**
-   - Backend: `GET /health` should return `{ status: 'ok' }`
-   - Frontend: `GET /` should return 200
+**Common Cause:** Health check path mismatch. The backend health endpoint is at `/api/health`, not `/health`.
 
-2. **Check build logs:**
+1. **Verify health check configuration:**
+   - Backend `railway.toml` should have: `healthcheckPath = "/api/health"`
+   - NOT `/health` (this endpoint doesn't exist)
+
+2. **Test health endpoints manually:**
+   ```bash
+   # Basic health check (used by Railway)
+   curl https://your-backend.railway.app/api/health
+   # Expected: {"status":"ok","timestamp":"..."}
+
+   # Detailed health check (includes DB status)
+   curl https://your-backend.railway.app/api/health/detailed
+   # Expected: {"status":"ok","checks":{"database":{"status":"ok"},...}}
+
+   # Claude API connectivity check
+   curl https://your-backend.railway.app/api/health/claude
+   # Expected: {"status":"healthy","latency":123,"model":"claude-3-haiku-..."}
+   ```
+
+3. **Check build logs:**
    ```bash
    railway logs
    ```
 
-3. **Verify environment variables:**
+4. **Verify environment variables:**
    ```bash
    railway variables
    ```
+
+5. **Check startup time:**
+   - Database migrations run on startup
+   - Health check timeout is 120 seconds
+   - If migrations are slow, increase timeout
 
 ### better-sqlite3 Build Errors
 
