@@ -96,10 +96,13 @@ async function generateActBreakdown(
   const prompt = buildActBreakdownPrompt(context, template, targetChapterCount);
 
   try {
+    logger.info('[OutlineGenerator] Calling Claude API for act breakdown...');
+
     const message = await anthropic.messages.create({
       model: 'claude-opus-4-5-20251101',
       max_tokens: 4000,
       temperature: 0.8,
+      system: 'You are a JSON API that generates story outlines. Always respond with valid JSON only, no markdown formatting, no explanations, no code blocks - just raw JSON.',
       messages: [
         {
           role: 'user',
@@ -108,7 +111,23 @@ async function generateActBreakdown(
       ],
     });
 
+    logger.info({
+      stopReason: message.stop_reason,
+      contentBlocks: message.content.length,
+      usage: message.usage
+    }, '[OutlineGenerator] Claude API response received');
+
     const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
+
+    if (!responseText) {
+      logger.error('[OutlineGenerator] Claude returned empty response text');
+      throw new Error('Claude API returned empty response');
+    }
+
+    logger.info({
+      responseLength: responseText.length,
+      responsePreview: responseText.substring(0, 500)
+    }, '[OutlineGenerator] Response text preview');
 
     const acts = parseActBreakdownResponse(responseText, template);
 
@@ -213,6 +232,7 @@ async function generateChaptersForAct(
       model: 'claude-opus-4-5-20251101',
       max_tokens: 6000,
       temperature: 0.8,
+      system: 'You are a JSON API that generates story outlines. Always respond with valid JSON only, no markdown formatting, no explanations, no code blocks - just raw JSON.',
       messages: [
         {
           role: 'user',
@@ -222,6 +242,11 @@ async function generateChaptersForAct(
     });
 
     const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
+
+    logger.info({
+      responseLength: responseText.length,
+      responsePreview: responseText.substring(0, 300)
+    }, '[OutlineGenerator] Chapter response preview');
 
     const chapters = parseChapterOutlineResponse(responseText, act);
 
@@ -323,6 +348,7 @@ async function generateSceneCards(
       model: 'claude-opus-4-5-20251101',
       max_tokens: 3000,
       temperature: 0.7,
+      system: 'You are a JSON API that generates story outlines. Always respond with valid JSON only, no markdown formatting, no explanations, no code blocks - just raw JSON.',
       messages: [
         {
           role: 'user',
@@ -332,6 +358,11 @@ async function generateSceneCards(
     });
 
     const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
+
+    logger.info({
+      responseLength: responseText.length,
+      chapterNumber: chapter.number
+    }, '[OutlineGenerator] Scene cards response for chapter');
 
     const sceneCards = parseSceneCardsResponse(responseText);
 

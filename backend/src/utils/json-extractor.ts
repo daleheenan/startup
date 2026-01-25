@@ -52,6 +52,29 @@ export function extractJsonArray<T = unknown>(text: string): T[] {
     // Not valid JSON
   }
 
+  // Strategy 4: Try with JSON cleaning (handles trailing commas, etc.)
+  const cleaned = cleanJsonString(text);
+  const cleanedArray = extractBalancedJson(cleaned, '[', ']');
+  if (cleanedArray) {
+    try {
+      const parsed = JSON.parse(cleanedArray);
+      if (Array.isArray(parsed)) {
+        return parsed as T[];
+      }
+    } catch {
+      // Still not valid
+    }
+  }
+
+  // Log what we received to help debug
+  logger.error({
+    textLength: text.length,
+    textPreview: text.substring(0, 1000),
+    hasOpenBracket: text.includes('['),
+    hasCloseBracket: text.includes(']'),
+    hasCodeBlock: text.includes('```'),
+  }, 'Failed to extract JSON array from response');
+
   throw new Error('No valid JSON array found in response');
 }
 

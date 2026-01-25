@@ -17,6 +17,8 @@ interface GenerationProgressProps {
   currentStep?: string;
   error?: string | null;
   onCancel?: () => void;
+  wordCount?: number; // Current word count being generated
+  targetWordCount?: number; // Target word count
 }
 
 const MESSAGES = [
@@ -39,6 +41,8 @@ export default function GenerationProgress({
   currentStep,
   error,
   onCancel,
+  wordCount = 0,
+  targetWordCount = 0,
 }: GenerationProgressProps) {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [messageIndex, setMessageIndex] = useState(0);
@@ -252,6 +256,25 @@ export default function GenerationProgress({
                 <span>{formatTime(elapsedTime)} elapsed</span>
                 <span>~{formatTime(Math.max(0, estimatedTime - elapsedTime))} remaining</span>
               </div>
+
+              {/* Word Count Progress */}
+              {(wordCount > 0 || targetWordCount > 0) && (
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    marginTop: '0.5rem',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#667eea',
+                  }}
+                >
+                  <span>
+                    {wordCount.toLocaleString()} words
+                    {targetWordCount > 0 && ` / ${targetWordCount.toLocaleString()} target`}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Current Action */}
