@@ -34,6 +34,9 @@ export default function ProjectDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // IMPORTANT: All hooks must be called before any early returns
+  const navigation = useProjectNavigation(projectId, project);
+
   useEffect(() => {
     if (projectId) {
       fetchProject();
@@ -118,8 +121,6 @@ export default function ProjectDetailPage() {
       </span>
     </div>
   );
-
-  const navigation = useProjectNavigation(projectId, project);
 
   return (
     <PageLayout

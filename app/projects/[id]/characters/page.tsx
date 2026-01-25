@@ -51,6 +51,9 @@ export default function CharactersPage() {
   const [nationalityFilter, setNationalityFilter] = useState<string>('all');
   const [ethnicityFilter, setEthnicityFilter] = useState<string>('all');
 
+  // IMPORTANT: All hooks must be called before any early returns
+  const navigation = useProjectNavigation(projectId, project);
+
   useEffect(() => {
     fetchCharacters();
   }, [projectId]);
@@ -279,8 +282,6 @@ export default function CharactersPage() {
   if (isLoading) {
     return <LoadingState message="Loading characters..." />;
   }
-
-  const navigation = useProjectNavigation(projectId, project);
 
   return (
     <PageLayout
