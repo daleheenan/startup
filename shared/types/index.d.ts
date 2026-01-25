@@ -1,4 +1,4 @@
-export type ProjectType = 'standalone' | 'trilogy';
+export type ProjectType = 'standalone' | 'trilogy' | 'series';
 export type ProjectStatus = 'setup' | 'generating' | 'completed';
 export interface Project {
     id: string;
@@ -10,8 +10,25 @@ export interface Project {
     story_bible: StoryBible | null;
     series_bible: SeriesBible | null;
     book_count: number;
+    universe_id: string | null;
+    is_universe_root: boolean;
+    time_period_type: TimePeriodType | null;
+    specific_year: number | null;
     created_at: string;
     updated_at: string;
+}
+export interface Universe {
+    id: string;
+    name: string;
+    description: string | null;
+    root_project_id: string | null;
+    story_dna_template: StoryDNA | null;
+    world_template: WorldElements | null;
+    created_at: string;
+    updated_at: string;
+}
+export interface UniverseWithProjects extends Universe {
+    projects: Project[];
 }
 export interface StoryDNA {
     genre: string;
@@ -19,7 +36,22 @@ export interface StoryDNA {
     tone: string;
     themes: string[];
     proseStyle: string;
+    timeframe?: string;
+    timePeriod?: TimePeriod;
 }
+export type TimePeriodType = 'past' | 'present' | 'future' | 'unknown' | 'custom';
+export interface TimePeriod {
+    type: TimePeriodType;
+    year?: number;
+    description?: string;
+}
+export declare const TIME_PERIOD_PRESETS: Array<{
+    type: TimePeriodType;
+    label: string;
+    description: string;
+    yearOffset?: number;
+    emoji: string;
+}>;
 export interface StoryBible {
     characters: Character[];
     world: WorldElements;
@@ -323,13 +355,52 @@ export interface SeriesTimelineEntry {
     endDate: string;
     majorEvents: string[];
 }
+export type PlotPhase = 'setup' | 'rising' | 'midpoint' | 'crisis' | 'climax' | 'falling' | 'resolution';
+export interface PlotPoint {
+    id: string;
+    chapter_number: number;
+    description: string;
+    phase: PlotPhase;
+    impact_level: 1 | 2 | 3 | 4 | 5;
+}
+export interface PlotLayer {
+    id: string;
+    name: string;
+    description: string;
+    type: 'main' | 'subplot' | 'mystery' | 'romance' | 'character-arc';
+    color: string;
+    points: PlotPoint[];
+    status: 'active' | 'resolved' | 'abandoned';
+    resolution_chapter?: number;
+}
+export interface PlotStructure {
+    plot_layers: PlotLayer[];
+    act_structure: {
+        act_one_end: number;
+        act_two_midpoint: number;
+        act_two_end: number;
+        act_three_climax: number;
+    };
+    pacing_notes: string;
+}
 export interface SeriesMystery {
     id: string;
     question: string;
-    introducedInBook: number;
-    answeredInBook: number | null;
-    answer: string | null;
-    relatedCharacters: string[];
+    raisedIn: {
+        bookNumber: number;
+        chapterNumber: number;
+        context: string;
+    };
+    answeredIn?: {
+        bookNumber: number;
+        chapterNumber: number;
+        answer: string;
+    };
+    status: 'open' | 'resolved' | 'red_herring';
+    importance: 'major' | 'minor' | 'subplot';
+    seriesId: string;
+    createdAt: string;
+    updatedAt: string;
 }
 export interface BookTransition {
     id: string;
@@ -538,4 +609,23 @@ export interface GenreBenchmark {
     created_at: string;
     updated_at: string;
 }
-//# sourceMappingURL=index.d.ts.map
+export interface CreationStep {
+    id: string;
+    name: string;
+    route: string;
+    required: boolean;
+    icon?: string;
+}
+export interface CreationProgressData {
+    steps: CreationStep[];
+    completedSteps: string[];
+    percentComplete: number;
+    canGenerate: boolean;
+}
+export interface ProjectNavigationTab {
+    id: string;
+    label: string;
+    route: string;
+    icon?: string;
+    badge?: string | number;
+}
