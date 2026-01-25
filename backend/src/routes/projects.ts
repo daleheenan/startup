@@ -251,6 +251,7 @@ router.post('/:id/story-dna', async (req, res) => {
 /**
  * POST /api/projects/:id/characters
  * Generate characters for a project
+ * Also generates Story DNA if it doesn't exist
  */
 router.post('/:id/characters', async (req, res) => {
   try {
@@ -263,11 +264,53 @@ router.post('/:id/characters', async (req, res) => {
       });
     }
 
+    // Get existing project data
+    const getStmt = db.prepare<[string], Project>(`
+      SELECT * FROM projects WHERE id = ?
+    `);
+    const project = getStmt.get(projectId);
+
+    if (!project) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project not found' },
+      });
+    }
+
+    // Generate Story DNA if it doesn't exist
+    let storyDNA = safeJsonParse(project.story_dna as any, null);
+    if (!storyDNA) {
+      console.log('[Characters] No Story DNA found, generating...');
+      storyDNA = await generateStoryDNA({
+        title: project.title,
+        logline: context.synopsis || 'A compelling story',
+        synopsis: context.synopsis || 'A compelling story',
+        genre: project.genre,
+        subgenre: context.subgenre || project.genre,
+        tone: context.tone || 'dramatic',
+        themes: context.themes || [],
+      });
+
+      // Save Story DNA immediately
+      const dnaStmt = db.prepare(`
+        UPDATE projects SET story_dna = ?, updated_at = ? WHERE id = ?
+      `);
+      dnaStmt.run(JSON.stringify(storyDNA), new Date().toISOString(), projectId);
+      console.log('[Characters] Story DNA generated and saved');
+    }
+
+    // Enrich context with Story DNA
+    const enrichedContext = {
+      ...context,
+      tone: storyDNA.tone || context.tone,
+      themes: storyDNA.themes || context.themes,
+      proseStyle: storyDNA.proseStyle,
+    };
+
     // Generate protagonist first
-    const protagonist = await generateProtagonist(context);
+    const protagonist = await generateProtagonist(enrichedContext);
 
     // Generate supporting cast
-    const supportingCast = await generateSupportingCast(context, protagonist);
+    const supportingCast = await generateSupportingCast(enrichedContext, protagonist);
 
     // Combine all characters
     const allCharacters = [protagonist, ...supportingCast];
@@ -285,11 +328,6 @@ router.post('/:id/characters', async (req, res) => {
     });
 
     // Get existing story bible or create new one
-    const getStmt = db.prepare<[string], Project>(`
-      SELECT story_bible FROM projects WHERE id = ?
-    `);
-    const project = getStmt.get(projectId);
-
     const storyBible = project?.story_bible
       ? safeJsonParse(project.story_bible as any, { characters: [], world: [], timeline: [] })
       : { characters: [], world: [], timeline: [] };
