@@ -13,6 +13,7 @@ import type {
 } from '../shared/types/index.js';
 import { getStructureTemplate } from './structure-templates.js';
 import { createLogger } from './logger.service.js';
+import { extractJsonArray } from '../utils/json-extractor.js';
 
 dotenv.config();
 
@@ -178,12 +179,11 @@ Make the descriptions SPECIFIC to this story, not generic beat descriptions.`;
 
 function parseActBreakdownResponse(responseText: string, template: any): Act[] {
   try {
-    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
-      throw new Error('No JSON array found in response');
-    }
+    const actsData = extractJsonArray(responseText);
 
-    const actsData = JSON.parse(jsonMatch[0]);
+    if (!actsData || actsData.length === 0) {
+      throw new Error('Empty acts array in response');
+    }
 
     const acts: Act[] = actsData.map((actData: any) => ({
       ...actData,
@@ -192,8 +192,8 @@ function parseActBreakdownResponse(responseText: string, template: any): Act[] {
 
     return acts;
   } catch (error: any) {
-    logger.error({ error }, 'Outline parse error');
-    logger.error({ responseText }, 'Outline response text');
+    logger.error({ error: error.message }, 'Outline parse error');
+    logger.error({ responseText: responseText.substring(0, 500) }, 'Outline response text (truncated)');
     throw new Error(`Failed to parse act breakdown: ${error.message}`);
   }
 }
@@ -284,12 +284,7 @@ Make each chapter summary SPECIFIC with concrete events, not vague descriptions.
 
 function parseChapterOutlineResponse(responseText: string, act: Act): ChapterOutline[] {
   try {
-    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
-      throw new Error('No JSON array found in response');
-    }
-
-    const chaptersData = JSON.parse(jsonMatch[0]);
+    const chaptersData = extractJsonArray(responseText);
 
     // Calculate starting chapter number based on previous chapters
     const chapterOffset = 0; // Will be adjusted when combining all acts
@@ -307,8 +302,8 @@ function parseChapterOutlineResponse(responseText: string, act: Act): ChapterOut
 
     return chapters;
   } catch (error: any) {
-    logger.error({ error }, 'Outline parse error');
-    logger.error({ responseText }, 'Outline response text');
+    logger.error({ error: error.message }, 'Outline parse error');
+    logger.error({ responseText: responseText.substring(0, 500) }, 'Outline response text (truncated)');
     throw new Error(`Failed to parse chapter outlines: ${error.message}`);
   }
 }
@@ -402,12 +397,7 @@ Be SPECIFIC - concrete goals, conflicts, and outcomes, not generic descriptions.
 
 function parseSceneCardsResponse(responseText: string): SceneCard[] {
   try {
-    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
-      throw new Error('No JSON array found in response');
-    }
-
-    const scenesData = JSON.parse(jsonMatch[0]);
+    const scenesData = extractJsonArray(responseText);
 
     const scenes: SceneCard[] = scenesData.map((scData: any, index: number) => ({
       id: randomUUID(),
@@ -425,8 +415,8 @@ function parseSceneCardsResponse(responseText: string): SceneCard[] {
 
     return scenes;
   } catch (error: any) {
-    logger.error({ error }, 'Outline parse error');
-    logger.error({ responseText }, 'Outline response text');
+    logger.error({ error: error.message }, 'Outline parse error');
+    logger.error({ responseText: responseText.substring(0, 500) }, 'Outline response text (truncated)');
     throw new Error(`Failed to parse scene cards: ${error.message}`);
   }
 }
