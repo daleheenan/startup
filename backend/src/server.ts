@@ -35,6 +35,7 @@ import genreTropesRouter from './routes/genre-tropes.js';
 import genreConventionsRouter from './routes/genre-conventions.js';
 import proseStylesRouter from './routes/prose-styles.js';
 import analyticsRouter from './routes/analytics.js';
+import presetsRouter from './routes/presets.js';
 
 // Run database migrations
 try {
@@ -130,6 +131,7 @@ app.use('/api/genre-tropes', apiLimiter, requireAuth, genreTropesRouter);
 app.use('/api/genre-conventions', apiLimiter, requireAuth, genreConventionsRouter);
 app.use('/api/prose-styles', apiLimiter, requireAuth, proseStylesRouter);
 app.use('/api/analytics', apiLimiter, requireAuth, analyticsRouter);
+app.use('/api/presets', apiLimiter, requireAuth, presetsRouter);
 
 // Error handling
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

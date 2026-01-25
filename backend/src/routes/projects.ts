@@ -455,10 +455,12 @@ router.put('/:id/characters/:characterId', (req, res) => {
 /**
  * POST /api/projects/:id/characters/:characterId/regenerate-name
  * Regenerate a character's name using AI
+ * Accepts optional ethnicity/nationality in body to use current editor values
  */
 router.post('/:id/characters/:characterId/regenerate-name', async (req, res) => {
   try {
     const { id: projectId, characterId } = req.params;
+    const { ethnicity: editedEthnicity, nationality: editedNationality } = req.body || {};
 
     // Get current project and story bible
     const getStmt = db.prepare<[string], Project>(`
@@ -491,6 +493,10 @@ router.post('/:id/characters/:characterId/regenerate-name', async (req, res) => 
 
     const character = storyBible.characters[charIndex];
 
+    // Use edited values if provided, otherwise fall back to stored values
+    const ethnicity = editedEthnicity || character.ethnicity || 'not specified';
+    const nationality = editedNationality || character.nationality || 'not specified';
+
     // Build prompt for name generation
     const prompt = `You are a creative naming expert. Generate a new name for this character that fits their background and the story's genre.
 
@@ -499,8 +505,8 @@ router.post('/:id/characters/:characterId/regenerate-name', async (req, res) => 
 
 **Character Details:**
 - Role: ${character.role}
-- Ethnicity/Background: ${character.ethnicity || 'not specified'}
-- Nationality: ${character.nationality || 'not specified'}
+- Ethnicity/Background: ${ethnicity}
+- Nationality: ${nationality}
 - Personality: ${character.personality?.join(', ') || 'not specified'}
 
 **Current Name:** ${character.name}
@@ -533,11 +539,28 @@ Return ONLY the new name, nothing else. Just the full name.`;
 
     const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
     const newName = responseText.trim();
+    const oldName = character.name;
 
-    // Update character with new name
+    // Helper function to replace old name with new name in text fields
+    const updateNameInText = (text: string | undefined): string | undefined => {
+      if (!text || !oldName) return text;
+      // Replace the old name with new name (case-insensitive for first occurrence, preserve case for rest)
+      return text.replace(new RegExp(oldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), newName);
+    };
+
+    // Update character with new name and preserve edited ethnicity/nationality
+    // Also update text fields that may reference the character's name
     storyBible.characters[charIndex] = {
       ...character,
       name: newName,
+      // Save the edited ethnicity/nationality if provided
+      ethnicity: editedEthnicity || character.ethnicity,
+      nationality: editedNationality || character.nationality,
+      // Update fields that might contain the old name
+      backstory: updateNameInText(character.backstory),
+      voiceSample: updateNameInText(character.voiceSample),
+      characterArc: updateNameInText(character.characterArc),
+      currentState: updateNameInText(character.currentState),
     };
 
     // Update relationships in other characters

@@ -315,10 +315,26 @@ export default function WorldPage() {
                     fontWeight: 600,
                     cursor: isGenerating ? 'not-allowed' : 'pointer',
                     boxShadow: isGenerating ? 'none' : '0 4px 14px rgba(102, 126, 234, 0.4)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
                   }}
                 >
+                  {isGenerating && (
+                    <span style={{
+                      display: 'inline-block',
+                      width: '16px',
+                      height: '16px',
+                      border: '2px solid rgba(255,255,255,0.3)',
+                      borderTopColor: '#fff',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite',
+                    }} />
+                  )}
                   {isGenerating ? 'Generating World...' : 'Generate World'}
                 </button>
+                <style jsx>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '2rem' }}>

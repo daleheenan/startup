@@ -144,7 +144,10 @@ export default function CharactersPage() {
     }
   };
 
-  const handleRegenerateName = async (characterId: string) => {
+  const [isRegenerating, setIsRegenerating] = useState(false);
+
+  const handleRegenerateName = async (characterId: string, currentCharacterData?: Partial<Character>) => {
+    setIsRegenerating(true);
     try {
       const token = getToken();
       const response = await fetch(
@@ -155,6 +158,11 @@ export default function CharactersPage() {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
           },
+          body: JSON.stringify({
+            // Send current edited values to use for name generation
+            ethnicity: currentCharacterData?.ethnicity,
+            nationality: currentCharacterData?.nationality,
+          }),
         }
       );
 
@@ -171,6 +179,8 @@ export default function CharactersPage() {
     } catch (err: any) {
       console.error('Error regenerating name:', err);
       setError(err.message);
+    } finally {
+      setIsRegenerating(false);
     }
   };
 
@@ -253,10 +263,26 @@ export default function CharactersPage() {
               padding: '1rem 2rem',
               ...(isGenerating && buttonDisabled),
               background: isGenerating ? colors.textTertiary : gradients.brand,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
             }}
           >
+            {isGenerating && (
+              <span style={{
+                display: 'inline-block',
+                width: '16px',
+                height: '16px',
+                border: '2px solid rgba(255,255,255,0.3)',
+                borderTopColor: '#fff',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+              }} />
+            )}
             {isGenerating ? 'Generating Characters...' : 'Generate Characters'}
           </button>
+          <style jsx>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
       ) : (
               <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '2rem' }}>
@@ -356,6 +382,7 @@ export default function CharactersPage() {
                     onSave={handleSaveCharacter}
                     onRegenerateName={handleRegenerateName}
                     isSaving={isSaving}
+                    isRegenerating={isRegenerating}
               />
             )}
           </div>
@@ -369,11 +396,13 @@ function CharacterEditor({
   onSave,
   onRegenerateName,
   isSaving,
+  isRegenerating,
 }: {
   character: Character;
   onSave: (char: Character) => void;
-  onRegenerateName: (characterId: string) => void;
+  onRegenerateName: (characterId: string, currentData?: Partial<Character>) => void;
   isSaving: boolean;
+  isRegenerating: boolean;
 }) {
   const [editedChar, setEditedChar] = useState(character);
 
@@ -433,22 +462,38 @@ function CharacterEditor({
               style={{ ...input, flex: 1 }}
             />
             <button
-              onClick={() => onRegenerateName(character.id)}
+              onClick={() => onRegenerateName(character.id, editedChar)}
+              disabled={isRegenerating}
               style={{
                 padding: '0.75rem 1rem',
-                background: '#FFFFFF',
+                background: isRegenerating ? '#F1F5F9' : '#FFFFFF',
                 border: '1px solid #E2E8F0',
                 borderRadius: '6px',
-                color: '#667eea',
+                color: isRegenerating ? '#94A3B8' : '#667eea',
                 fontSize: '0.875rem',
                 fontWeight: 500,
-                cursor: 'pointer',
+                cursor: isRegenerating ? 'not-allowed' : 'pointer',
                 whiteSpace: 'nowrap',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                transition: 'all 0.2s ease',
               }}
               title="Regenerate character name"
             >
-              🔄 Regenerate
+              {isRegenerating ? (
+                <span style={{
+                  display: 'inline-block',
+                  width: '14px',
+                  height: '14px',
+                  border: '2px solid #E2E8F0',
+                  borderTopColor: '#667eea',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                }} />
+              ) : '🔄'} Regenerate
             </button>
+            <style jsx>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           </div>
         </div>
 

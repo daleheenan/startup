@@ -1,6 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { getToken } from '../lib/auth';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+interface BookStylePreset {
+  id: string;
+  name: string;
+  description?: string;
+  genres: string[];
+  subgenres: string[];
+  modifiers: string[];
+  tones: string[];
+  themes: string[];
+  custom_theme?: string;
+  target_length: number;
+  is_default: boolean;
+}
 
 export interface StoryPreferences {
   genre: string;
@@ -71,31 +88,199 @@ const SPECIALIST_GENRES = [
 // Combined for lookups
 const GENRES = [...CLASSIC_GENRES, ...SPECIALIST_GENRES];
 
-const SUBGENRES: Record<string, string[]> = {
-  afrofuturism: ['Afrofuturist SF', 'Afrofuturist Fantasy', 'Afro-Cyberpunk', 'African Mythology SF', 'Black Space Opera', 'Afrofuturist Horror'],
-  'climate-fiction': ['Near Future Climate', 'Climate Disaster', 'Eco-Thriller', 'Solarpunk Utopia', 'Post-Climate Collapse', 'Climate Mystery'],
-  contemporary: ['Family Drama', 'Coming of Age', 'Social Issues', 'Workplace Drama', 'Slice of Life'],
-  'cozy-fantasy': ['Slice of Life Fantasy', 'Cozy Mystery Fantasy', 'Cozy Romance Fantasy', 'Low Stakes Adventure', 'Found Family Fantasy', 'Cottage Core Fantasy'],
-  fantasy: ['Epic Fantasy', 'Urban Fantasy', 'Dark Fantasy', 'High Fantasy', 'Low Fantasy', 'Sword & Sorcery'],
-  grimdark: ['Grimdark Fantasy', 'Grimdark Sci-Fi', 'Military Grimdark', 'Cosmic Grimdark', 'Historical Grimdark', 'Post-Apocalyptic Grimdark'],
-  historical: ['Ancient History', 'Medieval', 'Victorian Era', 'World War Era', '20th Century', 'Alternate History'],
-  horror: ['Supernatural Horror', 'Psychological Horror', 'Gothic Horror', 'Cosmic Horror', 'Body Horror'],
-  'legal-drama': ['Courtroom Drama', 'Legal Thriller', 'Criminal Defense', 'Corporate Law', 'Legal Mystery', 'Legal Romance'],
-  literary: ['Contemporary Literary', 'Experimental', 'Philosophical', 'Character-Driven', 'Magical Realism'],
-  litrpg: ['Dungeon Core', 'GameLit', 'Virtual Reality', 'System Apocalypse', 'Progression Fantasy', 'Cultivation'],
-  'medical-drama': ['Hospital Drama', 'Medical Thriller', 'Medical Mystery', 'Medical Romance', 'Emergency Medicine', 'Medical Horror'],
-  mystery: ['Cozy Mystery', 'Police Procedural', 'Detective', 'Noir', 'Whodunit', 'Legal Mystery'],
-  'new-weird': ['Urban Weird', 'Weird Horror', 'Weird Fantasy', 'Slipstream', 'Bizarro Fiction', 'Surreal Fiction'],
-  paranormal: ['Paranormal Mystery', 'Paranormal Thriller', 'Paranormal Investigation', 'Ghost Stories', 'Supernatural Drama', 'Paranormal Action'],
-  romance: ['Contemporary Romance', 'Historical Romance', 'Paranormal Romance', 'Romantic Comedy', 'Slow Burn'],
-  romantasy: ['Fae Romance', 'Witch Romance', 'Dragon Romance', 'Vampire Romance', 'Magical Royalty Romance', 'Court Intrigue Romance'],
-  'science-fiction': ['Space Opera', 'Cyberpunk', 'Hard SF', 'Dystopian', 'Post-Apocalyptic', 'First Contact'],
-  solarpunk: ['Eco-Utopia', 'Green Tech SF', 'Sustainable Future', 'Hopeful Climate Fiction', 'Community-Focused SF', 'Biomimicry Fiction'],
-  'sports-fiction': ['Sports Drama', 'Sports Romance', 'Underdog Sports', 'Professional Sports', 'College Sports', 'Fantasy Sports'],
-  steampunk: ['Victorian Steampunk', 'Dieselpunk', 'Clockpunk', 'Gaslamp Fantasy', 'Steampunk Romance', 'Post-Apocalyptic Steampunk'],
-  thriller: ['Psychological Thriller', 'Action Thriller', 'Legal Thriller', 'Medical Thriller', 'Spy Thriller'],
-  western: ['Classic Western', 'Weird West', 'Space Western', 'Contemporary Western', 'Western Romance', 'Revisionist Western'],
-  wuxia: ['Classical Wuxia', 'Xianxia Cultivation', 'Modern Wuxia', 'Wuxia Romance', 'Historical Wuxia', 'Mythological Wuxia'],
+interface SubgenreOption {
+  value: string;
+  description: string;
+}
+
+const SUBGENRES: Record<string, SubgenreOption[]> = {
+  afrofuturism: [
+    { value: 'Afrofuturist SF', description: 'African diaspora perspectives on future technology and society' },
+    { value: 'Afrofuturist Fantasy', description: 'African mythology and magic in speculative settings' },
+    { value: 'Afro-Cyberpunk', description: 'High-tech, low-life through an African lens' },
+    { value: 'African Mythology SF', description: 'Traditional African gods and spirits in science fiction' },
+    { value: 'Black Space Opera', description: 'Epic galactic adventures centering Black characters' },
+    { value: 'Afrofuturist Horror', description: 'Horror drawing on African folklore and diaspora fears' },
+  ],
+  'climate-fiction': [
+    { value: 'Near Future Climate', description: 'Climate change impacts in the next 20-50 years' },
+    { value: 'Climate Disaster', description: 'Catastrophic weather events and their aftermath' },
+    { value: 'Eco-Thriller', description: 'Environmental stakes with suspenseful pacing' },
+    { value: 'Solarpunk Utopia', description: 'Optimistic sustainable futures achieved' },
+    { value: 'Post-Climate Collapse', description: 'Survival after environmental catastrophe' },
+    { value: 'Climate Mystery', description: 'Solving crimes or puzzles in a changed climate' },
+  ],
+  contemporary: [
+    { value: 'Family Drama', description: 'Complex family relationships and generational dynamics' },
+    { value: 'Coming of Age', description: 'Young protagonists navigating growth and identity' },
+    { value: 'Social Issues', description: 'Stories addressing contemporary societal challenges' },
+    { value: 'Workplace Drama', description: 'Office politics, career struggles, and professional life' },
+    { value: 'Slice of Life', description: 'Everyday moments that reveal deeper truths' },
+  ],
+  'cozy-fantasy': [
+    { value: 'Slice of Life Fantasy', description: 'Daily life in magical settings without major conflict' },
+    { value: 'Cozy Mystery Fantasy', description: 'Low-stakes puzzles in warm, magical communities' },
+    { value: 'Cozy Romance Fantasy', description: 'Sweet love stories in comfortable magical worlds' },
+    { value: 'Low Stakes Adventure', description: 'Gentle quests without world-ending consequences' },
+    { value: 'Found Family Fantasy', description: 'Building chosen families in magical settings' },
+    { value: 'Cottage Core Fantasy', description: 'Rural, pastoral magic with simple pleasures' },
+  ],
+  fantasy: [
+    { value: 'Epic Fantasy', description: 'World-spanning quests with multiple POVs and high stakes' },
+    { value: 'Urban Fantasy', description: 'Magic hidden in modern cities and urban environments' },
+    { value: 'Dark Fantasy', description: 'Grim settings where magic has terrible costs' },
+    { value: 'High Fantasy', description: 'Secondary worlds with elaborate magic systems' },
+    { value: 'Low Fantasy', description: 'Subtle magic in realistic or historical settings' },
+    { value: 'Sword & Sorcery', description: 'Action-focused adventures with warriors and wizards' },
+  ],
+  grimdark: [
+    { value: 'Grimdark Fantasy', description: 'Morally grey characters in brutal fantasy worlds' },
+    { value: 'Grimdark Sci-Fi', description: 'Cynical, violent science fiction futures' },
+    { value: 'Military Grimdark', description: 'The horrors of warfare without glorification' },
+    { value: 'Cosmic Grimdark', description: 'Nihilistic horror at the scale of the universe' },
+    { value: 'Historical Grimdark', description: 'Real history shown at its darkest' },
+    { value: 'Post-Apocalyptic Grimdark', description: 'Humanity at its worst after collapse' },
+  ],
+  historical: [
+    { value: 'Ancient History', description: 'Greece, Rome, Egypt, or other ancient civilizations' },
+    { value: 'Medieval', description: 'Knights, castles, and feudal society' },
+    { value: 'Victorian Era', description: '19th century manners, industry, and empire' },
+    { value: 'World War Era', description: 'Stories set during WWI or WWII' },
+    { value: '20th Century', description: 'Modern history from 1900-1999' },
+    { value: 'Alternate History', description: 'What if key historical events went differently?' },
+  ],
+  horror: [
+    { value: 'Supernatural Horror', description: 'Ghosts, demons, and things that go bump in the night' },
+    { value: 'Psychological Horror', description: 'Terror from within the mind' },
+    { value: 'Gothic Horror', description: 'Atmospheric dread in crumbling mansions and moors' },
+    { value: 'Cosmic Horror', description: 'Incomprehensible entities and existential dread' },
+    { value: 'Body Horror', description: 'Disturbing transformations of the human form' },
+  ],
+  'legal-drama': [
+    { value: 'Courtroom Drama', description: 'Tension and revelation in the courtroom' },
+    { value: 'Legal Thriller', description: 'High-stakes cases with dangerous consequences' },
+    { value: 'Criminal Defense', description: 'Defending the accused against the system' },
+    { value: 'Corporate Law', description: 'Big business, mergers, and white-collar crime' },
+    { value: 'Legal Mystery', description: 'Solving crimes through legal investigation' },
+    { value: 'Legal Romance', description: 'Love among lawyers and legal professionals' },
+  ],
+  literary: [
+    { value: 'Contemporary Literary', description: 'Modern life explored with literary depth' },
+    { value: 'Experimental', description: 'Breaking narrative conventions and forms' },
+    { value: 'Philosophical', description: 'Ideas and big questions drive the narrative' },
+    { value: 'Character-Driven', description: 'Deep character studies over plot' },
+    { value: 'Magical Realism', description: 'Magic woven seamlessly into realistic settings' },
+  ],
+  litrpg: [
+    { value: 'Dungeon Core', description: 'Protagonist becomes or manages a dungeon' },
+    { value: 'GameLit', description: 'Game elements without full stat systems' },
+    { value: 'Virtual Reality', description: 'Adventures inside VR game worlds' },
+    { value: 'System Apocalypse', description: 'Game mechanics invade the real world' },
+    { value: 'Progression Fantasy', description: 'Power growth and leveling as core focus' },
+    { value: 'Cultivation', description: 'Eastern-style power cultivation and martial arts' },
+  ],
+  'medical-drama': [
+    { value: 'Hospital Drama', description: 'Day-to-day challenges in medical settings' },
+    { value: 'Medical Thriller', description: 'Life-or-death stakes and medical mysteries' },
+    { value: 'Medical Mystery', description: 'Diagnosing unusual or mysterious conditions' },
+    { value: 'Medical Romance', description: 'Love stories among healthcare workers' },
+    { value: 'Emergency Medicine', description: 'High-pressure ER and trauma scenarios' },
+    { value: 'Medical Horror', description: 'Body horror and medical nightmares' },
+  ],
+  mystery: [
+    { value: 'Cozy Mystery', description: 'Amateur sleuths solving crimes in charming settings' },
+    { value: 'Police Procedural', description: 'Realistic police investigation methods' },
+    { value: 'Detective', description: 'Professional or private investigators at work' },
+    { value: 'Noir', description: 'Dark, cynical mysteries with morally grey protagonists' },
+    { value: 'Whodunit', description: 'Classic puzzle mysteries with clues for readers' },
+    { value: 'Legal Mystery', description: 'Crimes solved through legal processes' },
+  ],
+  'new-weird': [
+    { value: 'Urban Weird', description: 'Strange happenings in city environments' },
+    { value: 'Weird Horror', description: 'Horror that defies classification' },
+    { value: 'Weird Fantasy', description: 'Fantasy that breaks genre conventions' },
+    { value: 'Slipstream', description: 'Genre-fluid narratives between realism and fantasy' },
+    { value: 'Bizarro Fiction', description: 'Deliberately absurd and transgressive' },
+    { value: 'Surreal Fiction', description: 'Dreamlike logic and impossible imagery' },
+  ],
+  paranormal: [
+    { value: 'Paranormal Mystery', description: 'Solving crimes with supernatural elements' },
+    { value: 'Paranormal Thriller', description: 'High-stakes supernatural suspense' },
+    { value: 'Paranormal Investigation', description: 'Ghost hunters and supernatural researchers' },
+    { value: 'Ghost Stories', description: 'Classic tales of haunting and spirits' },
+    { value: 'Supernatural Drama', description: 'Character-focused supernatural narratives' },
+    { value: 'Paranormal Action', description: 'Fast-paced supernatural combat' },
+  ],
+  romance: [
+    { value: 'Contemporary Romance', description: 'Modern-day love stories and relationships' },
+    { value: 'Historical Romance', description: 'Love across historical time periods' },
+    { value: 'Paranormal Romance', description: 'Love with vampires, shifters, or other beings' },
+    { value: 'Romantic Comedy', description: 'Lighthearted love stories with humor' },
+    { value: 'Slow Burn', description: 'Gradually building romantic tension' },
+  ],
+  romantasy: [
+    { value: 'Fae Romance', description: 'Love stories with faeries and magical courts' },
+    { value: 'Witch Romance', description: 'Magic users finding love and power' },
+    { value: 'Dragon Romance', description: 'Dragons as love interests or shifters' },
+    { value: 'Vampire Romance', description: 'Immortal romance with bloodsucking twist' },
+    { value: 'Magical Royalty Romance', description: 'Princes, princesses, and magical kingdoms' },
+    { value: 'Court Intrigue Romance', description: 'Love amid political machinations' },
+  ],
+  'science-fiction': [
+    { value: 'Space Opera', description: 'Epic adventures across galaxies and star systems' },
+    { value: 'Cyberpunk', description: 'High tech, low life in neon-lit futures' },
+    { value: 'Hard SF', description: 'Scientifically rigorous speculation' },
+    { value: 'Dystopian', description: 'Oppressive future societies and resistance' },
+    { value: 'Post-Apocalyptic', description: 'Survival after civilization falls' },
+    { value: 'First Contact', description: 'Humanity meeting alien intelligence' },
+  ],
+  solarpunk: [
+    { value: 'Eco-Utopia', description: 'Thriving sustainable societies achieved' },
+    { value: 'Green Tech SF', description: 'Environmental technology saving the world' },
+    { value: 'Sustainable Future', description: 'Harmony between humanity and nature' },
+    { value: 'Hopeful Climate Fiction', description: 'Optimistic takes on environmental challenges' },
+    { value: 'Community-Focused SF', description: 'Collective action and community building' },
+    { value: 'Biomimicry Fiction', description: 'Technology inspired by nature' },
+  ],
+  'sports-fiction': [
+    { value: 'Sports Drama', description: 'Emotional journeys through athletic competition' },
+    { value: 'Sports Romance', description: 'Love on and off the field' },
+    { value: 'Underdog Sports', description: 'Against-the-odds athletic triumph' },
+    { value: 'Professional Sports', description: 'Life in pro leagues and big-time athletics' },
+    { value: 'College Sports', description: 'Competition and growth in collegiate athletics' },
+    { value: 'Fantasy Sports', description: 'Fictional sports in imaginary worlds' },
+  ],
+  steampunk: [
+    { value: 'Victorian Steampunk', description: 'Classic steam technology in Victorian settings' },
+    { value: 'Dieselpunk', description: 'Art deco aesthetics and diesel technology' },
+    { value: 'Clockpunk', description: 'Clockwork and mechanical wonders' },
+    { value: 'Gaslamp Fantasy', description: 'Victorian fantasy with gas-lit atmosphere' },
+    { value: 'Steampunk Romance', description: 'Love amid gears and goggles' },
+    { value: 'Post-Apocalyptic Steampunk', description: 'Steam technology after modern collapse' },
+  ],
+  thriller: [
+    { value: 'Psychological Thriller', description: 'Mind games and unreliable narrators' },
+    { value: 'Action Thriller', description: 'Fast-paced physical danger and chases' },
+    { value: 'Legal Thriller', description: 'Courtroom stakes and legal danger' },
+    { value: 'Medical Thriller', description: 'Life-or-death medical situations' },
+    { value: 'Spy Thriller', description: 'Espionage, tradecraft, and international intrigue' },
+  ],
+  western: [
+    { value: 'Classic Western', description: 'Traditional frontier adventures and showdowns' },
+    { value: 'Weird West', description: 'Supernatural elements in the Old West' },
+    { value: 'Space Western', description: 'Frontier spirit on alien worlds' },
+    { value: 'Contemporary Western', description: 'Modern-day stories in the American West' },
+    { value: 'Western Romance', description: 'Love on the frontier' },
+    { value: 'Revisionist Western', description: 'Challenging western tropes and perspectives' },
+  ],
+  wuxia: [
+    { value: 'Classical Wuxia', description: 'Traditional Chinese martial arts adventure' },
+    { value: 'Xianxia Cultivation', description: 'Cultivating immortality and spiritual power' },
+    { value: 'Modern Wuxia', description: 'Martial arts in contemporary settings' },
+    { value: 'Wuxia Romance', description: 'Love among martial artists' },
+    { value: 'Historical Wuxia', description: 'Martial arts in specific Chinese dynasties' },
+    { value: 'Mythological Wuxia', description: 'Blending wuxia with Chinese mythology' },
+  ],
 };
 
 // Genre modifiers that can combine with any genre
@@ -177,11 +362,113 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
   const [customIdeas, setCustomIdeas] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Preset state
+  const [presets, setPresets] = useState<BookStylePreset[]>([]);
+  const [showSavePreset, setShowSavePreset] = useState(false);
+  const [presetName, setPresetName] = useState('');
+  const [presetDescription, setPresetDescription] = useState('');
+  const [savingPreset, setSavingPreset] = useState(false);
+
+  // Load presets on mount
+  useEffect(() => {
+    fetchPresets();
+  }, []);
+
+  const fetchPresets = async () => {
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/presets`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setPresets(data.presets || []);
+      }
+    } catch (err) {
+      console.error('Error fetching presets:', err);
+    }
+  };
+
+  const loadPreset = (preset: BookStylePreset) => {
+    setGenres(preset.genres || []);
+    setSubgenres(preset.subgenres || []);
+    setModifiers(preset.modifiers || []);
+    setTones(preset.tones || []);
+    setThemes(preset.themes || []);
+    setCustomTheme(preset.custom_theme || '');
+    setTargetLength(preset.target_length || 80000);
+    setErrors({});
+  };
+
+  const saveCurrentAsPreset = async () => {
+    if (!presetName.trim()) {
+      return;
+    }
+
+    setSavingPreset(true);
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/presets`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: presetName.trim(),
+          description: presetDescription.trim() || undefined,
+          genres,
+          subgenres,
+          modifiers,
+          tones,
+          themes,
+          customTheme: customTheme.trim() || undefined,
+          targetLength,
+        }),
+      });
+
+      if (response.ok) {
+        const newPreset = await response.json();
+        setPresets([...presets, newPreset]);
+        setShowSavePreset(false);
+        setPresetName('');
+        setPresetDescription('');
+      }
+    } catch (err) {
+      console.error('Error saving preset:', err);
+    } finally {
+      setSavingPreset(false);
+    }
+  };
+
+  const deletePreset = async (presetId: string) => {
+    if (!confirm('Delete this preset?')) return;
+
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/presets/${presetId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        setPresets(presets.filter(p => p.id !== presetId));
+      }
+    } catch (err) {
+      console.error('Error deleting preset:', err);
+    }
+  };
+
   const handleGenreToggle = (genreValue: string) => {
     if (genres.includes(genreValue)) {
       setGenres(genres.filter(g => g !== genreValue));
       // Remove subgenres that belong to the deselected genre
-      setSubgenres(subgenres.filter(sg => !SUBGENRES[genreValue]?.includes(sg)));
+      const genreSubgenreValues = SUBGENRES[genreValue]?.map(sg => sg.value) || [];
+      setSubgenres(subgenres.filter(sg => !genreSubgenreValues.includes(sg)));
     } else {
       if (genres.length < 3) {
         setGenres([...genres, genreValue]);
@@ -230,7 +517,7 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
   };
 
   // Get available subgenres based on selected genres
-  const availableSubgenres = genres.flatMap(g => SUBGENRES[g] || []);
+  const availableSubgenres: SubgenreOption[] = genres.flatMap(g => SUBGENRES[g] || []);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -398,6 +685,176 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
 
   return (
     <form onSubmit={handleSubmit} style={{ width: '100%' }}>
+      {/* Book Style Presets */}
+      <div style={{
+        ...sectionStyle,
+        padding: '1rem',
+        background: '#F0FDF4',
+        border: '1px solid #BBF7D0',
+        borderRadius: '8px',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+          <label style={{ ...labelStyle, marginBottom: 0 }}>
+            Book Style Presets
+            <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Quick start with saved preferences)</span>
+          </label>
+          {genres.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowSavePreset(true)}
+              style={{
+                padding: '0.5rem 1rem',
+                background: '#FFFFFF',
+                border: '1px solid #10B981',
+                borderRadius: '6px',
+                color: '#10B981',
+                fontSize: '0.813rem',
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              + Save Current as Preset
+            </button>
+          )}
+        </div>
+
+        {/* Save Preset Form */}
+        {showSavePreset && (
+          <div style={{
+            padding: '1rem',
+            background: '#FFFFFF',
+            border: '1px solid #E2E8F0',
+            borderRadius: '8px',
+            marginBottom: '1rem',
+          }}>
+            <div style={{ marginBottom: '0.75rem' }}>
+              <input
+                type="text"
+                value={presetName}
+                onChange={(e) => setPresetName(e.target.value)}
+                placeholder="Preset name (e.g., My Cozy Fantasy Style)"
+                style={inputStyle}
+              />
+            </div>
+            <div style={{ marginBottom: '0.75rem' }}>
+              <input
+                type="text"
+                value={presetDescription}
+                onChange={(e) => setPresetDescription(e.target.value)}
+                placeholder="Brief description (optional)"
+                style={inputStyle}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                type="button"
+                onClick={saveCurrentAsPreset}
+                disabled={!presetName.trim() || savingPreset}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: presetName.trim() ? '#10B981' : '#94A3B8',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: '#FFFFFF',
+                  fontSize: '0.813rem',
+                  fontWeight: 500,
+                  cursor: presetName.trim() ? 'pointer' : 'not-allowed',
+                }}
+              >
+                {savingPreset ? 'Saving...' : 'Save Preset'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSavePreset(false);
+                  setPresetName('');
+                  setPresetDescription('');
+                }}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: '#FFFFFF',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '6px',
+                  color: '#64748B',
+                  fontSize: '0.813rem',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Preset List */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+          {presets.map(preset => (
+            <div
+              key={preset.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => loadPreset(preset)}
+                disabled={isLoading}
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  background: '#FFFFFF',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '6px',
+                  color: '#374151',
+                  fontSize: '0.813rem',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-start',
+                  textAlign: 'left',
+                }}
+                title={preset.description || ''}
+              >
+                <span style={{ fontWeight: 600 }}>
+                  {preset.is_default && '⭐ '}{preset.name}
+                </span>
+                {preset.description && (
+                  <span style={{ fontSize: '0.7rem', color: '#64748B', marginTop: '0.125rem' }}>
+                    {preset.description}
+                  </span>
+                )}
+              </button>
+              {!preset.is_default && (
+                <button
+                  type="button"
+                  onClick={() => deletePreset(preset.id)}
+                  style={{
+                    padding: '0.25rem',
+                    background: 'none',
+                    border: 'none',
+                    color: '#DC2626',
+                    fontSize: '0.75rem',
+                    cursor: 'pointer',
+                    opacity: 0.6,
+                  }}
+                  title="Delete preset"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          ))}
+          {presets.length === 0 && (
+            <span style={{ fontSize: '0.813rem', color: '#64748B', fontStyle: 'italic' }}>
+              No presets yet. Save your selections above!
+            </span>
+          )}
+        </div>
+      </div>
+
       {/* Genre Preview */}
       <div style={{
         ...sectionStyle,
@@ -586,21 +1043,47 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
             <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Select 1-3)</span>
           </label>
           <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '0.5rem',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            gap: '0.625rem',
           }}>
             {availableSubgenres.map(sg => (
               <button
-                key={sg}
+                key={sg.value}
                 type="button"
-                onClick={() => handleSubgenreToggle(sg)}
-                disabled={isLoading || (!subgenres.includes(sg) && subgenres.length >= 3)}
-                style={chipStyle(subgenres.includes(sg), isLoading || (!subgenres.includes(sg) && subgenres.length >= 3))}
+                onClick={() => handleSubgenreToggle(sg.value)}
+                disabled={isLoading || (!subgenres.includes(sg.value) && subgenres.length >= 3)}
+                style={{
+                  padding: '0.75rem 1rem',
+                  background: subgenres.includes(sg.value)
+                    ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                    : '#F8FAFC',
+                  border: subgenres.includes(sg.value)
+                    ? '1px solid #667eea'
+                    : '1px solid #E2E8F0',
+                  borderRadius: '8px',
+                  color: subgenres.includes(sg.value) ? '#FFFFFF' : '#374151',
+                  cursor: isLoading || (!subgenres.includes(sg.value) && subgenres.length >= 3) ? 'not-allowed' : 'pointer',
+                  opacity: isLoading || (!subgenres.includes(sg.value) && subgenres.length >= 3) ? 0.5 : 1,
+                  transition: 'all 0.2s',
+                  textAlign: 'left',
+                }}
               >
-                {sg}
+                <div style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.25rem' }}>
+                  {sg.value}
+                </div>
+                <div style={{
+                  fontSize: '0.75rem',
+                  opacity: subgenres.includes(sg.value) ? 0.9 : 0.7,
+                  lineHeight: 1.3,
+                }}>
+                  {sg.description}
+                </div>
               </button>
             ))}
+          </div>
+          <div style={{ marginTop: '0.625rem', fontSize: '0.813rem', color: '#64748B' }}>
+            Selected: {subgenres.length}/3
           </div>
           {errors.subgenres && <div style={errorStyle}>{errors.subgenres}</div>}
         </div>
