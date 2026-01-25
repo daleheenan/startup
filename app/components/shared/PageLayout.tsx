@@ -3,6 +3,9 @@
 import Link from 'next/link';
 import { colors, gradients, borderRadius } from '@/app/lib/constants';
 import { sidebar, header, pageTitle, pageSubtitle } from '@/app/lib/styles';
+import type { CreationProgressData, ProjectNavigationTab } from '@/shared/types';
+import CreationProgress from './CreationProgress';
+import ProjectNavigation from './ProjectNavigation';
 
 interface PageLayoutProps {
   title: string;
@@ -10,6 +13,14 @@ interface PageLayoutProps {
   backLink?: string;
   backText?: string;
   children: React.ReactNode;
+  // Navigation props
+  showProgress?: boolean;
+  progressData?: CreationProgressData;
+  currentStepId?: string;
+  projectNavigation?: {
+    projectId: string;
+    tabs: ProjectNavigationTab[];
+  };
 }
 
 export default function PageLayout({
@@ -18,6 +29,10 @@ export default function PageLayout({
   backLink,
   backText = '← Back',
   children,
+  showProgress = false,
+  progressData,
+  currentStepId,
+  projectNavigation,
 }: PageLayoutProps) {
   return (
     <div style={{
@@ -111,6 +126,14 @@ export default function PageLayout({
           )}
         </header>
 
+        {/* Project Navigation Tabs */}
+        {projectNavigation && (
+          <ProjectNavigation
+            projectId={projectNavigation.projectId}
+            tabs={projectNavigation.tabs}
+          />
+        )}
+
         {/* Content Area */}
         <div style={{
           flex: 1,
@@ -118,6 +141,14 @@ export default function PageLayout({
           overflow: 'auto',
         }}>
           <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+            {/* Creation Progress */}
+            {showProgress && progressData && (
+              <CreationProgress
+                progress={progressData}
+                currentStepId={currentStepId}
+              />
+            )}
+
             {children}
           </div>
         </div>

@@ -10,6 +10,7 @@ import { fetchJson, post } from '../../../lib/fetch-utils';
 import { getToken } from '../../../lib/auth';
 import { colors, gradients, borderRadius, shadows, API_BASE_URL } from '../../../lib/constants';
 import { card, button, buttonPrimary, buttonSecondary, buttonDisabled, input, label } from '../../../lib/styles';
+import { useProjectNavigation } from '../../../hooks/useProjectProgress';
 
 interface Character {
   id: string;
@@ -46,6 +47,9 @@ export default function CharactersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [project, setProject] = useState<any>(null);
+  const [nationalityFilter, setNationalityFilter] = useState<string>('all');
+  const [ethnicityFilter, setEthnicityFilter] = useState<string>('all');
 
   useEffect(() => {
     fetchCharacters();
@@ -53,12 +57,13 @@ export default function CharactersPage() {
 
   const fetchCharacters = async () => {
     try {
-      const project = await fetchJson<any>(`/api/projects/${projectId}`);
+      const projectData = await fetchJson<any>(`/api/projects/${projectId}`);
+      setProject(projectData);
       // BUG-005 FIX: Add defensive null checks for story_bible and characters
-      if (project?.story_bible?.characters && Array.isArray(project.story_bible.characters)) {
-        setCharacters(project.story_bible.characters);
-        if (project.story_bible.characters.length > 0) {
-          setSelectedCharacter(project.story_bible.characters[0]);
+      if (projectData?.story_bible?.characters && Array.isArray(projectData.story_bible.characters)) {
+        setCharacters(projectData.story_bible.characters);
+        if (projectData.story_bible.characters.length > 0) {
+          setSelectedCharacter(projectData.story_bible.characters[0]);
         }
       } else {
         // Set empty array if no characters exist
@@ -200,6 +205,10 @@ export default function CharactersPage() {
       if (selectedCharacter?.id === updated.id) {
         setSelectedCharacter(updated);
       }
+
+      // Show success message
+      setSuccessMessage(`Name regenerated and backstory/arc updated for ${updated.name}`);
+      setTimeout(() => setSuccessMessage(null), 5000);
     } catch (err: any) {
       console.error('Error regenerating name:', err);
       setError(err.message);
@@ -252,9 +261,26 @@ export default function CharactersPage() {
     router.push(`/projects/${projectId}/world`);
   };
 
+  // Get unique nationalities and ethnicities for filters
+  const uniqueNationalities = Array.from(new Set(characters.map(c => c.nationality).filter(Boolean)));
+  const uniqueEthnicities = Array.from(new Set(characters.map(c => c.ethnicity).filter(Boolean)));
+
+  // Filter characters
+  const filteredCharacters = characters.filter(char => {
+    if (nationalityFilter !== 'all' && char.nationality !== nationalityFilter) {
+      return false;
+    }
+    if (ethnicityFilter !== 'all' && char.ethnicity !== ethnicityFilter) {
+      return false;
+    }
+    return true;
+  });
+
   if (isLoading) {
     return <LoadingState message="Loading characters..." />;
   }
+
+  const navigation = useProjectNavigation(projectId, project);
 
   return (
     <PageLayout
@@ -262,6 +288,7 @@ export default function CharactersPage() {
       subtitle="Create and edit your story's cast of characters"
       backLink={`/projects/${projectId}`}
       backText="← Back to Project"
+      projectNavigation={navigation}
     >
       {error && <ErrorMessage message={error} />}
 
@@ -329,9 +356,62 @@ export default function CharactersPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '2rem' }}>
                 {/* Character List */}
                 <div>
-                  <h3 style={{ fontSize: '1.125rem', marginBottom: '1rem', color: '#1A1A2E', fontWeight: 600 }}>Cast</h3>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <h3 style={{ fontSize: '1.125rem', color: '#1A1A2E', fontWeight: 600 }}>Cast</h3>
+                    <div style={{ fontSize: '0.875rem', color: '#64748B' }}>
+                      {filteredCharacters.length}/{characters.length}
+                    </div>
+                  </div>
+
+                  {/* Filters */}
+                  {(uniqueNationalities.length > 1 || uniqueEthnicities.length > 1) && (
+                    <div style={{ marginBottom: '1rem' }}>
+                      {uniqueNationalities.length > 1 && (
+                        <select
+                          value={nationalityFilter}
+                          onChange={(e) => setNationalityFilter(e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '0.5rem',
+                            marginBottom: '0.5rem',
+                            background: '#FFFFFF',
+                            border: '1px solid #E2E8F0',
+                            borderRadius: '6px',
+                            color: '#1A1A2E',
+                            fontSize: '0.875rem',
+                          }}
+                        >
+                          <option value="all">All Nationalities</option>
+                          {uniqueNationalities.map(nat => (
+                            <option key={nat} value={nat}>{nat}</option>
+                          ))}
+                        </select>
+                      )}
+                      {uniqueEthnicities.length > 1 && (
+                        <select
+                          value={ethnicityFilter}
+                          onChange={(e) => setEthnicityFilter(e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '0.5rem',
+                            background: '#FFFFFF',
+                            border: '1px solid #E2E8F0',
+                            borderRadius: '6px',
+                            color: '#1A1A2E',
+                            fontSize: '0.875rem',
+                          }}
+                        >
+                          <option value="all">All Ethnicities</option>
+                          {uniqueEthnicities.map(eth => (
+                            <option key={eth} value={eth}>{eth}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {characters.map(char => (
+                    {filteredCharacters.map(char => (
                       <button
                         key={char.id}
                         onClick={() => setSelectedCharacter(char)}
@@ -354,6 +434,11 @@ export default function CharactersPage() {
                         <div style={{ fontSize: '0.875rem', color: '#64748B', textTransform: 'capitalize' }}>
                           {char.role.replace('_', ' ')}
                         </div>
+                        {char.nationality && (
+                          <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '0.25rem' }}>
+                            {char.nationality}
+                          </div>
+                        )}
                       </button>
                     ))}
                   </div>
@@ -468,14 +553,86 @@ function CharacterEditor({
   const [nameReferences, setNameReferences] = useState<NameReferences | null>(null);
   const [includeChapterContent, setIncludeChapterContent] = useState(true);
   const [isLoadingReferences, setIsLoadingReferences] = useState(false);
+  const [isUpdatingDependentFields, setIsUpdatingDependentFields] = useState(false);
+  const [autoUpdateEnabled, setAutoUpdateEnabled] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('characterAutoUpdate');
+      return saved !== 'false'; // Default to true
+    }
+    return true;
+  });
+  const [nameChangeDebounceTimer, setNameChangeDebounceTimer] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     setEditedChar(character);
     setOriginalName(character.name);
   }, [character]);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('characterAutoUpdate', String(autoUpdateEnabled));
+    }
+  }, [autoUpdateEnabled]);
+
   const handleChange = (field: string, value: any) => {
     setEditedChar(prev => ({ ...prev, [field]: value }));
+
+    // Auto-update dependent fields when name changes
+    if (field === 'name' && autoUpdateEnabled && value !== originalName && value.trim()) {
+      // Clear existing timer
+      if (nameChangeDebounceTimer) {
+        clearTimeout(nameChangeDebounceTimer);
+      }
+
+      // Set new debounced timer (500ms)
+      const timer = setTimeout(() => {
+        handleAutoUpdateDependentFields(value);
+      }, 500);
+
+      setNameChangeDebounceTimer(timer);
+    }
+  };
+
+  const handleAutoUpdateDependentFields = async (newName: string) => {
+    if (newName === originalName || !newName.trim()) return;
+
+    setIsUpdatingDependentFields(true);
+
+    try {
+      const token = getToken();
+      const response = await fetch(
+        `${API_BASE_URL}/api/projects/${projectId}/characters/${character.id}/auto-update-dependent-fields`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            newName,
+            fieldsToUpdate: ['backstory', 'characterArc'],
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to auto-update dependent fields');
+      }
+
+      const updatedFields = await response.json();
+
+      // Update the edited character with the new fields
+      setEditedChar(prev => ({
+        ...prev,
+        backstory: updatedFields.backstory || prev.backstory,
+        characterArc: updatedFields.characterArc || prev.characterArc,
+      }));
+    } catch (err: any) {
+      console.error('Error auto-updating dependent fields:', err);
+      // Silently fail - user can still manually edit
+    } finally {
+      setIsUpdatingDependentFields(false);
+    }
   };
 
   const handleArrayChange = (field: string, index: number, value: string) => {
@@ -556,6 +713,56 @@ function CharacterEditor({
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        {/* Auto-Update Toggle */}
+        <div style={{
+          padding: '0.75rem 1rem',
+          background: '#F8FAFC',
+          borderRadius: '8px',
+          border: '1px solid #E2E8F0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          <div>
+            <label style={{ fontSize: '0.875rem', fontWeight: 500, color: '#1A1A2E', cursor: 'pointer' }}>
+              Auto-update dependent fields when name changes
+            </label>
+            <p style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '0.25rem' }}>
+              Automatically regenerate backstory and character arc when you change the name
+            </p>
+          </div>
+          <label style={{ position: 'relative', display: 'inline-block', width: '44px', height: '24px', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={autoUpdateEnabled}
+              onChange={(e) => setAutoUpdateEnabled(e.target.checked)}
+              style={{ opacity: 0, width: 0, height: 0 }}
+            />
+            <span style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: autoUpdateEnabled ? '#667eea' : '#CBD5E1',
+              borderRadius: '24px',
+              transition: 'all 0.3s ease',
+            }}>
+              <span style={{
+                position: 'absolute',
+                content: '""',
+                height: '18px',
+                width: '18px',
+                left: autoUpdateEnabled ? '23px' : '3px',
+                bottom: '3px',
+                background: '#fff',
+                borderRadius: '50%',
+                transition: 'all 0.3s ease',
+              }} />
+            </span>
+          </label>
+        </div>
+
         {/* Name */}
         <div>
           <label style={label}>Name</label>
@@ -674,23 +881,79 @@ function CharacterEditor({
 
         {/* Backstory */}
         <div>
-          <label style={label}>Backstory</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <label style={{ ...label, marginBottom: 0 }}>Backstory</label>
+            {isUpdatingDependentFields && (
+              <span style={{
+                fontSize: '0.75rem',
+                color: '#667eea',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+              }}>
+                <span style={{
+                  display: 'inline-block',
+                  width: '12px',
+                  height: '12px',
+                  border: '2px solid #E2E8F0',
+                  borderTopColor: '#667eea',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                }} />
+                Updating...
+              </span>
+            )}
+          </div>
           <textarea
             value={editedChar.backstory}
             onChange={(e) => handleChange('backstory', e.target.value)}
             rows={6}
-            style={{ ...input, resize: 'vertical' }}
+            style={{
+              ...input,
+              resize: 'vertical',
+              opacity: isUpdatingDependentFields ? 0.6 : 1,
+              transition: 'opacity 0.3s ease',
+            }}
+            disabled={isUpdatingDependentFields}
           />
         </div>
 
         {/* Character Arc */}
         <div>
-          <label style={label}>Character Arc</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <label style={{ ...label, marginBottom: 0 }}>Character Arc</label>
+            {isUpdatingDependentFields && (
+              <span style={{
+                fontSize: '0.75rem',
+                color: '#667eea',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+              }}>
+                <span style={{
+                  display: 'inline-block',
+                  width: '12px',
+                  height: '12px',
+                  border: '2px solid #E2E8F0',
+                  borderTopColor: '#667eea',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                }} />
+                Updating...
+              </span>
+            )}
+          </div>
           <textarea
             value={editedChar.characterArc}
             onChange={(e) => handleChange('characterArc', e.target.value)}
             rows={4}
-            style={{ ...input, resize: 'vertical' }}
+            style={{
+              ...input,
+              resize: 'vertical',
+              opacity: isUpdatingDependentFields ? 0.6 : 1,
+              transition: 'opacity 0.3s ease',
+            }}
+            disabled={isUpdatingDependentFields}
           />
         </div>
       </div>

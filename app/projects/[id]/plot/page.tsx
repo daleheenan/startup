@@ -6,6 +6,7 @@ import PageLayout from '../../../components/shared/PageLayout';
 import PlotLayersVisualization from '../../../components/PlotLayersVisualization';
 import { getToken } from '../../../lib/auth';
 import { colors } from '../../../lib/constants';
+import { useProjectNavigation } from '../../../hooks/useProjectProgress';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -93,6 +94,7 @@ export default function PlotStructurePage() {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [totalChapters, setTotalChapters] = useState(25);
   const [loading, setLoading] = useState(true);
+  const [project, setProject] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [generatingLayerId, setGeneratingLayerId] = useState<string | null>(null);
@@ -133,6 +135,7 @@ export default function PlotStructurePage() {
       const projectRes = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, { headers });
       if (projectRes.ok) {
         const projectData = await projectRes.json();
+        setProject(projectData);
         if (projectData.plot_structure) {
           setStructure(projectData.plot_structure);
         }
@@ -531,6 +534,8 @@ export default function PlotStructurePage() {
     fontSize: '0.875rem',
   };
 
+  const navigation = useProjectNavigation(projectId, project);
+
   if (loading) {
     return (
       <PageLayout
@@ -538,6 +543,7 @@ export default function PlotStructurePage() {
         subtitle="Loading..."
         backLink={`/projects/${projectId}`}
         backText="← Back to Project"
+        projectNavigation={navigation}
       >
         <div style={{ padding: '2rem', textAlign: 'center', color: colors.textSecondary }}>
           Loading plot structure...
@@ -552,6 +558,7 @@ export default function PlotStructurePage() {
       subtitle="Visualize and plan your story's plot layers"
       backLink={`/projects/${projectId}`}
       backText="← Back to Project"
+      projectNavigation={navigation}
     >
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
         {error && (

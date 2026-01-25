@@ -49,6 +49,7 @@ import mysteriesRouter from './routes/mysteries.js';
 import universesRouter from './routes/universes.js';
 import userSettingsRouter from './routes/user-settings.js';
 import storyIdeasRouter from './routes/story-ideas.js';
+import authorsRouter from './routes/authors.js';
 
 // Run database migrations
 try {
@@ -150,6 +151,7 @@ app.use('/api/mysteries', apiLimiter, requireAuth, mysteriesRouter);
 app.use('/api/universes', apiLimiter, requireAuth, universesRouter);
 app.use('/api/user-settings', apiLimiter, requireAuth, userSettingsRouter);
 app.use('/api/story-ideas', apiLimiter, requireAuth, storyIdeasRouter);
+app.use('/api/authors', apiLimiter, requireAuth, authorsRouter);
 
 // Sentry error handler - must be BEFORE custom error handlers
 app.use(sentryErrorHandler());

@@ -6,6 +6,8 @@ import { AUTHOR_STYLES, getRecommendedAuthors, AuthorStyle } from '../../shared/
 import { TimePeriodSelector, getTimeframeDescription } from './TimePeriodSelector';
 import type { TimePeriod, TimePeriodType } from '../../shared/types';
 import StoryIdeasGenerator, { GeneratedIdea } from './StoryIdeasGenerator';
+import CollapsibleSection from './CollapsibleSection';
+import NationalitySelector, { type NationalityConfig } from './NationalitySelector';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -50,6 +52,8 @@ export interface StoryPreferences {
   timePeriod?: TimePeriod;
   timePeriodType?: TimePeriodType;
   specificYear?: number;
+  // Character Nationality Configuration
+  nationalityConfig?: NationalityConfig;
 }
 
 interface SourceProject {
@@ -585,6 +589,7 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
   const [customIdeas, setCustomIdeas] = useState('');
   const [timeframe, setTimeframe] = useState('');
   const [timePeriod, setTimePeriod] = useState<TimePeriod>({ type: 'present' });
+  const [nationalityConfig, setNationalityConfig] = useState<NationalityConfig>({ mode: 'none' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showStoryIdeasGenerator, setShowStoryIdeasGenerator] = useState(false);
 
@@ -875,7 +880,7 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
     const newErrors: Record<string, string> = {};
 
     if (genres.length === 0) newErrors.genres = 'Please select at least one genre';
-    if (subgenres.length === 0) newErrors.subgenres = 'Please select at least one subgenre';
+    // Subgenre is now optional - validation removed
     if (tones.length === 0) newErrors.tones = 'Please select at least one tone';
     if (themes.length === 0 && !customTheme.trim()) newErrors.themes = 'Please select at least one theme or add a custom theme';
     if (targetLength < 40000) newErrors.targetLength = 'Target length must be at least 40,000 words';
@@ -952,6 +957,7 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
       timePeriod: timePeriod.type !== 'present' ? timePeriod : undefined,
       timePeriodType: timePeriod.type !== 'present' ? timePeriod.type : undefined,
       specificYear: timePeriod.type === 'custom' ? timePeriod.year : undefined,
+      nationalityConfig: nationalityConfig.mode !== 'none' ? nationalityConfig : undefined,
     };
 
     onSubmit(preferences);
@@ -1076,18 +1082,17 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
   return (
     <form onSubmit={handleSubmit} style={{ width: '100%' }}>
       {/* Book Style Presets */}
-      <div style={{
-        ...sectionStyle,
-        padding: '1rem',
-        background: '#F0FDF4',
-        border: '1px solid #BBF7D0',
-        borderRadius: '8px',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-          <label style={{ ...labelStyle, marginBottom: 0 }}>
-            Book Style Presets
-            <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Quick start with saved preferences)</span>
-          </label>
+      <CollapsibleSection
+        title="Book Style Presets"
+        description="Quick start with saved preferences"
+        defaultOpen={false}
+        optional={true}
+        count={presets.length}
+        sectionId="book-style-presets"
+        background="#F0FDF4"
+        borderColor="#BBF7D0"
+      >
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem' }}>
           {genres.length > 0 && (
             <button
               type="button"
@@ -1243,43 +1248,22 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
             </span>
           )}
         </div>
-      </div>
+      </CollapsibleSection>
 
       {/* Genre Combination Recipes */}
-      <div style={{
-        ...sectionStyle,
-        padding: '1rem',
-        background: '#FFF7ED',
-        border: '1px solid #FDBA74',
-        borderRadius: '8px',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-          <label style={{ ...labelStyle, marginBottom: 0 }}>
-            Genre Recipes
-            <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Popular combinations)</span>
-          </label>
-          <button
-            type="button"
-            onClick={() => setShowRecipes(!showRecipes)}
-            style={{
-              padding: '0.375rem 0.75rem',
-              background: '#FFFFFF',
-              border: '1px solid #E2E8F0',
-              borderRadius: '6px',
-              color: '#64748B',
-              fontSize: '0.75rem',
-              cursor: 'pointer',
-            }}
-          >
-            {showRecipes ? 'Hide' : 'Show'} Recipes
-          </button>
-        </div>
-
-        {showRecipes && (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-            gap: '0.75rem',
+      <CollapsibleSection
+        title="Genre Recipes"
+        description="Popular combinations to get you started"
+        defaultOpen={false}
+        optional={true}
+        sectionId="genre-recipes"
+        background="#FFF7ED"
+        borderColor="#FDBA74"
+      >
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+          gap: '0.75rem',
           }}>
             {GENRE_RECIPES.map(recipe => (
               <button
@@ -1319,65 +1303,21 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
               </button>
             ))}
           </div>
-        )}
-
-        {!showRecipes && (
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {GENRE_RECIPES.filter(r => r.popularity === 'hot').slice(0, 4).map(recipe => (
-              <button
-                key={recipe.id}
-                type="button"
-                onClick={() => applyRecipe(recipe)}
-                disabled={isLoading}
-                style={{
-                  padding: '0.5rem 0.75rem',
-                  background: '#FFFFFF',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: '6px',
-                  fontSize: '0.813rem',
-                  cursor: isLoading ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.375rem',
-                }}
-              >
-                <span>{recipe.icon}</span>
-                <span style={{ fontWeight: 500 }}>{recipe.name}</span>
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => setShowRecipes(true)}
-              style={{
-                padding: '0.5rem 0.75rem',
-                background: 'transparent',
-                border: '1px dashed #94A3B8',
-                borderRadius: '6px',
-                color: '#64748B',
-                fontSize: '0.813rem',
-                cursor: 'pointer',
-              }}
-            >
-              +{GENRE_RECIPES.length - 4} more...
-            </button>
-          </div>
-        )}
-      </div>
+      </CollapsibleSection>
 
       {/* Published Author Style Library */}
-      <div style={{
-        ...sectionStyle,
-        padding: '1rem',
-        background: '#F0FDF4',
-        border: '1px solid #BBF7D0',
-        borderRadius: '8px',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-          <label style={{ ...labelStyle, marginBottom: 0 }}>
-            Author Style Reference
-            <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Optional - emulate a famous author's style)</span>
-          </label>
-          {selectedAuthorStyle && (
+      <CollapsibleSection
+        title="Author Style Reference"
+        description="Emulate a famous author's writing style"
+        defaultOpen={false}
+        optional={true}
+        count={selectedAuthorStyle ? 1 : undefined}
+        sectionId="author-style-reference"
+        background="#F0FDF4"
+        borderColor="#BBF7D0"
+      >
+        {selectedAuthorStyle && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem' }}>
             <button
               type="button"
               onClick={() => setSelectedAuthorStyle(null)}
@@ -1393,8 +1333,8 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
             >
               Clear Selection
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Selected Author Display */}
         {selectedAuthorStyle && (
@@ -1577,7 +1517,7 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
             ))}
           </div>
         )}
-      </div>
+      </CollapsibleSection>
 
       {/* Project Structure Selection */}
       <div style={{
@@ -2178,8 +2118,8 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
       {genres.length > 0 && (
         <div style={sectionStyle}>
           <label style={labelStyle}>
-            Subgenre <span style={{ color: '#DC2626' }}>*</span>
-            <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Select 1-3)</span>
+            Subgenre
+            <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Optional - Select up to 3)</span>
           </label>
           <div style={{
             display: 'grid',
@@ -2627,6 +2567,19 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
           }}
           disabled={isLoading}
         />
+      </div>
+
+      {/* Character Nationality Settings */}
+      <div style={sectionStyle}>
+        <NationalitySelector
+          value={nationalityConfig}
+          onChange={setNationalityConfig}
+          characterCount={5}
+          disabled={isLoading}
+        />
+        <div style={{ marginTop: '0.75rem', fontSize: '0.813rem', color: '#64748B' }}>
+          Configure character nationalities for culturally appropriate names and backgrounds.
+        </div>
       </div>
 
       {/* Submit Button */}

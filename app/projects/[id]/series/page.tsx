@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import PageLayout from '../../../components/shared/PageLayout';
 import { getToken } from '../../../lib/auth';
 import { colors, gradients } from '../../../lib/constants';
+import { useProjectNavigation } from '../../../hooks/useProjectProgress';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -69,6 +70,7 @@ export default function SeriesManagementPage() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'characters' | 'timeline' | 'mysteries'>('overview');
+  const [project, setProject] = useState<any>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -78,6 +80,13 @@ export default function SeriesManagementPage() {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       };
+
+      // Fetch project
+      const projRes = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, { headers });
+      if (projRes.ok) {
+        const projData = await projRes.json();
+        setProject(projData);
+      }
 
       // Fetch books
       const booksRes = await fetch(`${API_BASE_URL}/api/books/project/${projectId}`, { headers });
@@ -219,12 +228,15 @@ export default function SeriesManagementPage() {
     marginBottom: '1rem',
   };
 
+  const navigation = useProjectNavigation(projectId, project);
+
   if (loading) {
     return (
       <PageLayout
         title="Series Management"
         backLink={`/projects/${projectId}`}
         backText="← Back to Project"
+        projectNavigation={navigation}
       >
         <div style={{ textAlign: 'center', padding: '3rem' }}>
           <div style={{ fontSize: '1.125rem', color: colors.textSecondary }}>
@@ -241,6 +253,7 @@ export default function SeriesManagementPage() {
         title="Series Management"
         backLink={`/projects/${projectId}`}
         backText="← Back to Project"
+        projectNavigation={navigation}
       >
         <div style={cardStyle}>
           <h3 style={{ fontSize: '1.25rem', marginBottom: '1rem', color: colors.text }}>
@@ -264,6 +277,7 @@ export default function SeriesManagementPage() {
       subtitle={`Managing ${books.length} books in series`}
       backLink={`/projects/${projectId}`}
       backText="← Back to Project"
+      projectNavigation={navigation}
     >
       {error && (
         <div style={{

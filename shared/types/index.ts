@@ -792,3 +792,28 @@ export interface GenreBenchmark {
   created_at: string;
   updated_at: string;
 }
+
+// Feature 3: Navigation and Progress Tracking Types
+
+export interface CreationStep {
+  id: string;
+  name: string;
+  route: string;
+  required: boolean;
+  icon?: string;
+}
+
+export interface CreationProgressData {
+  steps: CreationStep[];
+  completedSteps: string[];
+  percentComplete: number;
+  canGenerate: boolean;
+}
+
+export interface ProjectNavigationTab {
+  id: string;
+  label: string;
+  route: string;
+  icon?: string;
+  badge?: string | number;
+}

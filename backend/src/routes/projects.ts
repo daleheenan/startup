@@ -3,7 +3,7 @@ import db from '../db/connection.js';
 import type { Project } from '../shared/types/index.js';
 import { randomUUID } from 'crypto';
 import { generateStoryDNA } from '../services/story-dna-generator.js';
-import { generateProtagonist, generateSupportingCast } from '../services/character-generator.js';
+import { generateProtagonist, generateSupportingCast, assignNationalities } from '../services/character-generator.js';
 import { generateWorldElements } from '../services/world-generator.js';
 import { metricsService } from '../services/metrics.service.js';
 import { createLogger } from '../services/logger.service.js';
@@ -423,13 +423,22 @@ router.post('/:id/characters', async (req, res) => {
       tone: storyDNA.tone || context.tone,
       themes: storyDNA.themes || context.themes,
       proseStyle: storyDNA.proseStyle,
+      nationalityConfig: context.nationalityConfig,
     };
 
+    // Assign nationalities if configured
+    const totalCharacters = 5; // 1 protagonist + ~4-6 supporting (estimate 5 total)
+    const assignedNationalities = assignNationalities(totalCharacters, context.nationalityConfig);
+
+    logger.info({ nationalityConfig: context.nationalityConfig, assignedNationalities }, 'Nationality configuration');
+
     // Generate protagonist first
-    const protagonist = await generateProtagonist(enrichedContext);
+    const protagonistNationality = assignedNationalities ? assignedNationalities[0] : undefined;
+    const protagonist = await generateProtagonist(enrichedContext, protagonistNationality);
 
     // Generate supporting cast
-    const supportingCast = await generateSupportingCast(enrichedContext, protagonist);
+    const supportingNationalities = assignedNationalities ? assignedNationalities.slice(1) : undefined;
+    const supportingCast = await generateSupportingCast(enrichedContext, protagonist, supportingNationalities);
 
     // Combine all characters
     const allCharacters = [protagonist, ...supportingCast];
@@ -1000,26 +1009,58 @@ Return ONLY the new name, nothing else. Just the full name.`;
     const newName = responseText.trim();
     const oldName = character.name;
 
-    // Helper function to replace old name with new name in text fields
-    const updateNameInText = (text: string | undefined): string | undefined => {
-      if (!text || !oldName) return text;
-      // Replace the old name with new name (case-insensitive for first occurrence, preserve case for rest)
-      return text.replace(new RegExp(oldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), newName);
-    };
+    // Import regenerateDependentFields for auto-update
+    const { regenerateDependentFields } = await import('../services/character-generator.js');
 
-    // Update character with new name and preserve edited ethnicity/nationality
-    // Also update text fields that may reference the character's name
+    // Auto-regenerate backstory and character arc with the new name
+    let updatedBackstory = character.backstory;
+    let updatedCharacterArc = character.characterArc;
+
+    try {
+      const regeneratedFields = await regenerateDependentFields({
+        projectId,
+        characterId,
+        newName,
+        character: { ...character, name: newName },
+        fieldsToUpdate: ['backstory', 'characterArc'],
+        storyContext: {
+          genre: storyDNA?.genre || project.genre,
+          tone: storyDNA?.tone,
+          themes: storyDNA?.themes,
+        },
+      });
+
+      if (regeneratedFields.backstory) {
+        updatedBackstory = regeneratedFields.backstory;
+      }
+      if (regeneratedFields.characterArc) {
+        updatedCharacterArc = regeneratedFields.characterArc;
+      }
+
+      logger.info({ characterId, oldName, newName }, 'Auto-updated backstory and arc during name regeneration');
+    } catch (error: any) {
+      logger.error({ error: error.message }, 'Failed to auto-update dependent fields, using simple name replacement');
+      // Fallback: simple name replacement
+      const updateNameInText = (text: string | undefined): string | undefined => {
+        if (!text || !oldName) return text;
+        return text.replace(new RegExp(oldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), newName);
+      };
+      updatedBackstory = updateNameInText(character.backstory);
+      updatedCharacterArc = updateNameInText(character.characterArc);
+    }
+
+    // Update character with new name and regenerated fields
     storyBible.characters[charIndex] = {
       ...character,
       name: newName,
       // Save the edited ethnicity/nationality if provided
       ethnicity: editedEthnicity || character.ethnicity,
       nationality: editedNationality || character.nationality,
-      // Update fields that might contain the old name
-      backstory: updateNameInText(character.backstory),
-      voiceSample: updateNameInText(character.voiceSample),
-      characterArc: updateNameInText(character.characterArc),
-      currentState: updateNameInText(character.currentState),
+      // Use regenerated fields
+      backstory: updatedBackstory,
+      characterArc: updatedCharacterArc,
+      voiceSample: character.voiceSample, // Keep voice sample as-is
+      currentState: character.currentState, // Keep current state as-is
     };
 
     // Update relationships in other characters
@@ -1044,6 +1085,77 @@ Return ONLY the new name, nothing else. Just the full name.`;
     res.json(storyBible.characters[charIndex]);
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack }, 'Error regenerating character name');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * POST /api/projects/:id/characters/:characterId/auto-update-dependent-fields
+ * Auto-update backstory and character arc when name changes
+ * Body: { newName: string, fieldsToUpdate: ('backstory' | 'characterArc')[] }
+ */
+router.post('/:id/characters/:characterId/auto-update-dependent-fields', async (req, res) => {
+  try {
+    const { id: projectId, characterId } = req.params;
+    const { newName, fieldsToUpdate } = req.body;
+
+    if (!newName || !fieldsToUpdate || !Array.isArray(fieldsToUpdate)) {
+      return res.status(400).json({
+        error: { code: 'INVALID_REQUEST', message: 'newName and fieldsToUpdate array are required' },
+      });
+    }
+
+    // Get current project and story bible
+    const getStmt = db.prepare<[string], Project>(`
+      SELECT * FROM projects WHERE id = ?
+    `);
+    const project = getStmt.get(projectId);
+
+    if (!project?.story_bible) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Story bible not found' },
+      });
+    }
+
+    const storyBible = safeJsonParse(project.story_bible as any, null);
+    const storyDNA = safeJsonParse(project.story_dna as any, null);
+
+    if (!storyBible) {
+      return res.status(500).json({
+        error: { code: 'INTERNAL_ERROR', message: 'Failed to parse story bible' },
+      });
+    }
+
+    // Find the character
+    const character = storyBible.characters.find((c: any) => c.id === characterId);
+    if (!character) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Character not found' },
+      });
+    }
+
+    // Import regenerateDependentFields
+    const { regenerateDependentFields } = await import('../services/character-generator.js');
+
+    // Regenerate the fields
+    const updatedFields = await regenerateDependentFields({
+      projectId,
+      characterId,
+      newName,
+      character: { ...character, name: newName }, // Pass character with new name
+      fieldsToUpdate: fieldsToUpdate.filter((f: string) => f === 'backstory' || f === 'characterArc'),
+      storyContext: {
+        genre: storyDNA?.genre || project.genre,
+        tone: storyDNA?.tone,
+        themes: storyDNA?.themes,
+      },
+    });
+
+    logger.info({ projectId, characterId, newName, fieldsUpdated: Object.keys(updatedFields) }, 'Auto-updated dependent fields');
+
+    res.json(updatedFields);
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error auto-updating dependent fields');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });

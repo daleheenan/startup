@@ -10,6 +10,7 @@ import ErrorMessage from '../../components/shared/ErrorMessage';
 import { fetchJson } from '../../lib/fetch-utils';
 import { colors, gradients, borderRadius, shadows } from '../../lib/constants';
 import { card, statusBadge } from '../../lib/styles';
+import { useProjectNavigation } from '../../hooks/useProjectProgress';
 
 interface Project {
   id: string;
@@ -118,12 +119,15 @@ export default function ProjectDetailPage() {
     </div>
   );
 
+  const navigation = useProjectNavigation(projectId, project);
+
   return (
     <PageLayout
       title={project.title}
       subtitle={subtitle as any}
       backLink="/projects"
       backText="← Back to Projects"
+      projectNavigation={navigation}
     >
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
             {/* Project Details */}
