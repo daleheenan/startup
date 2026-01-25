@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getToken, logout } from '../../../lib/auth';
+import GenerationProgress from '../../../components/GenerationProgress';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -91,6 +92,7 @@ export default function OutlinePage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedChapter, setExpandedChapter] = useState<number | null>(null);
+  const [generationStep, setGenerationStep] = useState<string>('');
 
   useEffect(() => {
     if (projectId) {
@@ -186,7 +188,10 @@ export default function OutlinePage() {
     try {
       setIsGenerating(true);
       setError(null);
+      setGenerationStep('Preparing story context...');
       const token = getToken();
+
+      setGenerationStep('Analyzing story structure requirements...');
 
       const response = await fetch(`${API_BASE_URL}/api/outlines/generate`, {
         method: 'POST',
@@ -209,6 +214,7 @@ export default function OutlinePage() {
         throw new Error(errorData.error?.message || `Failed to generate outline (${response.status})`);
       }
 
+      setGenerationStep('Processing outline structure...');
       const outlineData = await response.json();
       setOutline(outlineData);
     } catch (err: any) {
@@ -216,6 +222,7 @@ export default function OutlinePage() {
       setError(err.message || 'An unexpected error occurred while generating the outline');
     } finally {
       setIsGenerating(false);
+      setGenerationStep('');
     }
   };
 
@@ -415,6 +422,39 @@ export default function OutlinePage() {
                   Generate Outline
                 </h2>
 
+                {/* Prerequisites Check */}
+                {project && !project.story_bible?.characters?.length && (
+                  <div style={{
+                    background: '#FEF3C7',
+                    border: '1px solid #FCD34D',
+                    borderRadius: '8px',
+                    padding: '1rem',
+                    marginBottom: '1.5rem',
+                  }}>
+                    <p style={{ color: '#92400E', fontSize: '0.875rem', margin: 0, marginBottom: '0.5rem', fontWeight: 600 }}>
+                      Missing Required Content
+                    </p>
+                    <p style={{ color: '#92400E', fontSize: '0.875rem', margin: 0, marginBottom: '0.75rem' }}>
+                      Before generating an outline, you need to create characters for your story. This helps the AI create a more personalized and coherent story structure.
+                    </p>
+                    <Link
+                      href={`/projects/${projectId}/characters`}
+                      style={{
+                        display: 'inline-block',
+                        padding: '0.5rem 1rem',
+                        background: '#F59E0B',
+                        color: '#FFFFFF',
+                        borderRadius: '6px',
+                        textDecoration: 'none',
+                        fontSize: '0.875rem',
+                        fontWeight: 500,
+                      }}
+                    >
+                      Go to Characters →
+                    </Link>
+                  </div>
+                )}
+
                 {/* Structure Template Selector */}
                 <div style={{ marginBottom: '1.5rem' }}>
                   <label style={{
@@ -467,11 +507,12 @@ export default function OutlinePage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   <button
                     onClick={generateOutline}
-                    disabled={isGenerating}
+                    disabled={isGenerating || !project?.story_bible?.characters?.length}
+                    title={!project?.story_bible?.characters?.length ? 'Create characters first to generate an outline' : ''}
                     style={{
                       width: '100%',
                       padding: '1rem',
-                      background: isGenerating
+                      background: (isGenerating || !project?.story_bible?.characters?.length)
                         ? '#94A3B8'
                         : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                       border: 'none',
@@ -479,8 +520,8 @@ export default function OutlinePage() {
                       color: '#fff',
                       fontSize: '1rem',
                       fontWeight: 600,
-                      cursor: isGenerating ? 'not-allowed' : 'pointer',
-                      boxShadow: isGenerating ? 'none' : '0 4px 14px rgba(102, 126, 234, 0.4)',
+                      cursor: (isGenerating || !project?.story_bible?.characters?.length) ? 'not-allowed' : 'pointer',
+                      boxShadow: (isGenerating || !project?.story_bible?.characters?.length) ? 'none' : '0 4px 14px rgba(102, 126, 234, 0.4)',
                     }}
                   >
                     {isGenerating ? 'Generating Outline...' : 'Generate Outline'}
@@ -550,7 +591,34 @@ export default function OutlinePage() {
                 </div>
 
                 {/* Acts and Chapters */}
-                {outline.structure.acts.map((act) => (
+                {(!outline.structure?.acts || outline.structure.acts.length === 0) ? (
+                  <div style={{
+                    background: '#FEF2F2',
+                    border: '1px solid #FECACA',
+                    borderRadius: '12px',
+                    padding: '1.5rem',
+                    textAlign: 'center',
+                  }}>
+                    <p style={{ color: '#DC2626', fontSize: '0.875rem', margin: 0 }}>
+                      The outline structure is incomplete. Please try regenerating the outline.
+                    </p>
+                    <button
+                      onClick={() => setOutline(null)}
+                      style={{
+                        marginTop: '1rem',
+                        padding: '0.5rem 1rem',
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        border: 'none',
+                        borderRadius: '6px',
+                        color: '#FFFFFF',
+                        fontSize: '0.875rem',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Regenerate Outline
+                    </button>
+                  </div>
+                ) : outline.structure.acts.map((act) => (
                   <div
                     key={act.number}
                     style={{
@@ -647,6 +715,21 @@ export default function OutlinePage() {
                 ))}
               </>
             )}
+
+            {/* Generation Progress Modal */}
+            <GenerationProgress
+              isActive={isGenerating}
+              title="Generating Story Outline"
+              subtitle={`Creating a ${templates.find(t => t.type === selectedTemplate)?.name || 'structured'} outline`}
+              currentStep={generationStep}
+              estimatedTime={90}
+              error={error}
+              onCancel={() => {
+                setIsGenerating(false);
+                setError(null);
+                setGenerationStep('');
+              }}
+            />
           </div>
         </div>
       </main>

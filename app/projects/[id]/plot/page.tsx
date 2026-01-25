@@ -97,6 +97,7 @@ export default function PlotStructurePage() {
   const [error, setError] = useState<string | null>(null);
   const [generatingLayerId, setGeneratingLayerId] = useState<string | null>(null);
   const [generatingPacing, setGeneratingPacing] = useState(false);
+  const [generatingNewLayer, setGeneratingNewLayer] = useState(false);
 
   // Modal state
   const [showLayerModal, setShowLayerModal] = useState(false);
@@ -214,9 +215,10 @@ export default function PlotStructurePage() {
     }
   };
 
-  const handleSaveLayer = () => {
+  const handleSaveLayer = (generatePoints: boolean = false) => {
+    const layerId = editingLayer?.id || `layer-${Date.now()}`;
     const newLayer: PlotLayer = {
-      id: editingLayer?.id || `layer-${Date.now()}`,
+      id: layerId,
       name: layerForm.name,
       description: layerForm.description,
       type: layerForm.type,
@@ -232,6 +234,62 @@ export default function PlotStructurePage() {
     const newStructure = { ...structure, plot_layers: newLayers };
     saveStructure(newStructure);
     setShowLayerModal(false);
+
+    // If generatePoints is true and this is a new layer, generate points for it
+    if (generatePoints && !editingLayer) {
+      // Use a timeout to ensure the layer is saved before generating
+      setTimeout(() => {
+        handleGenerateLayerPointsForNew(layerId, newLayer);
+      }, 100);
+    }
+  };
+
+  const handleGenerateLayerPointsForNew = async (layerId: string, layer: PlotLayer) => {
+    setGeneratingNewLayer(true);
+    setError(null);
+
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE_URL}/api/projects/${projectId}/generate-plot-points`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          layerId,
+          layerName: layer.name,
+          layerType: layer.type,
+          layerDescription: layer.description,
+          totalChapters,
+          actStructure: structure.act_structure,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error?.message || 'Failed to generate plot points');
+      }
+
+      const data = await res.json();
+
+      // Update the layer with generated points
+      setStructure(prevStructure => {
+        const newLayers = prevStructure.plot_layers.map(l => {
+          if (l.id !== layerId) return l;
+          return {
+            ...l,
+            points: [...l.points, ...data.points],
+          };
+        });
+        return { ...prevStructure, plot_layers: newLayers };
+      });
+    } catch (err: any) {
+      console.error('Error generating plot points:', err);
+      setError(err.message);
+    } finally {
+      setGeneratingNewLayer(false);
+    }
   };
 
   const handleDeleteLayer = (layerId: string) => {
@@ -848,6 +906,47 @@ export default function PlotStructurePage() {
           </div>
         )}
 
+        {/* Generating New Layer Points indicator */}
+        {generatingNewLayer && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1001,
+          }}>
+            <div style={{
+              background: '#FFFFFF',
+              borderRadius: '12px',
+              padding: '2rem',
+              textAlign: 'center',
+              maxWidth: '400px',
+            }}>
+              <div style={{
+                width: '48px',
+                height: '48px',
+                border: '3px solid #E2E8F0',
+                borderTopColor: '#667eea',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+                margin: '0 auto 1rem',
+              }} />
+              <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#1A1A2E', marginBottom: '0.5rem' }}>
+                Generating Plot Points
+              </h3>
+              <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
+                AI is creating plot points for your new layer. This may take a moment...
+              </p>
+            </div>
+            <style jsx>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          </div>
+        )}
+
         {/* Layer Modal */}
         {showLayerModal && (
           <div style={{
@@ -926,7 +1025,7 @@ export default function PlotStructurePage() {
                   </div>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                 <button
                   onClick={() => setShowLayerModal(false)}
                   style={{
@@ -941,21 +1040,44 @@ export default function PlotStructurePage() {
                   Cancel
                 </button>
                 <button
-                  onClick={handleSaveLayer}
+                  onClick={() => handleSaveLayer(false)}
                   disabled={!layerForm.name}
                   style={{
                     padding: '0.75rem 1.5rem',
-                    background: layerForm.name ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#94A3B8',
-                    border: 'none',
+                    background: layerForm.name ? '#FFFFFF' : '#F1F5F9',
+                    border: layerForm.name ? '1px solid #667eea' : '1px solid #E2E8F0',
                     borderRadius: '8px',
-                    color: '#fff',
+                    color: layerForm.name ? '#667eea' : '#94A3B8',
                     fontWeight: 500,
                     cursor: layerForm.name ? 'pointer' : 'not-allowed',
                   }}
                 >
-                  {editingLayer ? 'Save Changes' : 'Add Layer'}
+                  {editingLayer ? 'Save Changes' : 'Save Only'}
                 </button>
+                {!editingLayer && (
+                  <button
+                    onClick={() => handleSaveLayer(true)}
+                    disabled={!layerForm.name || !layerForm.description}
+                    title={!layerForm.description ? 'Add a description for better AI-generated plot points' : ''}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      background: (layerForm.name && layerForm.description) ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#94A3B8',
+                      border: 'none',
+                      borderRadius: '8px',
+                      color: '#fff',
+                      fontWeight: 500,
+                      cursor: (layerForm.name && layerForm.description) ? 'pointer' : 'not-allowed',
+                    }}
+                  >
+                    ✨ Save & Generate Points
+                  </button>
+                )}
               </div>
+              {!editingLayer && (
+                <p style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '0.75rem', textAlign: 'right' }}>
+                  Tip: Add a description to help AI generate better plot points
+                </p>
+              )}
             </div>
           </div>
         )}
