@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { v4 as uuidv4 } from 'uuid';
 import { createLogger } from './logger.service.js';
+import { extractJsonArray } from '../utils/json-extractor.js';
 
 const logger = createLogger('services:story-ideas-generator');
 
@@ -270,17 +271,7 @@ Return ONLY a JSON array of strings:
    */
   private parseIdeasResponse(responseText: string): GeneratedIdea[] {
     try {
-      // Extract JSON array from response
-      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) {
-        throw new Error('No JSON array found in response');
-      }
-
-      const ideas = JSON.parse(jsonMatch[0]);
-
-      if (!Array.isArray(ideas)) {
-        throw new Error('Response is not an array');
-      }
+      const ideas = extractJsonArray(responseText);
 
       // Validate and ensure IDs
       return ideas.map((idea: any, index: number) => {
@@ -303,7 +294,7 @@ Return ONLY a JSON array of strings:
         };
       });
     } catch (error: any) {
-      logger.error({ error, responseText: responseText.substring(0, 500) }, 'Failed to parse ideas response');
+      logger.error({ error: error.message, responseText: responseText.substring(0, 500) }, 'Failed to parse ideas response');
       throw new Error(`Failed to parse story ideas: ${error.message}`);
     }
   }
@@ -313,22 +304,12 @@ Return ONLY a JSON array of strings:
    */
   private parseSectionResponse(responseText: string): string[] {
     try {
-      // Extract JSON array from response
-      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) {
-        throw new Error('No JSON array found in response');
-      }
-
-      const items = JSON.parse(jsonMatch[0]);
-
-      if (!Array.isArray(items)) {
-        throw new Error('Response is not an array');
-      }
+      const items = extractJsonArray<string>(responseText);
 
       // Ensure all items are strings
       return items.map((item: any) => String(item));
     } catch (error: any) {
-      logger.error({ error }, 'Failed to parse section response');
+      logger.error({ error: error.message }, 'Failed to parse section response');
       throw new Error(`Failed to parse regenerated section: ${error.message}`);
     }
   }

@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import db from '../db/connection.js';
 import { formatGenre, formatSubgenre, formatModifiers, getWordCountContext } from '../utils/genre-helpers.js';
 import { createLogger } from './logger.service.js';
+import { extractJsonArray } from '../utils/json-extractor.js';
 
 const logger = createLogger('services:concept-generator');
 
@@ -611,18 +612,7 @@ function validateAndCleanConcepts(concepts: StoryConcept[], exclusions: ConceptE
  */
 function parseConceptsResponse(responseText: string): StoryConcept[] {
   try {
-    // Try to extract JSON from the response
-    // Claude might wrap it in markdown code blocks
-    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
-      throw new Error('No JSON array found in response');
-    }
-
-    const concepts = JSON.parse(jsonMatch[0]);
-
-    if (!Array.isArray(concepts)) {
-      throw new Error('Response is not an array');
-    }
+    const concepts = extractJsonArray<StoryConcept>(responseText);
 
     // Validate each concept has required fields
     for (const concept of concepts) {
@@ -633,8 +623,8 @@ function parseConceptsResponse(responseText: string): StoryConcept[] {
 
     return concepts;
   } catch (error: any) {
-    logger.error({ error }, 'Concept parse error');
-    logger.error({ responseText }, 'Concept response text');
+    logger.error({ error: error.message }, 'Concept parse error');
+    logger.error({ responseText: responseText.substring(0, 500) }, 'Concept response text (truncated)');
     throw new Error(`Failed to parse concepts: ${error.message}`);
   }
 }
@@ -759,16 +749,7 @@ Return ONLY a JSON array in this exact format:
  */
 function parseSummariesResponse(responseText: string): ConceptSummary[] {
   try {
-    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
-      throw new Error('No JSON array found in response');
-    }
-
-    const summaries = JSON.parse(jsonMatch[0]);
-
-    if (!Array.isArray(summaries)) {
-      throw new Error('Response is not an array');
-    }
+    const summaries = extractJsonArray<ConceptSummary>(responseText);
 
     // Validate each summary
     for (const summary of summaries) {
@@ -779,7 +760,7 @@ function parseSummariesResponse(responseText: string): ConceptSummary[] {
 
     return summaries;
   } catch (error: any) {
-    logger.error({ error }, 'Summary parse error');
+    logger.error({ error: error.message }, 'Summary parse error');
     throw new Error(`Failed to parse summaries: ${error.message}`);
   }
 }

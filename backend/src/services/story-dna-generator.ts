@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import dotenv from 'dotenv';
 import { createLogger } from './logger.service.js';
+import { extractJsonObject } from '../utils/json-extractor.js';
 
 dotenv.config();
 
@@ -126,13 +127,7 @@ Return ONLY a JSON object in this format:
 
 function parseStoryDNAResponse(responseText: string): StoryDNA {
   try {
-    // Extract JSON from response
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('No JSON object found in response');
-    }
-
-    const storyDNA = JSON.parse(jsonMatch[0]);
+    const storyDNA = extractJsonObject<StoryDNA>(responseText);
 
     // Validate required fields
     if (!storyDNA.proseStyle || !storyDNA.targetAudience || !storyDNA.contentRating) {
@@ -141,8 +136,8 @@ function parseStoryDNAResponse(responseText: string): StoryDNA {
 
     return storyDNA;
   } catch (error: any) {
-    logger.error({ error: error.message, stack: error.stack }, 'Story DNA parse error');
-    logger.error({ responseText }, 'Story DNA response text');
+    logger.error({ error: error.message }, 'Story DNA parse error');
+    logger.error({ responseText: responseText.substring(0, 500) }, 'Story DNA response text (truncated)');
     throw new Error(`Failed to parse Story DNA: ${error.message}`);
   }
 }

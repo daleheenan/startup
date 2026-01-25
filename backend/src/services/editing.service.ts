@@ -2,6 +2,7 @@ import { claudeService } from './claude.service.js';
 import db from '../db/connection.js';
 import type { Chapter, Flag } from '../shared/types/index.js';
 import { createLogger } from './logger.service.js';
+import { extractJsonObject } from '../utils/json-extractor.js';
 
 const logger = createLogger('services:editing');
 
@@ -472,17 +473,7 @@ Output the revised chapter:`;
    * Helper: Parse JSON response from editor, handling markdown wrappers
    */
   private parseEditorResponse(response: string): any {
-    try {
-      // Try direct parse first
-      return JSON.parse(response);
-    } catch {
-      // Extract JSON from markdown code blocks
-      const jsonMatch = response.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) || response.match(/(\{[\s\S]*\})/);
-      if (jsonMatch && jsonMatch[1]) {
-        return JSON.parse(jsonMatch[1]);
-      }
-      throw new Error('Failed to parse editor response as JSON');
-    }
+    return extractJsonObject(response);
   }
 
   /**

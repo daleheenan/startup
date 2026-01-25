@@ -2,6 +2,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import dotenv from 'dotenv';
 import { randomUUID } from 'crypto';
 import { createLogger } from './logger.service.js';
+import { generateNameByNationality } from './name-generator.js';
+import { extractJsonArray, extractJsonObject } from '../utils/json-extractor.js';
 
 dotenv.config();
 
@@ -37,6 +39,11 @@ export interface Character {
   }>;
 }
 
+export interface NationalityDistribution {
+  nationality: string;
+  count: number;
+}
+
 export interface CharacterGenerationContext {
   title: string;
   synopsis: string;
@@ -44,17 +51,23 @@ export interface CharacterGenerationContext {
   tone: string;
   themes: string[];
   storyDNA?: any;
+  nationalityConfig?: {
+    mode: 'none' | 'single' | 'mixed' | 'custom';
+    singleNationality?: string;
+    distribution?: NationalityDistribution[];
+  };
 }
 
 /**
  * Generate the protagonist character
  */
 export async function generateProtagonist(
-  context: CharacterGenerationContext
+  context: CharacterGenerationContext,
+  assignedNationality?: string
 ): Promise<Character> {
-  const prompt = buildProtagonistPrompt(context);
+  const prompt = buildProtagonistPrompt(context, assignedNationality);
 
-  logger.info('[CharacterGenerator] Generating protagonist...');
+  logger.info({ assignedNationality }, '[CharacterGenerator] Generating protagonist...');
 
   try {
     const message = await anthropic.messages.create({
@@ -73,9 +86,19 @@ export async function generateProtagonist(
       ? message.content[0].text
       : '';
 
-    const character = parseCharacterResponse(responseText, 'protagonist');
+    let character = parseCharacterResponse(responseText, 'protagonist');
 
-    logger.info(`[CharacterGenerator] Protagonist "${character.name}" generated`);
+    // Override name with nationality-appropriate name if specified
+    if (assignedNationality && character.nationality && character.nationality !== '') {
+      const gender = Math.random() < 0.5 ? 'male' : 'female';
+      character.name = await generateNameByNationality(
+        character.nationality,
+        gender,
+        { ethnicity: character.ethnicity, role: 'protagonist', genre: context.genre }
+      );
+    }
+
+    logger.info({ name: character.name, nationality: character.nationality }, '[CharacterGenerator] Protagonist generated');
 
     return character;
   } catch (error: any) {
@@ -89,11 +112,12 @@ export async function generateProtagonist(
  */
 export async function generateSupportingCast(
   context: CharacterGenerationContext,
-  protagonist: Character
+  protagonist: Character,
+  assignedNationalities?: string[]
 ): Promise<Character[]> {
-  const prompt = buildSupportingCastPrompt(context, protagonist);
+  const prompt = buildSupportingCastPrompt(context, protagonist, assignedNationalities);
 
-  logger.info('[CharacterGenerator] Generating supporting cast...');
+  logger.info({ assignedNationalities }, '[CharacterGenerator] Generating supporting cast...');
 
   try {
     const message = await anthropic.messages.create({
@@ -112,9 +136,24 @@ export async function generateSupportingCast(
       ? message.content[0].text
       : '';
 
-    const characters = parseSupportingCastResponse(responseText);
+    let characters = parseSupportingCastResponse(responseText);
 
-    logger.info(`[CharacterGenerator] Generated ${characters.length} supporting characters`);
+    // Override names with nationality-appropriate names if specified
+    if (assignedNationalities && assignedNationalities.length > 0) {
+      for (let i = 0; i < characters.length && i < assignedNationalities.length; i++) {
+        const nationality = characters[i].nationality;
+        if (nationality && nationality !== '') {
+          const gender = Math.random() < 0.5 ? 'male' : 'female';
+          characters[i].name = await generateNameByNationality(
+            nationality,
+            gender,
+            { ethnicity: characters[i].ethnicity, role: characters[i].role, genre: context.genre }
+          );
+        }
+      }
+    }
+
+    logger.info({ count: characters.length }, '[CharacterGenerator] Supporting cast generated');
 
     return characters;
   } catch (error: any) {
@@ -123,10 +162,14 @@ export async function generateSupportingCast(
   }
 }
 
-function buildProtagonistPrompt(context: CharacterGenerationContext): string {
+function buildProtagonistPrompt(context: CharacterGenerationContext, assignedNationality?: string): string {
   const { title, synopsis, genre, tone, themes } = context;
 
-  return `You are a master character creator. Based on this story, create a compelling, three-dimensional protagonist.
+  const nationalityGuidance = assignedNationality
+    ? `\n\nIMPORTANT: The protagonist MUST be from ${assignedNationality}. Ensure their nationality field is set to "${assignedNationality}" and their background, ethnicity, and cultural details are consistent with this nationality.`
+    : '';
+
+  return `You are a master character creator. Based on this story, create a compelling, three-dimensional protagonist.${nationalityGuidance}
 
 **Story Context:**
 Title: ${title}
@@ -184,11 +227,20 @@ Return ONLY a JSON object in this format:
 
 function buildSupportingCastPrompt(
   context: CharacterGenerationContext,
-  protagonist: Character
+  protagonist: Character,
+  assignedNationalities?: string[]
 ): string {
   const { title, synopsis, genre, tone, themes } = context;
 
-  return `You are a master character creator. Based on this story and protagonist, create a supporting cast of 4-6 characters who will populate this story world.
+  const nationalityGuidance = assignedNationalities && assignedNationalities.length > 0
+    ? `\n\nIMPORTANT NATIONALITY REQUIREMENTS:
+The supporting cast MUST include characters from these specific nationalities in order:
+${assignedNationalities.map((nat, i) => `${i + 1}. Character ${i + 1}: ${nat}`).join('\n')}
+
+Ensure each character's nationality field matches their assigned nationality, and their background, ethnicity, and cultural details are consistent.`
+    : '';
+
+  return `You are a master character creator. Based on this story and protagonist, create a supporting cast of 4-6 characters who will populate this story world.${nationalityGuidance}
 
 **Story Context:**
 Title: ${title}
@@ -257,12 +309,7 @@ Return ONLY a JSON array of character objects:
 
 function parseCharacterResponse(responseText: string, role: CharacterRole): Character {
   try {
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('No JSON object found in response');
-    }
-
-    const characterData = JSON.parse(jsonMatch[0]);
+    const characterData = extractJsonObject<any>(responseText);
 
     // Validate required fields
     if (!characterData.name || !characterData.voiceSample || !characterData.goals) {
@@ -272,32 +319,33 @@ function parseCharacterResponse(responseText: string, role: CharacterRole): Char
     const character: Character = {
       id: randomUUID(),
       role,
-      ...characterData,
+      name: characterData.name,
+      ethnicity: characterData.ethnicity,
+      nationality: characterData.nationality,
+      physicalDescription: characterData.physicalDescription,
+      personality: characterData.personality || [],
+      voiceSample: characterData.voiceSample,
+      goals: characterData.goals || [],
+      conflicts: characterData.conflicts || { internal: [], external: [] },
+      backstory: characterData.backstory,
+      currentState: characterData.currentState,
+      characterArc: characterData.characterArc,
       relationships: [],
     };
 
     return character;
   } catch (error: any) {
-    logger.error({ error: error.message, stack: error.stack }, 'Character generation parse error');
-    logger.error({ responseText }, 'Character generation response text');
+    logger.error({ error: error.message }, 'Character generation parse error');
+    logger.error({ responseText: responseText.substring(0, 500) }, 'Character generation response text (truncated)');
     throw new Error(`Failed to parse character: ${error.message}`);
   }
 }
 
 function parseSupportingCastResponse(responseText: string): Character[] {
   try {
-    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
-      throw new Error('No JSON array found in response');
-    }
+    const charactersData = extractJsonArray(responseText);
 
-    const charactersData = JSON.parse(jsonMatch[0]);
-
-    if (!Array.isArray(charactersData)) {
-      throw new Error('Response is not an array');
-    }
-
-    const characters: Character[] = charactersData.map(charData => {
+    const characters: Character[] = charactersData.map((charData: any) => {
       const { relationshipToProtagonist, ...rest } = charData;
 
       return {
@@ -313,8 +361,171 @@ function parseSupportingCastResponse(responseText: string): Character[] {
 
     return characters;
   } catch (error: any) {
-    logger.error({ error: error.message, stack: error.stack }, 'Character generation parse error');
-    logger.error({ responseText }, 'Character generation response text');
+    logger.error({ error: error.message }, 'Character generation parse error');
+    logger.error({ responseText: responseText.substring(0, 500) }, 'Character generation response text (truncated)');
     throw new Error(`Failed to parse supporting cast: ${error.message}`);
   }
+}
+
+/**
+ * Regenerate dependent fields (backstory, character arc) when a character's name changes
+ * Maintains narrative consistency while updating references to the new name
+ */
+export async function regenerateDependentFields(params: {
+  projectId: string;
+  characterId: string;
+  newName: string;
+  character: Character;
+  fieldsToUpdate: ('backstory' | 'characterArc')[];
+  storyContext?: {
+    genre?: string;
+    tone?: string;
+    themes?: string[];
+  };
+}): Promise<{ backstory?: string; characterArc?: string }> {
+  const { newName, character, fieldsToUpdate, storyContext } = params;
+
+  logger.info({ characterId: params.characterId, newName, fieldsToUpdate }, 'Regenerating dependent fields for name change');
+
+  // Build prompt for regeneration
+  const prompt = buildDependentFieldsPrompt(newName, character, fieldsToUpdate, storyContext);
+
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-opus-4-5-20251101',
+      max_tokens: 2000,
+      temperature: 0.8,
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+    });
+
+    const responseText = message.content[0].type === 'text'
+      ? message.content[0].text
+      : '';
+
+    const result = parseDependentFieldsResponse(responseText, fieldsToUpdate);
+
+    logger.info({ characterId: params.characterId, fieldsUpdated: Object.keys(result) }, 'Dependent fields regenerated');
+
+    return result;
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error regenerating dependent fields');
+    throw error;
+  }
+}
+
+function buildDependentFieldsPrompt(
+  newName: string,
+  character: Character,
+  fieldsToUpdate: ('backstory' | 'characterArc')[],
+  storyContext?: { genre?: string; tone?: string; themes?: string[] }
+): string {
+  const updateBackstory = fieldsToUpdate.includes('backstory');
+  const updateArc = fieldsToUpdate.includes('characterArc');
+
+  let prompt = `You are a character development expert. A character's name has changed from "${character.name}" to "${newName}".
+
+You need to update their ${fieldsToUpdate.join(' and ')} to reflect the new name while maintaining narrative consistency.
+
+**Character Details:**
+- New Name: ${newName}
+- Role: ${character.role}
+- Ethnicity: ${character.ethnicity || 'not specified'}
+- Nationality: ${character.nationality || 'not specified'}
+- Personality: ${character.personality.join(', ')}
+- Physical Description: ${character.physicalDescription}
+- Goals: ${character.goals.join(', ')}
+
+**Story Context:**
+${storyContext?.genre ? `- Genre: ${storyContext.genre}` : ''}
+${storyContext?.tone ? `- Tone: ${storyContext.tone}` : ''}
+${storyContext?.themes?.length ? `- Themes: ${storyContext.themes.join(', ')}` : ''}
+
+**Original Content (for reference):**
+${character.backstory ? `Backstory: ${character.backstory}` : ''}
+${character.characterArc ? `Character Arc: ${character.characterArc}` : ''}
+
+Generate updated content that:
+1. References the NEW name (${newName}) throughout
+2. Maintains the same narrative beats and character development
+3. Preserves the emotional core and motivations
+4. Keeps the same tone and style as the original
+5. Ensures consistency with other character details
+
+Return ONLY a JSON object in this format:
+{
+  ${updateBackstory ? '"backstory": "2-3 paragraph backstory using the new name",' : ''}
+  ${updateArc ? '"characterArc": "2-3 sentence character arc using the new name"' : ''}
+}`;
+
+  return prompt;
+}
+
+function parseDependentFieldsResponse(
+  responseText: string,
+  fieldsToUpdate: ('backstory' | 'characterArc')[]
+): { backstory?: string; characterArc?: string } {
+  try {
+    const data = extractJsonObject<{ backstory?: string; characterArc?: string }>(responseText);
+    const result: { backstory?: string; characterArc?: string } = {};
+
+    if (fieldsToUpdate.includes('backstory') && data.backstory) {
+      result.backstory = data.backstory;
+    }
+
+    if (fieldsToUpdate.includes('characterArc') && data.characterArc) {
+      result.characterArc = data.characterArc;
+    }
+
+    return result;
+  } catch (error: any) {
+    logger.error({ error: error.message }, 'Error parsing dependent fields response');
+    throw new Error(`Failed to parse dependent fields: ${error.message}`);
+  }
+}
+
+/**
+ * Assign nationalities to characters based on configuration
+ * Returns array of nationalities for [protagonist, ...supporting cast]
+ */
+export function assignNationalities(
+  characterCount: number,
+  nationalityConfig?: {
+    mode: 'none' | 'single' | 'mixed' | 'custom';
+    singleNationality?: string;
+    distribution?: NationalityDistribution[];
+  }
+): string[] | undefined {
+  if (!nationalityConfig || nationalityConfig.mode === 'none' || nationalityConfig.mode === 'custom') {
+    return undefined; // Let AI decide or handle individually
+  }
+
+  if (nationalityConfig.mode === 'single' && nationalityConfig.singleNationality) {
+    // All characters same nationality
+    return Array(characterCount).fill(nationalityConfig.singleNationality);
+  }
+
+  if (nationalityConfig.mode === 'mixed' && nationalityConfig.distribution) {
+    // Distribute based on counts
+    const nationalities: string[] = [];
+    for (const { nationality, count } of nationalityConfig.distribution) {
+      for (let i = 0; i < count; i++) {
+        nationalities.push(nationality);
+      }
+    }
+
+    // Shuffle to avoid predictable ordering
+    for (let i = nationalities.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [nationalities[i], nationalities[j]] = [nationalities[j], nationalities[i]];
+    }
+
+    return nationalities.slice(0, characterCount);
+  }
+
+  return undefined;
 }

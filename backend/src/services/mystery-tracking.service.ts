@@ -2,6 +2,7 @@ import db from '../db/connection.js';
 import { claudeService } from './claude.service.js';
 import type { SeriesMystery } from '../shared/types/index.js';
 import { createLogger } from './logger.service.js';
+import { extractJsonArray } from '../utils/json-extractor.js';
 
 const logger = createLogger('services:mystery-tracking');
 
@@ -345,29 +346,17 @@ Only include mysteries that are definitively answered, not partial hints or clue
    */
   private parseMysteryExtractionResponse(response: string): ExtractedMystery[] {
     try {
-      // Extract JSON from response
-      const jsonMatch = response.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) {
-        logger.warn('No JSON array found in mystery tracking response');
-        return [];
-      }
-
-      const parsed = JSON.parse(jsonMatch[0]);
-
-      if (!Array.isArray(parsed)) {
-        logger.warn('Mystery tracking response is not an array');
-        return [];
-      }
+      const parsed = extractJsonArray(response);
 
       return parsed
-        .filter(item => item.question && item.context && item.importance)
-        .map(item => ({
+        .filter((item: any) => item.question && item.context && item.importance)
+        .map((item: any) => ({
           question: item.question.trim(),
           context: item.context.trim().substring(0, 200),
           importance: item.importance as 'major' | 'minor' | 'subplot',
         }));
-    } catch (error) {
-      logger.error({ error }, 'Error parsing mystery extraction response');
+    } catch (error: any) {
+      logger.error({ error: error.message }, 'Error parsing mystery extraction response');
       return [];
     }
   }
@@ -377,29 +366,17 @@ Only include mysteries that are definitively answered, not partial hints or clue
    */
   private parseResolutionResponse(response: string): MysteryResolution[] {
     try {
-      // Extract JSON from response
-      const jsonMatch = response.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) {
-        logger.warn('No JSON array found in mystery tracking response');
-        return [];
-      }
-
-      const parsed = JSON.parse(jsonMatch[0]);
-
-      if (!Array.isArray(parsed)) {
-        logger.warn('Mystery tracking response is not an array');
-        return [];
-      }
+      const parsed = extractJsonArray(response);
 
       return parsed
-        .filter(item => item.mysteryId && item.answer && (item.confidence || 0) >= 70)
-        .map(item => ({
+        .filter((item: any) => item.mysteryId && item.answer && (item.confidence || 0) >= 70)
+        .map((item: any) => ({
           mysteryId: item.mysteryId,
           answer: item.answer.trim(),
           confidence: item.confidence,
         }));
-    } catch (error) {
-      logger.error({ error }, 'Error parsing resolution response');
+    } catch (error: any) {
+      logger.error({ error: error.message }, 'Error parsing resolution response');
       return [];
     }
   }

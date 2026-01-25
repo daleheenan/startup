@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import dotenv from 'dotenv';
 import { randomUUID } from 'crypto';
 import { createLogger } from './logger.service.js';
+import { extractJsonArray } from '../utils/json-extractor.js';
 
 dotenv.config();
 
@@ -167,18 +168,9 @@ Return ONLY a JSON array of world elements:
 
 function parseWorldElementsResponse(responseText: string): WorldElement[] {
   try {
-    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
-      throw new Error('No JSON array found in response');
-    }
+    const elementsData = extractJsonArray(responseText);
 
-    const elementsData = JSON.parse(jsonMatch[0]);
-
-    if (!Array.isArray(elementsData)) {
-      throw new Error('Response is not an array');
-    }
-
-    const worldElements: WorldElement[] = elementsData.map(element => ({
+    const worldElements: WorldElement[] = elementsData.map((element: any) => ({
       id: randomUUID(),
       type: element.type || 'custom',
       name: element.name,
@@ -190,8 +182,8 @@ function parseWorldElementsResponse(responseText: string): WorldElement[] {
 
     return worldElements;
   } catch (error: any) {
-    logger.error({ error: error.message, stack: error.stack }, 'World generation parse error');
-    logger.error({ responseText }, 'World generation response text');
+    logger.error({ error: error.message }, 'World generation parse error');
+    logger.error({ responseText: responseText.substring(0, 500) }, 'World generation response text (truncated)');
     throw new Error(`Failed to parse world elements: ${error.message}`);
   }
 }

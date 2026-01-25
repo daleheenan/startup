@@ -4,6 +4,7 @@ import { rateLimitHandler, RateLimitHandler } from './rate-limit-handler.js';
 import type { Job, JobType, JobStatus } from '../shared/types/index.js';
 import { randomUUID } from 'crypto';
 import { createLogger } from '../services/logger.service.js';
+import { extractJsonObject } from '../utils/json-extractor.js';
 
 const logger = createLogger('queue:worker');
 
@@ -687,14 +688,9 @@ Output only valid JSON, no commentary:`;
       // Parse the response
       let stateUpdates: Record<string, any>;
       try {
-        // Extract JSON from response (Claude might add markdown)
-        const jsonMatch = response.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) {
-          throw new Error('No JSON found in response');
-        }
-        stateUpdates = JSON.parse(jsonMatch[0]);
-      } catch (parseError) {
-        logger.error({ error: parseError, response }, 'update_states: Failed to parse state updates');
+        stateUpdates = extractJsonObject(response);
+      } catch (parseError: any) {
+        logger.error({ error: parseError.message, response: response.substring(0, 500) }, 'update_states: Failed to parse state updates');
         // Don't fail the job, just skip the update and mark chapter complete
         this.markChapterComplete(chapterId);
         return;
