@@ -2,6 +2,9 @@ import db from './connection.js';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { createLogger } from '../services/logger.service.js';
+
+const logger = createLogger('db:run-migrations');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -10,7 +13,7 @@ const __dirname = dirname(__filename);
  * Run all database migrations
  */
 export function runMigrations() {
-  console.log('[Migrations] Running database migrations...');
+  logger.info('[Migrations] Running database migrations...');
 
   try {
     // Create migrations tracking table if it doesn't exist
@@ -27,29 +30,29 @@ export function runMigrations() {
     `);
 
     const currentVersion = getVersionStmt.get()?.version || 0;
-    console.log(`[Migrations] Current schema version: ${currentVersion}`);
+    logger.info(`[Migrations] Current schema version: ${currentVersion}`);
 
     // Migration 001 is the base schema (schema.sql)
     if (currentVersion < 1) {
-      console.log('[Migrations] Applying migration 001: Base schema');
+      logger.info('[Migrations] Applying migration 001: Base schema');
       const migration001 = readFileSync(join(__dirname, 'schema.sql'), 'utf-8');
       db.exec(migration001);
       db.prepare(`INSERT INTO schema_migrations (version) VALUES (1)`).run();
-      console.log('[Migrations] Migration 001 applied successfully');
+      logger.info('[Migrations] Migration 001 applied successfully');
     }
 
     // Migration 002: Trilogy support
     if (currentVersion < 2) {
-      console.log('[Migrations] Applying migration 002: Trilogy support');
+      logger.info('[Migrations] Applying migration 002: Trilogy support');
       const migration002 = readFileSync(join(__dirname, 'migrations', '002_trilogy_support.sql'), 'utf-8');
       db.exec(migration002);
       db.prepare(`INSERT INTO schema_migrations (version) VALUES (2)`).run();
-      console.log('[Migrations] Migration 002 applied successfully');
+      logger.info('[Migrations] Migration 002 applied successfully');
     }
 
-    console.log('[Migrations] All migrations complete');
+    logger.info('[Migrations] All migrations complete');
   } catch (error) {
-    console.error('[Migrations] Error running migrations:', error);
+    logger.error({ error }, 'Error running migrations');
     throw error;
   }
 }

@@ -1,4 +1,7 @@
 import type { Response } from 'express';
+import { createLogger } from '../services/logger.service.js';
+
+const logger = createLogger('utils:response');
 
 export interface ErrorResponse {
   code: string;
@@ -30,7 +33,7 @@ export function sendNotFound(res: Response, resource: string): void {
  * Send 500 Internal Server Error
  */
 export function sendInternalError(res: Response, error: any, context: string): void {
-  console.error(`[API] Error ${context}:`, error);
+  logger.error({ error, context }, 'Internal error');
   sendError(res, 500, 'INTERNAL_ERROR', error.message || `Failed to ${context}`);
 }
 

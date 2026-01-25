@@ -1,5 +1,8 @@
 import db from '../db/connection.js';
 import type { Checkpoint, Job } from '../shared/types/index.js';
+import { createLogger } from '../services/logger.service.js';
+
+const logger = createLogger('queue:checkpoint');
 
 /**
  * CheckpointManager handles job state persistence for recovery.
@@ -20,7 +23,7 @@ export class CheckpointManager {
       timestamp: new Date().toISOString(),
     };
 
-    console.log(`[Checkpoint] Saving checkpoint for job ${jobId} at step: ${step}`);
+    logger.info({ jobId, step }, 'Saving checkpoint');
 
     const stmt = db.prepare(`
       UPDATE jobs SET checkpoint = ? WHERE id = ?
@@ -43,7 +46,7 @@ export class CheckpointManager {
     try {
       return JSON.parse(result.checkpoint) as Checkpoint;
     } catch (error) {
-      console.error(`[Checkpoint] Failed to parse checkpoint for job ${jobId}:`, error);
+      logger.error({ error, jobId }, 'Failed to parse checkpoint');
       return null;
     }
   }
@@ -107,9 +110,7 @@ export class CheckpointManager {
     try {
       const checkpoint: Checkpoint = JSON.parse(job.checkpoint);
 
-      console.log(
-        `[Checkpoint] Restoring job ${job.id} from step: ${checkpoint.step}`
-      );
+      logger.info({ jobId: job.id, step: checkpoint.step }, 'Restoring job from checkpoint');
 
       return {
         resumeFromStep: checkpoint.step,
@@ -117,7 +118,7 @@ export class CheckpointManager {
         completedSteps: checkpoint.completedSteps,
       };
     } catch (error) {
-      console.error(`[Checkpoint] Failed to restore checkpoint for job ${job.id}:`, error);
+      logger.error({ error, jobId: job.id }, 'Failed to restore checkpoint');
       return null;
     }
   }

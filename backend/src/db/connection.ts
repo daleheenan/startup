@@ -3,6 +3,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import fs from 'fs';
+import { createLogger } from '../services/logger.service.js';
+
+const logger = createLogger('db:connection');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -18,7 +21,7 @@ if (!fs.existsSync(dataDir)) {
 
 // Create database connection
 const db: Database.Database = new Database(DATABASE_PATH, {
-  verbose: process.env.NODE_ENV === 'development' ? console.log : undefined,
+  verbose: process.env.NODE_ENV === 'development' ? ((message?: unknown) => logger.debug({ sql: message }, 'query')) : undefined,
 });
 
 // Enable foreign keys
@@ -28,6 +31,6 @@ db.pragma('foreign_keys = ON');
 db.pragma('journal_mode = WAL');
 db.pragma('synchronous = NORMAL');
 
-console.log(`Database connected: ${DATABASE_PATH}`);
+logger.info({ path: DATABASE_PATH }, 'Database connected');
 
 export default db;

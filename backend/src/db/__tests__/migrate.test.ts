@@ -109,7 +109,7 @@ describe('Database Migrations', () => {
       });
 
       mockDb.prepare = mockPrepare;
-      mockDb.exec = jest.fn().mockImplementation((sql) => {
+      mockDb.exec = jest.fn().mockImplementation((sql: any) => {
         if (sql.includes('CREATE TABLE')) {
           throw new Error('SQL error');
         }
@@ -162,7 +162,7 @@ describe('Database Migrations', () => {
       runMigrations();
 
       // Should not try to add the column again
-      const alterCalls = (mockDb.exec as jest.Mock).mock.calls.filter((call) =>
+      const alterCalls = (mockDb.exec as jest.Mock).mock.calls.filter((call: any[]) =>
         call[0].includes('ALTER TABLE books ADD COLUMN ending_state')
       );
       expect(alterCalls).toHaveLength(0);
@@ -289,7 +289,7 @@ describe('Database Migrations', () => {
       });
 
       mockDb.prepare = mockPrepare;
-      mockDb.exec = jest.fn().mockImplementation((sql) => {
+      mockDb.exec = jest.fn().mockImplementation((sql: any) => {
         if (sql.includes('ALTER TABLE') && sql.includes('ADD COLUMN')) {
           const error: any = new Error('duplicate column name');
           error.code = 'SQLITE_ERROR';
@@ -368,7 +368,7 @@ describe('Database Migrations', () => {
       // Should only create the migration tracking table
       const execCalls = (mockDb.exec as jest.Mock).mock.calls;
       const transactionCalls = execCalls.filter(
-        (call) => call[0].includes('BEGIN TRANSACTION')
+        (call: any[]) => call[0].includes('BEGIN TRANSACTION')
       );
       expect(transactionCalls).toHaveLength(0);
     });
@@ -395,7 +395,7 @@ describe('Database Migrations', () => {
 
       // Should execute all three statements
       const createCalls = (mockDb.exec as jest.Mock).mock.calls.filter(
-        (call) => call[0].includes('CREATE')
+        (call: any[]) => call[0].includes('CREATE')
       );
       expect(createCalls.length).toBeGreaterThan(0);
     });
@@ -409,7 +409,7 @@ describe('Database Migrations', () => {
       });
 
       mockDb.prepare = mockPrepare;
-      mockDb.exec = jest.fn().mockImplementation((sql) => {
+      mockDb.exec = jest.fn().mockImplementation((sql: any) => {
         if (sql.includes('CREATE TABLE')) {
           const error: any = new Error('syntax error');
           error.code = 'SQLITE_ERROR';

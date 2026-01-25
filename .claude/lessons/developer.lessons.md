@@ -12,11 +12,11 @@ MAINTENANCE RULES:
 
 ## Summary Statistics
 
-- **Total tasks completed**: 7
-- **Total lessons recorded**: 7
+- **Total tasks completed**: 10
+- **Total lessons recorded**: 10
 - **Last updated**: 2026-01-25
 - **Proven lessons** (score >= 5): 0
-- **Top themes**: #typescript #testing #patterns #frontend #backend #database #migrations #third-party-integration #performance #caching
+- **Top themes**: #typescript #testing #patterns #frontend #backend #database #migrations #third-party-integration #performance #caching #mocking #jest #logging #structured-logging #pino
 
 ---
 
@@ -29,6 +29,94 @@ MAINTENANCE RULES:
 ---
 
 ## Active Lessons (Most Recent First)
+
+### 2026-01-25 | Task: Migrating Console Logging to Structured Pino Logger
+
+**Date**: 2026-01-25
+**Task**: Migrating remaining console.log/error statements to structured Pino logger across 8 backend files
+**Context**: Backend using Pino for structured logging, need to replace legacy console statements with proper logger calls
+
+**What Worked Well**:
+- Reading logger.service.ts first to understand the createLogger pattern and usage
+- Using grep to find all console.log/error/warn statements before starting migration
+- Systematic approach: import logger at top, then replace console statements with structured logging
+- Using structured logging with context objects: `logger.info({ jobId, type }, 'message')` instead of string concatenation
+- For database connection verbose mode, used `(message?: unknown)` to match better-sqlite3's type signature
+- Running `npx tsc --noEmit` after migration to verify no TypeScript errors
+- Following consistent context naming pattern: 'module:submodule' (e.g., 'queue:worker', 'db:migrate')
+- Using appropriate log levels: info for normal operations, warn for rate limits/retries, error for failures
+- Structuring log data as objects in first parameter, human-readable message in second parameter
+
+**What Didn't Work**:
+- Initial attempt used `(message?: string)` for database verbose function, needed `unknown` type to match library signature
+- First error handling in worker.ts used old pattern `logger.error('message:', error)` instead of structured `logger.error({ error }, 'message')`
+
+**Lesson**: When migrating to structured logging with Pino, always use the pattern `logger.level({ contextData }, 'message')` where contextData is an object containing relevant fields (IDs, counts, etc.) and message is a concise human-readable string. This enables better log searching and filtering in production. For third-party library callbacks, match the exact type signature (use `unknown` if needed). Use replace_all: true for common patterns like `console.log('[Module]` to speed up bulk replacements.
+
+**Application Score**: 0
+
+**Tags**: #logging #structured-logging #pino #migration #console #typescript #backend #best-practices
+
+---
+
+### 2026-01-25 | Task: Fixing TypeScript Compilation Errors in Jest Test Files
+
+**Date**: 2026-01-25
+**Task**: Fixing all remaining TypeScript compilation errors in backend test files (10 failing test suites)
+**Context**: Backend test suite using Jest with ESM, multiple test files with jest.Mock type inference issues, mock function parameter typing errors
+
+**What Worked Well**:
+- Systematically reading all failing test files first to identify common patterns
+- Using `grep` to find specific error lines and understand context
+- Applying type assertions to mock calls: `(mockCreate as any).mockResolvedValue(...)` for jest.Mock type issues
+- Using `: any` type annotation for mock variables: `const mockPrepare: any = jest.fn()`
+- Changing mock implementation parameters from `(sql: string)` to `(sql: any)` to avoid union type issues
+- Changing mock filter callbacks from `(call: string[])` to `(call: any[])` to handle unknown parameter types
+- Running tests after each batch of fixes to verify progress
+- Fixed Project type missing fields (universe_id, is_universe_root) by adding them
+- Fixed incorrect enum value ('three-act' should be 'three_act')
+- Removed non-existent Jest matcher `toHaveBeenCalledBefore` and replaced with two separate assertions
+
+**What Didn't Work**:
+- Initially tried wrapping jest.fn() assignment in `(as any)` on the left side - needed to put it on the right side after the chain
+- First attempt used `replace_all: false` when multiple identical strings existed - had to switch to `replace_all: true`
+
+**Lesson**: When fixing Jest mock TypeScript errors in ESM projects, the key patterns are: (1) Cast entire jest.Mock chains with `as any` on the right side after method calls, (2) Use `: any` type annotation for mock function variables, (3) Change callback parameter types to `any` when dealing with jest.Mock.calls filters, (4) Mock implementation parameters should use `any` type to avoid union type conflicts. Always verify the actual TypeScript errors with grep before fixing - runtime test failures are different from compilation errors.
+
+**Application Score**: 0
+
+**Tags**: #typescript #jest #mocking #testing #esm #type-inference #test-fixes
+
+---
+
+### 2026-01-25 | Task: Fixing Test Mocks After Logger Migration
+
+**Date**: 2026-01-25
+**Task**: Fixing failing tests after services migrated from console.error to Pino structured logger
+**Context**: Backend test suite using Jest with ESM, services migrated from console logging to Pino logger, tests checking for console.error calls were failing
+
+**What Worked Well**:
+- Used grep to systematically find all console.error spy assertions across test files
+- Identified that only 4 tests actually had console.error assertions (metrics.service.test.ts x3, claude.service.test.ts x1)
+- Removed assertions where services now use structured logging - verified error handling still works by checking return values
+- Verified that checkpoint.ts and worker.ts still use console.error (not yet migrated), so their tests remain unchanged
+- Cast mock functions to `any` type to bypass TypeScript inference issues: `(mockService.method as any).mockResolvedValue(...)`
+- Added missing `import { jest } from '@jest/globals'` to ESM mock files
+- Added database mocks with `jest.mock('../../db/connection.js')` before imports to prevent loading real modules
+
+**What Didn't Work**:
+- Initially tried changing jest.config.cjs module setting to support import.meta - caused "Cannot use import statement" errors
+- Tried wrapping import.meta in try-catch - TypeScript still analyzes syntax before runtime
+- Tried conditional import.meta with @ts-ignore - broke module loading
+- TypeScript type inference on jest.fn() in mock factories caused "type never" errors until explicit casting
+
+**Lesson**: When refactoring from console logging to structured loggers, tests that verify console.error calls should be updated to test behavior (return values, error handling) rather than implementation details (logging). For ESM projects with Jest, mock setup order matters - use jest.mock() before imports to prevent TypeScript from compiling mocked modules. Use explicit type assertions (`as any`) on mock methods when TypeScript can't infer jest.Mock types correctly.
+
+**Application Score**: 0
+
+**Tags**: #testing #mocking #jest #typescript #esm #logger #migration #console #pino
+
+---
 
 ### 2026-01-25 | Task: Sprint 15 Database and API Optimization
 

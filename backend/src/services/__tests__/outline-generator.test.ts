@@ -78,7 +78,7 @@ describe('OutlineGenerator', () => {
         } as any,
       ],
     } as any,
-    structureType: 'three-act',
+    structureType: 'three_act',
     targetWordCount: 90000,
   };
 
@@ -187,7 +187,7 @@ describe('OutlineGenerator', () => {
       ];
 
       // Setup mock responses
-      mockCreate
+      (mockCreate as any)
         .mockResolvedValueOnce({
           // Act breakdown
           content: [{ type: 'text', text: JSON.stringify(mockActBreakdown) }],
@@ -207,7 +207,7 @@ describe('OutlineGenerator', () => {
 
       // Mock scene card responses for all chapters (need many)
       for (let i = 0; i < 100; i++) {
-        mockCreate.mockResolvedValueOnce({
+        (mockCreate as any).mockResolvedValueOnce({
           content: [{ type: 'text', text: JSON.stringify(mockScenes) }],
         });
       }
@@ -242,12 +242,12 @@ describe('OutlineGenerator', () => {
         },
       ];
 
-      mockCreate.mockResolvedValue({
+      (mockCreate as any).mockResolvedValue({
         content: [{ type: 'text', text: JSON.stringify(mockActBreakdown) }],
       });
 
       // Mock chapter and scene responses
-      mockCreate.mockResolvedValue({
+      (mockCreate as any).mockResolvedValue({
         content: [{ type: 'text', text: '[]' }],
       });
 
@@ -296,12 +296,12 @@ describe('OutlineGenerator', () => {
         },
       ];
 
-      mockCreate.mockResolvedValue({
+      (mockCreate as any).mockResolvedValue({
         content: [{ type: 'text', text: JSON.stringify(mockActBreakdown) }],
       });
 
       // Mock empty chapters/scenes to simplify test
-      mockCreate.mockResolvedValue({
+      (mockCreate as any).mockResolvedValue({
         content: [{ type: 'text', text: '[]' }],
       });
 
@@ -314,7 +314,7 @@ describe('OutlineGenerator', () => {
     it('should include protagonist and antagonist in act breakdown prompt', async () => {
       (getStructureTemplate as jest.Mock).mockReturnValue(mockTemplate);
 
-      mockCreate.mockResolvedValue({
+      (mockCreate as any).mockResolvedValue({
         content: [{ type: 'text', text: '[]' }],
       });
 
@@ -333,7 +333,7 @@ describe('OutlineGenerator', () => {
         characters: [mockContext.characters[0]], // Only protagonist
       };
 
-      mockCreate.mockResolvedValue({
+      (mockCreate as any).mockResolvedValue({
         content: [{ type: 'text', text: '[]' }],
       });
 
@@ -378,7 +378,7 @@ describe('OutlineGenerator', () => {
         });
 
       // Mock scenes
-      mockCreate.mockResolvedValue({
+      (mockCreate as any).mockResolvedValue({
         content: [{ type: 'text', text: '[]' }],
       });
 
@@ -496,7 +496,7 @@ describe('OutlineGenerator', () => {
     it('should handle parsing errors gracefully', async () => {
       (getStructureTemplate as jest.Mock).mockReturnValue(mockTemplate);
 
-      mockCreate.mockResolvedValue({
+      (mockCreate as any).mockResolvedValue({
         content: [{ type: 'text', text: 'Invalid JSON response' }],
       });
 
@@ -506,7 +506,7 @@ describe('OutlineGenerator', () => {
     it('should handle API errors during outline generation', async () => {
       (getStructureTemplate as jest.Mock).mockReturnValue(mockTemplate);
 
-      mockCreate.mockRejectedValue(new Error('API connection failed'));
+      (mockCreate as any).mockRejectedValue(new Error('API connection failed'));
 
       await expect(generateOutline(mockContext)).rejects.toThrow(
         'API connection failed'

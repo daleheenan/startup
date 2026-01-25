@@ -1,8 +1,9 @@
 import { jest } from '@jest/globals';
-import { EditingService } from '../editing.service.js';
 
 jest.mock('../claude.service.js');
 jest.mock('../../db/connection.js');
+
+import { EditingService } from '../editing.service.js';
 
 describe('EditingService', () => {
   let service: EditingService;
@@ -50,12 +51,10 @@ describe('EditingService', () => {
       jest.spyOn(service as any, 'parseEditorResponse').mockReturnValue(mockEditorResponse);
       jest.spyOn(service as any, 'generateFlagId').mockReturnValue('flag-123');
 
-      mockClaudeService.createCompletionWithUsage = jest
-        .fn()
-        .mockResolvedValue({
-          content: JSON.stringify(mockEditorResponse),
-          usage: { input_tokens: 100, output_tokens: 50 },
-        });
+      (mockClaudeService.createCompletionWithUsage as any).mockResolvedValue({
+        content: JSON.stringify(mockEditorResponse),
+        usage: { input_tokens: 100, output_tokens: 50 },
+      });
 
       const result = await service.developmentalEdit('chapter-1');
 
@@ -93,12 +92,10 @@ describe('EditingService', () => {
       jest.spyOn(service as any, 'parseEditorResponse').mockReturnValue(mockEditorResponse);
       jest.spyOn(service as any, 'generateFlagId').mockReturnValue('flag-456');
 
-      mockClaudeService.createCompletionWithUsage = jest
-        .fn()
-        .mockResolvedValue({
-          content: JSON.stringify(mockEditorResponse),
-          usage: { input_tokens: 100, output_tokens: 50 },
-        });
+      (mockClaudeService.createCompletionWithUsage as any).mockResolvedValue({
+        content: JSON.stringify(mockEditorResponse),
+        usage: { input_tokens: 100, output_tokens: 50 },
+      });
 
       const result = await service.developmentalEdit('chapter-1');
 
@@ -143,12 +140,10 @@ describe('EditingService', () => {
       jest.spyOn(service as any, 'parseEditorResponse').mockReturnValue(mockEditorResponse);
       jest.spyOn(service as any, 'generateFlagId').mockReturnValue('flag-789');
 
-      mockClaudeService.createCompletionWithUsage = jest
-        .fn()
-        .mockResolvedValue({
-          content: JSON.stringify(mockEditorResponse),
-          usage: { input_tokens: 100, output_tokens: 50 },
-        });
+      (mockClaudeService.createCompletionWithUsage as any).mockResolvedValue({
+        content: JSON.stringify(mockEditorResponse),
+        usage: { input_tokens: 100, output_tokens: 50 },
+      });
 
       const result = await service.lineEdit('chapter-1');
 
@@ -182,12 +177,10 @@ describe('EditingService', () => {
       jest.spyOn(service as any, 'parseEditorResponse').mockReturnValue(mockEditorResponse);
       jest.spyOn(service as any, 'generateFlagId').mockReturnValue('flag-101');
 
-      mockClaudeService.createCompletionWithUsage = jest
-        .fn()
-        .mockResolvedValue({
-          content: JSON.stringify(mockEditorResponse),
-          usage: { input_tokens: 100, output_tokens: 50 },
-        });
+      (mockClaudeService.createCompletionWithUsage as any).mockResolvedValue({
+        content: JSON.stringify(mockEditorResponse),
+        usage: { input_tokens: 100, output_tokens: 50 },
+      });
 
       const result = await service.continuityEdit('chapter-1');
 
@@ -227,12 +220,10 @@ describe('EditingService', () => {
       jest.spyOn(service as any, 'parseEditorResponse').mockReturnValue(mockEditorResponse);
       jest.spyOn(service as any, 'generateFlagId').mockReturnValue('flag-102');
 
-      mockClaudeService.createCompletionWithUsage = jest
-        .fn()
-        .mockResolvedValue({
-          content: JSON.stringify(mockEditorResponse),
-          usage: { input_tokens: 100, output_tokens: 50 },
-        });
+      (mockClaudeService.createCompletionWithUsage as any).mockResolvedValue({
+        content: JSON.stringify(mockEditorResponse),
+        usage: { input_tokens: 100, output_tokens: 50 },
+      });
 
       const result = await service.continuityEdit('chapter-1');
 
@@ -265,12 +256,10 @@ describe('EditingService', () => {
       jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
       jest.spyOn(service as any, 'parseEditorResponse').mockReturnValue(mockEditorResponse);
 
-      mockClaudeService.createCompletionWithUsage = jest
-        .fn()
-        .mockResolvedValue({
-          content: JSON.stringify(mockEditorResponse),
-          usage: { input_tokens: 100, output_tokens: 50 },
-        });
+      (mockClaudeService.createCompletionWithUsage as any).mockResolvedValue({
+        content: JSON.stringify(mockEditorResponse),
+        usage: { input_tokens: 100, output_tokens: 50 },
+      });
 
       const result = await service.copyEdit('chapter-1');
 
@@ -317,12 +306,10 @@ describe('EditingService', () => {
 
       jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
 
-      mockClaudeService.createCompletionWithUsage = jest
-        .fn()
-        .mockResolvedValue({
-          content: mockRevisedContent,
-          usage: { input_tokens: 200, output_tokens: 150 },
-        });
+      (mockClaudeService.createCompletionWithUsage as any).mockResolvedValue({
+        content: mockRevisedContent,
+        usage: { input_tokens: 200, output_tokens: 150 },
+      });
 
       const result = await service.authorRevision('chapter-1', mockDevEditResult);
 

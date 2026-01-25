@@ -13,7 +13,7 @@ MAINTENANCE RULES:
 
 ## Summary Statistics
 
-- **Total lessons recorded**: 19
+- **Total lessons recorded**: 22
 - **Last updated**: 2026-01-25
 - **Foundational lessons** (score >= 10): 5
 - **Contributing agents**: Initial setup, bug-hunter, qa-test-engineer, project-director
@@ -75,6 +75,59 @@ These lessons have proven universally valuable across many tasks and agents.
 ---
 
 ## Active Lessons (Most Recent First)
+
+### 2026-01-25 | React Query Integration Pattern
+
+**Context**: Adding client-side data caching to Next.js applications
+
+**Lesson**: When adding React Query (@tanstack/react-query) to Next.js:
+1. Create a separate `QueryProvider.tsx` component with 'use client' directive
+2. Initialize QueryClient inside useState to avoid SSR hydration mismatches
+3. Wrap children in `QueryClientProvider` in the layout file
+4. Set sensible defaults: `staleTime: 5min`, `gcTime: 30min`, `retry: 2`
+5. Create hooks (e.g., `useProjects()`) that encapsulate query keys and fetch functions
+
+**Application Score**: 0
+
+**Tags**: #react-query #caching #frontend #next.js #patterns
+
+---
+
+### 2026-01-25 | Include Parameter Pattern for API Optimization
+
+**Context**: Optimizing API endpoints to reduce N+1 query problems
+
+**Lesson**: For parent-child data relationships, implement `?include=` query parameters:
+1. Parse comma-separated include values: `req.query.include?.split(',')`
+2. Use SQL JOINs to fetch related data in single queries
+3. Group child data by parent ID using Map for O(n) attachment
+4. Example: `GET /projects/:id?include=books,chapters` fetches all data in 2 queries instead of N+1
+
+This pattern reduces HTTP requests and database round-trips significantly.
+
+**Application Score**: 0
+
+**Tags**: #api #performance #database #joins #optimization
+
+---
+
+### 2026-01-25 | Jest ESM Mock Type Casting
+
+**Context**: TypeScript errors in Jest tests with ESM modules
+
+**Lesson**: When Jest mock types conflict with TypeScript:
+1. Use `: any` type annotation for mock variables: `let mockFn: any`
+2. Cast mock chains: `(mockFn as any).mockResolvedValue(...)`
+3. Use `(call: any[])` for mock.calls.filter callbacks
+4. Use `(param: any)` for mock implementation parameters
+
+This bypasses TypeScript's inability to properly infer jest.Mock types in ESM while maintaining working tests.
+
+**Application Score**: 0
+
+**Tags**: #jest #typescript #esm #mocking #testing
+
+---
 
 ### 2026-01-25 | Error Boundaries Are Required
 

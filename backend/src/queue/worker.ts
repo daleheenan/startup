@@ -3,6 +3,9 @@ import { checkpointManager } from './checkpoint.js';
 import { rateLimitHandler, RateLimitHandler } from './rate-limit-handler.js';
 import type { Job, JobType, JobStatus } from '../shared/types/index.js';
 import { randomUUID } from 'crypto';
+import { createLogger } from '../services/logger.service.js';
+
+const logger = createLogger('queue:worker');
 
 /**
  * QueueWorker processes jobs sequentially from the queue.
@@ -25,18 +28,18 @@ export class QueueWorker {
    */
   async start(): Promise<void> {
     if (this.isRunning) {
-      console.log('[QueueWorker] Already running');
+      logger.info('[QueueWorker] Already running');
       return;
     }
 
     this.isRunning = true;
-    console.log('[QueueWorker] Starting...');
+    logger.info('[QueueWorker] Starting...');
 
     while (this.isRunning) {
       try {
         await this.processNextJob();
       } catch (error) {
-        console.error('[QueueWorker] Unexpected error in worker loop:', error);
+        logger.error({ error }, 'Unexpected error in worker loop');
       }
 
       // Wait before checking for next job
@@ -54,23 +57,23 @@ export class QueueWorker {
     }
 
     this.isRunning = false;
-    console.log('[QueueWorker] Stopping...');
+    logger.info('[QueueWorker] Stopping...');
 
     // If no job is running, resolve immediately
     if (!this.currentJob) {
-      console.log('[QueueWorker] No active job, stopped immediately');
+      logger.info('[QueueWorker] No active job, stopped immediately');
       return Promise.resolve();
     }
 
     // Wait for current job to finish
     this.shutdownPromise = new Promise((resolve) => {
       this.shutdownResolve = resolve;
-      console.log(`[QueueWorker] Waiting for job ${this.currentJob?.id} to complete...`);
+      logger.info({ jobId: this.currentJob?.id }, 'Waiting for job to complete...');
 
       // Timeout after 60 seconds
       setTimeout(() => {
         if (this.currentJob) {
-          console.warn(`[QueueWorker] Timeout waiting for job ${this.currentJob.id}, forcing shutdown`);
+          logger.warn(`[QueueWorker] Timeout waiting for job ${this.currentJob.id}, forcing shutdown`);
         }
         resolve();
       }, 60000);
@@ -90,18 +93,18 @@ export class QueueWorker {
     this.currentJob = job;
 
     try {
-      console.log(`[QueueWorker] Starting job ${job.id} (${job.type})`);
+      logger.info({ jobId: job.id, type: job.type }, 'Starting job');
 
       // Execute the job
       await this.executeJob(job);
 
       // Mark as completed
       this.markCompleted(job.id);
-      console.log(`[QueueWorker] Completed job ${job.id}`);
+      logger.info({ jobId: job.id }, 'Completed job');
     } catch (error) {
       if (RateLimitHandler.isRateLimitError(error)) {
         // Handle rate limit
-        console.log('[QueueWorker] Rate limit detected, pausing queue');
+        logger.info('[QueueWorker] Rate limit detected, pausing queue');
         await rateLimitHandler.handleRateLimit(job);
       } else {
         // Handle other errors
@@ -111,7 +114,7 @@ export class QueueWorker {
       this.currentJob = null;
       // Signal shutdown if waiting
       if (this.shutdownResolve && !this.isRunning) {
-        console.log('[QueueWorker] Job complete, shutdown proceeding');
+        logger.info('[QueueWorker] Job complete, shutdown proceeding');
         this.shutdownResolve();
       }
     }
@@ -189,7 +192,7 @@ export class QueueWorker {
    * Generate a chapter
    */
   private async generateChapter(job: Job): Promise<void> {
-    console.log(`[Job:generate_chapter] Processing chapter ${job.target_id}`);
+    logger.info({ chapterId: job.target_id }, 'generate_chapter: Processing chapter');
     const chapterId = job.target_id;
 
     // Import services (dynamic to avoid circular dependencies)
@@ -202,7 +205,7 @@ export class QueueWorker {
 
     try {
       // Step 1: Update chapter status to 'writing'
-      console.log(`[Job:generate_chapter] Updating status to 'writing'`);
+      logger.info('generate_chapter: Updating status to writing');
       const updateStatusStmt = db.prepare(`
         UPDATE chapters
         SET status = 'writing', updated_at = ?
@@ -213,9 +216,9 @@ export class QueueWorker {
       checkpointManager.saveCheckpoint(job.id, 'status_updated', { chapterId });
 
       // Step 2: Assemble context
-      console.log(`[Job:generate_chapter] Assembling context`);
+      logger.info('generate_chapter: Assembling context');
       const context = contextAssemblyService.assembleChapterContext(chapterId);
-      console.log(`[Job:generate_chapter] Context assembled: ~${context.estimatedTokens} tokens`);
+      logger.info({ estimatedTokens: context.estimatedTokens }, 'generate_chapter: Context assembled');
 
       checkpointManager.saveCheckpoint(job.id, 'context_assembled', {
         chapterId,
@@ -223,7 +226,7 @@ export class QueueWorker {
       });
 
       // Step 3: Generate chapter with Claude (with token tracking)
-      console.log(`[Job:generate_chapter] Generating chapter content with Claude`);
+      logger.info('generate_chapter: Generating chapter content with Claude');
       const response = await claudeService.createCompletionWithUsage({
         system: context.system,
         messages: [{ role: 'user', content: context.userPrompt }],
@@ -234,7 +237,7 @@ export class QueueWorker {
       const chapterContent = response.content;
 
       // Track token usage
-      console.log(`[Job:generate_chapter] Tracking tokens: ${response.usage.input_tokens} in / ${response.usage.output_tokens} out`);
+      logger.info({ inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens }, 'generate_chapter: Tracking tokens');
       metricsService.trackChapterTokens(chapterId, response.usage.input_tokens, response.usage.output_tokens);
 
       checkpointManager.saveCheckpoint(job.id, 'content_generated', {
@@ -245,7 +248,7 @@ export class QueueWorker {
       });
 
       // Step 4: Save chapter content
-      console.log(`[Job:generate_chapter] Saving chapter content`);
+      logger.info('generate_chapter: Saving chapter content');
       const wordCount = chapterContent.split(/\s+/).length;
 
       const updateContentStmt = db.prepare(`
@@ -255,14 +258,14 @@ export class QueueWorker {
       `);
       updateContentStmt.run(chapterContent, wordCount, new Date().toISOString(), chapterId);
 
-      console.log(`[Job:generate_chapter] Chapter generated: ${wordCount} words`);
+      logger.info({ wordCount }, 'generate_chapter: Chapter generated');
 
       checkpointManager.saveCheckpoint(job.id, 'completed', {
         chapterId,
         wordCount,
       });
     } catch (error) {
-      console.error(`[Job:generate_chapter] Error generating chapter:`, error);
+      logger.error({ error }, 'generate_chapter: Error generating chapter');
       // Update chapter status to failed
       const updateErrorStmt = db.prepare(`
         UPDATE chapters
@@ -278,7 +281,7 @@ export class QueueWorker {
    * Developmental edit - Analyze chapter structure, pacing, character arcs
    */
   private async developmentalEdit(job: Job): Promise<void> {
-    console.log(`[Job:dev_edit] Processing chapter ${job.target_id}`);
+    logger.info({ chapterId: job.target_id }, 'dev_edit: Processing chapter');
     const chapterId = job.target_id;
 
     // Import editing service
@@ -293,7 +296,7 @@ export class QueueWorker {
 
       // Track token usage
       if (result.usage) {
-        console.log(`[Job:dev_edit] Tracking tokens: ${result.usage.input_tokens} in / ${result.usage.output_tokens} out`);
+        logger.info({ inputTokens: result.usage.input_tokens, outputTokens: result.usage.output_tokens }, 'dev_edit: Tracking tokens');
         metricsService.trackChapterTokens(chapterId, result.usage.input_tokens, result.usage.output_tokens);
       }
 
@@ -309,7 +312,7 @@ export class QueueWorker {
 
       // If developmental editor says revision needed, queue author revision
       if (!result.approved) {
-        console.log(`[Job:dev_edit] Chapter needs revision, queueing author_revision job`);
+        logger.info('dev_edit: Chapter needs revision, queueing author_revision job');
 
         // Queue author revision job
         QueueWorker.createJob('author_revision' as any, chapterId);
@@ -323,11 +326,11 @@ export class QueueWorker {
         storeStmt.run(JSON.stringify({ devEditResult: result }), job.id);
       }
 
-      console.log(`[Job:dev_edit] Complete: ${result.flags.length} flags, approved: ${result.approved}`);
+      logger.info({ flagsCount: result.flags.length, approved: result.approved }, 'dev_edit: Complete');
 
       checkpointManager.saveCheckpoint(job.id, 'completed', { chapterId });
     } catch (error) {
-      console.error(`[Job:dev_edit] Error:`, error);
+      logger.error({ error }, 'dev_edit: Error');
       throw error;
     }
   }
@@ -336,7 +339,7 @@ export class QueueWorker {
    * Author revision - Revise chapter based on developmental feedback
    */
   private async authorRevision(job: Job): Promise<void> {
-    console.log(`[Job:author_revision] Processing chapter ${job.target_id}`);
+    logger.info({ chapterId: job.target_id }, 'author_revision: Processing chapter');
     const chapterId = job.target_id;
 
     const { editingService } = await import('../services/editing.service.js');
@@ -364,7 +367,7 @@ export class QueueWorker {
       const revisionResult = await editingService.authorRevision(chapterId, devEditResult);
 
       // Track token usage
-      console.log(`[Job:author_revision] Tracking tokens: ${revisionResult.usage.input_tokens} in / ${revisionResult.usage.output_tokens} out`);
+      logger.info({ inputTokens: revisionResult.usage.input_tokens, outputTokens: revisionResult.usage.output_tokens }, 'author_revision: Tracking tokens');
       metricsService.trackChapterTokens(chapterId, revisionResult.usage.input_tokens, revisionResult.usage.output_tokens);
 
       checkpointManager.saveCheckpoint(job.id, 'revision_complete', { chapterId });
@@ -377,11 +380,11 @@ export class QueueWorker {
       `);
       updateStmt.run(revisionResult.content, new Date().toISOString(), chapterId);
 
-      console.log(`[Job:author_revision] Revision complete`);
+      logger.info('author_revision: Revision complete');
 
       checkpointManager.saveCheckpoint(job.id, 'completed', { chapterId });
     } catch (error) {
-      console.error(`[Job:author_revision] Error:`, error);
+      logger.error({ error }, 'author_revision: Error');
       throw error;
     }
   }
@@ -390,7 +393,7 @@ export class QueueWorker {
    * Line edit - Polish prose, dialogue, sensory details
    */
   private async lineEdit(job: Job): Promise<void> {
-    console.log(`[Job:line_edit] Processing chapter ${job.target_id}`);
+    logger.info({ chapterId: job.target_id }, 'line_edit: Processing chapter');
     const chapterId = job.target_id;
 
     const { editingService } = await import('../services/editing.service.js');
@@ -403,7 +406,7 @@ export class QueueWorker {
 
       // Track token usage
       if (result.usage) {
-        console.log(`[Job:line_edit] Tracking tokens: ${result.usage.input_tokens} in / ${result.usage.output_tokens} out`);
+        logger.info({ inputTokens: result.usage.input_tokens, outputTokens: result.usage.output_tokens }, 'line_edit: Tracking tokens');
         metricsService.trackChapterTokens(chapterId, result.usage.input_tokens, result.usage.output_tokens);
       }
 
@@ -414,11 +417,11 @@ export class QueueWorker {
 
       await editingService.applyEditResult(chapterId, result);
 
-      console.log(`[Job:line_edit] Complete: ${result.flags.length} flags`);
+      logger.info({ flagsCount: result.flags.length }, 'line_edit: Complete');
 
       checkpointManager.saveCheckpoint(job.id, 'completed', { chapterId });
     } catch (error) {
-      console.error(`[Job:line_edit] Error:`, error);
+      logger.error({ error }, 'line_edit: Error');
       throw error;
     }
   }
@@ -427,7 +430,7 @@ export class QueueWorker {
    * Continuity check - Verify consistency with story bible and previous chapters
    */
   private async continuityCheck(job: Job): Promise<void> {
-    console.log(`[Job:continuity_check] Processing chapter ${job.target_id}`);
+    logger.info({ chapterId: job.target_id }, 'continuity_check: Processing chapter');
     const chapterId = job.target_id;
 
     const { editingService } = await import('../services/editing.service.js');
@@ -440,7 +443,7 @@ export class QueueWorker {
 
       // Track token usage
       if (result.usage) {
-        console.log(`[Job:continuity_check] Tracking tokens: ${result.usage.input_tokens} in / ${result.usage.output_tokens} out`);
+        logger.info({ inputTokens: result.usage.input_tokens, outputTokens: result.usage.output_tokens }, 'continuity_check: Tracking tokens');
         metricsService.trackChapterTokens(chapterId, result.usage.input_tokens, result.usage.output_tokens);
       }
 
@@ -452,11 +455,11 @@ export class QueueWorker {
 
       await editingService.applyEditResult(chapterId, result);
 
-      console.log(`[Job:continuity_check] Complete: ${result.suggestions.length} issues, ${result.flags.length} flags`);
+      logger.info({ suggestionsCount: result.suggestions.length, flagsCount: result.flags.length }, 'continuity_check: Complete');
 
       checkpointManager.saveCheckpoint(job.id, 'completed', { chapterId });
     } catch (error) {
-      console.error(`[Job:continuity_check] Error:`, error);
+      logger.error({ error }, 'continuity_check: Error');
       throw error;
     }
   }
@@ -465,7 +468,7 @@ export class QueueWorker {
    * Copy edit - Grammar, punctuation, style consistency
    */
   private async copyEdit(job: Job): Promise<void> {
-    console.log(`[Job:copy_edit] Processing chapter ${job.target_id}`);
+    logger.info({ chapterId: job.target_id }, 'copy_edit: Processing chapter');
     const chapterId = job.target_id;
 
     const { editingService } = await import('../services/editing.service.js');
@@ -478,7 +481,7 @@ export class QueueWorker {
 
       // Track token usage
       if (result.usage) {
-        console.log(`[Job:copy_edit] Tracking tokens: ${result.usage.input_tokens} in / ${result.usage.output_tokens} out`);
+        logger.info({ inputTokens: result.usage.input_tokens, outputTokens: result.usage.output_tokens }, 'copy_edit: Tracking tokens');
         metricsService.trackChapterTokens(chapterId, result.usage.input_tokens, result.usage.output_tokens);
       }
 
@@ -501,11 +504,11 @@ export class QueueWorker {
         updateWordCountStmt.run(wordCount, new Date().toISOString(), chapterId);
       }
 
-      console.log(`[Job:copy_edit] Complete`);
+      logger.info('copy_edit: Complete');
 
       checkpointManager.saveCheckpoint(job.id, 'completed', { chapterId });
     } catch (error) {
-      console.error(`[Job:copy_edit] Error:`, error);
+      logger.error({ error }, 'copy_edit: Error');
       throw error;
     }
   }
@@ -514,7 +517,7 @@ export class QueueWorker {
    * Generate summary for a chapter (used as context for next chapter)
    */
   private async generateSummary(job: Job): Promise<void> {
-    console.log(`[Job:generate_summary] Processing chapter ${job.target_id}`);
+    logger.info({ chapterId: job.target_id }, 'generate_summary: Processing chapter');
     const chapterId = job.target_id;
 
     // Import services
@@ -535,7 +538,7 @@ export class QueueWorker {
         throw new Error('Chapter content not found');
       }
 
-      console.log(`[Job:generate_summary] Generating summary for chapter ${chapter.chapter_number}`);
+      logger.info({ chapterNumber: chapter.chapter_number }, 'generate_summary: Generating summary');
 
       // Generate summary with Claude
       const systemPrompt = `You are a professional story analyst. Your task is to create concise, informative chapter summaries for use as context in subsequent chapters.`;
@@ -564,7 +567,7 @@ Write the summary now:`;
       });
 
       // Track token usage
-      console.log(`[Job:generate_summary] Tracking tokens: ${apiResponse.usage.input_tokens} in / ${apiResponse.usage.output_tokens} out`);
+      logger.info({ inputTokens: apiResponse.usage.input_tokens, outputTokens: apiResponse.usage.output_tokens }, 'generate_summary: Tracking tokens');
       metricsService.trackChapterTokens(chapterId, apiResponse.usage.input_tokens, apiResponse.usage.output_tokens);
 
       checkpointManager.saveCheckpoint(job.id, 'summary_generated', { chapterId });
@@ -578,11 +581,11 @@ Write the summary now:`;
 
       updateSummaryStmt.run(apiResponse.content.trim(), new Date().toISOString(), chapterId);
 
-      console.log(`[Job:generate_summary] Summary saved for chapter ${chapter.chapter_number}`);
+      logger.info({ chapterNumber: chapter.chapter_number }, 'generate_summary: Summary saved');
 
       checkpointManager.saveCheckpoint(job.id, 'completed', { chapterId });
     } catch (error) {
-      console.error(`[Job:generate_summary] Error generating summary:`, error);
+      logger.error({ error }, 'generate_summary: Error generating summary');
       throw error;
     }
   }
@@ -591,7 +594,7 @@ Write the summary now:`;
    * Update character states after chapter generation
    */
   private async updateStates(job: Job): Promise<void> {
-    console.log(`[Job:update_states] Processing chapter ${job.target_id}`);
+    logger.info({ chapterId: job.target_id }, 'update_states: Processing chapter');
     const chapterId = job.target_id;
 
     // Import services
@@ -625,7 +628,7 @@ Write the summary now:`;
       const sceneCards = data.scene_cards ? JSON.parse(data.scene_cards) : [];
 
       if (!storyBible || !storyBible.characters) {
-        console.log(`[Job:update_states] No story bible found, skipping state update`);
+        logger.info('update_states: No story bible found, skipping state update');
         // Still mark chapter as completed
         this.markChapterComplete(chapterId);
         return;
@@ -638,15 +641,13 @@ Write the summary now:`;
       });
 
       if (characterNames.size === 0) {
-        console.log(`[Job:update_states] No characters to update`);
+        logger.info('update_states: No characters to update');
         // Still mark chapter as completed
         this.markChapterComplete(chapterId);
         return;
       }
 
-      console.log(
-        `[Job:update_states] Updating states for: ${Array.from(characterNames).join(', ')}`
-      );
+      logger.info({ characters: Array.from(characterNames) }, 'update_states: Updating character states');
 
       // Generate state update with Claude
       const systemPrompt = `You are a continuity tracker for a novel. Your task is to update character states based on what happened in a chapter.`;
@@ -693,8 +694,7 @@ Output only valid JSON, no commentary:`;
         }
         stateUpdates = JSON.parse(jsonMatch[0]);
       } catch (parseError) {
-        console.error(`[Job:update_states] Failed to parse state updates:`, parseError);
-        console.log(`[Job:update_states] Raw response:`, response);
+        logger.error({ error: parseError, response }, 'update_states: Failed to parse state updates');
         // Don't fail the job, just skip the update and mark chapter complete
         this.markChapterComplete(chapterId);
         return;
@@ -704,7 +704,11 @@ Output only valid JSON, no commentary:`;
       for (const character of storyBible.characters) {
         if (stateUpdates[character.name]) {
           character.currentState = stateUpdates[character.name];
-          console.log(`[Job:update_states] Updated ${character.name}: ${character.currentState.emotionalState} in ${character.currentState.location}`);
+          logger.info({
+            characterName: character.name,
+            emotionalState: character.currentState.emotionalState,
+            location: character.currentState.location
+          }, 'update_states: Character updated');
         }
       }
 
@@ -721,14 +725,14 @@ Output only valid JSON, no commentary:`;
         data.project_id
       );
 
-      console.log(`[Job:update_states] Character states updated`);
+      logger.info('update_states: Character states updated');
 
       // Mark chapter as completed (this is the final job in the pipeline)
       this.markChapterComplete(chapterId);
 
       checkpointManager.saveCheckpoint(job.id, 'completed', { chapterId });
     } catch (error) {
-      console.error(`[Job:update_states] Error updating states:`, error);
+      logger.error({ error }, 'update_states: Error updating states');
       throw error;
     }
   }
@@ -743,7 +747,7 @@ Output only valid JSON, no commentary:`;
       WHERE id = ?
     `);
     stmt.run(new Date().toISOString(), chapterId);
-    console.log(`[Worker] Chapter ${chapterId} marked as completed`);
+    logger.info({ chapterId }, 'Chapter marked as completed');
   }
 
   /**
@@ -770,7 +774,7 @@ Output only valid JSON, no commentary:`;
     const newAttempts = job.attempts + 1;
 
     if (newAttempts < maxAttempts) {
-      console.log(`[QueueWorker] Job ${job.id} failed, retrying (${newAttempts}/${maxAttempts})`);
+      logger.warn({ jobId: job.id, attempts: newAttempts, maxAttempts }, 'Job failed, retrying');
 
       const stmt = db.prepare(`
         UPDATE jobs
@@ -780,7 +784,7 @@ Output only valid JSON, no commentary:`;
 
       stmt.run(newAttempts, error.message, job.id);
     } else {
-      console.error(`[QueueWorker] Job ${job.id} failed after ${maxAttempts} attempts`);
+      logger.error({ jobId: job.id, attempts: maxAttempts }, 'Job failed after maximum attempts');
 
       const stmt = db.prepare(`
         UPDATE jobs
@@ -805,7 +809,7 @@ Output only valid JSON, no commentary:`;
 
     stmt.run(jobId, type, targetId);
 
-    console.log(`[QueueWorker] Created job ${jobId} (${type}) for ${targetId}`);
+    logger.info({ jobId, type, targetId }, 'Created job');
     return jobId;
   }
 

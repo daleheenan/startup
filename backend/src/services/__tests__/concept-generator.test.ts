@@ -92,7 +92,7 @@ describe('ConceptGenerator', () => {
         },
       ];
 
-      mockCreate.mockResolvedValue({
+      (mockCreate as any).mockResolvedValue({
         content: [
           {
             type: 'text',
@@ -150,7 +150,7 @@ describe('ConceptGenerator', () => {
         },
       ];
 
-      mockCreate.mockResolvedValue({
+      (mockCreate as any).mockResolvedValue({
         content: [
           {
             type: 'text',
@@ -190,7 +190,7 @@ describe('ConceptGenerator', () => {
         },
       ];
 
-      mockCreate.mockResolvedValue({
+      (mockCreate as any).mockResolvedValue({
         content: [{ type: 'text', text: JSON.stringify(mockConcepts) }],
       });
 
@@ -220,7 +220,7 @@ describe('ConceptGenerator', () => {
         },
       ];
 
-      mockCreate.mockResolvedValue({
+      (mockCreate as any).mockResolvedValue({
         content: [
           {
             type: 'text',
@@ -236,7 +236,7 @@ describe('ConceptGenerator', () => {
     });
 
     it('should throw error if response is not valid JSON', async () => {
-      mockCreate.mockResolvedValue({
+      (mockCreate as any).mockResolvedValue({
         content: [
           {
             type: 'text',
@@ -251,7 +251,7 @@ describe('ConceptGenerator', () => {
     });
 
     it('should throw error if response is not an array', async () => {
-      mockCreate.mockResolvedValue({
+      (mockCreate as any).mockResolvedValue({
         content: [
           {
             type: 'text',
@@ -274,7 +274,7 @@ describe('ConceptGenerator', () => {
         },
       ];
 
-      mockCreate.mockResolvedValue({
+      (mockCreate as any).mockResolvedValue({
         content: [
           {
             type: 'text',
@@ -289,7 +289,7 @@ describe('ConceptGenerator', () => {
     });
 
     it('should throw error if no concepts returned', async () => {
-      mockCreate.mockResolvedValue({
+      (mockCreate as any).mockResolvedValue({
         content: [
           {
             type: 'text',
@@ -321,7 +321,7 @@ describe('ConceptGenerator', () => {
         },
       ];
 
-      mockCreate.mockResolvedValue({
+      (mockCreate as any).mockResolvedValue({
         content: [{ type: 'text', text: JSON.stringify(mockConcepts) }],
       });
 
@@ -339,7 +339,7 @@ describe('ConceptGenerator', () => {
     });
 
     it('should handle API errors gracefully', async () => {
-      mockCreate.mockRejectedValue(new Error('API Error: Service unavailable'));
+      (mockCreate as any).mockRejectedValue(new Error('API Error: Service unavailable'));
 
       await expect(generateConcepts(validPreferences)).rejects.toThrow(
         'API Error: Service unavailable'
@@ -383,7 +383,7 @@ describe('ConceptGenerator', () => {
         },
       ];
 
-      mockCreate.mockResolvedValue({
+      (mockCreate as any).mockResolvedValue({
         content: [
           {
             type: 'text',
@@ -421,7 +421,7 @@ describe('ConceptGenerator', () => {
         },
       ];
 
-      mockCreate.mockResolvedValue({
+      (mockCreate as any).mockResolvedValue({
         content: [{ type: 'text', text: JSON.stringify(mockRefinedConcepts) }],
       });
 
@@ -460,7 +460,7 @@ describe('ConceptGenerator', () => {
         },
       ];
 
-      mockCreate.mockResolvedValue({
+      (mockCreate as any).mockResolvedValue({
         content: [{ type: 'text', text: JSON.stringify(mockRefinedConcepts) }],
       });
 
@@ -478,7 +478,7 @@ describe('ConceptGenerator', () => {
     });
 
     it('should throw error if refinement returns invalid JSON', async () => {
-      mockCreate.mockResolvedValue({
+      (mockCreate as any).mockResolvedValue({
         content: [{ type: 'text', text: 'Invalid JSON' }],
       });
 
@@ -488,7 +488,7 @@ describe('ConceptGenerator', () => {
     });
 
     it('should handle API errors during refinement', async () => {
-      mockCreate.mockRejectedValue(new Error('Rate limit exceeded'));
+      (mockCreate as any).mockRejectedValue(new Error('Rate limit exceeded'));
 
       await expect(
         refineConcepts(validPreferences, existingConcepts, feedback)

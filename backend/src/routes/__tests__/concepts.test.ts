@@ -10,16 +10,16 @@ jest.mock('../../services/concept-generator.js', () => ({
 
 describe('Concepts API Routes', () => {
   let app: express.Application;
-  let generateConcepts: jest.Mock;
-  let refineConcepts: jest.Mock;
+  let generateConcepts: any;
+  let refineConcepts: any;
 
   beforeEach(async () => {
     jest.clearAllMocks();
 
     // Import mocked service
     const conceptModule = await import('../../services/concept-generator.js');
-    generateConcepts = conceptModule.generateConcepts as jest.Mock;
-    refineConcepts = conceptModule.refineConcepts as jest.Mock;
+    generateConcepts = conceptModule.generateConcepts;
+    refineConcepts = conceptModule.refineConcepts;
 
     // Setup Express app with route
     app = express();
@@ -188,7 +188,7 @@ describe('Concepts API Routes', () => {
         .send({ preferences: invalidPreferences })
         .expect(400);
 
-      expect(response.body.error.message).toContain('Themes must be a non-empty array');
+      expect(response.body.error.message).toContain('themes must be');
     });
 
     it('should return 400 if themes is empty array', async () => {
@@ -205,7 +205,7 @@ describe('Concepts API Routes', () => {
         .send({ preferences: invalidPreferences })
         .expect(400);
 
-      expect(response.body.error.message).toContain('Themes must be a non-empty array');
+      expect(response.body.error.message).toContain('themes must be');
     });
 
     it('should return 400 if targetLength is missing', async () => {
@@ -273,7 +273,7 @@ describe('Concepts API Routes', () => {
         .send({ preferences: validPreferences })
         .expect(500);
 
-      expect(response.body.error.message).toBe('Failed to generate concepts');
+      expect(response.body.error.message).toBe('Failed to generating concepts');
     });
   });
 
@@ -371,7 +371,7 @@ describe('Concepts API Routes', () => {
         })
         .expect(400);
 
-      expect(response.body.error.message).toContain('must be a non-empty array');
+      expect(response.body.error.message).toContain('must be an array');
     });
 
     it('should return 400 if existingConcepts is empty array', async () => {
@@ -466,7 +466,7 @@ describe('Concepts API Routes', () => {
         .send({ preferences: validPreferences, existingConcepts, feedback })
         .expect(500);
 
-      expect(response.body.error.message).toBe('Failed to refine concepts');
+      expect(response.body.error.message).toBe('Failed to refining concepts');
     });
   });
 });

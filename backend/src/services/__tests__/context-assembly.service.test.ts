@@ -143,7 +143,7 @@ describe('ContextAssemblyService', () => {
         updated_at: new Date().toISOString(),
       };
 
-      const mockPrepare = jest.fn();
+      const mockPrepare: any = jest.fn();
       mockDb.prepare = mockPrepare;
 
       const chapterStmt = { get: jest.fn().mockReturnValue(mockChapter) };
@@ -234,7 +234,7 @@ describe('ContextAssemblyService', () => {
         }),
       };
 
-      const mockPrepare = jest.fn();
+      const mockPrepare: any = jest.fn();
       mockDb.prepare = mockPrepare;
 
       const chapterStmt = { get: jest.fn().mockReturnValue(mockChapter) };
@@ -257,7 +257,7 @@ describe('ContextAssemblyService', () => {
     });
 
     it('should throw error if chapter not found', () => {
-      const mockPrepare = jest.fn();
+      const mockPrepare: any = jest.fn();
       mockDb.prepare = mockPrepare;
 
       const chapterStmt = { get: jest.fn().mockReturnValue(null) };
@@ -296,7 +296,7 @@ describe('ContextAssemblyService', () => {
         story_bible: JSON.stringify({ characters: [] }),
       };
 
-      const mockPrepare = jest.fn();
+      const mockPrepare: any = jest.fn();
       mockDb.prepare = mockPrepare;
 
       const chapterStmt = { get: jest.fn().mockReturnValue(mockChapter) };
@@ -347,7 +347,7 @@ describe('ContextAssemblyService', () => {
         story_bible: JSON.stringify({ characters: [] }),
       };
 
-      const mockPrepare = jest.fn();
+      const mockPrepare: any = jest.fn();
       mockDb.prepare = mockPrepare;
 
       const chapterStmt = { get: jest.fn().mockReturnValue(mockChapter) };
@@ -428,7 +428,7 @@ describe('ContextAssemblyService', () => {
         }),
       };
 
-      const mockPrepare = jest.fn();
+      const mockPrepare: any = jest.fn();
       mockDb.prepare = mockPrepare;
 
       const chapterStmt = { get: jest.fn().mockReturnValue(mockChapter) };
@@ -544,7 +544,7 @@ describe('ContextAssemblyService', () => {
         }),
       };
 
-      const mockPrepare = jest.fn();
+      const mockPrepare: any = jest.fn();
       mockDb.prepare = mockPrepare;
 
       const chapterStmt = { get: jest.fn().mockReturnValue(mockChapter) };

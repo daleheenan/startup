@@ -12,11 +12,11 @@ MAINTENANCE RULES:
 
 ## Summary Statistics
 
-- **Total tasks completed**: 2
-- **Total lessons recorded**: 5
+- **Total tasks completed**: 3
+- **Total lessons recorded**: 7
 - **Last updated**: 2026-01-25
 - **Proven lessons** (score >= 5): 0
-- **Top themes**: #project-management #orchestration #agents #reporting #planning
+- **Top themes**: #project-management #orchestration #agents #reporting #planning #sprints #testing #logging #performance
 
 ---
 
@@ -29,6 +29,62 @@ MAINTENANCE RULES:
 ---
 
 ## Active Lessons (Most Recent First)
+
+### 2026-01-25 | Task: Sprint 13-15 Completion (97 Story Points)
+
+**Date**: 2026-01-25
+**Task**: Complete Sprint 13 (Testing), Sprint 14 (Logging), Sprint 15 (Performance) in single session
+**Context**: Multi-sprint execution with TypeScript errors, test fixes, logger migration, and performance optimization
+
+**What Worked Well**:
+- **Fix blockers first**: Resolved TypeScript compilation errors before attempting tests
+- **Verify existing work**: Many Sprint tasks were already done (logging, indexes, cache) - checked before implementing
+- **Batch similar work**: Fixed all console.log migrations in one pass, all test type errors in one pass
+- **Use include pattern**: Added `?include=books,chapters` to projects endpoint - single query instead of N+1
+- **Update lessons continuously**: Added learnings as they emerged, not just at the end
+
+**What Didn't Work**:
+- Initially missed that Sprint 14 logging was largely complete (checked service files late)
+- Some test fixes required multiple iterations due to ESM/Jest mock complexities
+
+**Lesson**: For multi-sprint completion:
+1. **Compile first** - Fix TypeScript errors before running tests
+2. **Inventory existing work** - Check what's done vs. what's claimed as done
+3. **Batch by similarity** - Group test fixes, logger migrations, etc.
+4. **Verify each layer** - Backend compiles → Tests pass → Frontend builds
+5. **Document learnings live** - Update lessons files during work, not after
+
+**Application Score**: 0
+
+**Tags**: #sprints #execution #typescript #testing #logging #performance
+
+---
+
+### 2026-01-25 | Task: Cross-Sprint Integration
+
+**Date**: 2026-01-25
+**Task**: Managing dependencies between testing, logging, and performance sprints
+**Context**: Changes in one area (logging) affected another (tests expecting console.error)
+
+**What Worked Well**:
+- Recognized that logger migration would break tests checking for console.error
+- Updated test assertions to verify behavior (return values) instead of implementation (log calls)
+- React Query integration was isolated - didn't break existing functionality
+
+**What Didn't Work**:
+- Initially forgot that migrating console.error to structured logger would break existing test assertions
+
+**Lesson**: When sprints have cross-cutting concerns:
+1. Identify implementation-specific tests that will break
+2. Update tests to verify behavior, not implementation details
+3. Run full test suite after each major change, not just at the end
+4. Keep new features (React Query) isolated from refactoring (logger migration)
+
+**Application Score**: 0
+
+**Tags**: #integration #testing #logging #cross-cutting #refactoring
+
+---
 
 ### 2026-01-25 | Task: NovelForge Project Review
 

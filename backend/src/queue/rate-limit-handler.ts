@@ -1,6 +1,9 @@
 import db from '../db/connection.js';
 import { sessionTracker } from '../services/session-tracker.js';
 import type { Job } from '../shared/types/index.js';
+import { createLogger } from '../services/logger.service.js';
+
+const logger = createLogger('queue:rate-limit');
 
 /**
  * Custom error class for rate limit errors
@@ -30,7 +33,7 @@ export class RateLimitHandler {
    * Pauses the current job and waits for session reset
    */
   async handleRateLimit(job: Job): Promise<void> {
-    console.log(`[RateLimitHandler] Rate limit hit on job ${job.id}`);
+    logger.warn({ jobId: job.id }, 'Rate limit hit');
 
     // Pause the job
     await this.pauseJob(job.id);
@@ -40,23 +43,22 @@ export class RateLimitHandler {
 
     // If no wait time, session has already reset
     if (waitMs === 0) {
-      console.log('[RateLimitHandler] Session has already reset, resuming immediately');
+      logger.info('Session has already reset, resuming immediately');
       await this.resumePausedJobs();
       return;
     }
 
     const waitMinutes = Math.round(waitMs / 1000 / 60);
-    console.log(
-      `[RateLimitHandler] Pausing queue. Waiting ${waitMinutes} minutes until session reset...`
-    );
-    console.log(
-      `[RateLimitHandler] Session will reset at: ${sessionTracker.getCurrentSession()?.session_resets_at}`
+    const sessionResetAt = sessionTracker.getCurrentSession()?.session_resets_at;
+    logger.warn(
+      { waitMinutes, sessionResetAt },
+      'Pausing queue until session reset'
     );
 
     // Wait until session resets
     await this.sleep(waitMs);
 
-    console.log('[RateLimitHandler] Session has reset. Clearing session and resuming jobs...');
+    logger.info('Session has reset, clearing session and resuming jobs');
 
     // Clear session tracking
     sessionTracker.clearSession();
@@ -76,7 +78,7 @@ export class RateLimitHandler {
     `);
 
     stmt.run(jobId);
-    console.log(`[RateLimitHandler] Paused job ${jobId}`);
+    logger.info({ jobId }, 'Job paused');
   }
 
   /**
@@ -90,7 +92,7 @@ export class RateLimitHandler {
     `);
 
     const result = stmt.run();
-    console.log(`[RateLimitHandler] Resumed ${result.changes} paused job(s)`);
+    logger.info({ count: result.changes }, 'Paused jobs resumed');
   }
 
   /**
@@ -131,7 +133,7 @@ export class RateLimitHandler {
    */
   async handleRateLimitFallback(): Promise<void> {
     const fallbackWaitMs = 30 * 60 * 1000; // 30 minutes
-    console.log('[RateLimitHandler] Using conservative 30-minute fallback wait');
+    logger.warn({ waitMinutes: 30 }, 'Using conservative fallback wait');
 
     await this.sleep(fallbackWaitMs);
     sessionTracker.clearSession();

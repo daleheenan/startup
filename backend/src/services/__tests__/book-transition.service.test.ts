@@ -118,7 +118,7 @@ describe('BookTransitionService', () => {
 
       mockClaudeService.createCompletion = jest
         .fn()
-        .mockResolvedValue(JSON.stringify(mockTransitionData));
+        .mockResolvedValue(JSON.stringify(mockTransitionData)) as any;
 
       const result = await service.generateBookTransition(
         'project-1',

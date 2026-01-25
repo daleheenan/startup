@@ -58,6 +58,13 @@ router.get('/', (req, res) => {
 /**
  * GET /api/projects/:id
  * Get project details
+ *
+ * Query params:
+ * - include: Comma-separated list of related data to include
+ *   - 'books': Include all books for this project
+ *   - 'chapters': Include all chapters for all books (requires 'books')
+ *
+ * Performance: Uses JOINs to fetch related data in single queries
  */
 router.get('/:id', (req, res) => {
   try {
@@ -74,12 +81,63 @@ router.get('/:id', (req, res) => {
     }
 
     // Parse JSON fields and attach metrics (with safe parsing)
-    const parsedProject = {
+    const parsedProject: any = {
       ...project,
       story_dna: safeJsonParse(project.story_dna as any, null),
       story_bible: safeJsonParse(project.story_bible as any, null),
       metrics: metricsService.getFormattedMetrics(project.id),
     };
+
+    // Handle include query parameter for related data
+    const includeParam = req.query.include as string | undefined;
+    if (includeParam) {
+      const includes = includeParam.split(',').map(s => s.trim().toLowerCase());
+
+      // Include books
+      if (includes.includes('books') || includes.includes('chapters')) {
+        const booksStmt = db.prepare(`
+          SELECT id, project_id, book_number, title, status, word_count, created_at, updated_at
+          FROM books
+          WHERE project_id = ?
+          ORDER BY book_number ASC
+        `);
+        const books = booksStmt.all(req.params.id) as any[];
+
+        // Include chapters for each book (uses single query with JOIN for efficiency)
+        if (includes.includes('chapters')) {
+          const chaptersStmt = db.prepare(`
+            SELECT c.id, c.book_id, c.chapter_number, c.title, c.status, c.word_count
+            FROM chapters c
+            INNER JOIN books b ON c.book_id = b.id
+            WHERE b.project_id = ?
+            ORDER BY b.book_number ASC, c.chapter_number ASC
+          `);
+          const allChapters = chaptersStmt.all(req.params.id) as any[];
+
+          // Group chapters by book_id
+          const chaptersByBook = new Map<string, any[]>();
+          for (const chapter of allChapters) {
+            if (!chaptersByBook.has(chapter.book_id)) {
+              chaptersByBook.set(chapter.book_id, []);
+            }
+            chaptersByBook.get(chapter.book_id)!.push({
+              id: chapter.id,
+              chapter_number: chapter.chapter_number,
+              title: chapter.title,
+              status: chapter.status,
+              word_count: chapter.word_count,
+            });
+          }
+
+          // Attach chapters to books
+          for (const book of books) {
+            book.chapters = chaptersByBook.get(book.id) || [];
+          }
+        }
+
+        parsedProject.books = books;
+      }
+    }
 
     res.json(parsedProject);
   } catch (error: any) {

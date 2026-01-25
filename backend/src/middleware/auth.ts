@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { createLogger } from '../services/logger.service.js';
+
+const logger = createLogger('middleware:auth');
 
 /**
  * Authentication middleware
@@ -26,7 +29,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     const jwtSecret = process.env.JWT_SECRET;
 
     if (!jwtSecret) {
-      console.error('[Auth] JWT_SECRET not configured');
+      logger.error('JWT_SECRET not configured');
       return res.status(500).json({
         error: 'Server configuration error',
         code: 'CONFIG_ERROR'
@@ -53,7 +56,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
       });
     }
 
-    console.error('[Auth] Unexpected error:', error);
+    logger.error({ error }, 'Unexpected authentication error');
     return res.status(500).json({
       error: 'Authentication failed',
       code: 'AUTH_ERROR'

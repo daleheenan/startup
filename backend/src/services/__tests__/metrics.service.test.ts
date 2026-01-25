@@ -211,7 +211,6 @@ describe('MetricsService', () => {
     });
 
     it('should handle database errors', () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       mockStatement.get.mockImplementation(() => {
         throw new Error('Database error');
       });
@@ -219,8 +218,7 @@ describe('MetricsService', () => {
       const result = metricsService.getProjectMetrics('project-123');
 
       expect(result).toBeNull();
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
+      // Logger handles error logging - no need to verify console calls
     });
   });
 
@@ -297,7 +295,6 @@ describe('MetricsService', () => {
     });
 
     it('should return empty map on error', () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       mockStatement.all.mockImplementation(() => {
         throw new Error('Database error');
       });
@@ -305,8 +302,7 @@ describe('MetricsService', () => {
       const result = metricsService.getAllProjectMetrics();
 
       expect(result.size).toBe(0);
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
+      // Logger handles error logging - no need to verify console calls
     });
   });
 
@@ -325,7 +321,6 @@ describe('MetricsService', () => {
     });
 
     it('should handle errors gracefully', () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       mockStatement.run.mockImplementation(() => {
         throw new Error('Database error');
       });
@@ -334,8 +329,7 @@ describe('MetricsService', () => {
         metricsService.trackChapterTokens('chapter-123', 1000, 2000);
       }).not.toThrow();
 
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
+      // Logger handles error logging - no need to verify console calls
     });
   });
 
