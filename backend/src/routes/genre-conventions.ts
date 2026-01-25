@@ -1,9 +1,13 @@
 import express from 'express';
 import { genreConventionsService } from '../services/genre-conventions.service.js';
 import { createLogger } from '../services/logger.service.js';
+import { cache } from '../services/cache.service.js';
 
 const router = express.Router();
 const logger = createLogger('routes:genre-conventions');
+
+// Cache TTL in seconds
+const CACHE_TTL = 3600; // 1 hour for genre conventions (static data)
 
 /**
  * POST /api/genre-conventions/validate
@@ -42,6 +46,15 @@ router.post('/validate', (req, res) => {
 router.get('/genres/:genre', (req, res) => {
   try {
     const { genre } = req.params;
+    const cacheKey = `genre-conventions:${genre}`;
+
+    // Try cache first
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      logger.info({ genre }, 'Genre conventions cache hit');
+      return res.json(cached);
+    }
+
     const conventions = genreConventionsService.getGenreConventions(genre);
 
     if (conventions.length === 0) {
@@ -51,12 +64,17 @@ router.get('/genres/:genre', (req, res) => {
       });
     }
 
-    res.json({
+    const response = {
       success: true,
       genre,
       conventions,
       count: conventions.length,
-    });
+    };
+
+    // Cache the result
+    cache.set(cacheKey, response, CACHE_TTL);
+
+    res.json(response);
   } catch (error) {
     logger.error({ error: error instanceof Error ? error.message : error, genre: req.params.genre }, 'Error fetching genre conventions');
     res.status(500).json({
@@ -72,13 +90,27 @@ router.get('/genres/:genre', (req, res) => {
  */
 router.get('/genres', (req, res) => {
   try {
+    const cacheKey = 'genre-conventions:all-genres';
+
+    // Try cache first
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      logger.info('All genres cache hit');
+      return res.json(cached);
+    }
+
     const genres = genreConventionsService.getAvailableGenres();
 
-    res.json({
+    const response = {
       success: true,
       genres,
       count: genres.length,
-    });
+    };
+
+    // Cache the result
+    cache.set(cacheKey, response, CACHE_TTL);
+
+    res.json(response);
   } catch (error) {
     logger.error({ error: error instanceof Error ? error.message : error }, 'Error fetching available genres');
     res.status(500).json({

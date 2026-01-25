@@ -1,8 +1,11 @@
 import Anthropic from '@anthropic-ai/sdk';
 import dotenv from 'dotenv';
 import { randomUUID } from 'crypto';
+import { createLogger } from './logger.service.js';
 
 dotenv.config();
+
+const logger = createLogger('services:world-generator');
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -38,7 +41,7 @@ export async function generateWorldElements(
 ): Promise<WorldElement[]> {
   const prompt = buildWorldPrompt(context);
 
-  console.log('[WorldGenerator] Generating world elements...');
+  logger.info('[WorldGenerator] Generating world elements...');
 
   try {
     const message = await anthropic.messages.create({
@@ -59,11 +62,11 @@ export async function generateWorldElements(
 
     const worldElements = parseWorldElementsResponse(responseText);
 
-    console.log(`[WorldGenerator] Generated ${worldElements.length} world elements`);
+    logger.info(`[WorldGenerator] Generated ${worldElements.length} world elements`);
 
     return worldElements;
   } catch (error: any) {
-    console.error('[WorldGenerator] Error:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'World generation error');
     throw error;
   }
 }
@@ -185,8 +188,8 @@ function parseWorldElementsResponse(responseText: string): WorldElement[] {
 
     return worldElements;
   } catch (error: any) {
-    console.error('[WorldGenerator] Parse error:', error);
-    console.error('[WorldGenerator] Response text:', responseText);
+    logger.error({ error: error.message, stack: error.stack }, 'World generation parse error');
+    logger.error({ responseText }, 'World generation response text');
     throw new Error(`Failed to parse world elements: ${error.message}`);
   }
 }

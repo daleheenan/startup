@@ -1,8 +1,14 @@
 import { Router } from 'express';
 import db from '../db/connection.js';
 import { randomUUID } from 'crypto';
+import { cache } from '../services/cache.service.js';
+import { createLogger } from '../services/logger.service.js';
 
 const router = Router();
+const logger = createLogger('routes:presets');
+
+// Cache TTL in seconds
+const CACHE_TTL = 3600; // 1 hour for presets (changes infrequently)
 
 interface BookStylePreset {
   id: string;
@@ -27,8 +33,8 @@ function safeJsonParse(jsonString: string | null | undefined, fallback: any = []
   if (!jsonString) return fallback;
   try {
     return JSON.parse(jsonString);
-  } catch (error) {
-    console.error('[JSON Parse Error]', error);
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'JSON parse error');
     return fallback;
   }
 }
@@ -39,6 +45,14 @@ function safeJsonParse(jsonString: string | null | undefined, fallback: any = []
  */
 router.get('/', (req, res) => {
   try {
+    const cacheKey = 'presets:all';
+
+    // Try cache first
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
     const stmt = db.prepare(`
       SELECT * FROM book_style_presets ORDER BY is_default DESC, name ASC
     `);
@@ -56,9 +70,14 @@ router.get('/', (req, res) => {
       is_default: p.is_default === 1,
     }));
 
-    res.json({ presets: parsedPresets });
+    const response = { presets: parsedPresets };
+
+    // Cache the result
+    cache.set(cacheKey, response, CACHE_TTL);
+
+    res.json(response);
   } catch (error: any) {
-    console.error('[API] Error fetching presets:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error fetching presets');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -69,6 +88,14 @@ router.get('/', (req, res) => {
  */
 router.get('/:id', (req, res) => {
   try {
+    const cacheKey = `presets:${req.params.id}`;
+
+    // Try cache first
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
     const stmt = db.prepare(`
       SELECT * FROM book_style_presets WHERE id = ?
     `);
@@ -91,9 +118,12 @@ router.get('/:id', (req, res) => {
       is_default: preset.is_default === 1,
     };
 
+    // Cache the result
+    cache.set(cacheKey, parsedPreset, CACHE_TTL);
+
     res.json(parsedPreset);
   } catch (error: any) {
-    console.error('[API] Error fetching preset:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error fetching preset');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -135,6 +165,9 @@ router.post('/', (req, res) => {
       now
     );
 
+    // Invalidate presets cache
+    cache.invalidate('presets:');
+
     res.status(201).json({
       id: presetId,
       name,
@@ -151,7 +184,7 @@ router.post('/', (req, res) => {
       updated_at: now,
     });
   } catch (error: any) {
-    console.error('[API] Error creating preset:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error creating preset');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -202,9 +235,12 @@ router.put('/:id', (req, res) => {
       req.params.id
     );
 
+    // Invalidate presets cache
+    cache.invalidate('presets:');
+
     res.json({ success: true });
   } catch (error: any) {
-    console.error('[API] Error updating preset:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error updating preset');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -234,9 +270,12 @@ router.delete('/:id', (req, res) => {
     const stmt = db.prepare(`DELETE FROM book_style_presets WHERE id = ?`);
     stmt.run(req.params.id);
 
+    // Invalidate presets cache
+    cache.invalidate('presets:');
+
     res.status(204).send();
   } catch (error: any) {
-    console.error('[API] Error deleting preset:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error deleting preset');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });

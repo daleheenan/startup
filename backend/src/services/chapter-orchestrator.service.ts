@@ -1,5 +1,8 @@
 import { QueueWorker } from '../queue/worker.js';
 import db from '../db/connection.js';
+import { createLogger } from './logger.service.js';
+
+const logger = createLogger('services:chapter-orchestrator');
 
 /**
  * ChapterOrchestratorService orchestrates the full chapter generation workflow
@@ -39,7 +42,7 @@ export class ChapterOrchestratorService {
       // Note: +1 additional job (author_revision) may be created dynamically if dev editor requires it
     }
 
-    console.log(`[ChapterOrchestrator] Queued ${chapters.length} chapters (${jobsCreated} jobs) for book ${bookId}`);
+    logger.info(`[ChapterOrchestrator] Queued ${chapters.length} chapters (${jobsCreated} jobs) for book ${bookId}`);
 
     return {
       chaptersQueued: chapters.length,
@@ -78,14 +81,14 @@ export class ChapterOrchestratorService {
     const summaryJobId = QueueWorker.createJob('generate_summary', chapterId);
     const statesJobId = QueueWorker.createJob('update_states', chapterId);
 
-    console.log(`[ChapterOrchestrator] Queued full workflow for chapter ${chapterId}`);
-    console.log(`  - Generate: ${generateJobId}`);
-    console.log(`  - Dev Edit: ${devEditJobId}`);
-    console.log(`  - Line Edit: ${lineEditJobId}`);
-    console.log(`  - Continuity: ${continuityJobId}`);
-    console.log(`  - Copy Edit: ${copyEditJobId}`);
-    console.log(`  - Summary: ${summaryJobId}`);
-    console.log(`  - States: ${statesJobId}`);
+    logger.info(`[ChapterOrchestrator] Queued full workflow for chapter ${chapterId}`);
+    logger.info(`  - Generate: ${generateJobId}`);
+    logger.info(`  - Dev Edit: ${devEditJobId}`);
+    logger.info(`  - Line Edit: ${lineEditJobId}`);
+    logger.info(`  - Continuity: ${continuityJobId}`);
+    logger.info(`  - Copy Edit: ${copyEditJobId}`);
+    logger.info(`  - Summary: ${summaryJobId}`);
+    logger.info(`  - States: ${statesJobId}`);
 
     return {
       generateJobId,
@@ -115,7 +118,7 @@ export class ChapterOrchestratorService {
 
     resetStmt.run(new Date().toISOString(), chapterId);
 
-    console.log(`[ChapterOrchestrator] Reset chapter ${chapterId} for regeneration`);
+    logger.info(`[ChapterOrchestrator] Reset chapter ${chapterId} for regeneration`);
 
     // Queue the workflow
     return this.queueChapterWorkflow(chapterId);

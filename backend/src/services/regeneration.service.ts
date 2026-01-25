@@ -10,6 +10,9 @@ import type {
   StoryDNA,
   SceneCard,
 } from '../shared/types/index.js';
+import { createLogger } from './logger.service.js';
+
+const logger = createLogger('services:regeneration');
 
 /**
  * RegenerationService handles targeted text regeneration and variations
@@ -27,7 +30,7 @@ export class RegenerationService {
     mode: RegenerationMode,
     contextTokens: number = 500
   ): Promise<VariationResult> {
-    console.log(`[RegenerationService] Generating variations for chapter ${chapterId}, mode: ${mode}`);
+    logger.info(`[RegenerationService] Generating variations for chapter ${chapterId}, mode: ${mode}`);
 
     // Get chapter data
     const chapterData = this.getChapterData(chapterId);
@@ -63,7 +66,7 @@ export class RegenerationService {
     const variations: [string, string, string] = ['', '', ''];
 
     for (let i = 0; i < 3; i++) {
-      console.log(`[RegenerationService] Generating variation ${i + 1}/3`);
+      logger.info(`[RegenerationService] Generating variation ${i + 1}/3`);
 
       const variation = await claudeService.createCompletion({
         system,
@@ -123,7 +126,7 @@ export class RegenerationService {
       now
     );
 
-    console.log(`[RegenerationService] Variations generated successfully: ${variationId}`);
+    logger.info(`[RegenerationService] Variations generated successfully: ${variationId}`);
 
     return {
       variationId,
@@ -143,7 +146,7 @@ export class RegenerationService {
     variationId: string,
     selectedVariation: number
   ): Promise<ApplyVariationResult> {
-    console.log(`[RegenerationService] Applying variation ${selectedVariation} for ${variationId}`);
+    logger.info(`[RegenerationService] Applying variation ${selectedVariation} for ${variationId}`);
 
     // Validate selectedVariation
     if (selectedVariation < 0 || selectedVariation > 3) {
@@ -238,7 +241,7 @@ export class RegenerationService {
       now
     );
 
-    console.log(`[RegenerationService] Variation applied successfully`);
+    logger.info(`[RegenerationService] Variation applied successfully`);
 
     return {
       success: true,
@@ -255,7 +258,7 @@ export class RegenerationService {
     chapterId: string,
     sceneIndex: number
   ): Promise<SceneRegenerationResult> {
-    console.log(`[RegenerationService] Regenerating scene ${sceneIndex} for chapter ${chapterId}`);
+    logger.info(`[RegenerationService] Regenerating scene ${sceneIndex} for chapter ${chapterId}`);
 
     // Get chapter data
     const chapterData = this.getChapterData(chapterId);
@@ -354,7 +357,7 @@ Output only the regenerated scene text:`;
       now
     );
 
-    console.log(`[RegenerationService] Scene regenerated successfully`);
+    logger.info(`[RegenerationService] Scene regenerated successfully`);
 
     return {
       success: true,

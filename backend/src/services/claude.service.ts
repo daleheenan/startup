@@ -1,6 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { sessionTracker } from './session-tracker.js';
 import { RateLimitError } from '../queue/rate-limit-handler.js';
+import { createLogger } from './logger.service.js';
+
+const logger = createLogger('services:claude');
 
 export interface ClaudeResponse {
   content: string;
@@ -20,7 +23,7 @@ export class ClaudeService {
   constructor() {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey || apiKey === 'placeholder-key-will-be-set-later') {
-      console.warn('[ClaudeService] Warning: ANTHROPIC_API_KEY not configured');
+      logger.warn('[ClaudeService] Warning: ANTHROPIC_API_KEY not configured');
       // Don't throw error to allow CLI commands to work
       this.client = null as any;
       this.model = process.env.ANTHROPIC_MODEL || 'claude-opus-4-5-20251101';
@@ -32,7 +35,7 @@ export class ClaudeService {
     });
 
     this.model = process.env.ANTHROPIC_MODEL || 'claude-opus-4-5-20251101';
-    console.log(`[ClaudeService] Initialized with model: ${this.model}`);
+    logger.info({ model: this.model }, 'ClaudeService initialized');
   }
 
   /**
@@ -119,7 +122,7 @@ export class ClaudeService {
 
       return response.includes('OK');
     } catch (error) {
-      console.error('[ClaudeService] Connection test failed:', error);
+      logger.error({ error }, 'ClaudeService connection test failed');
       return false;
     }
   }

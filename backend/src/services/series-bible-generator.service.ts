@@ -11,6 +11,9 @@ import type {
   StoryBible,
   BookEndingState,
 } from '../shared/types/index.js';
+import { createLogger } from './logger.service.js';
+
+const logger = createLogger('services:series-bible-generator');
 
 /**
  * SeriesBibleGeneratorService creates aggregated trilogy data
@@ -21,7 +24,7 @@ export class SeriesBibleGeneratorService {
    * Generate complete series bible aggregating data from all books
    */
   generateSeriesBible(projectId: string): SeriesBible {
-    console.log(`[SeriesBible] Generating series bible for project ${projectId}`);
+    logger.info(`[SeriesBible] Generating series bible for project ${projectId}`);
 
     // Get all books in the project
     const booksStmt = db.prepare<[string], Book>(`
@@ -82,7 +85,7 @@ export class SeriesBibleGeneratorService {
       projectId
     );
 
-    console.log(`[SeriesBible] Series bible generated and saved`);
+    logger.info(`[SeriesBible] Series bible generated and saved`);
 
     return seriesBible;
   }

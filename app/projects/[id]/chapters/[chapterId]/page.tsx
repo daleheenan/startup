@@ -3,8 +3,18 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import ChapterEditor from '../../../../components/ChapterEditor';
+import dynamic from 'next/dynamic';
 import { getToken, logout } from '../../../../lib/auth';
+
+// Lazy load ChapterEditor - it's a large component only needed on this page
+const ChapterEditor = dynamic(() => import('../../../../components/ChapterEditor'), {
+  loading: () => (
+    <div style={{ padding: '2rem', textAlign: 'center', color: '#64748B' }}>
+      Loading editor...
+    </div>
+  ),
+  ssr: false, // Editor doesn't need server-side rendering
+});
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 

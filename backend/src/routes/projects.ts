@@ -6,8 +6,10 @@ import { generateStoryDNA } from '../services/story-dna-generator.js';
 import { generateProtagonist, generateSupportingCast } from '../services/character-generator.js';
 import { generateWorldElements } from '../services/world-generator.js';
 import { metricsService } from '../services/metrics.service.js';
+import { createLogger } from '../services/logger.service.js';
 
 const router = Router();
+const logger = createLogger('routes:projects');
 
 /**
  * Helper: Safely parse JSON with fallback
@@ -16,8 +18,8 @@ function safeJsonParse(jsonString: string | null | undefined, fallback: any = nu
   if (!jsonString) return fallback;
   try {
     return JSON.parse(jsonString as any);
-  } catch (error) {
-    console.error('[JSON Parse Error]', error);
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'JSON parse error');
     return fallback;
   }
 }
@@ -47,7 +49,7 @@ router.get('/', (req, res) => {
 
     res.json({ projects: parsedProjects });
   } catch (error: any) {
-    console.error('[API] Error fetching projects:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error fetching projects');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -80,7 +82,7 @@ router.get('/:id', (req, res) => {
 
     res.json(parsedProject);
   } catch (error: any) {
-    console.error('[API] Error fetching project:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error fetching project');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -123,7 +125,7 @@ router.post('/', (req, res) => {
       status: 'setup',
     });
   } catch (error: any) {
-    console.error('[API] Error creating project:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error creating project');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -184,7 +186,7 @@ router.put('/:id', (req, res) => {
 
     res.json({ success: true });
   } catch (error: any) {
-    console.error('[API] Error updating project:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error updating project');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -209,7 +211,7 @@ router.delete('/:id', (req, res) => {
 
     res.status(204).send();
   } catch (error: any) {
-    console.error('[API] Error deleting project:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error deleting project');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -243,7 +245,7 @@ router.post('/:id/story-dna', async (req, res) => {
 
     res.json(storyDNA);
   } catch (error: any) {
-    console.error('[API] Error generating Story DNA:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error generating Story DNA');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -279,7 +281,7 @@ router.post('/:id/characters', async (req, res) => {
     // Generate Story DNA if it doesn't exist
     let storyDNA = safeJsonParse(project.story_dna as any, null);
     if (!storyDNA) {
-      console.log('[Characters] No Story DNA found, generating...');
+      logger.info({ projectId }, 'No Story DNA found, generating...');
       storyDNA = await generateStoryDNA({
         title: project.title,
         logline: context.synopsis || 'A compelling story',
@@ -295,7 +297,7 @@ router.post('/:id/characters', async (req, res) => {
         UPDATE projects SET story_dna = ?, updated_at = ? WHERE id = ?
       `);
       dnaStmt.run(JSON.stringify(storyDNA), new Date().toISOString(), projectId);
-      console.log('[Characters] Story DNA generated and saved');
+      logger.info({ projectId }, 'Story DNA generated and saved');
     }
 
     // Enrich context with Story DNA
@@ -346,7 +348,7 @@ router.post('/:id/characters', async (req, res) => {
 
     res.json({ characters: allCharacters });
   } catch (error: any) {
-    console.error('[API] Error generating characters:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error generating characters');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -393,7 +395,7 @@ router.post('/:id/world', async (req, res) => {
 
     res.json({ world: worldElements });
   } catch (error: any) {
-    console.error('[API] Error generating world:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error generating world');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -447,7 +449,7 @@ router.put('/:id/characters/:characterId', (req, res) => {
 
     res.json(storyBible.characters[charIndex]);
   } catch (error: any) {
-    console.error('[API] Error updating character:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error updating character');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -584,7 +586,7 @@ Return ONLY the new name, nothing else. Just the full name.`;
 
     res.json(storyBible.characters[charIndex]);
   } catch (error: any) {
-    console.error('[API] Error regenerating character name:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error regenerating character name');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -700,7 +702,7 @@ Return ONLY the new name, nothing else. Just the full name.`;
 
     res.json({ characters: updatedCharacters });
   } catch (error: any) {
-    console.error('[API] Error regenerating all character names:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error regenerating all character names');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -721,7 +723,7 @@ router.get('/:id/metrics', (req, res) => {
 
     res.json(metrics);
   } catch (error: any) {
-    console.error('[API] Error fetching project metrics:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error fetching project metrics');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -775,7 +777,7 @@ router.put('/:id/world/:elementId', (req, res) => {
 
     res.json(storyBible.world[elemIndex]);
   } catch (error: any) {
-    console.error('[API] Error updating world element:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error updating world element');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });

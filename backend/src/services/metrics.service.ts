@@ -1,4 +1,7 @@
 import db from '../db/connection.js';
+import { createLogger } from './logger.service.js';
+
+const logger = createLogger('services:metrics');
 
 /**
  * Claude Opus 4.5 pricing (as of Jan 2025)
@@ -73,7 +76,7 @@ class MetricsService {
         this.updateProjectTokens(result.project_id, inputTokens, outputTokens);
       }
     } catch (error) {
-      console.error('[MetricsService] Error tracking chapter tokens:', error);
+      logger.error({ error }, 'Error tracking chapter tokens');
     }
   }
 
@@ -94,7 +97,7 @@ class MetricsService {
       // Recalculate costs
       this.recalculateCosts(projectId);
     } catch (error) {
-      console.error('[MetricsService] Error updating project tokens:', error);
+      logger.error({ error }, 'Error updating project tokens');
     }
   }
 
@@ -126,7 +129,7 @@ class MetricsService {
       `);
       updateStmt.run(totalCostUSD, totalCostGBP, projectId);
     } catch (error) {
-      console.error('[MetricsService] Error recalculating costs:', error);
+      logger.error({ error }, 'Error recalculating costs');
     }
   }
 
@@ -142,7 +145,7 @@ class MetricsService {
       `);
       return stmt.get(projectId) || null;
     } catch (error) {
-      console.error('[MetricsService] Error getting project metrics:', error);
+      logger.error({ error }, 'Error getting project metrics');
       return null;
     }
   }
@@ -234,7 +237,7 @@ class MetricsService {
 
       return metricsMap;
     } catch (error) {
-      console.error('[MetricsService] Error getting all project metrics:', error);
+      logger.error({ error }, 'Error getting all project metrics');
       return new Map();
     }
   }
@@ -269,7 +272,7 @@ class MetricsService {
       `);
       updateStmt.run(stats.total_chapters, stats.total_word_count, readingTimeMinutes, projectId);
     } catch (error) {
-      console.error('[MetricsService] Error recalculating content metrics:', error);
+      logger.error({ error }, 'Error recalculating content metrics');
     }
   }
 }

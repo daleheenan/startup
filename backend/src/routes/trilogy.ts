@@ -3,8 +3,14 @@ import db from '../db/connection.js';
 import { crossBookContinuityService } from '../services/cross-book-continuity.service.js';
 import { seriesBibleGeneratorService } from '../services/series-bible-generator.service.js';
 import { bookTransitionService } from '../services/book-transition.service.js';
+import { cache } from '../services/cache.service.js';
+import { createLogger } from '../services/logger.service.js';
 
 const router = Router();
+const logger = createLogger('routes:trilogy');
+
+// Cache TTL in seconds
+const SERIES_BIBLE_CACHE_TTL = 300; // 5 minutes for series bible (expensive but changes with book updates)
 
 /**
  * POST /api/trilogy/books/:bookId/ending-state
@@ -18,7 +24,7 @@ router.post('/books/:bookId/ending-state', async (req, res) => {
 
     res.json(endingState);
   } catch (error: any) {
-    console.error('[API] Error generating book ending state:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error generating book ending state');
     res.status(500).json({
       error: { code: 'INTERNAL_ERROR', message: error.message },
     });
@@ -37,7 +43,7 @@ router.post('/books/:bookId/summary', async (req, res) => {
 
     res.json({ summary });
   } catch (error: any) {
-    console.error('[API] Error generating book summary:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error generating book summary');
     res.status(500).json({
       error: { code: 'INTERNAL_ERROR', message: error.message },
     });
@@ -78,7 +84,7 @@ router.get('/books/:bookId/previous-state', (req, res) => {
 
     res.json(previousState);
   } catch (error: any) {
-    console.error('[API] Error loading previous book state:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error loading previous book state');
     res.status(500).json({
       error: { code: 'INTERNAL_ERROR', message: error.message },
     });
@@ -93,11 +99,19 @@ router.post('/projects/:projectId/series-bible', (req, res) => {
   try {
     const { projectId } = req.params;
 
+    const startTime = Date.now();
     const seriesBible = seriesBibleGeneratorService.generateSeriesBible(projectId);
+    const duration = Date.now() - startTime;
+
+    logger.info({ projectId, duration }, 'Series bible generation completed');
+
+    // Cache the generated result
+    const cacheKey = `series-bible:${projectId}`;
+    cache.set(cacheKey, seriesBible, SERIES_BIBLE_CACHE_TTL);
 
     res.json(seriesBible);
   } catch (error: any) {
-    console.error('[API] Error generating series bible:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error generating series bible');
     res.status(500).json({
       error: { code: 'INTERNAL_ERROR', message: error.message },
     });
@@ -111,6 +125,14 @@ router.post('/projects/:projectId/series-bible', (req, res) => {
 router.get('/projects/:projectId/series-bible', (req, res) => {
   try {
     const { projectId } = req.params;
+    const cacheKey = `series-bible:${projectId}`;
+
+    // Try cache first
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      logger.info({ projectId }, 'Series bible cache hit');
+      return res.json(cached);
+    }
 
     const seriesBible = seriesBibleGeneratorService.getSeriesBible(projectId);
 
@@ -120,9 +142,12 @@ router.get('/projects/:projectId/series-bible', (req, res) => {
       });
     }
 
+    // Cache the result
+    cache.set(cacheKey, seriesBible, SERIES_BIBLE_CACHE_TTL);
+
     res.json(seriesBible);
   } catch (error: any) {
-    console.error('[API] Error getting series bible:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error getting series bible');
     res.status(500).json({
       error: { code: 'INTERNAL_ERROR', message: error.message },
     });
@@ -152,7 +177,7 @@ router.post('/transitions', async (req, res) => {
 
     res.status(201).json(transition);
   } catch (error: any) {
-    console.error('[API] Error generating book transition:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error generating book transition');
     res.status(500).json({
       error: { code: 'INTERNAL_ERROR', message: error.message },
     });
@@ -177,7 +202,7 @@ router.get('/transitions/:fromBookId/:toBookId', (req, res) => {
 
     res.json(transition);
   } catch (error: any) {
-    console.error('[API] Error getting transition:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error getting transition');
     res.status(500).json({
       error: { code: 'INTERNAL_ERROR', message: error.message },
     });
@@ -196,7 +221,7 @@ router.get('/projects/:projectId/transitions', (req, res) => {
 
     res.json({ transitions });
   } catch (error: any) {
-    console.error('[API] Error getting project transitions:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error getting project transitions');
     res.status(500).json({
       error: { code: 'INTERNAL_ERROR', message: error.message },
     });
@@ -271,7 +296,7 @@ router.post('/projects/:projectId/convert-to-trilogy', (req, res) => {
       books: createdBooks,
     });
   } catch (error: any) {
-    console.error('[API] Error converting to trilogy:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error converting to trilogy');
     res.status(500).json({
       error: { code: 'INTERNAL_ERROR', message: error.message },
     });

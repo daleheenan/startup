@@ -2,7 +2,17 @@
 
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import ProseStyleEditor from '../../../components/ProseStyleEditor';
+import dynamic from 'next/dynamic';
+
+// Lazy load ProseStyleEditor - large editor component
+const ProseStyleEditor = dynamic(() => import('../../../components/ProseStyleEditor'), {
+  loading: () => (
+    <div style={{ padding: '2rem', textAlign: 'center', color: '#64748B' }}>
+      Loading prose style editor...
+    </div>
+  ),
+  ssr: false,
+});
 
 export default function ProseStylePage() {
   const params = useParams();

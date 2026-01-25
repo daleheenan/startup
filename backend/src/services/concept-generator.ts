@@ -1,6 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk';
 import dotenv from 'dotenv';
 import { formatGenre, formatSubgenre, formatModifiers, getWordCountContext } from '../utils/genre-helpers.js';
+import { createLogger } from './logger.service.js';
+
+const logger = createLogger('services:concept-generator');
 
 dotenv.config();
 
@@ -45,7 +48,7 @@ export async function generateConcepts(
   // Build the prompt for concept generation
   const prompt = buildConceptPrompt(preferences);
 
-  console.log('[ConceptGenerator] Calling Claude API...');
+  logger.info('[ConceptGenerator] Calling Claude API...');
 
   try {
     const message = await anthropic.messages.create({
@@ -72,11 +75,11 @@ export async function generateConcepts(
       throw new Error('Failed to parse concepts from Claude response');
     }
 
-    console.log(`[ConceptGenerator] Successfully generated ${concepts.length} concepts`);
+    logger.info(`[ConceptGenerator] Successfully generated ${concepts.length} concepts`);
 
     return concepts;
   } catch (error: any) {
-    console.error('[ConceptGenerator] Error:', error);
+    logger.error({ error }, 'Concept generation error');
     throw error;
   }
 }
@@ -222,7 +225,7 @@ Return ONLY a JSON array of 5 concepts in this exact format:
   ...
 ]`;
 
-  console.log('[ConceptGenerator] Calling Claude API for refinement...');
+  logger.info('[ConceptGenerator] Calling Claude API for refinement...');
 
   try {
     const message = await anthropic.messages.create({
@@ -247,11 +250,11 @@ Return ONLY a JSON array of 5 concepts in this exact format:
       throw new Error('Failed to parse refined concepts from Claude response');
     }
 
-    console.log(`[ConceptGenerator] Successfully generated ${concepts.length} refined concepts`);
+    logger.info(`[ConceptGenerator] Successfully generated ${concepts.length} refined concepts`);
 
     return concepts;
   } catch (error: any) {
-    console.error('[ConceptGenerator] Refinement error:', error);
+    logger.error({ error }, 'Concept refinement error');
     throw error;
   }
 }
@@ -283,8 +286,8 @@ function parseConceptsResponse(responseText: string): StoryConcept[] {
 
     return concepts;
   } catch (error: any) {
-    console.error('[ConceptGenerator] Parse error:', error);
-    console.error('[ConceptGenerator] Response text:', responseText);
+    logger.error({ error }, 'Concept parse error');
+    logger.error({ responseText }, 'Concept response text');
     throw new Error(`Failed to parse concepts: ${error.message}`);
   }
 }

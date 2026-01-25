@@ -8,6 +8,9 @@ import type {
   WorldTransitionChange,
 } from '../shared/types/index.js';
 import { claudeService } from './claude.service.js';
+import { createLogger } from './logger.service.js';
+
+const logger = createLogger('services:book-transition');
 
 /**
  * BookTransitionService generates summaries of what happened
@@ -23,7 +26,7 @@ export class BookTransitionService {
     toBookId: string,
     timeGap: string
   ): Promise<BookTransition> {
-    console.log(`[BookTransition] Generating transition from book ${fromBookId} to ${toBookId}`);
+    logger.info(`[BookTransition] Generating transition from book ${fromBookId} to ${toBookId}`);
 
     // Get both books
     const bookStmt = db.prepare<[string], Book>(`
@@ -94,7 +97,7 @@ export class BookTransitionService {
       now
     );
 
-    console.log(`[BookTransition] Transition ${transitionId} created`);
+    logger.info(`[BookTransition] Transition ${transitionId} created`);
 
     return {
       id: transitionId,

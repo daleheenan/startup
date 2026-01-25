@@ -1,6 +1,9 @@
 import db from '../db/connection.js';
 import type { GenerationProgress, ProgressEvent } from '../shared/types/index.js';
 import { sessionTracker } from './session-tracker.js';
+import { createLogger } from './logger.service.js';
+
+const logger = createLogger('services:progress-tracking');
 
 /**
  * ProgressTrackingService tracks chapter generation progress and provides estimates
@@ -334,7 +337,7 @@ export class ProgressTrackingService {
   recordEvent(bookId: string, type: string, description: string, chapterNumber?: number): void {
     // This could be expanded to a dedicated events table if needed
     // For now, events are derived from job completions
-    console.log(`[ProgressTracking] Event: ${description} (book: ${bookId})`);
+    logger.info(`[ProgressTracking] Event: ${description} (book: ${bookId})`);
   }
 }
 

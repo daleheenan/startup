@@ -12,8 +12,11 @@ import type {
   WorldElements,
 } from '../shared/types/index.js';
 import { getStructureTemplate } from './structure-templates.js';
+import { createLogger } from './logger.service.js';
 
 dotenv.config();
+
+const logger = createLogger('services:outline-generator');
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -36,9 +39,9 @@ export interface OutlineContext {
  * Generate complete story outline with act breakdown and chapter-by-chapter structure
  */
 export async function generateOutline(context: OutlineContext): Promise<StoryStructure> {
-  console.log(`[OutlineGenerator] Generating outline for: ${context.concept.title}`);
-  console.log(`[OutlineGenerator] Structure type: ${context.structureType}`);
-  console.log(`[OutlineGenerator] Target word count: ${context.targetWordCount}`);
+  logger.info(`[OutlineGenerator] Generating outline for: ${context.concept.title}`);
+  logger.info(`[OutlineGenerator] Structure type: ${context.structureType}`);
+  logger.info(`[OutlineGenerator] Target word count: ${context.targetWordCount}`);
 
   // Get the structure template
   const template = getStructureTemplate(context.structureType);
@@ -50,21 +53,21 @@ export async function generateOutline(context: OutlineContext): Promise<StoryStr
   const avgWordsPerChapter = 2200;
   const targetChapterCount = Math.round(context.targetWordCount / avgWordsPerChapter);
 
-  console.log(`[OutlineGenerator] Target chapters: ${targetChapterCount}`);
+  logger.info(`[OutlineGenerator] Target chapters: ${targetChapterCount}`);
 
   // Generate act-level breakdown with chapter assignments
   const acts = await generateActBreakdown(context, template, targetChapterCount);
 
   // Generate detailed chapter outlines for each act
   for (let i = 0; i < acts.length; i++) {
-    console.log(`[OutlineGenerator] Generating chapters for Act ${i + 1}...`);
+    logger.info(`[OutlineGenerator] Generating chapters for Act ${i + 1}...`);
     acts[i].chapters = await generateChaptersForAct(context, acts[i], template);
   }
 
   // Generate scene cards for each chapter
   for (const act of acts) {
     for (let i = 0; i < act.chapters.length; i++) {
-      console.log(
+      logger.info(
         `[OutlineGenerator] Generating scene cards for Chapter ${act.chapters[i].number}...`
       );
       act.chapters[i].scenes = await generateSceneCards(context, act.chapters[i], act);
@@ -76,7 +79,7 @@ export async function generateOutline(context: OutlineContext): Promise<StoryStr
     acts,
   };
 
-  console.log('[OutlineGenerator] Outline generation complete');
+  logger.info('[OutlineGenerator] Outline generation complete');
 
   return storyStructure;
 }
@@ -110,7 +113,7 @@ async function generateActBreakdown(
 
     return acts;
   } catch (error: any) {
-    console.error('[OutlineGenerator] Error generating act breakdown:', error);
+    logger.error({ error }, 'Error generating act breakdown');
     throw error;
   }
 }
@@ -189,8 +192,8 @@ function parseActBreakdownResponse(responseText: string, template: any): Act[] {
 
     return acts;
   } catch (error: any) {
-    console.error('[OutlineGenerator] Parse error:', error);
-    console.error('[OutlineGenerator] Response text:', responseText);
+    logger.error({ error }, 'Outline parse error');
+    logger.error({ responseText }, 'Outline response text');
     throw new Error(`Failed to parse act breakdown: ${error.message}`);
   }
 }
@@ -224,7 +227,7 @@ async function generateChaptersForAct(
 
     return chapters;
   } catch (error: any) {
-    console.error('[OutlineGenerator] Error generating chapters for act:', error);
+    logger.error({ error }, 'Error generating chapters for act');
     throw error;
   }
 }
@@ -304,8 +307,8 @@ function parseChapterOutlineResponse(responseText: string, act: Act): ChapterOut
 
     return chapters;
   } catch (error: any) {
-    console.error('[OutlineGenerator] Parse error:', error);
-    console.error('[OutlineGenerator] Response text:', responseText);
+    logger.error({ error }, 'Outline parse error');
+    logger.error({ responseText }, 'Outline response text');
     throw new Error(`Failed to parse chapter outlines: ${error.message}`);
   }
 }
@@ -339,7 +342,7 @@ async function generateSceneCards(
 
     return sceneCards;
   } catch (error: any) {
-    console.error('[OutlineGenerator] Error generating scene cards:', error);
+    logger.error({ error }, 'Error generating scene cards');
     throw error;
   }
 }
@@ -422,8 +425,8 @@ function parseSceneCardsResponse(responseText: string): SceneCard[] {
 
     return scenes;
   } catch (error: any) {
-    console.error('[OutlineGenerator] Parse error:', error);
-    console.error('[OutlineGenerator] Response text:', responseText);
+    logger.error({ error }, 'Outline parse error');
+    logger.error({ responseText }, 'Outline response text');
     throw new Error(`Failed to parse scene cards: ${error.message}`);
   }
 }

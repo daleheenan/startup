@@ -4,8 +4,10 @@ import { randomUUID } from 'crypto';
 import type { Outline, StoryStructure, Project, Book } from '../shared/types/index.js';
 import { generateOutline, type OutlineContext } from '../services/outline-generator.js';
 import { getAllStructureTemplates } from '../services/structure-templates.js';
+import { createLogger } from '../services/logger.service.js';
 
 const router = Router();
+const logger = createLogger('routes:outlines');
 
 /**
  * GET /api/outlines/templates
@@ -16,7 +18,7 @@ router.get('/templates', (req, res) => {
     const templates = getAllStructureTemplates();
     res.json({ templates });
   } catch (error: any) {
-    console.error('[API] Error fetching templates:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error fetching templates');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -47,7 +49,7 @@ router.get('/book/:bookId', (req, res) => {
 
     res.json(parsedOutline);
   } catch (error: any) {
-    console.error('[API] Error fetching outline:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error fetching outline');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -118,7 +120,7 @@ router.post('/generate', async (req, res) => {
     };
 
     // Generate the outline
-    console.log(`[API] Generating outline for book: ${book.title}`);
+    logger.info({ bookId, bookTitle: book.title }, 'Generating outline for book');
     const structure = await generateOutline(context);
 
     // Calculate total chapters
@@ -166,7 +168,7 @@ router.post('/generate', async (req, res) => {
       updated_at: now,
     });
   } catch (error: any) {
-    console.error('[API] Error generating outline:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error generating outline');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -213,7 +215,7 @@ router.put('/:id', (req, res) => {
 
     res.json({ success: true });
   } catch (error: any) {
-    console.error('[API] Error updating outline:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error updating outline');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -288,7 +290,7 @@ router.post('/:id/start-generation', (req, res) => {
       jobsQueued: chapterIds.length,
     });
   } catch (error: any) {
-    console.error('[API] Error starting generation:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error starting generation');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -313,7 +315,7 @@ router.delete('/:id', (req, res) => {
 
     res.status(204).send();
   } catch (error: any) {
-    console.error('[API] Error deleting outline:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error deleting outline');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });

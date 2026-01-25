@@ -3,8 +3,10 @@ import { randomUUID } from 'crypto';
 import db from '../db/connection.js';
 import { ProseAnalyzer } from '../services/proseAnalyzer.js';
 import type { ProseStyle, VoiceSample, StylePreset, StyleTemplate, StyleCheck } from '../shared/types/index.js';
+import { createLogger } from '../services/logger.service.js';
 
 const router = express.Router();
+const logger = createLogger('routes:prose-styles');
 
 /**
  * Get all prose styles for a project
@@ -21,7 +23,7 @@ router.get('/project/:projectId', (req, res) => {
 
     res.json({ styles });
   } catch (error: any) {
-    console.error('[Prose Styles] Error fetching styles:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error fetching styles');
     res.status(500).json({ error: { code: 'FETCH_ERROR', message: error.message } });
   }
 });
@@ -41,7 +43,7 @@ router.get('/:styleId', (req, res) => {
 
     res.json({ style });
   } catch (error: any) {
-    console.error('[Prose Styles] Error fetching style:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error fetching style');
     res.status(500).json({ error: { code: 'FETCH_ERROR', message: error.message } });
   }
 });
@@ -97,7 +99,7 @@ router.post('/', (req, res) => {
 
     res.json({ style });
   } catch (error: any) {
-    console.error('[Prose Styles] Error creating style:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error creating style');
     res.status(500).json({ error: { code: 'CREATE_ERROR', message: error.message } });
   }
 });
@@ -169,7 +171,7 @@ router.put('/:styleId', (req, res) => {
 
     res.json({ style });
   } catch (error: any) {
-    console.error('[Prose Styles] Error updating style:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error updating style');
     res.status(500).json({ error: { code: 'UPDATE_ERROR', message: error.message } });
   }
 });
@@ -185,7 +187,7 @@ router.delete('/:styleId', (req, res) => {
 
     res.json({ success: true });
   } catch (error: any) {
-    console.error('[Prose Styles] Error deleting style:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error deleting style');
     res.status(500).json({ error: { code: 'DELETE_ERROR', message: error.message } });
   }
 });
@@ -225,7 +227,7 @@ router.post('/:styleId/voice-samples', (req, res) => {
 
     res.json({ sample });
   } catch (error: any) {
-    console.error('[Prose Styles] Error adding voice sample:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error adding voice sample');
     res.status(500).json({ error: { code: 'CREATE_ERROR', message: error.message } });
   }
 });
@@ -245,7 +247,7 @@ router.get('/:styleId/voice-samples', (req, res) => {
 
     res.json({ samples });
   } catch (error: any) {
-    console.error('[Prose Styles] Error fetching voice samples:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error fetching voice samples');
     res.status(500).json({ error: { code: 'FETCH_ERROR', message: error.message } });
   }
 });
@@ -276,7 +278,7 @@ router.get('/presets/all', (req, res) => {
 
     res.json({ presets });
   } catch (error: any) {
-    console.error('[Prose Styles] Error fetching presets:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error fetching presets');
     res.status(500).json({ error: { code: 'FETCH_ERROR', message: error.message } });
   }
 });
@@ -336,7 +338,7 @@ router.post('/presets/:presetId/apply', (req, res) => {
 
     res.json({ style });
   } catch (error: any) {
-    console.error('[Prose Styles] Error applying preset:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error applying preset');
     res.status(500).json({ error: { code: 'APPLY_ERROR', message: error.message } });
   }
 });
@@ -385,7 +387,7 @@ router.post('/check/:chapterId', (req, res) => {
 
     res.json({ check: styleCheck });
   } catch (error: any) {
-    console.error('[Prose Styles] Error checking style:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error checking style');
     res.status(500).json({ error: { code: 'CHECK_ERROR', message: error.message } });
   }
 });
@@ -405,7 +407,7 @@ router.get('/checks/chapter/:chapterId', (req, res) => {
 
     res.json({ checks });
   } catch (error: any) {
-    console.error('[Prose Styles] Error fetching checks:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error fetching checks');
     res.status(500).json({ error: { code: 'FETCH_ERROR', message: error.message } });
   }
 });

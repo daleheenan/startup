@@ -1,6 +1,9 @@
 import { claudeService } from './claude.service.js';
 import db from '../db/connection.js';
 import type { Chapter, Flag } from '../shared/types/index.js';
+import { createLogger } from './logger.service.js';
+
+const logger = createLogger('services:editing');
 
 /**
  * EditResult captures the output of an editing pass
@@ -41,7 +44,7 @@ export class EditingService {
    * Developmental Editor - Analyzes story structure, pacing, character development
    */
   async developmentalEdit(chapterId: string): Promise<EditResult> {
-    console.log(`[EditingService] Running developmental edit for chapter ${chapterId}`);
+    logger.info(`[EditingService] Running developmental edit for chapter ${chapterId}`);
 
     // Get chapter data
     const chapterData = this.getChapterData(chapterId);
@@ -122,8 +125,8 @@ Output only valid JSON, no commentary:`;
       resolved: false,
     }));
 
-    console.log(`[EditingService] Dev edit complete: ${suggestions.length} suggestions, ${flags.length} flags`);
-    console.log(`[EditingService] Needs revision: ${analysis.needsRevision}`);
+    logger.info(`[EditingService] Dev edit complete: ${suggestions.length} suggestions, ${flags.length} flags`);
+    logger.info(`[EditingService] Needs revision: ${analysis.needsRevision}`);
 
     return {
       editorType: 'developmental',
@@ -140,7 +143,7 @@ Output only valid JSON, no commentary:`;
    * Line Editor - Polishes prose, dialogue, sensory details
    */
   async lineEdit(chapterId: string): Promise<EditResult> {
-    console.log(`[EditingService] Running line edit for chapter ${chapterId}`);
+    logger.info(`[EditingService] Running line edit for chapter ${chapterId}`);
 
     const chapterData = this.getChapterData(chapterId);
     if (!chapterData.content) {
@@ -183,7 +186,7 @@ Output the edited chapter text:`;
     // Extract any [NEEDS AUTHOR: ...] markers as flags
     const flags = this.extractAuthorFlags(apiResponse.content);
 
-    console.log(`[EditingService] Line edit complete: ${flags.length} flags for author review`);
+    logger.info(`[EditingService] Line edit complete: ${flags.length} flags for author review`);
 
     return {
       editorType: 'line',
@@ -200,7 +203,7 @@ Output the edited chapter text:`;
    * Continuity Editor - Checks consistency with story bible and previous chapters
    */
   async continuityEdit(chapterId: string): Promise<EditResult> {
-    console.log(`[EditingService] Running continuity check for chapter ${chapterId}`);
+    logger.info(`[EditingService] Running continuity check for chapter ${chapterId}`);
 
     const chapterData = this.getChapterData(chapterId);
     if (!chapterData.content) {
@@ -285,7 +288,7 @@ Output only valid JSON, no commentary:`;
       resolved: false,
     }));
 
-    console.log(`[EditingService] Continuity check complete: ${suggestions.length} issues, ${flags.length} flags`);
+    logger.info(`[EditingService] Continuity check complete: ${suggestions.length} issues, ${flags.length} flags`);
 
     return {
       editorType: 'continuity',
@@ -302,7 +305,7 @@ Output only valid JSON, no commentary:`;
    * Copy Editor - Grammar, punctuation, style consistency
    */
   async copyEdit(chapterId: string): Promise<EditResult> {
-    console.log(`[EditingService] Running copy edit for chapter ${chapterId}`);
+    logger.info(`[EditingService] Running copy edit for chapter ${chapterId}`);
 
     const chapterData = this.getChapterData(chapterId);
     if (!chapterData.content) {
@@ -341,7 +344,7 @@ Output the corrected chapter text:`;
       temperature: 0.3, // Lower temperature for more precise corrections
     });
 
-    console.log(`[EditingService] Copy edit complete`);
+    logger.info(`[EditingService] Copy edit complete`);
 
     return {
       editorType: 'copy',
@@ -358,7 +361,7 @@ Output the corrected chapter text:`;
    * Author Revision - Author Agent revises chapter based on developmental feedback
    */
   async authorRevision(chapterId: string, devEditResult: EditResult): Promise<{ content: string; usage: { input_tokens: number; output_tokens: number } }> {
-    console.log(`[EditingService] Running author revision for chapter ${chapterId}`);
+    logger.info(`[EditingService] Running author revision for chapter ${chapterId}`);
 
     const chapterData = this.getChapterData(chapterId);
     if (!chapterData.content) {
@@ -399,7 +402,7 @@ Output the revised chapter:`;
       temperature: 1.0,
     });
 
-    console.log(`[EditingService] Author revision complete`);
+    logger.info(`[EditingService] Author revision complete`);
 
     return { content: apiResponse.content.trim(), usage: apiResponse.usage };
   }
@@ -515,7 +518,7 @@ Output the revised chapter:`;
    * Update chapter with edit result
    */
   async applyEditResult(chapterId: string, result: EditResult): Promise<void> {
-    console.log(`[EditingService] Applying ${result.editorType} edit to chapter ${chapterId}`);
+    logger.info(`[EditingService] Applying ${result.editorType} edit to chapter ${chapterId}`);
 
     // Get existing flags
     const getStmt = db.prepare<[string], { flags: string | null }>(`
@@ -541,7 +544,7 @@ Output the revised chapter:`;
       chapterId
     );
 
-    console.log(`[EditingService] Applied edit: ${result.flags.length} new flags added`);
+    logger.info(`[EditingService] Applied edit: ${result.flags.length} new flags added`);
   }
 }
 

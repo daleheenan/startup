@@ -1,6 +1,9 @@
 import db from '../db/connection.js';
 import { claudeService } from './claude.service.js';
 import type { SeriesMystery } from '../shared/types/index.js';
+import { createLogger } from './logger.service.js';
+
+const logger = createLogger('services:mystery-tracking');
 
 interface ExtractedMystery {
   question: string;
@@ -25,7 +28,7 @@ export class MysteryTrackingService {
     chapterId: string,
     content: string
   ): Promise<SeriesMystery[]> {
-    console.log(`[MysteryTracking] Extracting mysteries from chapter ${chapterId}`);
+    logger.info(`[MysteryTracking] Extracting mysteries from chapter ${chapterId}`);
 
     // Get chapter metadata
     const chapterStmt = db.prepare<[string], any>(`
@@ -96,7 +99,7 @@ export class MysteryTrackingService {
       });
     }
 
-    console.log(`[MysteryTracking] Extracted ${mysteries.length} mysteries`);
+    logger.info(`[MysteryTracking] Extracted ${mysteries.length} mysteries`);
     return mysteries;
   }
 
@@ -107,7 +110,7 @@ export class MysteryTrackingService {
     chapterId: string,
     content: string
   ): Promise<MysteryResolution[]> {
-    console.log(`[MysteryTracking] Finding mystery resolutions in chapter ${chapterId}`);
+    logger.info(`[MysteryTracking] Finding mystery resolutions in chapter ${chapterId}`);
 
     // Get chapter metadata
     const chapterStmt = db.prepare<[string], any>(`
@@ -127,7 +130,7 @@ export class MysteryTrackingService {
     const openMysteries = this.getOpenMysteries(chapter.project_id);
 
     if (openMysteries.length === 0) {
-      console.log('[MysteryTracking] No open mysteries to resolve');
+      logger.info('[MysteryTracking] No open mysteries to resolve');
       return [];
     }
 
@@ -163,7 +166,7 @@ export class MysteryTrackingService {
       );
     }
 
-    console.log(`[MysteryTracking] Found ${resolutions.length} resolutions`);
+    logger.info(`[MysteryTracking] Found ${resolutions.length} resolutions`);
     return resolutions;
   }
 
@@ -249,7 +252,7 @@ export class MysteryTrackingService {
   deleteMystery(mysteryId: string): void {
     const stmt = db.prepare(`DELETE FROM series_mysteries WHERE id = ?`);
     stmt.run(mysteryId);
-    console.log(`[MysteryTracking] Deleted mystery ${mysteryId}`);
+    logger.info(`[MysteryTracking] Deleted mystery ${mysteryId}`);
   }
 
   /**
@@ -345,14 +348,14 @@ Only include mysteries that are definitively answered, not partial hints or clue
       // Extract JSON from response
       const jsonMatch = response.match(/\[[\s\S]*\]/);
       if (!jsonMatch) {
-        console.warn('[MysteryTracking] No JSON array found in response');
+        logger.warn('No JSON array found in mystery tracking response');
         return [];
       }
 
       const parsed = JSON.parse(jsonMatch[0]);
 
       if (!Array.isArray(parsed)) {
-        console.warn('[MysteryTracking] Response is not an array');
+        logger.warn('Mystery tracking response is not an array');
         return [];
       }
 
@@ -364,7 +367,7 @@ Only include mysteries that are definitively answered, not partial hints or clue
           importance: item.importance as 'major' | 'minor' | 'subplot',
         }));
     } catch (error) {
-      console.error('[MysteryTracking] Error parsing mystery extraction response:', error);
+      logger.error({ error }, 'Error parsing mystery extraction response');
       return [];
     }
   }
@@ -377,14 +380,14 @@ Only include mysteries that are definitively answered, not partial hints or clue
       // Extract JSON from response
       const jsonMatch = response.match(/\[[\s\S]*\]/);
       if (!jsonMatch) {
-        console.warn('[MysteryTracking] No JSON array found in response');
+        logger.warn('No JSON array found in mystery tracking response');
         return [];
       }
 
       const parsed = JSON.parse(jsonMatch[0]);
 
       if (!Array.isArray(parsed)) {
-        console.warn('[MysteryTracking] Response is not an array');
+        logger.warn('Mystery tracking response is not an array');
         return [];
       }
 
@@ -396,7 +399,7 @@ Only include mysteries that are definitively answered, not partial hints or clue
           confidence: item.confidence,
         }));
     } catch (error) {
-      console.error('[MysteryTracking] Error parsing resolution response:', error);
+      logger.error({ error }, 'Error parsing resolution response');
       return [];
     }
   }

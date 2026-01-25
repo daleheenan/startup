@@ -12,11 +12,11 @@ MAINTENANCE RULES:
 
 ## Summary Statistics
 
-- **Total tasks completed**: 5
-- **Total lessons recorded**: 5
+- **Total tasks completed**: 7
+- **Total lessons recorded**: 7
 - **Last updated**: 2026-01-25
 - **Proven lessons** (score >= 5): 0
-- **Top themes**: #typescript #testing #patterns #frontend #backend #database #migrations
+- **Top themes**: #typescript #testing #patterns #frontend #backend #database #migrations #third-party-integration #performance #caching
 
 ---
 
@@ -29,6 +29,61 @@ MAINTENANCE RULES:
 ---
 
 ## Active Lessons (Most Recent First)
+
+### 2026-01-25 | Task: Sprint 15 Database and API Optimization
+
+**Date**: 2026-01-25
+**Task**: Implementing database query optimization and API response caching for backend performance
+**Context**: Backend using better-sqlite3, Express.js routes, need to improve query performance and reduce redundant data fetching
+
+**What Worked Well**:
+- Analyzing existing schema and migrations first to identify what indexes already existed (avoided duplicates)
+- Creating a simple, focused in-memory cache service with clear interface (get, set, invalidate, clear)
+- Using pattern-based cache invalidation (e.g., `cache.invalidate('genre-tropes:')`) for related entries
+- Adding composite indexes for common query patterns (status + created_at for jobs table)
+- Writing comprehensive tests for cache service before integrating into routes
+- Adding performance logging to measure impact (`const startTime = Date.now()`)
+- Different TTL values based on data volatility (1 hour for static, 5 minutes for dynamic)
+- Systematic caching: import cache, check cache, use or set, invalidate on updates
+
+**What Didn't Work**:
+- Initially used vitest imports in test file when project uses jest (caught by test runner)
+- Build script doesn't copy new migration files automatically (had to manually copy 013 to dist)
+
+**Lesson**: When implementing performance optimizations, always analyze what already exists before adding new indexes. For caching, use a layered approach: (1) cache static data aggressively with long TTL, (2) cache expensive operations with shorter TTL, (3) invalidate related caches on updates. Pattern-based invalidation (prefix matching) is cleaner than tracking individual keys for related data.
+
+**Application Score**: 0
+
+**Tags**: #performance #caching #database #indexes #optimization #backend #migrations
+
+---
+
+### 2026-01-25 | Task: Sentry Integration for Error Tracking
+
+**Date**: 2026-01-25
+**Task**: Integrating Sentry SDK for error tracking in NovelForge backend
+**Context**: Adding third-party error monitoring service to production Express/TypeScript application
+
+**What Worked Well**:
+- Reading existing service patterns (logger.service.ts) before creating sentry.service.ts ensured consistency
+- Initializing Sentry at the very top of server.ts (before other imports) follows Sentry best practices
+- Creating a service wrapper with graceful skipping (when SENTRY_DSN not set) prevents dev environment errors
+- Excluding test files from tsconfig build prevents unrelated test errors from blocking deployment
+- Building incrementally: service -> initialization -> middleware -> error handlers
+- Testing startup without DSN configured verified graceful degradation
+
+**What Didn't Work**:
+- Initial attempt to use `Sentry.Handlers.errorHandler()` failed because Sentry v10 uses different API
+- File watching/linting made editing route files difficult - had to focus on core integration first
+- Didn't check Sentry version before implementing - should verify third-party API versions
+
+**Lesson**: When integrating third-party SDKs, always check the installed version and use version-specific documentation. Create a service wrapper that gracefully handles missing configuration (fail open for development). Exclude test files from production builds to prevent test-only errors from blocking deployment.
+
+**Application Score**: 0
+
+**Tags**: #third-party-integration #error-tracking #sentry #typescript #graceful-degradation #service-wrapper
+
+---
 
 ### 2026-01-25 | Task: Implementing Mystery Tracking Feature
 

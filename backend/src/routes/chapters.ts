@@ -5,6 +5,7 @@ import type { Chapter } from '../shared/types/index.js';
 import { chapterOrchestratorService } from '../services/chapter-orchestrator.service.js';
 import { sendBadRequest, sendNotFound, sendInternalError } from '../utils/response-helpers.js';
 import { createLogger } from '../services/logger.service.js';
+import { cache } from '../services/cache.service.js';
 
 const router = Router();
 const logger = createLogger('routes:chapters');
@@ -176,6 +177,18 @@ router.put('/:id', (req, res) => {
 
     if (result.changes === 0) {
       return sendNotFound(res, 'Chapter');
+    }
+
+    // Invalidate series bible cache when chapter is updated
+    // Get chapter's project_id via book to invalidate the right cache
+    const chapterStmt = db.prepare<[string], any>(`
+      SELECT b.project_id FROM chapters c
+      JOIN books b ON c.book_id = b.id
+      WHERE c.id = ?
+    `);
+    const chapter = chapterStmt.get(req.params.id);
+    if (chapter) {
+      cache.invalidate(`series-bible:${chapter.project_id}`);
     }
 
     res.json({ success: true });

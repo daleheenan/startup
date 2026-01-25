@@ -1,8 +1,11 @@
 import Anthropic from '@anthropic-ai/sdk';
 import dotenv from 'dotenv';
 import { randomUUID } from 'crypto';
+import { createLogger } from './logger.service.js';
 
 dotenv.config();
+
+const logger = createLogger('services:character-generator');
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -51,7 +54,7 @@ export async function generateProtagonist(
 ): Promise<Character> {
   const prompt = buildProtagonistPrompt(context);
 
-  console.log('[CharacterGenerator] Generating protagonist...');
+  logger.info('[CharacterGenerator] Generating protagonist...');
 
   try {
     const message = await anthropic.messages.create({
@@ -72,11 +75,11 @@ export async function generateProtagonist(
 
     const character = parseCharacterResponse(responseText, 'protagonist');
 
-    console.log(`[CharacterGenerator] Protagonist "${character.name}" generated`);
+    logger.info(`[CharacterGenerator] Protagonist "${character.name}" generated`);
 
     return character;
   } catch (error: any) {
-    console.error('[CharacterGenerator] Error:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Character generation error');
     throw error;
   }
 }
@@ -90,7 +93,7 @@ export async function generateSupportingCast(
 ): Promise<Character[]> {
   const prompt = buildSupportingCastPrompt(context, protagonist);
 
-  console.log('[CharacterGenerator] Generating supporting cast...');
+  logger.info('[CharacterGenerator] Generating supporting cast...');
 
   try {
     const message = await anthropic.messages.create({
@@ -111,11 +114,11 @@ export async function generateSupportingCast(
 
     const characters = parseSupportingCastResponse(responseText);
 
-    console.log(`[CharacterGenerator] Generated ${characters.length} supporting characters`);
+    logger.info(`[CharacterGenerator] Generated ${characters.length} supporting characters`);
 
     return characters;
   } catch (error: any) {
-    console.error('[CharacterGenerator] Error:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Character generation error');
     throw error;
   }
 }
@@ -275,8 +278,8 @@ function parseCharacterResponse(responseText: string, role: CharacterRole): Char
 
     return character;
   } catch (error: any) {
-    console.error('[CharacterGenerator] Parse error:', error);
-    console.error('[CharacterGenerator] Response text:', responseText);
+    logger.error({ error: error.message, stack: error.stack }, 'Character generation parse error');
+    logger.error({ responseText }, 'Character generation response text');
     throw new Error(`Failed to parse character: ${error.message}`);
   }
 }
@@ -310,8 +313,8 @@ function parseSupportingCastResponse(responseText: string): Character[] {
 
     return characters;
   } catch (error: any) {
-    console.error('[CharacterGenerator] Parse error:', error);
-    console.error('[CharacterGenerator] Response text:', responseText);
+    logger.error({ error: error.message, stack: error.stack }, 'Character generation parse error');
+    logger.error({ responseText }, 'Character generation response text');
     throw new Error(`Failed to parse supporting cast: ${error.message}`);
   }
 }

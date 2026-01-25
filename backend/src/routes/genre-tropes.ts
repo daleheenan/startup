@@ -1,9 +1,13 @@
 import express from 'express';
 import { genreTropesService } from '../services/genre-tropes.service.js';
 import { createLogger } from '../services/logger.service.js';
+import { cache } from '../services/cache.service.js';
 
 const router = express.Router();
 const logger = createLogger('routes:genre-tropes');
+
+// Cache TTL in seconds
+const CACHE_TTL = 3600; // 1 hour for genre tropes (static/semi-static data)
 
 /**
  * GET /api/genre-tropes
@@ -18,13 +22,28 @@ router.get('/', (req, res) => {
       usage_frequency: req.query.usage_frequency as string | undefined,
     };
 
+    // Create cache key from filter parameters
+    const cacheKey = `genre-tropes:list:${JSON.stringify(filters)}`;
+
+    // Try cache first
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      logger.info({ filters }, 'Genre tropes cache hit');
+      return res.json(cached);
+    }
+
     const tropes = genreTropesService.getTropes(filters);
 
-    res.json({
+    const response = {
       success: true,
       tropes,
       count: tropes.length,
-    });
+    };
+
+    // Cache the result
+    cache.set(cacheKey, response, CACHE_TTL);
+
+    res.json(response);
   } catch (error) {
     logger.error({ error: error instanceof Error ? error.message : error }, 'Error fetching tropes');
     res.status(500).json({
@@ -43,15 +62,29 @@ router.get('/genres/:genre', (req, res) => {
     const { genre } = req.params;
     const subgenre = req.query.subgenre as string | undefined;
 
+    const cacheKey = `genre-tropes:genre:${genre}:${subgenre || 'all'}`;
+
+    // Try cache first
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      logger.info({ genre, subgenre }, 'Genre tropes by genre cache hit');
+      return res.json(cached);
+    }
+
     const tropes = genreTropesService.getTropesByGenre(genre, subgenre);
 
-    res.json({
+    const response = {
       success: true,
       genre,
       subgenre,
       tropes,
       count: tropes.length,
-    });
+    };
+
+    // Cache the result
+    cache.set(cacheKey, response, CACHE_TTL);
+
+    res.json(response);
   } catch (error) {
     logger.error({ error: error instanceof Error ? error.message : error, genre: req.params.genre }, 'Error fetching tropes for genre');
     res.status(500).json({
@@ -178,6 +211,10 @@ router.post('/', (req, res) => {
       examples,
       subversions,
     });
+
+    // Invalidate all genre-tropes caches since we added new data
+    cache.invalidate('genre-tropes:');
+    logger.info({ trope_name, genre }, 'Created new trope, invalidated cache');
 
     res.status(201).json({
       success: true,

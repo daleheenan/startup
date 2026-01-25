@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, ReactNode, useRef, useEffect } from 'react';
 
 interface Toast {
   id: string;
@@ -29,9 +29,16 @@ export function useToast() {
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const timeoutRefs = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
+    // Clear the timeout when toast is manually removed
+    const timeoutId = timeoutRefs.current.get(id);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutRefs.current.delete(id);
+    }
   }, []);
 
   const showToast = useCallback((message: string, type: Toast['type'] = 'info', duration = 4000) => {
@@ -41,9 +48,20 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setToasts((prev) => [...prev, newToast]);
 
     if (duration > 0) {
-      setTimeout(() => removeToast(id), duration);
+      const timeoutId = setTimeout(() => {
+        removeToast(id);
+      }, duration);
+      timeoutRefs.current.set(id, timeoutId);
     }
   }, [removeToast]);
+
+  // Cleanup all pending timeouts on unmount
+  useEffect(() => {
+    return () => {
+      timeoutRefs.current.forEach(timeout => clearTimeout(timeout));
+      timeoutRefs.current.clear();
+    };
+  }, []);
 
   const showSuccess = useCallback((message: string) => showToast(message, 'success'), [showToast]);
   const showError = useCallback((message: string) => showToast(message, 'error', 6000), [showToast]);

@@ -220,11 +220,36 @@
 
 5. **Style Preview** - Generate sample paragraphs in selected style before applying
 
+6. **User-Added Author Presets** (AI-Assisted)
+   - User enters author name they want to add
+   - AI agent automatically searches online for:
+     - Author biography and background
+     - Notable books and series
+     - Writing style characteristics (prose, pacing, dialogue)
+     - Common themes and tropes
+     - Critical analysis and reviews
+   - Auto-populates preset fields:
+     - Sentence length patterns
+     - Vocabulary level
+     - Dialogue style
+     - Description density
+     - POV preferences
+     - Pacing characteristics
+     - Signature techniques
+   - User can review and adjust before saving
+   - Preset is added to their personal library
+
 **Technical Implementation**:
-- Database table for style presets
+- Database table for style presets (system + user-created)
 - Style configuration JSON schema
 - Integration with Story DNA generation
 - UI for style selection in project setup
+- **Author Research Agent** that:
+  - Uses web search to gather author information
+  - Analyzes writing style from descriptions/reviews
+  - Extracts quantifiable style parameters
+  - Generates preset configuration automatically
+- User review/edit flow before saving custom author
 
 **Success Criteria**:
 - [ ] 30+ author style presets available
@@ -233,6 +258,9 @@
 - [ ] Style mixing with up to 3 sources
 - [ ] Preview generates in < 30 seconds
 - [ ] Styles persist in project settings
+- [ ] Can add custom author by name
+- [ ] AI auto-populates author style from web research
+- [ ] User can review/edit before saving
 
 ---
 

@@ -1,7 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk';
 import dotenv from 'dotenv';
+import { createLogger } from './logger.service.js';
 
 dotenv.config();
+
+const logger = createLogger('services:story-dna-generator');
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -41,7 +44,7 @@ export interface ConceptInput {
 export async function generateStoryDNA(concept: ConceptInput): Promise<StoryDNA> {
   const prompt = buildStoryDNAPrompt(concept);
 
-  console.log('[StoryDNAGenerator] Generating Story DNA...');
+  logger.info('[StoryDNAGenerator] Generating Story DNA...');
 
   try {
     const message = await anthropic.messages.create({
@@ -62,11 +65,11 @@ export async function generateStoryDNA(concept: ConceptInput): Promise<StoryDNA>
 
     const storyDNA = parseStoryDNAResponse(responseText);
 
-    console.log('[StoryDNAGenerator] Story DNA generated successfully');
+    logger.info('[StoryDNAGenerator] Story DNA generated successfully');
 
     return storyDNA;
   } catch (error: any) {
-    console.error('[StoryDNAGenerator] Error:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Story DNA generation error');
     throw error;
   }
 }
@@ -138,8 +141,8 @@ function parseStoryDNAResponse(responseText: string): StoryDNA {
 
     return storyDNA;
   } catch (error: any) {
-    console.error('[StoryDNAGenerator] Parse error:', error);
-    console.error('[StoryDNAGenerator] Response text:', responseText);
+    logger.error({ error: error.message, stack: error.stack }, 'Story DNA parse error');
+    logger.error({ responseText }, 'Story DNA response text');
     throw new Error(`Failed to parse Story DNA: ${error.message}`);
   }
 }

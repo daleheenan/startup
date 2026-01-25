@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { mysteryTrackingService } from '../services/mystery-tracking.service.js';
+import { createLogger } from '../services/logger.service.js';
 
 const router = Router();
+const logger = createLogger('routes:mysteries');
 
 /**
  * GET /api/mysteries/series/:seriesId
@@ -15,7 +17,7 @@ router.get('/series/:seriesId', (req, res) => {
 
     res.json({ mysteries });
   } catch (error: any) {
-    console.error('[API] Error getting series mysteries:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error getting series mysteries');
     res.status(500).json({
       error: { code: 'INTERNAL_ERROR', message: error.message },
     });
@@ -34,7 +36,7 @@ router.get('/series/:seriesId/open', (req, res) => {
 
     res.json({ mysteries });
   } catch (error: any) {
-    console.error('[API] Error getting open mysteries:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error getting open mysteries');
     res.status(500).json({
       error: { code: 'INTERNAL_ERROR', message: error.message },
     });
@@ -53,7 +55,7 @@ router.get('/series/:seriesId/timeline', (req, res) => {
 
     res.json({ timeline });
   } catch (error: any) {
-    console.error('[API] Error getting mystery timeline:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error getting mystery timeline');
     res.status(500).json({
       error: { code: 'INTERNAL_ERROR', message: error.message },
     });
@@ -82,7 +84,7 @@ router.post('/chapters/:chapterId/extract', async (req, res) => {
 
     res.json({ mysteries });
   } catch (error: any) {
-    console.error('[API] Error extracting mysteries:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error extracting mysteries');
     res.status(500).json({
       error: { code: 'INTERNAL_ERROR', message: error.message },
     });
@@ -111,7 +113,7 @@ router.post('/chapters/:chapterId/find-resolutions', async (req, res) => {
 
     res.json({ resolutions });
   } catch (error: any) {
-    console.error('[API] Error finding resolutions:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error finding resolutions');
     res.status(500).json({
       error: { code: 'INTERNAL_ERROR', message: error.message },
     });
@@ -146,7 +148,7 @@ router.patch('/:id', (req, res) => {
 
     res.json({ mystery });
   } catch (error: any) {
-    console.error('[API] Error updating mystery:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error updating mystery');
     res.status(500).json({
       error: { code: 'INTERNAL_ERROR', message: error.message },
     });
@@ -165,7 +167,7 @@ router.delete('/:id', (req, res) => {
 
     res.json({ success: true });
   } catch (error: any) {
-    console.error('[API] Error deleting mystery:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error deleting mystery');
     res.status(500).json({
       error: { code: 'INTERNAL_ERROR', message: error.message },
     });

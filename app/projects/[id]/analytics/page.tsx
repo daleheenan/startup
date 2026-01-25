@@ -3,8 +3,18 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import AnalyticsDashboard from '../../../components/AnalyticsDashboard';
+import dynamic from 'next/dynamic';
 import { getToken, logout } from '../../../lib/auth';
+
+// Lazy load AnalyticsDashboard - heavy component with charts
+const AnalyticsDashboard = dynamic(() => import('../../../components/AnalyticsDashboard'), {
+  loading: () => (
+    <div style={{ padding: '2rem', textAlign: 'center', color: '#64748B' }}>
+      Loading analytics...
+    </div>
+  ),
+  ssr: false, // Analytics don't need SSR
+});
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 

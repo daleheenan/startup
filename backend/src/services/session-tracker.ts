@@ -1,5 +1,8 @@
 import db from '../db/connection.js';
 import type { SessionTracking } from '../shared/types/index.js';
+import { createLogger } from './logger.service.js';
+
+const logger = createLogger('services:session-tracker');
 
 /**
  * SessionTracker manages Claude Max subscription session tracking.
@@ -34,7 +37,7 @@ export class SessionTracker {
     const now = new Date();
     const resetTime = new Date(now.getTime() + SessionTracker.SESSION_DURATION_MS);
 
-    console.log(`[SessionTracker] Starting new session. Resets at: ${resetTime.toISOString()}`);
+    logger.info(`[SessionTracker] Starting new session. Resets at: ${resetTime.toISOString()}`);
 
     const stmt = db.prepare(`
       UPDATE session_tracking
@@ -97,7 +100,7 @@ export class SessionTracker {
    * Clear session data (used when session resets)
    */
   clearSession(): void {
-    console.log('[SessionTracker] Clearing session data');
+    logger.info('[SessionTracker] Clearing session data');
 
     const stmt = db.prepare(`
       UPDATE session_tracking

@@ -1,5 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
 import db from '../db/connection.js';
+import { createLogger } from './logger.service.js';
+
+const logger = createLogger('services:genre-tropes');
 
 export interface GenreTrope {
   id: string;
@@ -57,7 +60,7 @@ class GenreTropesService {
 
       return rows.map(this.parseTrope);
     } catch (error) {
-      console.error('Error fetching tropes by genre:', error);
+      logger.error({ error }, 'Error fetching tropes by genre');
       throw error;
     }
   }
@@ -97,7 +100,7 @@ class GenreTropesService {
 
       return rows.map(this.parseTrope);
     } catch (error) {
-      console.error('Error fetching tropes with filters:', error);
+      logger.error({ error }, 'Error fetching tropes with filters');
       throw error;
     }
   }
@@ -116,7 +119,7 @@ class GenreTropesService {
 
       return this.parseTrope(row);
     } catch (error) {
-      console.error('Error fetching trope by ID:', error);
+      logger.error({ error }, 'Error fetching trope by ID');
       throw error;
     }
   }
@@ -142,7 +145,7 @@ class GenreTropesService {
 
       return rows.map(this.parseTrope);
     } catch (error) {
-      console.error('Error fetching tropes for genres:', error);
+      logger.error({ error }, 'Error fetching tropes for genres');
       throw error;
     }
   }
@@ -170,7 +173,7 @@ class GenreTropesService {
         insertStmt.run(id, conceptId, trope.tropeId, trope.preference, trope.notes || null);
       }
     } catch (error) {
-      console.error('Error saving concept tropes:', error);
+      logger.error({ error }, 'Error saving concept tropes');
       throw error;
     }
   }
@@ -225,7 +228,7 @@ class GenreTropesService {
         },
       }));
     } catch (error) {
-      console.error('Error fetching concept tropes:', error);
+      logger.error({ error }, 'Error fetching concept tropes');
       throw error;
     }
   }
@@ -258,7 +261,7 @@ class GenreTropesService {
 
       return genreTropes;
     } catch (error) {
-      console.error('Error getting recommended tropes:', error);
+      logger.error({ error }, 'Error getting recommended tropes');
       throw error;
     }
   }
@@ -303,7 +306,7 @@ class GenreTropesService {
         updated_at: now,
       };
     } catch (error) {
-      console.error('Error creating trope:', error);
+      logger.error({ error }, 'Error creating trope');
       throw error;
     }
   }

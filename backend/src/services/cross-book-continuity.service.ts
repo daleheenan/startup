@@ -9,6 +9,9 @@ import type {
   WorldElements,
 } from '../shared/types/index.js';
 import { claudeService } from './claude.service.js';
+import { createLogger } from './logger.service.js';
+
+const logger = createLogger('services:cross-book-continuity');
 
 /**
  * CrossBookContinuityService manages character and world state across books in a trilogy
@@ -19,7 +22,7 @@ export class CrossBookContinuityService {
    * Captures the state of all characters and world at the end of a book
    */
   async generateBookEndingState(bookId: string): Promise<BookEndingState> {
-    console.log(`[CrossBookContinuity] Generating ending state for book ${bookId}`);
+    logger.info(`[CrossBookContinuity] Generating ending state for book ${bookId}`);
 
     // Get the book
     const bookStmt = db.prepare<[string], Book>(`
@@ -81,7 +84,7 @@ export class CrossBookContinuityService {
       bookId
     );
 
-    console.log(`[CrossBookContinuity] Ending state saved for book ${bookId}`);
+    logger.info(`[CrossBookContinuity] Ending state saved for book ${bookId}`);
 
     return endingState;
   }
@@ -90,7 +93,7 @@ export class CrossBookContinuityService {
    * Generate book summary for context in next book
    */
   async generateBookSummary(bookId: string): Promise<string> {
-    console.log(`[CrossBookContinuity] Generating summary for book ${bookId}`);
+    logger.info(`[CrossBookContinuity] Generating summary for book ${bookId}`);
 
     // Get all chapter summaries
     const chaptersStmt = db.prepare<[string], any>(`
@@ -158,7 +161,7 @@ Write in past tense, objective narrative style.`;
       bookId
     );
 
-    console.log(`[CrossBookContinuity] Book summary saved for book ${bookId}`);
+    logger.info(`[CrossBookContinuity] Book summary saved for book ${bookId}`);
 
     return summary;
   }
@@ -179,7 +182,7 @@ Write in past tense, objective narrative style.`;
     const previousBook = previousBookStmt.get(projectId, currentBookNumber - 1);
 
     if (!previousBook?.ending_state) {
-      console.warn(`[CrossBookContinuity] No ending state found for book ${currentBookNumber - 1}`);
+      logger.warn({ bookNumber: currentBookNumber - 1 }, 'No ending state found for previous book');
       return null;
     }
 
@@ -212,7 +215,7 @@ Write in past tense, objective narrative style.`;
     currentStoryBible: StoryBible,
     previousState: BookEndingState
   ): StoryBible {
-    console.log(`[CrossBookContinuity] Applying previous book ending state`);
+    logger.info(`[CrossBookContinuity] Applying previous book ending state`);
 
     // Update character current states
     const updatedCharacters = currentStoryBible.characters.map(char => {

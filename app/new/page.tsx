@@ -3,9 +3,19 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import GenrePreferenceForm from '../components/GenrePreferenceForm';
+import dynamic from 'next/dynamic';
 import GenerationProgress from '../components/GenerationProgress';
 import { getToken } from '../lib/auth';
+
+// Lazy load GenrePreferenceForm - form with complex validation
+const GenrePreferenceForm = dynamic(() => import('../components/GenrePreferenceForm'), {
+  loading: () => (
+    <div style={{ padding: '2rem', textAlign: 'center', color: '#64748B' }}>
+      Loading form...
+    </div>
+  ),
+  ssr: false,
+});
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 

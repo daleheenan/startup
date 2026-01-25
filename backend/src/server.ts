@@ -1,11 +1,14 @@
+// Initialize Sentry FIRST - must be before all other imports
+import dotenv from 'dotenv';
+dotenv.config();
+
+import { initSentry, errorHandler as sentryErrorHandler, captureException } from './services/sentry.service.js';
+initSentry();
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import dotenv from 'dotenv';
-
-// Load environment variables first
-dotenv.config();
 
 console.log('[Server] Starting NovelForge Backend...');
 console.log('[Server] NODE_ENV:', process.env.NODE_ENV);
@@ -47,6 +50,9 @@ try {
   console.log('[Server] Migrations complete');
 } catch (error) {
   console.error('[Server] Migration failed:', error);
+  if (error instanceof Error) {
+    captureException(error, { context: 'database_migration' });
+  }
   process.exit(1);
 }
 
@@ -132,7 +138,10 @@ app.use('/api/analytics', apiLimiter, requireAuth, analyticsRouter);
 app.use('/api/presets', apiLimiter, requireAuth, presetsRouter);
 app.use('/api/mysteries', apiLimiter, requireAuth, mysteriesRouter);
 
-// Error handling
+// Sentry error handler - must be BEFORE custom error handlers
+app.use(sentryErrorHandler());
+
+// Custom error handling
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   // Use request logger if available, otherwise use global logger
   const log = req.log || logger;
@@ -159,6 +168,9 @@ app.listen(PORT, () => {
   logger.info('Starting queue worker');
   queueWorker.start().catch((error) => {
     logger.error({ error }, 'Queue worker failed to start');
+    if (error instanceof Error) {
+      captureException(error, { context: 'queue_worker_startup' });
+    }
     process.exit(1);
   });
 });
@@ -172,6 +184,9 @@ async function shutdown(signal: string) {
     process.exit(0);
   } catch (error) {
     logger.error({ error }, 'Shutdown error');
+    if (error instanceof Error) {
+      captureException(error, { context: 'graceful_shutdown', signal });
+    }
     process.exit(1);
   }
 }

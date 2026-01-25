@@ -3,6 +3,7 @@ import db from '../db/connection.js';
 import { randomUUID } from 'crypto';
 import type { Book } from '../shared/types/index.js';
 import { createLogger } from '../services/logger.service.js';
+import { cache } from '../services/cache.service.js';
 
 const router = Router();
 const logger = createLogger('routes:books');
@@ -132,6 +133,14 @@ router.put('/:id', (req, res) => {
       return res.status(404).json({
         error: { code: 'NOT_FOUND', message: 'Book not found' },
       });
+    }
+
+    // Invalidate series bible cache when book is updated
+    // Get book's project_id to invalidate the right cache
+    const bookStmt = db.prepare<[string], Book>(`SELECT project_id FROM books WHERE id = ?`);
+    const book = bookStmt.get(req.params.id);
+    if (book) {
+      cache.invalidate(`series-bible:${book.project_id}`);
     }
 
     res.json({ success: true });
