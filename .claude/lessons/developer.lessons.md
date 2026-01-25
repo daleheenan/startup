@@ -12,11 +12,11 @@ MAINTENANCE RULES:
 
 ## Summary Statistics
 
-- **Total tasks completed**: 4
-- **Total lessons recorded**: 4
-- **Last updated**: 2026-01-24
+- **Total tasks completed**: 5
+- **Total lessons recorded**: 5
+- **Last updated**: 2026-01-25
 - **Proven lessons** (score >= 5): 0
-- **Top themes**: #typescript #testing #patterns #frontend #backend
+- **Top themes**: #typescript #testing #patterns #frontend #backend #database #migrations
 
 ---
 
@@ -29,6 +29,33 @@ MAINTENANCE RULES:
 ---
 
 ## Active Lessons (Most Recent First)
+
+### 2026-01-25 | Task: Implementing Mystery Tracking Feature
+
+**Date**: 2026-01-25
+**Task**: Implementing mystery tracking system for plot mysteries across book series
+**Context**: Full-stack feature with database migration, service layer, API routes, and integration with existing SeriesBibleGeneratorService
+
+**What Worked Well**:
+- Reading existing patterns first (checked SeriesBibleGeneratorService, ClaudeService, migration structure)
+- Following established migration numbering and structure (012_mystery_tracking.sql)
+- Using proper TypeScript interfaces that match database schema
+- Creating comprehensive service with Claude integration for automated mystery extraction
+- Building API routes following existing REST patterns
+- Writing integration tests to verify functionality end-to-end
+- Updating both shared types directories (shared/types and backend/src/shared/types)
+
+**What Didn't Work**:
+- Initial implementation forgot to include answered_book and answered_chapter in manual status updates
+- Had to manually copy migration file to dist/ after build due to build script failing on test errors
+
+**Lesson**: When implementing database-backed features, always ensure update methods handle all related fields atomically. For mystery resolutions, status, answer, answered_book, and answered_chapter should all be updated together to maintain data consistency.
+
+**Application Score**: 0
+
+**Tags**: #database #migrations #service-layer #api #claude-integration #full-stack
+
+---
 
 ### 2026-01-24 | Task: Implementing Sprints 16 & 17 - Interactive Editing & Regeneration
 

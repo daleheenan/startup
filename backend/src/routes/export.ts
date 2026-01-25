@@ -1,7 +1,9 @@
 import express, { Request, Response } from 'express';
 import { exportService } from '../services/export.service.js';
+import { createLogger } from '../services/logger.service.js';
 
 const router = express.Router();
+const logger = createLogger('routes:export');
 
 /**
  * Export project as DOCX
@@ -16,7 +18,7 @@ router.get('/docx/:projectId', async (req: Request, res: Response) => {
     res.setHeader('Content-Disposition', `attachment; filename="manuscript-${projectId}.docx"`);
     res.send(buffer);
   } catch (error) {
-    console.error('Error generating DOCX:', error);
+    logger.error({ error: error instanceof Error ? error.message : error, projectId: req.params.projectId }, 'Error generating DOCX');
     res.status(500).json({
       error: 'Failed to generate DOCX',
       message: error instanceof Error ? error.message : 'Unknown error',
@@ -37,7 +39,7 @@ router.get('/pdf/:projectId', async (req: Request, res: Response) => {
     res.setHeader('Content-Disposition', `attachment; filename="manuscript-${projectId}.pdf"`);
     res.send(buffer);
   } catch (error) {
-    console.error('Error generating PDF:', error);
+    logger.error({ error: error instanceof Error ? error.message : error, projectId: req.params.projectId }, 'Error generating PDF');
     res.status(500).json({
       error: 'Failed to generate PDF',
       message: error instanceof Error ? error.message : 'Unknown error',
@@ -58,7 +60,7 @@ router.get('/story-bible/:projectId', async (req: Request, res: Response) => {
     res.setHeader('Content-Disposition', `attachment; filename="story-bible-${projectId}.docx"`);
     res.send(buffer);
   } catch (error) {
-    console.error('Error generating Story Bible:', error);
+    logger.error({ error: error instanceof Error ? error.message : error, projectId: req.params.projectId }, 'Error generating Story Bible');
     res.status(500).json({
       error: 'Failed to generate Story Bible',
       message: error instanceof Error ? error.message : 'Unknown error',

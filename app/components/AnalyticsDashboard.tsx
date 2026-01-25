@@ -13,8 +13,12 @@ export default function AnalyticsDashboard({ bookId }: AnalyticsDashboardProps) 
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
 
+  // BUG-010 FIX: Add try/catch to async useEffect
   useEffect(() => {
-    loadAnalytics();
+    loadAnalytics().catch(err => {
+      console.error('Failed to load analytics on mount:', err);
+      setLoading(false);
+    });
   }, [bookId]);
 
   const loadAnalytics = async () => {

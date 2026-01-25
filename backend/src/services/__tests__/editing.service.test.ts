@@ -13,8 +13,8 @@ describe('EditingService', () => {
     const { claudeService } = await import('../claude.service.js');
     const dbModule = await import('../../db/connection.js');
 
-    mockClaudeService = claudeService;
-    mockDb = dbModule.default;
+    mockClaudeService = claudeService as any;
+    mockDb = dbModule.default as any;
 
     service = new EditingService();
     jest.clearAllMocks();
@@ -50,9 +50,12 @@ describe('EditingService', () => {
       jest.spyOn(service as any, 'parseEditorResponse').mockReturnValue(mockEditorResponse);
       jest.spyOn(service as any, 'generateFlagId').mockReturnValue('flag-123');
 
-      (mockClaudeService.createCompletion as jest.Mock) = jest
+      mockClaudeService.createCompletionWithUsage = jest
         .fn()
-        .mockResolvedValue(JSON.stringify(mockEditorResponse));
+        .mockResolvedValue({
+          content: JSON.stringify(mockEditorResponse),
+          usage: { input_tokens: 100, output_tokens: 50 },
+        });
 
       const result = await service.developmentalEdit('chapter-1');
 
@@ -90,9 +93,12 @@ describe('EditingService', () => {
       jest.spyOn(service as any, 'parseEditorResponse').mockReturnValue(mockEditorResponse);
       jest.spyOn(service as any, 'generateFlagId').mockReturnValue('flag-456');
 
-      (mockClaudeService.createCompletion as jest.Mock) = jest
+      mockClaudeService.createCompletionWithUsage = jest
         .fn()
-        .mockResolvedValue(JSON.stringify(mockEditorResponse));
+        .mockResolvedValue({
+          content: JSON.stringify(mockEditorResponse),
+          usage: { input_tokens: 100, output_tokens: 50 },
+        });
 
       const result = await service.developmentalEdit('chapter-1');
 
@@ -137,9 +143,12 @@ describe('EditingService', () => {
       jest.spyOn(service as any, 'parseEditorResponse').mockReturnValue(mockEditorResponse);
       jest.spyOn(service as any, 'generateFlagId').mockReturnValue('flag-789');
 
-      (mockClaudeService.createCompletion as jest.Mock) = jest
+      mockClaudeService.createCompletionWithUsage = jest
         .fn()
-        .mockResolvedValue(JSON.stringify(mockEditorResponse));
+        .mockResolvedValue({
+          content: JSON.stringify(mockEditorResponse),
+          usage: { input_tokens: 100, output_tokens: 50 },
+        });
 
       const result = await service.lineEdit('chapter-1');
 
@@ -173,9 +182,12 @@ describe('EditingService', () => {
       jest.spyOn(service as any, 'parseEditorResponse').mockReturnValue(mockEditorResponse);
       jest.spyOn(service as any, 'generateFlagId').mockReturnValue('flag-101');
 
-      (mockClaudeService.createCompletion as jest.Mock) = jest
+      mockClaudeService.createCompletionWithUsage = jest
         .fn()
-        .mockResolvedValue(JSON.stringify(mockEditorResponse));
+        .mockResolvedValue({
+          content: JSON.stringify(mockEditorResponse),
+          usage: { input_tokens: 100, output_tokens: 50 },
+        });
 
       const result = await service.continuityEdit('chapter-1');
 
@@ -215,9 +227,12 @@ describe('EditingService', () => {
       jest.spyOn(service as any, 'parseEditorResponse').mockReturnValue(mockEditorResponse);
       jest.spyOn(service as any, 'generateFlagId').mockReturnValue('flag-102');
 
-      (mockClaudeService.createCompletion as jest.Mock) = jest
+      mockClaudeService.createCompletionWithUsage = jest
         .fn()
-        .mockResolvedValue(JSON.stringify(mockEditorResponse));
+        .mockResolvedValue({
+          content: JSON.stringify(mockEditorResponse),
+          usage: { input_tokens: 100, output_tokens: 50 },
+        });
 
       const result = await service.continuityEdit('chapter-1');
 
@@ -250,15 +265,253 @@ describe('EditingService', () => {
       jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
       jest.spyOn(service as any, 'parseEditorResponse').mockReturnValue(mockEditorResponse);
 
-      (mockClaudeService.createCompletion as jest.Mock) = jest
+      mockClaudeService.createCompletionWithUsage = jest
         .fn()
-        .mockResolvedValue(JSON.stringify(mockEditorResponse));
+        .mockResolvedValue({
+          content: JSON.stringify(mockEditorResponse),
+          usage: { input_tokens: 100, output_tokens: 50 },
+        });
 
       const result = await service.copyEdit('chapter-1');
 
       expect(result.editorType).toBe('copy');
       expect(result.editedContent).toBe('Content without typos...');
       expect(result.approved).toBe(true);
+    });
+
+    it('should throw error if chapter content not found', async () => {
+      jest.spyOn(service as any, 'getChapterData').mockReturnValue({ content: null });
+
+      await expect(service.copyEdit('chapter-1')).rejects.toThrow(
+        'Chapter content not found'
+      );
+    });
+  });
+
+  describe('authorRevision', () => {
+    it('should revise chapter based on developmental feedback', async () => {
+      const mockChapterData = {
+        chapter_number: 1,
+        content: 'Original chapter content needing revision...',
+        scene_cards: [],
+      };
+
+      const mockDevEditResult = {
+        editorType: 'developmental' as const,
+        originalContent: 'Original content',
+        editedContent: 'Original content',
+        suggestions: [
+          {
+            type: 'plot' as const,
+            location: 'Opening',
+            issue: 'Weak opening hook',
+            suggestion: 'Start with action',
+            severity: 'major' as const,
+          },
+        ],
+        flags: [],
+        approved: false,
+      };
+
+      const mockRevisedContent = 'Revised chapter with stronger opening...';
+
+      jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
+
+      mockClaudeService.createCompletionWithUsage = jest
+        .fn()
+        .mockResolvedValue({
+          content: mockRevisedContent,
+          usage: { input_tokens: 200, output_tokens: 150 },
+        });
+
+      const result = await service.authorRevision('chapter-1', mockDevEditResult);
+
+      expect(result.content).toBe(mockRevisedContent);
+      expect(result.usage).toBeDefined();
+      expect(result.usage.input_tokens).toBe(200);
+      expect(mockClaudeService.createCompletionWithUsage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          system: expect.stringContaining('Author Agent'),
+          messages: expect.arrayContaining([
+            expect.objectContaining({
+              content: expect.stringContaining('DEVELOPMENTAL EDITOR FEEDBACK'),
+            }),
+          ]),
+        })
+      );
+    });
+
+    it('should throw error if chapter content not found', async () => {
+      jest.spyOn(service as any, 'getChapterData').mockReturnValue({ content: null });
+
+      const mockDevEditResult = {
+        editorType: 'developmental' as const,
+        originalContent: '',
+        editedContent: '',
+        suggestions: [],
+        flags: [],
+        approved: false,
+      };
+
+      await expect(service.authorRevision('chapter-1', mockDevEditResult)).rejects.toThrow(
+        'Chapter content not found'
+      );
+    });
+
+    it('should throw error if dev edit result not approved', async () => {
+      const mockChapterData = {
+        chapter_number: 1,
+        content: 'Content',
+        scene_cards: [],
+      };
+
+      jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
+
+      const mockDevEditResult = {
+        editorType: 'developmental' as const,
+        originalContent: '',
+        editedContent: '',
+        suggestions: [],
+        flags: [],
+        approved: true,
+      };
+
+      await expect(service.authorRevision('chapter-1', mockDevEditResult)).rejects.toThrow(
+        'Cannot revise without developmental editor feedback'
+      );
+    });
+  });
+
+  describe('applyEditResult', () => {
+    it('should update chapter with edited content and flags', async () => {
+      const mockExistingChapter = {
+        flags: JSON.stringify([
+          {
+            id: 'flag-1',
+            type: 'existing',
+            severity: 'minor',
+            description: 'Old flag',
+            location: 'Scene 1',
+            resolved: false,
+          },
+        ]),
+      };
+
+      const mockEditResult = {
+        editorType: 'line' as const,
+        originalContent: 'Old content',
+        editedContent: 'New polished content',
+        suggestions: [],
+        flags: [
+          {
+            id: 'flag-2',
+            type: 'needs_review',
+            severity: 'major' as const,
+            description: 'Needs author attention',
+            location: 'Paragraph 5',
+            resolved: false,
+          },
+        ],
+        approved: true,
+      };
+
+      const mockPrepare = jest.fn();
+      mockDb.prepare = mockPrepare;
+
+      const getStmt = { get: jest.fn().mockReturnValue(mockExistingChapter) };
+      const updateStmt = { run: jest.fn() };
+
+      mockPrepare.mockReturnValueOnce(getStmt).mockReturnValueOnce(updateStmt);
+
+      await service.applyEditResult('chapter-1', mockEditResult);
+
+      expect(updateStmt.run).toHaveBeenCalledWith(
+        'New polished content',
+        expect.stringContaining('flag-1'),
+        expect.any(String),
+        'chapter-1'
+      );
+    });
+  });
+
+  describe('getPreviousChapterSummaries', () => {
+    it('should retrieve previous chapter summaries for continuity checking', () => {
+      const mockSummaries = [
+        { chapter_number: 1, summary: 'Chapter 1 summary' },
+        { chapter_number: 2, summary: 'Chapter 2 summary' },
+        { chapter_number: 3, summary: 'Chapter 3 summary' },
+      ];
+
+      const mockPrepare = jest.fn();
+      mockDb.prepare = mockPrepare;
+
+      const stmt = { all: jest.fn().mockReturnValue(mockSummaries) };
+      mockPrepare.mockReturnValueOnce(stmt);
+
+      const result = (service as any).getPreviousChapterSummaries('chapter-5', 5);
+
+      expect(result).toHaveLength(3);
+      expect(result[0].chapter_number).toBe(1);
+      expect(result[2].chapter_number).toBe(3);
+    });
+  });
+
+  describe('extractAuthorFlags', () => {
+    it('should extract [NEEDS AUTHOR: ...] markers from text', () => {
+      const text = `This is some content.
+[NEEDS AUTHOR: Clarify this motivation]
+More content here.
+[NEEDS AUTHOR: Add sensory details]
+Final content.`;
+
+      const result = (service as any).extractAuthorFlags(text);
+
+      expect(result).toHaveLength(2);
+      expect(result[0].type).toBe('needs_review');
+      expect(result[0].description).toBe('Clarify this motivation');
+      expect(result[1].description).toBe('Add sensory details');
+    });
+
+    it('should return empty array if no markers found', () => {
+      const text = 'This is clean content with no markers.';
+
+      const result = (service as any).extractAuthorFlags(text);
+
+      expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('parseEditorResponse', () => {
+    it('should parse valid JSON response', () => {
+      const response = '{"key": "value", "items": [1, 2, 3]}';
+
+      const result = (service as any).parseEditorResponse(response);
+
+      expect(result).toEqual({ key: 'value', items: [1, 2, 3] });
+    });
+
+    it('should parse JSON from markdown code blocks', () => {
+      const response = '```json\n{"key": "value"}\n```';
+
+      const result = (service as any).parseEditorResponse(response);
+
+      expect(result).toEqual({ key: 'value' });
+    });
+
+    it('should parse JSON without language specifier in code block', () => {
+      const response = '```\n{"key": "value"}\n```';
+
+      const result = (service as any).parseEditorResponse(response);
+
+      expect(result).toEqual({ key: 'value' });
+    });
+
+    it('should throw error for invalid JSON', () => {
+      const response = 'This is not JSON at all';
+
+      expect(() => (service as any).parseEditorResponse(response)).toThrow(
+        'Failed to parse editor response as JSON'
+      );
     });
   });
 });

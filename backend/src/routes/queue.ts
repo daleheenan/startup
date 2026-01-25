@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import { QueueWorker } from '../queue/worker.js';
 import { sessionTracker } from '../services/session-tracker.js';
+import { createLogger } from '../services/logger.service.js';
 
 const router = Router();
+const logger = createLogger('routes:queue');
 
 /**
  * GET /api/queue/stats
@@ -18,7 +20,7 @@ router.get('/stats', (req, res) => {
       session: sessionStats,
     });
   } catch (error: any) {
-    console.error('[API] Error fetching queue stats:', error);
+    logger.error({ error: error.message, stack: error.stack }, 'Error fetching queue stats');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -46,7 +48,7 @@ router.post('/test', (req, res) => {
       status: 'pending',
     });
   } catch (error: any) {
-    console.error('[API] Error creating test job:', error);
+    logger.error({ error: error.message, stack: error.stack, type: req.body.type, targetId: req.body.targetId }, 'Error creating test job');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });

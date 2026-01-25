@@ -34,11 +34,19 @@ export default function ProseStyleEditor({ projectId, currentStyleId, onStyleCha
   const [voiceSample, setVoiceSample] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
 
+  // BUG-010 FIX: Add try/catch to async useEffect
   useEffect(() => {
-    if (currentStyleId) {
-      loadStyle(currentStyleId);
-    }
-    loadPresets();
+    const loadData = async () => {
+      try {
+        if (currentStyleId) {
+          await loadStyle(currentStyleId);
+        }
+        await loadPresets();
+      } catch (err) {
+        console.error('Failed to load style data on mount:', err);
+      }
+    };
+    loadData();
   }, [currentStyleId]);
 
   const loadStyle = async (styleId: string) => {

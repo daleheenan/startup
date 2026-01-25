@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { ToastProvider } from './components/shared/Toast'
+import ErrorBoundary from './components/ErrorBoundary'
 
 export const metadata: Metadata = {
   title: 'NovelForge - AI-Powered Novel Writing',
@@ -19,9 +20,11 @@ export default function RootLayout({
         backgroundColor: '#F8FAFC',
         color: '#1A1A2E'
       }}>
-        <ToastProvider>
-          {children}
-        </ToastProvider>
+        <ErrorBoundary>
+          <ToastProvider>
+            {children}
+          </ToastProvider>
+        </ErrorBoundary>
       </body>
     </html>
   )

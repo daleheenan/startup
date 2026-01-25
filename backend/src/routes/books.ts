@@ -2,8 +2,10 @@ import { Router } from 'express';
 import db from '../db/connection.js';
 import { randomUUID } from 'crypto';
 import type { Book } from '../shared/types/index.js';
+import { createLogger } from '../services/logger.service.js';
 
 const router = Router();
+const logger = createLogger('routes:books');
 
 /**
  * GET /api/books/project/:projectId
@@ -19,7 +21,7 @@ router.get('/project/:projectId', (req, res) => {
 
     res.json({ books });
   } catch (error: any) {
-    console.error('[API] Error fetching books:', error);
+    logger.error({ error: error.message, stack: error.stack, projectId: req.params.projectId }, 'Error fetching books');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -44,7 +46,7 @@ router.get('/:id', (req, res) => {
 
     res.json(book);
   } catch (error: any) {
-    console.error('[API] Error fetching book:', error);
+    logger.error({ error: error.message, stack: error.stack, bookId: req.params.id }, 'Error fetching book');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -84,7 +86,7 @@ router.post('/', (req, res) => {
       updated_at: now,
     });
   } catch (error: any) {
-    console.error('[API] Error creating book:', error);
+    logger.error({ error: error.message, stack: error.stack, projectId: req.body.projectId, title: req.body.title }, 'Error creating book');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -134,7 +136,7 @@ router.put('/:id', (req, res) => {
 
     res.json({ success: true });
   } catch (error: any) {
-    console.error('[API] Error updating book:', error);
+    logger.error({ error: error.message, stack: error.stack, bookId: req.params.id }, 'Error updating book');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -159,7 +161,7 @@ router.delete('/:id', (req, res) => {
 
     res.status(204).send();
   } catch (error: any) {
-    console.error('[API] Error deleting book:', error);
+    logger.error({ error: error.message, stack: error.stack, bookId: req.params.id }, 'Error deleting book');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });

@@ -5,8 +5,10 @@ import type {
   ApplyVariationRequest,
   RegenerateSceneRequest,
 } from '../shared/types/index.js';
+import { createLogger } from '../services/logger.service.js';
 
 const router = express.Router();
+const logger = createLogger('routes:regeneration');
 
 /**
  * POST /api/regeneration/chapters/:chapterId/regenerate-selection
@@ -41,7 +43,7 @@ router.post('/chapters/:chapterId/regenerate-selection', async (req, res) => {
 
     res.json(result);
   } catch (error: any) {
-    console.error('[API] Error generating variations:', error);
+    logger.error({ error: error.message, stack: error.stack, chapterId: req.params.chapterId }, 'Error generating variations');
     res.status(500).json({ error: error.message });
   }
 });
@@ -73,7 +75,7 @@ router.post('/chapters/:chapterId/apply-variation', async (req, res) => {
 
     res.json(result);
   } catch (error: any) {
-    console.error('[API] Error applying variation:', error);
+    logger.error({ error: error.message, stack: error.stack, chapterId: req.params.chapterId }, 'Error applying variation');
     res.status(500).json({ error: error.message });
   }
 });
@@ -97,7 +99,7 @@ router.post('/chapters/:chapterId/regenerate-scene', async (req, res) => {
 
     res.json(result);
   } catch (error: any) {
-    console.error('[API] Error regenerating scene:', error);
+    logger.error({ error: error.message, stack: error.stack, chapterId: req.params.chapterId }, 'Error regenerating scene');
     res.status(500).json({ error: error.message });
   }
 });
@@ -125,7 +127,7 @@ router.get('/chapters/:chapterId/history', (req, res) => {
 
     res.json(result);
   } catch (error: any) {
-    console.error('[API] Error getting regeneration history:', error);
+    logger.error({ error: error.message, stack: error.stack, chapterId: req.params.chapterId }, 'Error getting regeneration history');
     res.status(500).json({ error: error.message });
   }
 });

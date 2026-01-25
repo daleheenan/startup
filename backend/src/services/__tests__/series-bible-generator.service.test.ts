@@ -211,7 +211,7 @@ describe('SeriesBibleGeneratorService', () => {
         mysteries: [],
       };
 
-      const mockProject: Project = {
+      const mockProject = {
         id: 'project-1',
         title: 'Test',
         type: 'standalone',

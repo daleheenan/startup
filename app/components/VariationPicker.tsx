@@ -28,11 +28,14 @@ export default function VariationPicker({
   const [selectedVariation, setSelectedVariation] = useState<number | null>(null);
   const [applying, setApplying] = useState(false);
 
+  // BUG-009 FIX: Add bounds checking for array access
   const allOptions = [
     { index: 0, label: 'Original', text: variationData.originalText },
-    { index: 1, label: 'Variation 1', text: variationData.variations[0] },
-    { index: 2, label: 'Variation 2', text: variationData.variations[1] },
-    { index: 3, label: 'Variation 3', text: variationData.variations[2] },
+    ...(variationData.variations && variationData.variations.length >= 3 ? [
+      { index: 1, label: 'Variation 1', text: variationData.variations[0] },
+      { index: 2, label: 'Variation 2', text: variationData.variations[1] },
+      { index: 3, label: 'Variation 3', text: variationData.variations[2] },
+    ] : [])
   ];
 
   const handleApply = async () => {

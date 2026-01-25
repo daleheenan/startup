@@ -2,8 +2,10 @@ import express from 'express';
 import db from '../db/connection.js';
 import { editingService } from '../services/editing.service.js';
 import { QueueWorker } from '../queue/worker.js';
+import { createLogger } from '../services/logger.service.js';
 
 const router = express.Router();
+const logger = createLogger('routes:editing');
 
 /**
  * GET /api/editing/chapters/:chapterId/flags
@@ -26,7 +28,7 @@ router.get('/chapters/:chapterId/flags', (req, res) => {
 
     res.json({ flags });
   } catch (error: any) {
-    console.error('[API] Error getting flags:', error);
+    logger.error({ error: error.message, stack: error.stack, chapterId: req.params.chapterId }, 'Error getting flags');
     res.status(500).json({ error: error.message });
   }
 });
@@ -67,7 +69,7 @@ router.post('/chapters/:chapterId/flags/:flagId/resolve', (req, res) => {
 
     res.json({ success: true, flag });
   } catch (error: any) {
-    console.error('[API] Error resolving flag:', error);
+    logger.error({ error: error.message, stack: error.stack, chapterId: req.params.chapterId, flagId: req.params.flagId }, 'Error resolving flag');
     res.status(500).json({ error: error.message });
   }
 });
@@ -131,7 +133,7 @@ router.post('/chapters/:chapterId/regenerate-with-edits', (req, res) => {
       },
     });
   } catch (error: any) {
-    console.error('[API] Error regenerating chapter:', error);
+    logger.error({ error: error.message, stack: error.stack, chapterId: req.params.chapterId }, 'Error regenerating chapter');
     res.status(500).json({ error: error.message });
   }
 });
@@ -177,7 +179,7 @@ router.post('/chapters/:chapterId/run-editor/:editorType', async (req, res) => {
       },
     });
   } catch (error: any) {
-    console.error('[API] Error running editor:', error);
+    logger.error({ error: error.message, stack: error.stack, chapterId: req.params.chapterId, editorType: req.params.editorType }, 'Error running editor');
     res.status(500).json({ error: error.message });
   }
 });
@@ -232,7 +234,7 @@ router.get('/books/:bookId/flags-summary', (req, res) => {
       chapters: chapterFlags,
     });
   } catch (error: any) {
-    console.error('[API] Error getting flags summary:', error);
+    logger.error({ error: error.message, stack: error.stack, bookId: req.params.bookId }, 'Error getting flags summary');
     res.status(500).json({ error: error.message });
   }
 });
@@ -275,7 +277,7 @@ router.get('/chapters/:chapterId/edit', (req, res) => {
       },
     });
   } catch (error: any) {
-    console.error('[API] Error getting chapter edit:', error);
+    logger.error({ error: error.message, stack: error.stack, chapterId: req.params.chapterId }, 'Error getting chapter edit');
     res.status(500).json({ error: error.message });
   }
 });
@@ -328,7 +330,7 @@ router.post('/chapters/:chapterId/edit', (req, res) => {
 
     res.json({ success: true, edit });
   } catch (error: any) {
-    console.error('[API] Error saving chapter edit:', error);
+    logger.error({ error: error.message, stack: error.stack, chapterId: req.params.chapterId }, 'Error saving chapter edit');
     res.status(500).json({ error: error.message });
   }
 });
@@ -348,7 +350,7 @@ router.delete('/chapters/:chapterId/edit', (req, res) => {
 
     res.json({ success: true });
   } catch (error: any) {
-    console.error('[API] Error deleting chapter edit:', error);
+    logger.error({ error: error.message, stack: error.stack, chapterId: req.params.chapterId }, 'Error deleting chapter edit');
     res.status(500).json({ error: error.message });
   }
 });
@@ -410,7 +412,7 @@ router.get('/chapters/:chapterId/comparison', (req, res) => {
 
     res.json(result);
   } catch (error: any) {
-    console.error('[API] Error getting comparison:', error);
+    logger.error({ error: error.message, stack: error.stack, chapterId: req.params.chapterId }, 'Error getting comparison');
     res.status(500).json({ error: error.message });
   }
 });
@@ -463,7 +465,7 @@ router.post('/chapters/:chapterId/lock', (req, res) => {
 
     res.json({ success: true, isLocked });
   } catch (error: any) {
-    console.error('[API] Error toggling lock:', error);
+    logger.error({ error: error.message, stack: error.stack, chapterId: req.params.chapterId }, 'Error toggling lock');
     res.status(500).json({ error: error.message });
   }
 });
@@ -514,7 +516,7 @@ router.get('/books/:bookId/word-count', (req, res) => {
       chapters: chapterStats,
     });
   } catch (error: any) {
-    console.error('[API] Error getting word count:', error);
+    logger.error({ error: error.message, stack: error.stack, bookId: req.params.bookId }, 'Error getting word count');
     res.status(500).json({ error: error.message });
   }
 });

@@ -36,7 +36,44 @@ export function getToken(): string | null {
   if (typeof window === 'undefined') {
     return null;
   }
-  return localStorage.getItem(TOKEN_KEY);
+  const token = localStorage.getItem(TOKEN_KEY);
+
+  // BUG-007 FIX: Validate token before returning
+  if (token && isTokenExpired(token)) {
+    console.warn('Token is expired, clearing it');
+    logout();
+    return null;
+  }
+
+  return token;
+}
+
+/**
+ * BUG-007 FIX: Check if JWT token is expired
+ */
+function isTokenExpired(token: string): boolean {
+  try {
+    // Parse JWT token (format: header.payload.signature)
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      return true; // Invalid token format
+    }
+
+    // Decode payload (Base64URL)
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+
+    // Check expiration (exp is in seconds)
+    if (payload.exp) {
+      const now = Math.floor(Date.now() / 1000);
+      return payload.exp < now;
+    }
+
+    // No expiration claim - treat as valid
+    return false;
+  } catch (error) {
+    console.error('Error parsing token:', error);
+    return true; // If we can't parse it, treat as expired
+  }
 }
 
 /**

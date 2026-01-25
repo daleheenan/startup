@@ -30,21 +30,36 @@ export default function ConceptsPage() {
   const [currentStep, setCurrentStep] = useState<string>('');
 
   useEffect(() => {
-    // Load concepts and preferences from sessionStorage
-    const conceptsData = sessionStorage.getItem('generatedConcepts');
-    const prefsData = sessionStorage.getItem('preferences');
-
-    if (!conceptsData || !prefsData) {
-      // Redirect back to new project page if no data
-      router.push('/new');
-      return;
-    }
-
+    // BUG-012 FIX: Add proper error handling for sessionStorage access
     try {
-      setConcepts(JSON.parse(conceptsData));
-      setPreferences(JSON.parse(prefsData));
+      // Load concepts and preferences from sessionStorage
+      const conceptsData = sessionStorage.getItem('generatedConcepts');
+      const prefsData = sessionStorage.getItem('preferences');
+
+      if (!conceptsData || !prefsData) {
+        // Redirect back to new project page if no data
+        router.push('/new');
+        return;
+      }
+
+      try {
+        const parsedConcepts = JSON.parse(conceptsData);
+        const parsedPrefs = JSON.parse(prefsData);
+
+        // Validate parsed data
+        if (Array.isArray(parsedConcepts) && parsedPrefs && typeof parsedPrefs === 'object') {
+          setConcepts(parsedConcepts);
+          setPreferences(parsedPrefs);
+        } else {
+          console.error('Invalid session data format');
+          router.push('/new');
+        }
+      } catch (err) {
+        console.error('Error parsing session data:', err);
+        router.push('/new');
+      }
     } catch (err) {
-      console.error('Error parsing session data:', err);
+      console.error('Error accessing sessionStorage:', err);
       router.push('/new');
     }
   }, [router]);
@@ -128,7 +143,7 @@ export default function ConceptsPage() {
       setConcepts(data.concepts);
       setSelectedConcept(null);
 
-      // Update sessionStorage
+      // BUG-002 FIX: Update sessionStorage
       sessionStorage.setItem('generatedConcepts', JSON.stringify(data.concepts));
     } catch (err: any) {
       console.error('Error regenerating concepts:', err);

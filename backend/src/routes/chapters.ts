@@ -4,15 +4,17 @@ import { randomUUID } from 'crypto';
 import type { Chapter } from '../shared/types/index.js';
 import { chapterOrchestratorService } from '../services/chapter-orchestrator.service.js';
 import { sendBadRequest, sendNotFound, sendInternalError } from '../utils/response-helpers.js';
+import { createLogger } from '../services/logger.service.js';
 
 const router = Router();
+const logger = createLogger('routes:chapters');
 
 function safeJsonParse(jsonString: string | null | undefined, fallback: any = []): any {
   if (!jsonString) return fallback;
   try {
     return JSON.parse(jsonString);
   } catch (error) {
-    console.error('[Chapters] JSON parse error:', error);
+    logger.error({ error: error instanceof Error ? error.message : error, jsonString }, 'JSON parse error');
     return fallback;
   }
 }

@@ -28,10 +28,18 @@ Before starting any task:
 
 4. **Note applicable lessons**: Mentally note which lessons apply to your current task
 
-5. **Check cross-agent lessons** if relevant:
-   - If you're reviewing code, check `developer.lessons.md`
-   - If you're testing, check `code-reviewer.lessons.md`
-   - If you're implementing, check `architect.lessons.md`
+5. **Check cross-agent lessons** using this lookup table:
+
+   | Your Task Type | Read These Lesson Files |
+   |----------------|------------------------|
+   | Bug fixing | `bug-hunter`, `developer`, `code-reviewer` |
+   | New feature | `developer`, `architect`, `code-reviewer` |
+   | Security audit | `security-hardener`, `pen-test` |
+   | Testing | `qa-test-engineer`, `qa-tester`, `developer` |
+   | Code review | `code-reviewer`, `code-quality-inspector` |
+   | Architecture | `architect`, `software-architect-designer` |
+   | Performance | `code-optimizer`, `architect` |
+   | Project planning | `project-director`, `agile-product-strategist` |
 
 ### During Task: Apply and Track
 

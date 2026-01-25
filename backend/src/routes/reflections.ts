@@ -1,7 +1,9 @@
 import express from 'express';
 import { reflectionsService } from '../services/reflections.js';
+import { createLogger } from '../services/logger.service.js';
 
 const router = express.Router();
+const logger = createLogger('routes:reflections');
 
 /**
  * GET /api/reflections
@@ -22,7 +24,7 @@ router.get('/', async (req, res) => {
 
     res.json(reflections);
   } catch (error) {
-    console.error('[Reflections] Query error:', error);
+    logger.error({ error: error instanceof Error ? error.message : error }, 'Query error');
     res.status(500).json({ error: 'Failed to query reflections' });
   }
 });
@@ -41,7 +43,7 @@ router.get('/:id', async (req, res) => {
 
     res.json(reflection);
   } catch (error) {
-    console.error('[Reflections] Get error:', error);
+    logger.error({ error: error instanceof Error ? error.message : error, reflectionId: req.params.id }, 'Get error');
     res.status(500).json({ error: 'Failed to get reflection' });
   }
 });
@@ -71,7 +73,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(created);
   } catch (error) {
-    console.error('[Reflections] Create error:', error);
+    logger.error({ error: error instanceof Error ? error.message : error }, 'Create error');
     res.status(500).json({ error: 'Failed to create reflection' });
   }
 });
@@ -93,7 +95,7 @@ router.patch('/:id/promote', async (req, res) => {
     const updated = await reflectionsService.getById(req.params.id);
     res.json(updated);
   } catch (error) {
-    console.error('[Reflections] Promote error:', error);
+    logger.error({ error: error instanceof Error ? error.message : error, reflectionId: req.params.id }, 'Promote error');
     res.status(500).json({ error: 'Failed to promote reflection' });
   }
 });

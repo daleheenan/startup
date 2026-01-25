@@ -11,6 +11,7 @@ export default function StatusPanel() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // BUG-010 FIX: Already has try/catch, but ensure proper error handling
   useEffect(() => {
     async function fetchStatus() {
       try {
@@ -29,7 +30,11 @@ export default function StatusPanel() {
       }
     }
 
-    fetchStatus();
+    // BUG-010 FIX: Wrap initial call in try/catch
+    fetchStatus().catch(err => {
+      console.error('Failed to fetch status on mount:', err);
+      setLoading(false);
+    });
 
     // Poll every 5 seconds
     const interval = setInterval(fetchStatus, 5000);

@@ -13,10 +13,10 @@ MAINTENANCE RULES:
 
 ## Summary Statistics
 
-- **Total lessons recorded**: 15
-- **Last updated**: 2026-01-20
+- **Total lessons recorded**: 19
+- **Last updated**: 2026-01-25
 - **Foundational lessons** (score >= 10): 5
-- **Contributing agents**: Initial setup
+- **Contributing agents**: Initial setup, bug-hunter, qa-test-engineer, project-director
 
 ---
 
@@ -75,6 +75,76 @@ These lessons have proven universally valuable across many tasks and agents.
 ---
 
 ## Active Lessons (Most Recent First)
+
+### 2026-01-25 | Error Boundaries Are Required
+
+**Context**: React applications without proper error handling
+
+**Lesson**: Every React application MUST have Error Boundaries at three levels:
+1. **App level** - catches catastrophic failures, shows "something went wrong"
+2. **Page level** - allows other pages to work if one crashes
+3. **Feature level** - isolates component failures
+
+Without Error Boundaries, ANY runtime error causes a white screen crash. This is the #1 UX bug pattern.
+
+**Application Score**: 0
+
+**Tags**: #react #error-handling #ux #critical
+
+---
+
+### 2026-01-25 | Race Condition Prevention Pattern
+
+**Context**: Multiple async operations that can trigger simultaneously
+
+**Lesson**: Race conditions occur in predictable patterns. Prevent them with:
+1. **Auth flows** - Use singleton flag for logout/redirect (prevent multiple 401 handlers)
+2. **Form submissions** - Disable button during submit (prevent double-submit)
+3. **State updates** - Check if component is mounted before setState
+4. **Async callbacks** - Use functional setState to avoid stale closures
+
+Always look for: "what if this triggers twice?"
+
+**Application Score**: 0
+
+**Tags**: #race-conditions #async #auth #patterns
+
+---
+
+### 2026-01-25 | Server-Side Validation Is Mandatory
+
+**Context**: Form validation and API input handling
+
+**Lesson**: Client-side validation is UX ONLY. Server MUST validate ALL inputs because:
+1. DevTools can bypass any client validation
+2. Direct API calls skip the UI entirely
+3. Malicious users will exploit validation gaps
+
+Use schema validation libraries (Zod, Joi) on the server. Never trust client input.
+
+**Application Score**: 0
+
+**Tags**: #security #validation #forms #api
+
+---
+
+### 2026-01-25 | Inventory Before Implementing
+
+**Context**: Implementing new features in existing codebase
+
+**Lesson**: Before writing new code, systematically check what already exists:
+1. **Database** - Does the table/migration exist?
+2. **Backend services** - Is the logic already written?
+3. **API routes** - Are endpoints defined?
+4. **Frontend components** - Are UI pieces built?
+
+Often 50-80% of work is already done and just needs wiring. Check first, implement second.
+
+**Application Score**: 0
+
+**Tags**: #efficiency #existing-code #planning #fullstack
+
+---
 
 ### 2026-01-20 | Cross-Agent Communication
 

@@ -257,14 +257,43 @@ export class SeriesBibleGeneratorService {
    * Track mysteries introduced and resolved across books
    */
   private trackMysteries(books: Book[]): SeriesMystery[] {
-    // This would ideally use Claude to analyze chapters and identify mysteries
-    // For now, we'll return an empty array and note that this would be implemented
-    // with a more sophisticated analysis pass
+    if (books.length === 0) {
+      return [];
+    }
 
-    // TODO: Implement mystery tracking with Claude analysis
-    console.log('[SeriesBible] Mystery tracking not yet implemented');
+    // Get project ID from first book
+    const projectId = books[0].project_id;
 
-    return [];
+    // Fetch mysteries from database
+    const stmt = db.prepare<[string], any>(`
+      SELECT * FROM series_mysteries
+      WHERE series_id = ?
+      ORDER BY raised_book, raised_chapter
+    `);
+
+    const rows = stmt.all(projectId);
+
+    return rows.map(row => ({
+      id: row.id,
+      question: row.question,
+      raisedIn: {
+        bookNumber: row.raised_book,
+        chapterNumber: row.raised_chapter,
+        context: row.context,
+      },
+      answeredIn: row.answered_book
+        ? {
+            bookNumber: row.answered_book,
+            chapterNumber: row.answered_chapter,
+            answer: row.answer,
+          }
+        : undefined,
+      status: row.status,
+      importance: row.importance,
+      seriesId: row.series_id,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
   }
 
   /**

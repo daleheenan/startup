@@ -1,7 +1,9 @@
 import express from 'express';
 import { lessonsService } from '../services/lessons.js';
+import { createLogger } from '../services/logger.service.js';
 
 const router = express.Router();
+const logger = createLogger('routes:lessons');
 
 /**
  * GET /api/lessons
@@ -20,7 +22,7 @@ router.get('/', async (req, res) => {
 
     res.json(lessons);
   } catch (error) {
-    console.error('[Lessons] Query error:', error);
+    logger.error({ error: error instanceof Error ? error.message : error }, 'Query error');
     res.status(500).json({ error: 'Failed to query lessons' });
   }
 });
@@ -39,7 +41,7 @@ router.get('/:id', async (req, res) => {
 
     res.json(lesson);
   } catch (error) {
-    console.error('[Lessons] Get error:', error);
+    logger.error({ error: error instanceof Error ? error.message : error, lessonId: req.params.id }, 'Get error');
     res.status(500).json({ error: 'Failed to get lesson' });
   }
 });
@@ -71,7 +73,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(lesson);
   } catch (error) {
-    console.error('[Lessons] Create error:', error);
+    logger.error({ error: error instanceof Error ? error.message : error }, 'Create error');
     res.status(500).json({ error: 'Failed to create lesson' });
   }
 });
@@ -96,7 +98,7 @@ router.patch('/:id', async (req, res) => {
     const updated = await lessonsService.getById(req.params.id);
     res.json(updated);
   } catch (error) {
-    console.error('[Lessons] Update error:', error);
+    logger.error({ error: error instanceof Error ? error.message : error, lessonId: req.params.id }, 'Update error');
     res.status(500).json({ error: 'Failed to update lesson' });
   }
 });
@@ -118,7 +120,7 @@ router.patch('/:id/score', async (req, res) => {
     const updated = await lessonsService.getById(req.params.id);
     res.json(updated);
   } catch (error) {
-    console.error('[Lessons] Score update error:', error);
+    logger.error({ error: error instanceof Error ? error.message : error, lessonId: req.params.id }, 'Score update error');
     res.status(500).json({ error: 'Failed to update score' });
   }
 });
@@ -132,7 +134,7 @@ router.delete('/:id', async (req, res) => {
     await lessonsService.delete(req.params.id);
     res.json({ success: true });
   } catch (error) {
-    console.error('[Lessons] Delete error:', error);
+    logger.error({ error: error instanceof Error ? error.message : error, lessonId: req.params.id }, 'Delete error');
     res.status(500).json({ error: 'Failed to delete lesson' });
   }
 });
@@ -151,7 +153,7 @@ router.post('/prune', async (req, res) => {
       pruned: count,
     });
   } catch (error) {
-    console.error('[Lessons] Prune error:', error);
+    logger.error({ error: error instanceof Error ? error.message : error }, 'Prune error');
     res.status(500).json({ error: 'Failed to prune lessons' });
   }
 });

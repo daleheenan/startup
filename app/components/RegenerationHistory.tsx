@@ -25,8 +25,12 @@ export default function RegenerationHistory({ chapterId }: RegenerationHistoryPr
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  // BUG-010 FIX: Add try/catch to async useEffect
   useEffect(() => {
-    fetchHistory();
+    fetchHistory().catch(err => {
+      console.error('Failed to fetch history on mount:', err);
+      setLoading(false);
+    });
   }, [chapterId]);
 
   const fetchHistory = async () => {

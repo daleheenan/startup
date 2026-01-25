@@ -1,7 +1,9 @@
 import express from 'express';
 import { genreTropesService } from '../services/genre-tropes.service.js';
+import { createLogger } from '../services/logger.service.js';
 
 const router = express.Router();
+const logger = createLogger('routes:genre-tropes');
 
 /**
  * GET /api/genre-tropes
@@ -24,7 +26,7 @@ router.get('/', (req, res) => {
       count: tropes.length,
     });
   } catch (error) {
-    console.error('Error fetching tropes:', error);
+    logger.error({ error: error instanceof Error ? error.message : error }, 'Error fetching tropes');
     res.status(500).json({
       success: false,
       error: 'Failed to fetch tropes',
@@ -51,7 +53,7 @@ router.get('/genres/:genre', (req, res) => {
       count: tropes.length,
     });
   } catch (error) {
-    console.error('Error fetching tropes for genre:', error);
+    logger.error({ error: error instanceof Error ? error.message : error, genre: req.params.genre }, 'Error fetching tropes for genre');
     res.status(500).json({
       success: false,
       error: 'Failed to fetch tropes for genre',
@@ -84,7 +86,7 @@ router.post('/recommended', (req, res) => {
       count: tropes.length,
     });
   } catch (error) {
-    console.error('Error fetching recommended tropes:', error);
+    logger.error({ error: error instanceof Error ? error.message : error }, 'Error fetching recommended tropes');
     res.status(500).json({
       success: false,
       error: 'Failed to fetch recommended tropes',
@@ -113,7 +115,7 @@ router.get('/:id', (req, res) => {
       trope,
     });
   } catch (error) {
-    console.error('Error fetching trope:', error);
+    logger.error({ error: error instanceof Error ? error.message : error, tropeId: req.params.id }, 'Error fetching trope');
     res.status(500).json({
       success: false,
       error: 'Failed to fetch trope',
@@ -182,7 +184,7 @@ router.post('/', (req, res) => {
       trope,
     });
   } catch (error) {
-    console.error('Error creating trope:', error);
+    logger.error({ error: error instanceof Error ? error.message : error }, 'Error creating trope');
     res.status(500).json({
       success: false,
       error: 'Failed to create trope',

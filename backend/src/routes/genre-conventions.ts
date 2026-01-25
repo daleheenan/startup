@@ -1,7 +1,9 @@
 import express from 'express';
 import { genreConventionsService } from '../services/genre-conventions.service.js';
+import { createLogger } from '../services/logger.service.js';
 
 const router = express.Router();
+const logger = createLogger('routes:genre-conventions');
 
 /**
  * POST /api/genre-conventions/validate
@@ -25,7 +27,7 @@ router.post('/validate', (req, res) => {
       validation: result,
     });
   } catch (error) {
-    console.error('Error validating genre conventions:', error);
+    logger.error({ error: error instanceof Error ? error.message : error, genre: req.body.genre }, 'Error validating genre conventions');
     res.status(500).json({
       success: false,
       error: 'Failed to validate genre conventions',
@@ -56,7 +58,7 @@ router.get('/genres/:genre', (req, res) => {
       count: conventions.length,
     });
   } catch (error) {
-    console.error('Error fetching genre conventions:', error);
+    logger.error({ error: error instanceof Error ? error.message : error, genre: req.params.genre }, 'Error fetching genre conventions');
     res.status(500).json({
       success: false,
       error: 'Failed to fetch genre conventions',
@@ -78,7 +80,7 @@ router.get('/genres', (req, res) => {
       count: genres.length,
     });
   } catch (error) {
-    console.error('Error fetching available genres:', error);
+    logger.error({ error: error instanceof Error ? error.message : error }, 'Error fetching available genres');
     res.status(500).json({
       success: false,
       error: 'Failed to fetch available genres',

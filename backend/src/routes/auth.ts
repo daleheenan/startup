@@ -1,8 +1,10 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { createLogger } from '../services/logger.service.js';
 
 const router = express.Router();
+const logger = createLogger('routes:auth');
 
 /**
  * POST /api/auth/login
@@ -33,7 +35,7 @@ router.post('/login', async (req, res) => {
     const jwtSecret = process.env.JWT_SECRET;
 
     if (!passwordHash || !jwtSecret) {
-      console.error('[Auth] Missing environment variables: OWNER_PASSWORD_HASH or JWT_SECRET');
+      logger.error('Missing environment variables: OWNER_PASSWORD_HASH or JWT_SECRET');
       return res.status(500).json({
         error: 'Server configuration error'
       });
@@ -43,7 +45,7 @@ router.post('/login', async (req, res) => {
     const valid = await bcrypt.compare(password, passwordHash);
 
     if (!valid) {
-      console.log('[Auth] Invalid login attempt');
+      logger.warn('Invalid login attempt');
       return res.status(401).json({
         error: 'Invalid password'
       });
@@ -56,10 +58,10 @@ router.post('/login', async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    console.log('[Auth] Successful login');
+    logger.info('Successful login');
     res.json({ token });
   } catch (error) {
-    console.error('[Auth] Login error:', error);
+    logger.error({ error: error instanceof Error ? error.message : error }, 'Login error');
     res.status(500).json({
       error: 'Authentication failed'
     });

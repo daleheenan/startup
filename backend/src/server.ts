@@ -15,7 +15,9 @@ console.log('[Server] DATABASE_PATH:', process.env.DATABASE_PATH);
 import { runMigrations } from './db/migrate.js';
 import { queueWorker } from './queue/worker.js';
 import { requireAuth } from './middleware/auth.js';
+import { logger, requestLogger } from './services/logger.service.js';
 import authRouter from './routes/auth.js';
+import healthRouter from './routes/health.js';
 import progressRouter from './routes/progress.js';
 import lessonsRouter from './routes/lessons.js';
 import reflectionsRouter from './routes/reflections.js';
@@ -36,6 +38,7 @@ import genreConventionsRouter from './routes/genre-conventions.js';
 import proseStylesRouter from './routes/prose-styles.js';
 import analyticsRouter from './routes/analytics.js';
 import presetsRouter from './routes/presets.js';
+import mysteriesRouter from './routes/mysteries.js';
 
 // Run database migrations
 try {
@@ -79,6 +82,9 @@ app.use(cors({
 // Request body parsing with size limits
 app.use(express.json({ limit: '1mb' }));
 
+// Request logging with correlation IDs
+app.use(requestLogger());
+
 // Rate limiting for auth endpoints
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -97,16 +103,8 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Request logging
-app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path}`);
-  next();
-});
-
-// Health check (public)
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+// Public Routes (no auth required, no rate limiting)
+app.use('/api/health', healthRouter);
 
 // Public API Routes with rate limiting
 app.use('/api/auth', authLimiter, authRouter);
@@ -132,10 +130,14 @@ app.use('/api/genre-conventions', apiLimiter, requireAuth, genreConventionsRoute
 app.use('/api/prose-styles', apiLimiter, requireAuth, proseStylesRouter);
 app.use('/api/analytics', apiLimiter, requireAuth, analyticsRouter);
 app.use('/api/presets', apiLimiter, requireAuth, presetsRouter);
+app.use('/api/mysteries', apiLimiter, requireAuth, mysteriesRouter);
 
 // Error handling
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('[Server] Error:', err);
+  // Use request logger if available, otherwise use global logger
+  const log = req.log || logger;
+  log.error({ err, path: req.path, method: req.method }, 'Request error');
+
   res.status(500).json({
     error: {
       code: 'INTERNAL_ERROR',
@@ -146,29 +148,30 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`\n🚀 NovelForge Backend Server`);
-  console.log(`   Port: ${PORT}`);
-  console.log(`   Frontend: ${FRONTEND_URL}`);
-  console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`\n✅ Server started successfully\n`);
+  logger.info({
+    port: PORT,
+    frontend: FRONTEND_URL,
+    environment: process.env.NODE_ENV || 'development',
+    logLevel: logger.level,
+  }, 'NovelForge Backend Server started');
 
   // Start queue worker
-  console.log('🔄 Starting queue worker...');
+  logger.info('Starting queue worker');
   queueWorker.start().catch((error) => {
-    console.error('Queue worker failed:', error);
+    logger.error({ error }, 'Queue worker failed to start');
     process.exit(1);
   });
 });
 
 // Graceful shutdown
 async function shutdown(signal: string) {
-  console.log(`\n\n🛑 Received ${signal}, shutting down gracefully...`);
+  logger.info({ signal }, 'Shutting down gracefully');
   try {
     await queueWorker.stop();
-    console.log('✅ Shutdown complete');
+    logger.info('Shutdown complete');
     process.exit(0);
   } catch (error) {
-    console.error('❌ Shutdown error:', error);
+    logger.error({ error }, 'Shutdown error');
     process.exit(1);
   }
 }

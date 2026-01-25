@@ -46,7 +46,20 @@
       "Bash(git reset:*)",
       "Bash(npx jest --passWithNoTests)",
       "Bash(npx jest:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(wc:*)",
+      "Bash(while read f)",
+      "Bash(do basename \"$f\" .ts)",
+      "Bash(done)",
+      "Bash(do basename \"$f\" .test.ts)",
+      "Bash(comm:*)",
+      "Bash(npm test:*)",
+      "Bash(pkill:*)",
+      "Bash(for file in src/routes/*.ts)",
+      "Bash(for file in *.ts)",
+      "Bash(do if grep -q \"console\\\\.\" \"$file\")",
+      "Bash(then echo \"$file\")",
+      "Bash(fi)"
     ]
   }
 }

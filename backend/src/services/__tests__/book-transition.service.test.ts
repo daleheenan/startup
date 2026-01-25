@@ -14,8 +14,8 @@ describe('BookTransitionService', () => {
     const { claudeService } = await import('../claude.service.js');
     const dbModule = await import('../../db/connection.js');
 
-    mockClaudeService = claudeService;
-    mockDb = dbModule.default;
+    mockClaudeService = claudeService as any;
+    mockDb = dbModule.default as any;
 
     service = new BookTransitionService();
     jest.clearAllMocks();
@@ -116,7 +116,7 @@ describe('BookTransitionService', () => {
 
       mockPrepare.mockReturnValueOnce(bookStmt).mockReturnValueOnce(insertStmt);
 
-      (mockClaudeService.createCompletion as jest.Mock) = jest
+      mockClaudeService.createCompletion = jest
         .fn()
         .mockResolvedValue(JSON.stringify(mockTransitionData));
 

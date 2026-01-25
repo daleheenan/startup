@@ -54,11 +54,15 @@ export default function CharactersPage() {
   const fetchCharacters = async () => {
     try {
       const project = await fetchJson<any>(`/api/projects/${projectId}`);
-      if (project.story_bible?.characters) {
+      // BUG-005 FIX: Add defensive null checks for story_bible and characters
+      if (project?.story_bible?.characters && Array.isArray(project.story_bible.characters)) {
         setCharacters(project.story_bible.characters);
         if (project.story_bible.characters.length > 0) {
           setSelectedCharacter(project.story_bible.characters[0]);
         }
+      } else {
+        // Set empty array if no characters exist
+        setCharacters([]);
       }
     } catch (err: any) {
       console.error('Error fetching characters:', err);

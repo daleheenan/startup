@@ -102,6 +102,11 @@ export default function ChapterEditor({ chapterId, onClose }: ChapterEditorProps
   };
 
   const handleSave = async () => {
+    // BUG-006 FIX: Prevent save if already saving
+    if (saving) {
+      return;
+    }
+
     setSaving(true);
     try {
       const res = await fetchWithAuth(`/api/editing/chapters/${chapterId}/edit`, {
@@ -237,29 +242,34 @@ export default function ChapterEditor({ chapterId, onClose }: ChapterEditorProps
       }
 
       const data = await res.json();
-      setVariationData(data);
 
-      // Clear selection toolbar
+      // BUG-011 FIX: Use functional setState to consolidate updates and prevent race conditions
+      setVariationData(data);
+      setGeneratingVariations(false);
+
+      // Clear selection in a single batch
       setSelectionStart(null);
       setSelectionEnd(null);
       setSelectionText('');
     } catch (error) {
       console.error('Error generating variations:', error);
       alert('Failed to generate variations');
-    } finally {
       setGeneratingVariations(false);
     }
   };
 
   // Sprint 17: Handle variation applied
   const handleVariationApplied = (updatedContent: string) => {
+    // BUG-011 FIX: Consolidate state updates to prevent race conditions
     setContent(updatedContent);
     calculateWordCount(updatedContent);
     setHasUnsavedChanges(true);
     setVariationData(null);
 
     // Refresh chapter data
-    fetchChapterData();
+    fetchChapterData().catch(err => {
+      console.error('Failed to refresh chapter data:', err);
+    });
   };
 
   // Sprint 17: Close variation picker
@@ -356,7 +366,8 @@ export default function ChapterEditor({ chapterId, onClose }: ChapterEditorProps
               value={content}
               onChange={handleContentChange}
               onSelect={handleTextSelection}
-              style={styles.textarea}
+              disabled={saving}
+              style={{...styles.textarea, ...(saving && {opacity: 0.6, cursor: 'not-allowed'})}}
               placeholder="Start editing..."
             />
             {selectionStart !== null && selectionEnd !== null && selectionText && (

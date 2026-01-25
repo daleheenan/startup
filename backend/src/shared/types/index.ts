@@ -388,10 +388,21 @@ export interface SeriesTimelineEntry {
 export interface SeriesMystery {
   id: string;
   question: string;
-  introducedInBook: number;
-  answeredInBook: number | null;
-  answer: string | null;
-  relatedCharacters: string[];
+  raisedIn: {
+    bookNumber: number;
+    chapterNumber: number;
+    context: string;  // Excerpt where question is raised
+  };
+  answeredIn?: {
+    bookNumber: number;
+    chapterNumber: number;
+    answer: string;  // How it was resolved
+  };
+  status: 'open' | 'resolved' | 'red_herring';
+  importance: 'major' | 'minor' | 'subplot';
+  seriesId: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface BookTransition {

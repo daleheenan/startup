@@ -41,9 +41,13 @@ export default function NewProjectPage() {
       setCurrentStep('Finalizing story concepts...');
       const data = await response.json();
 
-      // Navigate to concept selection page with generated concepts
+      // BUG-002 FIX: Ensure sessionStorage writes complete before redirect
       sessionStorage.setItem('generatedConcepts', JSON.stringify(data.concepts));
       sessionStorage.setItem('preferences', JSON.stringify(preferences));
+
+      // Wait for next tick to ensure storage writes are flushed
+      await new Promise(resolve => setTimeout(resolve, 0));
+
       router.push('/concepts');
     } catch (err: any) {
       console.error('Error generating concepts:', err);

@@ -181,12 +181,29 @@ When one agent hands off to another:
 
 | If you are... | Also read lessons from... |
 |---------------|---------------------------|
-| `developer` | `code-reviewer`, `architect` |
-| `code-reviewer` | `developer`, `qa-tester` |
-| `architect` | `developer`, `pm-spec-writer` |
-| `qa-tester` | `developer`, `bug-hunter` |
-| `bug-hunter` | `developer`, `security-hardener` |
-| `security-hardener` | `pen-test`, `developer` |
+| `developer` | `code-reviewer`, `architect`, `bug-hunter` |
+| `code-reviewer` | `developer`, `qa-tester`, `code-quality-inspector` |
+| `architect` | `developer`, `pm-spec-writer`, `software-architect-designer` |
+| `qa-tester` | `developer`, `bug-hunter`, `qa-test-engineer` |
+| `qa-test-engineer` | `developer`, `code-reviewer`, `qa-tester` |
+| `bug-hunter` | `developer`, `security-hardener`, `code-quality-inspector` |
+| `security-hardener` | `pen-test`, `developer`, `code-reviewer` |
+| `code-quality-inspector` | `code-reviewer`, `developer`, `architect` |
+| `project-director` | `architect`, `developer`, `all agent lessons` |
+| `implementation-engineer` | `developer`, `architect`, `code-reviewer` |
+
+#### Task-Based Lesson Lookup
+
+| Task Type | Relevant Lesson Files |
+|-----------|----------------------|
+| **Bug fixing** | `bug-hunter`, `developer`, `code-reviewer` |
+| **New feature** | `developer`, `architect`, `code-reviewer` |
+| **Security audit** | `security-hardener`, `pen-test`, `code-reviewer` |
+| **Testing** | `qa-test-engineer`, `qa-tester`, `developer` |
+| **Code review** | `code-reviewer`, `code-quality-inspector`, `security-hardener` |
+| **Architecture** | `architect`, `software-architect-designer`, `developer` |
+| **Performance** | `code-optimizer`, `architect`, `developer` |
+| **Project planning** | `project-director`, `agile-product-strategist`, `architect` |
 
 #### Promoting to Shared Lessons
 

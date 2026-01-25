@@ -2,8 +2,10 @@ import { Router } from 'express';
 import { generateConcepts, refineConcepts } from '../services/concept-generator.js';
 import { sendBadRequest, sendInternalError, sendRateLimitError, isRateLimitError } from '../utils/response-helpers.js';
 import { validateNonEmptyArray } from '../utils/validation.js';
+import { createLogger } from '../services/logger.service.js';
 
 const router = Router();
+const logger = createLogger('routes:concepts');
 
 /**
  * POST /api/concepts/generate
@@ -31,12 +33,12 @@ router.post('/generate', async (req, res) => {
       return sendBadRequest(res, validationError);
     }
 
-    console.log('[API] Generating concepts for preferences:', {
+    logger.info({
       genre: genre || genres?.join(' + '),
       subgenre: subgenre || subgenres?.join(', '),
       tone,
-      themes: themes.length,
-    });
+      themesCount: themes.length,
+    }, 'Generating concepts for preferences');
 
     const concepts = await generateConcepts(preferences);
 
@@ -70,10 +72,10 @@ router.post('/refine', async (req, res) => {
       return sendBadRequest(res, 'feedback must be a non-empty string');
     }
 
-    console.log('[API] Refining concepts with feedback:', {
+    logger.info({
       existingCount: existingConcepts.length,
       feedbackLength: feedback.length,
-    });
+    }, 'Refining concepts with feedback');
 
     const concepts = await refineConcepts(preferences, existingConcepts, feedback.trim());
 

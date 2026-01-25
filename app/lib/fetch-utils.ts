@@ -6,6 +6,9 @@ interface FetchOptions extends RequestInit {
   skipAuth?: boolean;
 }
 
+// BUG-001 FIX: Singleton flag to prevent multiple logout operations
+let isLoggingOut = false;
+
 /**
  * Fetch with authentication and standardized error handling
  */
@@ -40,8 +43,12 @@ export async function fetchWithAuth(
   });
 
   if (response.status === 401) {
-    logout();
-    window.location.href = '/login';
+    // BUG-001 FIX: Only logout once even with multiple simultaneous 401s
+    if (!isLoggingOut) {
+      isLoggingOut = true;
+      logout();
+      window.location.href = '/login';
+    }
     throw new Error('Session expired. Please log in again.');
   }
 
@@ -58,9 +65,13 @@ export async function fetchJson<T>(
   const response = await fetchWithAuth(endpoint, options);
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({
-      error: { message: `Request failed with status ${response.status}` }
-    }));
+    const errorData = await response.json().catch((parseError) => {
+      // BUG-003 FIX: Log JSON parse errors before providing fallback
+      console.error('Failed to parse error response JSON:', parseError);
+      return {
+        error: { message: `Request failed with status ${response.status}` }
+      };
+    });
     throw new Error(errorData.error?.message || `Request failed with status ${response.status}`);
   }
 
