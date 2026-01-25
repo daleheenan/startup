@@ -351,7 +351,7 @@ function buildSceneCardPrompt(
 
   const povChar = characters.find((c) => c.name === chapter.povCharacter);
 
-  const locations = world.locations.map((l) => `- ${l.name}: ${l.description}`).join('\n');
+  const locations = (world?.locations || []).map((l) => `- ${l.name}: ${l.description}`).join('\n') || 'No specific locations defined';
 
   return `You are a master story architect. Generate detailed scene cards for Chapter ${chapter.number}: "${chapter.title}".
 
