@@ -82,11 +82,15 @@ export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, E
               </button>
             </div>
 
-            {process.env.NODE_ENV === 'development' && this.state.error && (
-              <details style={styles.details}>
-                <summary style={styles.summary}>Error Details (Development Only)</summary>
+            {this.state.error && (
+              <details style={styles.details} open>
+                <summary style={styles.summary}>Error Details</summary>
                 <div style={styles.errorDetails}>
                   <p style={styles.errorMessage}><strong>Error:</strong> {this.state.error.toString()}</p>
+                  <p style={styles.errorMessage}><strong>Message:</strong> {this.state.error.message}</p>
+                  {this.state.error.stack && (
+                    <pre style={styles.stackTrace}>{this.state.error.stack}</pre>
+                  )}
                   {this.state.errorInfo && (
                     <pre style={styles.stackTrace}>{this.state.errorInfo.componentStack}</pre>
                   )}
