@@ -1306,6 +1306,115 @@ router.get('/:id/plot-structure', (req, res) => {
 });
 
 /**
+ * POST /api/projects/:id/generate-plot-layer-field
+ * Generate a name or description for a plot layer using AI
+ */
+router.post('/:id/generate-plot-layer-field', async (req, res) => {
+  try {
+    const { id: projectId } = req.params;
+    const { field, layerType, existingValues } = req.body;
+
+    if (!field || !['name', 'description'].includes(field)) {
+      return res.status(400).json({
+        error: { code: 'INVALID_REQUEST', message: 'field must be "name" or "description"' },
+      });
+    }
+
+    if (!layerType) {
+      return res.status(400).json({
+        error: { code: 'INVALID_REQUEST', message: 'layerType is required' },
+      });
+    }
+
+    // Get project context
+    const projectStmt = db.prepare<[string], Project>(`
+      SELECT title, genre, story_dna, story_bible, plot_structure FROM projects WHERE id = ?
+    `);
+    const project = projectStmt.get(projectId);
+
+    if (!project) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project not found' },
+      });
+    }
+
+    const storyDNA = safeJsonParse(project.story_dna as any, null);
+    const storyBible = safeJsonParse(project.story_bible as any, null);
+    const plotStructure = safeJsonParse((project as any).plot_structure, null);
+
+    // Get existing layer names to avoid duplicates
+    const existingLayerNames = plotStructure?.plot_layers?.map((l: any) => l.name) || [];
+
+    // Import Anthropic client
+    const { default: Anthropic } = await import('@anthropic-ai/sdk');
+    const anthropic = new Anthropic();
+
+    let prompt: string;
+
+    if (field === 'name') {
+      prompt = `You are a creative story structure expert. Generate a compelling name for a ${layerType} plot layer.
+
+**Story Context:**
+- Title: ${project.title}
+- Genre: ${project.genre}
+${storyDNA?.tone ? `- Tone: ${storyDNA.tone}` : ''}
+${storyBible?.characters?.length ? `- Main Characters: ${storyBible.characters.slice(0, 3).map((c: any) => c.name).join(', ')}` : ''}
+
+**Layer Type:** ${layerType}
+${existingValues?.description ? `**Description Hint:** ${existingValues.description}` : ''}
+
+**Existing Layer Names (avoid these):** ${existingLayerNames.join(', ') || 'None'}
+
+Generate a short, evocative name for this plot layer that:
+1. Reflects the type of plot thread (${layerType})
+2. Hints at the emotional or dramatic content
+3. Is distinct from existing layer names
+4. Is 2-4 words maximum
+
+Return ONLY the name, nothing else.`;
+    } else {
+      prompt = `You are a story structure expert. Generate a brief description for a plot layer.
+
+**Story Context:**
+- Title: ${project.title}
+- Genre: ${project.genre}
+${storyDNA?.tone ? `- Tone: ${storyDNA.tone}` : ''}
+${storyBible?.characters?.length ? `- Main Characters: ${storyBible.characters.slice(0, 3).map((c: any) => c.name).join(', ')}` : ''}
+
+**Layer:**
+- Type: ${layerType}
+${existingValues?.name ? `- Name: ${existingValues.name}` : ''}
+
+Generate a 1-2 sentence description for this plot layer that:
+1. Explains what this thread will explore
+2. Hints at the central conflict or tension
+3. Connects to the genre and tone
+4. Is specific enough to guide plot point creation
+
+Return ONLY the description, nothing else.`;
+    }
+
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 200,
+      temperature: 0.8,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const generatedValue = message.content[0].type === 'text'
+      ? message.content[0].text.trim()
+      : '';
+
+    logger.info({ projectId, field, layerType, generatedValue }, 'Plot layer field generated');
+
+    res.json({ field, value: generatedValue });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error generating plot layer field');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
  * POST /api/projects/:id/generate-plot-points
  * Generate plot points for a specific layer using AI
  */

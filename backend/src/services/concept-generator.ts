@@ -58,12 +58,34 @@ export interface ConceptSummary {
 }
 
 /**
- * Fetch exclusion data from previously saved concepts and projects
+ * Common fantasy/generic names to always exclude
+ * These names appear frequently in AI-generated content
+ */
+const COMMON_FANTASY_NAMES = [
+  'Kira', 'Aric', 'Zara', 'Kael', 'Lyra', 'Theron', 'Mira', 'Darian',
+  'Elena', 'Marcus', 'Luna', 'Raven', 'Phoenix', 'Shadow', 'Storm',
+  'Aurora', 'Jasper', 'Sage', 'Aria', 'Finn', 'Ivy', 'Rowan', 'Ember',
+  'Nova', 'Atlas', 'Orion', 'Celeste', 'Dante', 'Seraphina', 'Caspian',
+  'Elara', 'Nyx', 'Alaric', 'Isolde', 'Draven', 'Astrid', 'Corvus',
+];
+
+/**
+ * Common generic title words to avoid
+ */
+const GENERIC_TITLE_WORDS = [
+  'Shadow', 'Dark', 'Last', 'Rising', 'Fallen', 'Crown', 'Throne',
+  'Blood', 'Fire', 'Ice', 'Storm', 'Night', 'Dawn', 'Dusk', 'Edge',
+  'Guardian', 'Prophecy', 'Legacy', 'Secret', 'Hidden', 'Lost', 'Chosen',
+];
+
+/**
+ * Fetch exclusion data from previously saved concepts, summaries, and projects
+ * Improved to extract more comprehensive name patterns
  */
 function fetchExclusions(): ConceptExclusions {
   const exclusions: ConceptExclusions = {
     titles: [],
-    protagonistNames: [],
+    protagonistNames: [...COMMON_FANTASY_NAMES], // Start with common names to avoid
     centralConflicts: [],
   };
 
@@ -72,20 +94,45 @@ function fetchExclusions(): ConceptExclusions {
     const savedConceptsStmt = db.prepare(`
       SELECT title, protagonist_hint, logline FROM saved_concepts
       WHERE status IN ('saved', 'used')
-      LIMIT 50
+      LIMIT 100
     `);
     const savedConcepts = savedConceptsStmt.all() as { title: string; protagonist_hint: string | null; logline: string }[];
 
     for (const concept of savedConcepts) {
       exclusions.titles.push(concept.title);
       if (concept.protagonist_hint) {
-        // Extract name from hint like "Kira - street thief with..."
-        const nameMatch = concept.protagonist_hint.match(/^([A-Z][a-z]+)/);
+        // Extract name patterns more comprehensively
+        // Pattern 1: "Name - description" or "Name, description"
+        const nameMatch = concept.protagonist_hint.match(/^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/);
         if (nameMatch) {
           exclusions.protagonistNames.push(nameMatch[1]);
         }
+        // Also extract any capitalized words that look like names (2-12 chars)
+        const allNames = concept.protagonist_hint.match(/\b[A-Z][a-z]{1,11}\b/g);
+        if (allNames) {
+          exclusions.protagonistNames.push(...allNames);
+        }
       }
-      exclusions.centralConflicts.push(concept.logline.substring(0, 100));
+      // Extract key phrases from logline
+      if (concept.logline) {
+        exclusions.centralConflicts.push(concept.logline.substring(0, 150));
+      }
+    }
+
+    // Get titles from saved concept summaries
+    try {
+      const summariesStmt = db.prepare(`
+        SELECT title, logline FROM saved_concept_summaries
+        WHERE status IN ('saved', 'expanded')
+        LIMIT 100
+      `);
+      const summaries = summariesStmt.all() as { title: string; logline: string }[];
+      for (const summary of summaries) {
+        exclusions.titles.push(summary.title);
+        exclusions.centralConflicts.push(summary.logline.substring(0, 150));
+      }
+    } catch {
+      // Table might not exist yet
     }
 
     // Get titles from existing projects
@@ -98,6 +145,11 @@ function fetchExclusions(): ConceptExclusions {
     for (const project of projects) {
       exclusions.titles.push(project.title);
     }
+
+    // Deduplicate and clean
+    exclusions.titles = [...new Set(exclusions.titles)];
+    exclusions.protagonistNames = [...new Set(exclusions.protagonistNames)];
+    exclusions.centralConflicts = [...new Set(exclusions.centralConflicts)];
 
     logger.info({
       titlesCount: exclusions.titles.length,
@@ -146,11 +198,14 @@ export async function generateConcepts(
       : '';
 
     // Parse the JSON response
-    const concepts = parseConceptsResponse(responseText);
+    let concepts = parseConceptsResponse(responseText);
 
     if (!concepts || concepts.length === 0) {
       throw new Error('Failed to parse concepts from Claude response');
     }
+
+    // Validate and clean concepts against exclusions
+    concepts = validateAndCleanConcepts(concepts, exclusions);
 
     logger.info(`[ConceptGenerator] Successfully generated ${concepts.length} concepts`);
 
@@ -182,15 +237,30 @@ function buildConceptPrompt(preferences: StoryPreferences, exclusions?: ConceptE
   const uniqueSeed = regenerationTimestamp || Date.now();
   const seedHint = `[Generation ID: ${uniqueSeed} - Use this to ensure maximum randomization]`;
 
-  // Build exclusion section
+  // Build exclusion section with STRONG enforcement
   let exclusionSection = '';
   if (exclusions && (exclusions.titles.length > 0 || exclusions.protagonistNames.length > 0)) {
     exclusionSection = `
-**MANDATORY EXCLUSIONS - DO NOT USE ANY OF THESE:**
-${exclusions.titles.length > 0 ? `- Titles to AVOID: ${exclusions.titles.slice(0, 20).join(', ')}` : ''}
-${exclusions.protagonistNames.length > 0 ? `- Character names to AVOID: ${exclusions.protagonistNames.slice(0, 30).join(', ')}` : ''}
+═══════════════════════════════════════════════════════════════════════════════
+⛔ CRITICAL: BANNED ELEMENTS - YOUR OUTPUT WILL BE REJECTED IF YOU USE THESE ⛔
+═══════════════════════════════════════════════════════════════════════════════
 
-You MUST generate completely original titles and character names that are NOT similar to any in the exclusion list.
+**BANNED TITLES (using ANY of these exact titles = automatic rejection):**
+${exclusions.titles.slice(0, 25).join(' | ')}
+
+**BANNED CHARACTER NAMES (using ANY of these names = automatic rejection):**
+${exclusions.protagonistNames.slice(0, 50).join(' | ')}
+
+**BANNED GENERIC TITLE WORDS (avoid titles containing these overused words):**
+${GENERIC_TITLE_WORDS.join(' | ')}
+
+**VERIFICATION REQUIRED:**
+Before finalizing each concept, verify:
+✗ Title is NOT in the banned list above
+✗ Title does NOT contain banned generic words
+✗ Protagonist name is NOT in the banned names list
+✗ Protagonist name is from a REAL cultural background (Korean, Nigerian, Brazilian, etc.)
+═══════════════════════════════════════════════════════════════════════════════
 `;
   }
 
@@ -351,6 +421,59 @@ Return ONLY a JSON array of 5 concepts in this exact format:
 }
 
 /**
+ * Validate concepts against exclusions and modify if needed
+ * Returns concepts with any violations flagged or fixed
+ */
+function validateAndCleanConcepts(concepts: StoryConcept[], exclusions: ConceptExclusions): StoryConcept[] {
+  const cleanedConcepts: StoryConcept[] = [];
+
+  for (const concept of concepts) {
+    let cleanConcept = { ...concept };
+
+    // Check for banned titles (exact match)
+    const titleLower = concept.title.toLowerCase();
+    const isBannedTitle = exclusions.titles.some(t =>
+      t.toLowerCase() === titleLower
+    );
+
+    if (isBannedTitle) {
+      // Append a unique suffix to make title different
+      cleanConcept.title = `${concept.title}: A New Beginning`;
+      logger.warn({ originalTitle: concept.title, newTitle: cleanConcept.title },
+        'Modified banned title');
+    }
+
+    // Check for generic title words
+    const hasGenericWord = GENERIC_TITLE_WORDS.some(word =>
+      titleLower.includes(word.toLowerCase())
+    );
+
+    if (hasGenericWord) {
+      logger.info({ title: concept.title }, 'Concept uses generic title word (allowed but noted)');
+    }
+
+    // Check for banned character names in protagonist hint
+    if (concept.protagonistHint) {
+      const protagonistLower = concept.protagonistHint.toLowerCase();
+      const usedBannedName = exclusions.protagonistNames.find(name =>
+        protagonistLower.startsWith(name.toLowerCase()) ||
+        protagonistLower.includes(` ${name.toLowerCase()} `)
+      );
+
+      if (usedBannedName) {
+        logger.warn({ protagonist: concept.protagonistHint, bannedName: usedBannedName },
+          'Concept uses banned character name');
+        // Note: We don't auto-fix names as it would require significant changes
+      }
+    }
+
+    cleanedConcepts.push(cleanConcept);
+  }
+
+  return cleanedConcepts;
+}
+
+/**
  * Parse concepts from Claude's JSON response
  */
 function parseConceptsResponse(responseText: string): StoryConcept[] {
@@ -444,11 +567,20 @@ function buildSummaryPrompt(preferences: StoryPreferences, exclusions?: ConceptE
 
   const uniqueSeed = regenerationTimestamp || Date.now();
 
-  // Build exclusion section
+  // Build exclusion section with STRONG enforcement
   let exclusionSection = '';
   if (exclusions && (exclusions.titles.length > 0 || exclusions.protagonistNames.length > 0)) {
     exclusionSection = `
-**DO NOT USE ANY OF THESE TITLES:** ${exclusions.titles.slice(0, 20).join(', ')}
+═══════════════════════════════════════════════════════════════════════════════
+⛔ BANNED TITLES - YOUR OUTPUT WILL BE REJECTED IF YOU USE ANY OF THESE ⛔
+═══════════════════════════════════════════════════════════════════════════════
+${exclusions.titles.slice(0, 30).join(' | ')}
+
+**ALSO AVOID titles containing these generic words:**
+${GENERIC_TITLE_WORDS.join(' | ')}
+
+**VERIFICATION:** Before finalizing, ensure NONE of your 10 titles match or resemble the banned list.
+═══════════════════════════════════════════════════════════════════════════════
 `;
   }
 
@@ -556,6 +688,117 @@ export async function expandSummariesToConcepts(
     logger.error({ error }, 'Concept expansion error');
     throw error;
   }
+}
+
+/**
+ * Expand a single summary into multiple varied full concepts
+ * Each concept explores the same core idea from a different angle
+ */
+export async function expandSummaryToVariations(
+  preferences: StoryPreferences,
+  summary: ConceptSummary,
+  count: number = 4
+): Promise<StoryConcept[]> {
+  const prompt = buildVariationPrompt(preferences, summary, count);
+
+  logger.info(`[ConceptGenerator] Generating ${count} variations for "${summary.title}"...`);
+
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-opus-4-5-20251101',
+      max_tokens: 6000,
+      temperature: 1.0, // High creativity for diverse variations
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+    });
+
+    const responseText = message.content[0].type === 'text'
+      ? message.content[0].text
+      : '';
+
+    const concepts = parseConceptsResponse(responseText);
+
+    if (!concepts || concepts.length === 0) {
+      throw new Error('Failed to parse variation concepts from Claude response');
+    }
+
+    logger.info(`[ConceptGenerator] Successfully generated ${concepts.length} variations`);
+
+    return concepts;
+  } catch (error: any) {
+    logger.error({ error }, 'Variation generation error');
+    throw error;
+  }
+}
+
+/**
+ * Build prompt for generating concept variations from a single summary
+ */
+function buildVariationPrompt(preferences: StoryPreferences, summary: ConceptSummary, count: number): string {
+  const { tone, tones, themes, customTheme, targetLength, timeframe } = preferences;
+
+  const genreText = formatGenre(preferences);
+  const subgenreText = formatSubgenre(preferences);
+  const toneText = tones && tones.length > 0 ? tones.join(' + ') : tone;
+  const allThemes = customTheme ? [...themes, customTheme] : themes;
+  const themesText = allThemes.join(', ');
+  const wordCountContext = getWordCountContext(targetLength);
+
+  const uniqueSeed = Date.now();
+
+  return `You are a master storyteller. Generate ${count} RADICALLY DIFFERENT variations of this story concept.
+
+[Generation ID: ${uniqueSeed}]
+
+**ORIGINAL CONCEPT:**
+- Title: "${summary.title}"
+- Logline: ${summary.logline}
+
+**Genre:** ${genreText}
+**Subgenre:** ${subgenreText}
+**Tone:** ${toneText}
+**Themes:** ${themesText}
+${timeframe ? `**Time Period/Era:** ${timeframe}` : ''}
+**Target Length:** ${targetLength.toLocaleString()} words (${wordCountContext})
+
+**VARIATION REQUIREMENTS:**
+Each variation should explore the SAME core story idea but from a completely different angle:
+1. **Different Protagonist** - Each version should have a unique main character with a different background, motivation, and arc
+2. **Different Tone** - Explore the premise through different emotional lenses (dark, humorous, romantic, thriller, etc.)
+3. **Different Setting** - Place the story in different time periods, locations, or worlds
+4. **Different Structure** - Use different narrative approaches (linear, non-linear, multiple POV, frame story)
+
+**CHARACTER NAME RULES:**
+- Each variation MUST use completely UNIQUE character names
+- Names should come from diverse cultural backgrounds
+- NO generic fantasy names (Kira, Aric, Zara, etc.)
+- NO repeated names across variations
+
+For EACH variation, provide:
+- **title**: A UNIQUE title (can be inspired by original but must be different)
+- **logline**: Keep the same logline from the original
+- **synopsis**: A detailed 3-paragraph synopsis exploring THIS variation's unique approach (150-200 words)
+- **hook**: What makes THIS specific variation unique
+- **protagonistHint**: Full protagonist description with UNIQUE NAME, role, and motivation
+- **conflictType**: The primary conflict type
+
+Return ONLY a JSON array of ${count} concepts:
+[
+  {
+    "id": "variation-1",
+    "title": "Variation title here",
+    "logline": "${summary.logline}",
+    "synopsis": "Unique synopsis for this variation...",
+    "hook": "What makes this variation unique",
+    "protagonistHint": "UniqueName - role, background, motivation",
+    "conflictType": "internal/external/both"
+  },
+  ...
+]`;
 }
 
 /**

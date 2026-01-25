@@ -631,13 +631,24 @@ export default function OutlinePage() {
                     }}
                   >
                     <h3 style={{ fontSize: '1.125rem', marginBottom: '0.5rem', color: '#1A1A2E', fontWeight: 600 }}>
-                      {act.name}
+                      {act.name || `Act ${act.number}`}
                     </h3>
-                    <p style={{ color: '#64748B', marginBottom: '1.5rem', fontSize: '0.875rem' }}>{act.description}</p>
+                    <p style={{ color: '#64748B', marginBottom: '1.5rem', fontSize: '0.875rem' }}>{act.description || 'No description'}</p>
 
                     {/* Chapters in this act */}
                     <div style={{ display: 'grid', gap: '0.75rem' }}>
-                      {act.chapters.map((chapter) => (
+                      {(!act.chapters || act.chapters.length === 0) ? (
+                        <div style={{
+                          padding: '1rem',
+                          background: '#F8FAFC',
+                          borderRadius: '8px',
+                          color: '#64748B',
+                          fontSize: '0.875rem',
+                          textAlign: 'center',
+                        }}>
+                          No chapters in this act yet
+                        </div>
+                      ) : act.chapters.map((chapter) => (
                         <div
                           key={chapter.number}
                           style={{
@@ -673,10 +684,21 @@ export default function OutlinePage() {
 
                           {expandedChapter === chapter.number && (
                             <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #E2E8F0' }}>
-                              <p style={{ color: '#64748B', marginBottom: '1rem', fontSize: '0.875rem' }}>{chapter.summary}</p>
+                              <p style={{ color: '#64748B', marginBottom: '1rem', fontSize: '0.875rem' }}>{chapter.summary || 'No summary'}</p>
 
                               {/* Scene Cards */}
-                              {chapter.scenes.map((scene) => (
+                              {(!chapter.scenes || chapter.scenes.length === 0) ? (
+                                <div style={{
+                                  padding: '0.75rem',
+                                  background: '#F8FAFC',
+                                  borderRadius: '6px',
+                                  color: '#64748B',
+                                  fontSize: '0.813rem',
+                                  textAlign: 'center',
+                                }}>
+                                  No scenes defined for this chapter
+                                </div>
+                              ) : chapter.scenes.map((scene) => (
                                 <div
                                   key={scene.id}
                                   style={{

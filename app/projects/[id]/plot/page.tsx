@@ -98,6 +98,7 @@ export default function PlotStructurePage() {
   const [generatingLayerId, setGeneratingLayerId] = useState<string | null>(null);
   const [generatingPacing, setGeneratingPacing] = useState(false);
   const [generatingNewLayer, setGeneratingNewLayer] = useState(false);
+  const [generatingField, setGeneratingField] = useState<'name' | 'description' | null>(null);
 
   // Modal state
   const [showLayerModal, setShowLayerModal] = useState(false);
@@ -199,6 +200,46 @@ export default function PlotStructurePage() {
       color: LAYER_COLORS[structure.plot_layers.length % LAYER_COLORS.length],
     });
     setShowLayerModal(true);
+  };
+
+  const handleGenerateLayerField = async (field: 'name' | 'description') => {
+    setGeneratingField(field);
+    setError(null);
+
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE_URL}/api/projects/${projectId}/generate-plot-layer-field`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          field,
+          layerType: layerForm.type,
+          existingValues: {
+            name: layerForm.name,
+            description: layerForm.description,
+          },
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error?.message || `Failed to generate ${field}`);
+      }
+
+      const data = await res.json();
+      setLayerForm(prev => ({
+        ...prev,
+        [field]: data.value,
+      }));
+    } catch (err: any) {
+      console.error(`Error generating ${field}:`, err);
+      setError(err.message);
+    } finally {
+      setGeneratingField(null);
+    }
   };
 
   const handleEditLayer = (layerId: string) => {
@@ -973,7 +1014,26 @@ export default function PlotStructurePage() {
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div>
-                  <label style={labelStyle}>Name</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <label style={{ ...labelStyle, marginBottom: 0 }}>Name</label>
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateLayerField('name')}
+                      disabled={generatingField !== null}
+                      style={{
+                        padding: '0.25rem 0.5rem',
+                        background: generatingField === 'name' ? '#94A3B8' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        border: 'none',
+                        borderRadius: '4px',
+                        color: '#FFFFFF',
+                        fontSize: '0.625rem',
+                        fontWeight: 500,
+                        cursor: generatingField !== null ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {generatingField === 'name' ? 'Generating...' : '✨ Generate'}
+                    </button>
+                  </div>
                   <input
                     type="text"
                     value={layerForm.name}
@@ -983,7 +1043,26 @@ export default function PlotStructurePage() {
                   />
                 </div>
                 <div>
-                  <label style={labelStyle}>Description</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <label style={{ ...labelStyle, marginBottom: 0 }}>Description</label>
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateLayerField('description')}
+                      disabled={generatingField !== null}
+                      style={{
+                        padding: '0.25rem 0.5rem',
+                        background: generatingField === 'description' ? '#94A3B8' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        border: 'none',
+                        borderRadius: '4px',
+                        color: '#FFFFFF',
+                        fontSize: '0.625rem',
+                        fontWeight: 500,
+                        cursor: generatingField !== null ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {generatingField === 'description' ? 'Generating...' : '✨ Generate'}
+                    </button>
+                  </div>
                   <textarea
                     value={layerForm.description}
                     onChange={(e) => setLayerForm({ ...layerForm, description: e.target.value })}

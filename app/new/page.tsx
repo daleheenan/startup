@@ -81,6 +81,9 @@ export default function NewProjectPage() {
   const [quickGenre, setQuickGenre] = useState<string>('');
   const [quickPrompt, setQuickPrompt] = useState<string>('');
 
+  // Generation mode: 'full' = 5 detailed concepts, 'summaries' = 10 short summaries
+  const [generateMode, setGenerateMode] = useState<'full' | 'summaries'>('full');
+
   const handleSubmit = async (preferences: any) => {
     setIsGenerating(true);
     setError(null);
@@ -88,33 +91,64 @@ export default function NewProjectPage() {
 
     try {
       const token = getToken();
-      setCurrentStep('Analyzing your genre preferences...');
 
-      const response = await fetch(`${API_BASE_URL}/api/concepts/generate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ preferences }),
-      });
+      if (generateMode === 'summaries') {
+        // Two-stage workflow: Generate summaries first
+        setCurrentStep('Generating concept summaries...');
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Failed to generate concepts');
+        const response = await fetch(`${API_BASE_URL}/api/concepts/summaries`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ preferences }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error?.message || 'Failed to generate summaries');
+        }
+
+        setCurrentStep('Finalizing summaries...');
+        const data = await response.json();
+
+        sessionStorage.setItem('generatedSummaries', JSON.stringify(data.summaries));
+        sessionStorage.setItem('summaryPreferences', JSON.stringify(preferences));
+
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        router.push('/summaries');
+      } else {
+        // Direct full concept generation (existing behavior)
+        setCurrentStep('Analyzing your genre preferences...');
+
+        const response = await fetch(`${API_BASE_URL}/api/concepts/generate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ preferences }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error?.message || 'Failed to generate concepts');
+        }
+
+        setCurrentStep('Finalizing story concepts...');
+        const data = await response.json();
+
+        // BUG-002 FIX: Ensure sessionStorage writes complete before redirect
+        sessionStorage.setItem('generatedConcepts', JSON.stringify(data.concepts));
+        sessionStorage.setItem('preferences', JSON.stringify(preferences));
+
+        // Wait for next tick to ensure storage writes are flushed
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        router.push('/concepts');
       }
-
-      setCurrentStep('Finalizing story concepts...');
-      const data = await response.json();
-
-      // BUG-002 FIX: Ensure sessionStorage writes complete before redirect
-      sessionStorage.setItem('generatedConcepts', JSON.stringify(data.concepts));
-      sessionStorage.setItem('preferences', JSON.stringify(preferences));
-
-      // Wait for next tick to ensure storage writes are flushed
-      await new Promise(resolve => setTimeout(resolve, 0));
-
-      router.push('/concepts');
     } catch (err: any) {
       console.error('Error generating concepts:', err);
       setError(err.message || 'An error occurred while generating concepts');
@@ -268,20 +302,33 @@ export default function NewProjectPage() {
               Tell us about your story and we'll generate concepts
             </p>
           </div>
-          <Link
-            href="/projects"
-            style={{
-              padding: '0.5rem 1rem',
-              color: '#64748B',
-              textDecoration: 'none',
-              fontSize: '0.875rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-            }}
-          >
-            ← Back to Projects
-          </Link>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <Link
+              href="/saved-summaries"
+              style={{
+                padding: '0.5rem 1rem',
+                color: '#667eea',
+                textDecoration: 'none',
+                fontSize: '0.875rem',
+              }}
+            >
+              Saved Summaries
+            </Link>
+            <Link
+              href="/projects"
+              style={{
+                padding: '0.5rem 1rem',
+                color: '#64748B',
+                textDecoration: 'none',
+                fontSize: '0.875rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+              }}
+            >
+              ← Back to Projects
+            </Link>
+          </div>
         </header>
 
         {/* Content Area */}
@@ -445,6 +492,70 @@ export default function NewProjectPage() {
                   />
                 </div>
 
+                {/* Generation Mode Selection */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '0.75rem',
+                    color: '#374151',
+                    fontWeight: 600,
+                    fontSize: '0.875rem',
+                  }}>
+                    Generation Mode
+                  </label>
+                  <div style={{
+                    display: 'flex',
+                    gap: '0.75rem',
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => setGenerateMode('full')}
+                      disabled={isGenerating}
+                      style={{
+                        flex: 1,
+                        padding: '0.875rem',
+                        background: generateMode === 'full'
+                          ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                          : '#F8FAFC',
+                        border: generateMode === 'full'
+                          ? '2px solid #667eea'
+                          : '1px solid #E2E8F0',
+                        borderRadius: '8px',
+                        color: generateMode === 'full' ? '#FFFFFF' : '#374151',
+                        cursor: isGenerating ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>5 Full Concepts</div>
+                      <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>Detailed concepts ready to use</div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setGenerateMode('summaries')}
+                      disabled={isGenerating}
+                      style={{
+                        flex: 1,
+                        padding: '0.875rem',
+                        background: generateMode === 'summaries'
+                          ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                          : '#F8FAFC',
+                        border: generateMode === 'summaries'
+                          ? '2px solid #667eea'
+                          : '1px solid #E2E8F0',
+                        borderRadius: '8px',
+                        color: generateMode === 'summaries' ? '#FFFFFF' : '#374151',
+                        cursor: isGenerating ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>10 Quick Summaries</div>
+                      <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>Browse ideas, save favorites, expand later</div>
+                    </button>
+                  </div>
+                </div>
+
                 {/* Action Buttons */}
                 <div style={{ display: 'flex', gap: '1rem' }}>
                   <button
@@ -484,7 +595,12 @@ export default function NewProjectPage() {
                       transition: 'all 0.2s',
                     }}
                   >
-                    {isGenerating ? 'Generating...' : '⚡ Generate Concepts'}
+                    {isGenerating
+                      ? 'Generating...'
+                      : generateMode === 'summaries'
+                      ? '📝 Generate Summaries'
+                      : '⚡ Generate Concepts'
+                    }
                   </button>
                 </div>
 
