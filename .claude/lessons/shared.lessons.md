@@ -13,10 +13,10 @@ MAINTENANCE RULES:
 
 ## Summary Statistics
 
-- **Total lessons recorded**: 22
+- **Total lessons recorded**: 23
 - **Last updated**: 2026-01-25
 - **Foundational lessons** (score >= 10): 5
-- **Contributing agents**: Initial setup, bug-hunter, qa-test-engineer, project-director
+- **Contributing agents**: Initial setup, bug-hunter, qa-test-engineer, project-director, developer
 
 ---
 
@@ -75,6 +75,31 @@ These lessons have proven universally valuable across many tasks and agents.
 ---
 
 ## Active Lessons (Most Recent First)
+
+### 2026-01-25 | Pre-Deployment Checklist for Railway/Cloud Builds
+
+**Context**: Railway deployment failures due to missing files and version incompatibilities
+
+**Lesson**: Before pushing code that will trigger a Railway/cloud deployment, run this checklist:
+
+1. **Check for untracked files**: `git status --short | grep "^??"` - ensure all imported modules are committed
+2. **Verify TypeScript compilation**: `npx tsc --noEmit` in the backend directory
+3. **Check third-party library versions**: Major version changes (e.g., Zod v3 → v4) can have breaking API changes
+4. **Verify sync/async consistency**: Module initialization code (migrations, DB connections) must match expected sync/async behavior
+5. **Test both frontend and backend builds**: `npm run build` in each directory
+6. **Review imports with grep**: `grep -r "from '\.\./module" --include="*.ts"` to find all imports of a new module
+
+Common failures this prevents:
+- "Cannot find module" errors (untracked files)
+- TypeScript compilation errors (type inference changes in library updates)
+- "await only allowed in async function" (sync/async mismatch)
+- Runtime crashes from breaking API changes in dependencies
+
+**Application Score**: 0
+
+**Tags**: #deployment #railway #ci-cd #verification #untracked-files #dependencies
+
+---
 
 ### 2026-01-25 | React Query Integration Pattern
 

@@ -12,11 +12,11 @@ MAINTENANCE RULES:
 
 ## Summary Statistics
 
-- **Total tasks completed**: 10
-- **Total lessons recorded**: 10
+- **Total tasks completed**: 12
+- **Total lessons recorded**: 12
 - **Last updated**: 2026-01-25
 - **Proven lessons** (score >= 5): 0
-- **Top themes**: #typescript #testing #patterns #frontend #backend #database #migrations #third-party-integration #performance #caching #mocking #jest #logging #structured-logging #pino
+- **Top themes**: #typescript #testing #patterns #frontend #backend #database #migrations #third-party-integration #performance #caching #mocking #jest #logging #structured-logging #pino #fullstack #prompts #claude-api #deployment #railway #ci-cd
 
 ---
 
@@ -29,6 +29,78 @@ MAINTENANCE RULES:
 ---
 
 ## Active Lessons (Most Recent First)
+
+### 2026-01-25 | Task: Fixing Railway Deployment Failures - Untracked Files and Zod Version
+
+**Date**: 2026-01-25
+**Task**: Debugging and fixing Railway deployment failures caused by missing modules and dependency version issues
+**Context**: Railway deployment of Express/TypeScript backend failing with multiple "Cannot find module" and TypeScript compilation errors
+
+**What Worked Well**:
+- Systematically checking `git status` to find untracked files that were being imported
+- Using grep to trace import dependencies: `grep -r "migration-registry\|query-monitor" --include="*.ts"`
+- Running `npx tsc --noEmit` locally to reproduce Railway's TypeScript errors before pushing fixes
+- Checking npm package versions with `npm list zod` to identify version mismatches
+- Recognizing that Zod v4 (4.3.6) has breaking changes vs Zod v3 (type inference differences)
+- Adding synchronous versions of async methods when code needed to run at module initialization time
+- Committing fixes incrementally with descriptive messages to track what each fix addressed
+
+**What Didn't Work**:
+- Initial commits missed several untracked files - should have done comprehensive check first
+- Didn't immediately recognize Zod v4 breaking changes - assumed syntax error in our code
+- Async migration function was called synchronously at server startup - needed to trace full call stack to find issue
+
+**Lesson**: When Railway deployments fail, follow this systematic approach:
+1. **Reproduce locally first** - Run `npx tsc --noEmit` in backend to see same errors
+2. **Check for untracked files** - `git status --short | grep "^??"` then trace imports
+3. **Verify dependency versions** - Major version bumps (v3→v4) often have breaking changes
+4. **Check sync/async consistency** - Module initialization code (server.ts, db connections, migrations) must be synchronous if called at import time
+5. **Downgrade problematic dependencies** - Use stable versions (`npm install zod@3.24.4`) rather than latest
+6. **Test build before push** - Both `npm run build` and `npx tsc --noEmit` should pass
+
+Specific patterns that broke Railway:
+- `Cannot find module '../utils/schemas.js'` → File was untracked/uncommitted
+- `TS2339: Property 'preferences' does not exist on type 'never'` → Zod v4 type inference breaking change
+- `TS1308: 'await' only allowed in async functions` → Migration function changed to async but called synchronously
+
+**Application Score**: 0
+
+**Tags**: #deployment #railway #ci-cd #typescript #zod #untracked-files #async-sync #debugging #dependencies
+
+---
+
+### 2026-01-25 | Task: Adding Timeframe/Era Setting to Genre Setup Flow
+
+**Date**: 2026-01-25
+**Task**: Adding story universe timeframe/year setting to genre setup flow with preset buttons and custom input
+**Context**: Full-stack feature spanning database migration, shared types, backend prompts, and frontend UI components
+
+**What Worked Well**:
+- Reading lessons files first to understand existing patterns and best practices
+- Systematically inventorying existing code before implementation (checked migrations, types, services, components)
+- Following existing migration patterns (checked latest migration number, used consistent naming 016_timeframe_support.sql)
+- Creating a reference table for timeframe presets with categories (historical, modern, future, fantasy) for UI population
+- Updating shared types in both frontend (`shared/types/index.ts`) and backend (`backend/src/shared/types/index.ts` and `.d.ts`)
+- Adding timeframe as optional field in StoryDNA interface (allows backward compatibility)
+- Updating concept-generator prompts to include timeframe in both `buildConceptPrompt` and `refineConcepts` functions
+- Updating world-generator prompts to include timeframe for historical/cultural context
+- Updating context-assembly service to include timeframe in chapter generation prompts with specific guidance about historical accuracy
+- Creating intuitive UI with both preset buttons (with emojis) and custom text input
+- The migration system uses a hardcoded list in migrate.ts - remembered to add new migration to that array
+- Running `npm run build` in backend before migrations ensures migration files are copied to dist folder
+- Both frontends build (`npm run build`) and backend compilation (`npx tsc --noEmit`) verified successfully
+
+**What Didn't Work**:
+- Initial migration didn't run until I added it to the hardcoded list in migrate.ts
+- Needed to update types in THREE places: shared/types/index.ts, backend/src/shared/types/index.ts, backend/src/shared/types/index.d.ts
+
+**Lesson**: When adding a new story metadata field that affects AI generation, update it systematically across all layers: (1) Add database migration if needed (reference tables for presets), (2) Update shared TypeScript types in BOTH frontend and backend directories (including .d.ts files), (3) Update relevant service interfaces (StoryPreferences, WorldGenerationContext), (4) Update ALL Claude prompt building functions (concept generation, world building, chapter generation), (5) Add UI fields with good UX (presets + custom input), (6) Remember to add new migrations to the hardcoded list in migrate.ts. For optional fields, use `field?: string` syntax for backward compatibility.
+
+**Application Score**: 0
+
+**Tags**: #fullstack #database #migrations #types #prompts #claude-api #ui #ux #story-metadata #world-building
+
+---
 
 ### 2026-01-25 | Task: Migrating Console Logging to Structured Pino Logger
 
