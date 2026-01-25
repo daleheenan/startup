@@ -8,6 +8,13 @@ import { generateWorldElements } from '../services/world-generator.js';
 import { metricsService } from '../services/metrics.service.js';
 import { createLogger } from '../services/logger.service.js';
 import { universeService } from '../services/universe.service.js';
+import {
+  createProjectSchema,
+  updateProjectSchema,
+  validateRequest,
+  type CreateProjectInput,
+  type UpdateProjectInput,
+} from '../utils/schemas.js';
 
 const router = Router();
 const logger = createLogger('routes:projects');
@@ -158,13 +165,12 @@ router.get('/:id', (req, res) => {
  */
 router.post('/', (req, res) => {
   try {
-    const { concept, preferences } = req.body;
-
-    if (!concept?.title || !preferences?.genre) {
-      return res.status(400).json({
-        error: { code: 'INVALID_REQUEST', message: 'Missing required fields' },
-      });
+    const validation = validateRequest(createProjectSchema, req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error });
     }
+
+    const { concept, preferences } = validation.data;
 
     const projectId = randomUUID();
     const now = new Date().toISOString();
@@ -235,10 +241,14 @@ router.post('/', (req, res) => {
  */
 router.put('/:id', (req, res) => {
   try {
-    const { storyDNA, storyBible, status } = req.body;
+    const validation = validateRequest(updateProjectSchema, req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error });
+    }
+
+    const { storyDNA, storyBible, status } = validation.data;
 
     // Whitelist of allowed update fields (prevents SQL injection)
-    const allowedFields = ['story_dna', 'story_bible', 'status'];
     const updates: string[] = [];
     const params: any[] = [];
 
@@ -1291,6 +1301,201 @@ router.get('/:id/plot-structure', (req, res) => {
     res.json(plotStructure);
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack }, 'Error fetching plot structure');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * POST /api/projects/:id/generate-plot-points
+ * Generate plot points for a specific layer using AI
+ */
+router.post('/:id/generate-plot-points', async (req, res) => {
+  try {
+    const { id: projectId } = req.params;
+    const { layerId, layerName, layerType, layerDescription, totalChapters, actStructure } = req.body;
+
+    if (!layerId || !layerName) {
+      return res.status(400).json({
+        error: { code: 'INVALID_REQUEST', message: 'layerId and layerName are required' },
+      });
+    }
+
+    // Get project context for better generation
+    const projectStmt = db.prepare<[string], Project>(`
+      SELECT title, genre, story_dna, story_bible FROM projects WHERE id = ?
+    `);
+    const project = projectStmt.get(projectId);
+
+    if (!project) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project not found' },
+      });
+    }
+
+    const storyDNA = safeJsonParse(project.story_dna as any, null);
+    const storyBible = safeJsonParse(project.story_bible as any, null);
+
+    // Import Anthropic client
+    const { default: Anthropic } = await import('@anthropic-ai/sdk');
+    const anthropic = new Anthropic();
+
+    const prompt = `You are a story structure expert. Generate 5-7 plot points for a ${layerType} plot layer.
+
+**Story Context:**
+- Title: ${project.title}
+- Genre: ${project.genre}
+${storyDNA?.tone ? `- Tone: ${storyDNA.tone}` : ''}
+${storyBible?.characters?.length ? `- Main Characters: ${storyBible.characters.slice(0, 3).map((c: any) => c.name).join(', ')}` : ''}
+
+**Plot Layer:**
+- Name: ${layerName}
+- Type: ${layerType}
+${layerDescription ? `- Description: ${layerDescription}` : ''}
+
+**Structure:**
+- Total Chapters: ${totalChapters || 25}
+- Act I ends: Chapter ${actStructure?.act_one_end || 5}
+- Midpoint: Chapter ${actStructure?.act_two_midpoint || 12}
+- Act II ends: Chapter ${actStructure?.act_two_end || 20}
+- Climax: Chapter ${actStructure?.act_three_climax || 23}
+
+Generate plot points that:
+1. Follow the three-act structure
+2. Build tension progressively
+3. Have varied impact levels (1-5)
+4. Cover setup, rising action, midpoint, crisis, climax, falling action, and resolution phases
+
+Return ONLY a JSON array of plot points:
+[
+  {
+    "id": "point-1",
+    "chapter_number": 3,
+    "description": "Brief description of what happens",
+    "phase": "setup",
+    "impact_level": 2
+  }
+]
+
+Phase options: setup, rising, midpoint, crisis, climax, falling, resolution
+Impact levels: 1 (minor) to 5 (critical turning point)`;
+
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2000,
+      temperature: 0.8,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const responseText = message.content[0].type === 'text'
+      ? message.content[0].text
+      : '';
+
+    // Parse response
+    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      throw new Error('Failed to parse plot points from AI response');
+    }
+
+    const points = JSON.parse(jsonMatch[0]);
+
+    // Validate and add unique IDs
+    const validatedPoints = points.map((p: any, i: number) => ({
+      id: `point-${Date.now()}-${i}`,
+      chapter_number: Math.min(Math.max(1, p.chapter_number || 1), totalChapters || 25),
+      description: p.description || 'Plot point',
+      phase: ['setup', 'rising', 'midpoint', 'crisis', 'climax', 'falling', 'resolution'].includes(p.phase) ? p.phase : 'rising',
+      impact_level: Math.min(Math.max(1, p.impact_level || 3), 5) as 1 | 2 | 3 | 4 | 5,
+    }));
+
+    logger.info({ projectId, layerId, pointsGenerated: validatedPoints.length }, 'Plot points generated');
+
+    res.json({ points: validatedPoints });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error generating plot points');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * POST /api/projects/:id/generate-pacing-notes
+ * Generate pacing notes based on plot structure using AI
+ */
+router.post('/:id/generate-pacing-notes', async (req, res) => {
+  try {
+    const { id: projectId } = req.params;
+    const { plotLayers, actStructure, totalChapters } = req.body;
+
+    if (!plotLayers || !Array.isArray(plotLayers)) {
+      return res.status(400).json({
+        error: { code: 'INVALID_REQUEST', message: 'plotLayers array is required' },
+      });
+    }
+
+    // Get project context
+    const projectStmt = db.prepare<[string], Project>(`
+      SELECT title, genre, story_dna FROM projects WHERE id = ?
+    `);
+    const project = projectStmt.get(projectId);
+
+    if (!project) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project not found' },
+      });
+    }
+
+    const storyDNA = safeJsonParse(project.story_dna as any, null);
+
+    // Build layer summary
+    const layerSummary = plotLayers.map((layer: any) =>
+      `- ${layer.name} (${layer.type}): ${layer.points?.length || 0} plot points`
+    ).join('\n');
+
+    // Import Anthropic client
+    const { default: Anthropic } = await import('@anthropic-ai/sdk');
+    const anthropic = new Anthropic();
+
+    const prompt = `You are a story structure and pacing expert. Generate concise pacing notes and recommendations for this story.
+
+**Story:**
+- Title: ${project.title}
+- Genre: ${project.genre}
+${storyDNA?.tone ? `- Tone: ${storyDNA.tone}` : ''}
+- Total Chapters: ${totalChapters || 25}
+
+**Act Structure:**
+- Act I ends: Chapter ${actStructure?.act_one_end || 5}
+- Midpoint: Chapter ${actStructure?.act_two_midpoint || 12}
+- Act II ends: Chapter ${actStructure?.act_two_end || 20}
+- Climax: Chapter ${actStructure?.act_three_climax || 23}
+
+**Plot Layers:**
+${layerSummary}
+
+Generate pacing notes that include:
+1. Tension arc recommendations for each act
+2. Key moments where multiple plot threads should intersect
+3. Suggested "breather" chapters for reader recovery
+4. Chapter-by-chapter pacing intensity suggestions (where needed)
+5. Any potential pacing issues to watch for
+
+Keep it practical and actionable. Format as clean markdown with headers and bullet points.`;
+
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2000,
+      temperature: 0.7,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const pacingNotes = message.content[0].type === 'text'
+      ? message.content[0].text
+      : '';
+
+    logger.info({ projectId, notesLength: pacingNotes.length }, 'Pacing notes generated');
+
+    res.json({ pacingNotes });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error generating pacing notes');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });

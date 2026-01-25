@@ -28,6 +28,7 @@ export default function ConceptsPage() {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState<string>('');
+  const [savedConceptIds, setSavedConceptIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     // BUG-012 FIX: Add proper error handling for sessionStorage access
@@ -142,6 +143,8 @@ export default function ConceptsPage() {
       const data = await response.json();
       setConcepts(data.concepts);
       setSelectedConcept(null);
+      // Clear saved state for regenerated concepts
+      setSavedConceptIds(new Set());
 
       // BUG-002 FIX: Update sessionStorage
       sessionStorage.setItem('generatedConcepts', JSON.stringify(data.concepts));
@@ -161,6 +164,9 @@ export default function ConceptsPage() {
   };
 
   const handleSaveConcept = async (conceptId: string) => {
+    // Prevent saving if already saved
+    if (savedConceptIds.has(conceptId)) return;
+
     try {
       const concept = concepts.find(c => c.id === conceptId);
       if (!concept) return;
@@ -180,7 +186,8 @@ export default function ConceptsPage() {
         throw new Error(errorData.error?.message || 'Failed to save concept');
       }
 
-      alert(`"${concept.title}" has been saved! You can find it in your Saved Concepts.`);
+      // Mark concept as saved
+      setSavedConceptIds(prev => new Set(prev).add(conceptId));
     } catch (err: any) {
       console.error('Error saving concept:', err);
       setError(err.message || 'Failed to save concept');
@@ -333,6 +340,7 @@ export default function ConceptsPage() {
                   onSelect={() => setSelectedConcept(concept.id)}
                   onSave={() => handleSaveConcept(concept.id)}
                   disabled={isCreating || isRegenerating}
+                  isSaved={savedConceptIds.has(concept.id)}
                 />
               ))}
             </div>

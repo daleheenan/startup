@@ -95,6 +95,8 @@ export default function PlotStructurePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [generatingLayerId, setGeneratingLayerId] = useState<string | null>(null);
+  const [generatingPacing, setGeneratingPacing] = useState(false);
 
   // Modal state
   const [showLayerModal, setShowLayerModal] = useState(false);
@@ -288,6 +290,118 @@ export default function PlotStructurePage() {
 
   const handlePacingNotesChange = (notes: string) => {
     const newStructure = { ...structure, pacing_notes: notes };
+    saveStructure(newStructure);
+  };
+
+  const handleGenerateLayerPoints = async (layerId: string) => {
+    const layer = structure.plot_layers.find(l => l.id === layerId);
+    if (!layer) return;
+
+    setGeneratingLayerId(layerId);
+    setError(null);
+
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE_URL}/api/projects/${projectId}/generate-plot-points`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          layerId,
+          layerName: layer.name,
+          layerType: layer.type,
+          layerDescription: layer.description,
+          totalChapters,
+          actStructure: structure.act_structure,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error?.message || 'Failed to generate plot points');
+      }
+
+      const data = await res.json();
+
+      // Merge generated points with existing layer
+      const newLayers = structure.plot_layers.map(l => {
+        if (l.id !== layerId) return l;
+        return {
+          ...l,
+          points: [...l.points, ...data.points],
+        };
+      });
+
+      const newStructure = { ...structure, plot_layers: newLayers };
+      saveStructure(newStructure);
+    } catch (err: any) {
+      console.error('Error generating plot points:', err);
+      setError(err.message);
+    } finally {
+      setGeneratingLayerId(null);
+    }
+  };
+
+  const handleGeneratePacingNotes = async () => {
+    setGeneratingPacing(true);
+    setError(null);
+
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE_URL}/api/projects/${projectId}/generate-pacing-notes`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          plotLayers: structure.plot_layers,
+          actStructure: structure.act_structure,
+          totalChapters,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error?.message || 'Failed to generate pacing notes');
+      }
+
+      const data = await res.json();
+      const newStructure = { ...structure, pacing_notes: data.pacingNotes };
+      saveStructure(newStructure);
+    } catch (err: any) {
+      console.error('Error generating pacing notes:', err);
+      setError(err.message);
+    } finally {
+      setGeneratingPacing(false);
+    }
+  };
+
+  const handleEditPoint = (layerId: string, point: PlotPoint) => {
+    setEditingPoint({ layerId, point });
+    setPointForm({
+      chapter_number: point.chapter_number,
+      description: point.description,
+      phase: point.phase,
+      impact_level: point.impact_level,
+    });
+    setShowPointModal(true);
+  };
+
+  const handleDeletePoint = (layerId: string, pointId: string) => {
+    if (!confirm('Are you sure you want to delete this plot point?')) return;
+
+    const newLayers = structure.plot_layers.map(layer => {
+      if (layer.id !== layerId) return layer;
+      return {
+        ...layer,
+        points: layer.points.filter(p => p.id !== pointId),
+      };
+    });
+
+    const newStructure = { ...structure, plot_layers: newLayers };
     saveStructure(newStructure);
   };
 
@@ -520,7 +634,23 @@ export default function PlotStructurePage() {
                         {layer.points.length} plot point{layer.points.length !== 1 ? 's' : ''}
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <button
+                        onClick={() => handleGenerateLayerPoints(layer.id)}
+                        disabled={generatingLayerId === layer.id}
+                        style={{
+                          padding: '0.375rem 0.75rem',
+                          background: generatingLayerId === layer.id ? '#94A3B8' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                          border: 'none',
+                          borderRadius: '6px',
+                          color: '#FFFFFF',
+                          fontSize: '0.75rem',
+                          fontWeight: 500,
+                          cursor: generatingLayerId === layer.id ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        {generatingLayerId === layer.id ? 'Generating...' : '✨ Generate Points'}
+                      </button>
                       <button
                         onClick={() => handleAddPoint(layer.id)}
                         style={{
@@ -533,7 +663,7 @@ export default function PlotStructurePage() {
                           cursor: 'pointer',
                         }}
                       >
-                        + Point
+                        + Add Point
                       </button>
                       <button
                         onClick={() => handleEditLayer(layer.id)}
@@ -565,6 +695,97 @@ export default function PlotStructurePage() {
                       </button>
                     </div>
                   </div>
+
+                  {/* Plot Points List */}
+                  {layer.points.length > 0 && (
+                    <div style={{ marginTop: '1rem', borderTop: '1px solid #E2E8F0', paddingTop: '1rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {layer.points
+                          .sort((a, b) => a.chapter_number - b.chapter_number)
+                          .map(point => (
+                          <div
+                            key={point.id}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'flex-start',
+                              padding: '0.5rem 0.75rem',
+                              background: '#FFFFFF',
+                              borderRadius: '6px',
+                              border: '1px solid #E2E8F0',
+                            }}
+                          >
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                                <span style={{
+                                  padding: '0.125rem 0.375rem',
+                                  background: layer.color + '20',
+                                  color: layer.color,
+                                  borderRadius: '4px',
+                                  fontSize: '0.625rem',
+                                  fontWeight: 600,
+                                }}>
+                                  Ch. {point.chapter_number}
+                                </span>
+                                <span style={{
+                                  padding: '0.125rem 0.375rem',
+                                  background: '#F1F5F9',
+                                  color: '#64748B',
+                                  borderRadius: '4px',
+                                  fontSize: '0.625rem',
+                                  textTransform: 'capitalize',
+                                }}>
+                                  {point.phase.replace('-', ' ')}
+                                </span>
+                                <span style={{
+                                  padding: '0.125rem 0.375rem',
+                                  background: point.impact_level >= 4 ? '#FEF2F2' : '#F1F5F9',
+                                  color: point.impact_level >= 4 ? '#DC2626' : '#64748B',
+                                  borderRadius: '4px',
+                                  fontSize: '0.625rem',
+                                }}>
+                                  Impact: {point.impact_level}/5
+                                </span>
+                              </div>
+                              <p style={{ fontSize: '0.813rem', color: colors.text, margin: 0 }}>
+                                {point.description}
+                              </p>
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.25rem', marginLeft: '0.5rem' }}>
+                              <button
+                                onClick={() => handleEditPoint(layer.id, point)}
+                                style={{
+                                  padding: '0.25rem 0.5rem',
+                                  background: '#FFFFFF',
+                                  border: '1px solid #E2E8F0',
+                                  borderRadius: '4px',
+                                  color: '#64748B',
+                                  fontSize: '0.625rem',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeletePoint(layer.id, point.id)}
+                                style={{
+                                  padding: '0.25rem 0.5rem',
+                                  background: '#FEF2F2',
+                                  border: '1px solid #FECACA',
+                                  borderRadius: '4px',
+                                  color: '#DC2626',
+                                  fontSize: '0.625rem',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -573,14 +794,39 @@ export default function PlotStructurePage() {
 
         {/* Pacing Notes */}
         <div style={cardStyle}>
-          <h2 style={{ fontSize: '1.125rem', fontWeight: 600, color: colors.text, marginBottom: '1rem' }}>
-            Pacing Notes
-          </h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h2 style={{ fontSize: '1.125rem', fontWeight: 600, color: colors.text }}>
+              Pacing Notes
+            </h2>
+            <button
+              onClick={handleGeneratePacingNotes}
+              disabled={generatingPacing || structure.plot_layers.length === 0}
+              style={{
+                padding: '0.5rem 1rem',
+                background: generatingPacing || structure.plot_layers.length === 0
+                  ? '#94A3B8'
+                  : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                border: 'none',
+                borderRadius: '8px',
+                color: '#fff',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                cursor: generatingPacing || structure.plot_layers.length === 0 ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {generatingPacing ? 'Generating...' : '✨ Generate Pacing Notes'}
+            </button>
+          </div>
+          {structure.plot_layers.length === 0 && (
+            <p style={{ fontSize: '0.813rem', color: '#F59E0B', marginBottom: '0.5rem' }}>
+              Add plot layers first to generate pacing notes.
+            </p>
+          )}
           <textarea
             value={structure.pacing_notes}
             onChange={(e) => handlePacingNotesChange(e.target.value)}
             placeholder="Add notes about your story's pacing, tension arcs, or structure decisions..."
-            rows={4}
+            rows={6}
             style={{ ...inputStyle, resize: 'vertical' }}
           />
         </div>

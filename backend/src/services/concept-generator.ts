@@ -1,11 +1,21 @@
 import Anthropic from '@anthropic-ai/sdk';
 import dotenv from 'dotenv';
+import db from '../db/connection.js';
 import { formatGenre, formatSubgenre, formatModifiers, getWordCountContext } from '../utils/genre-helpers.js';
 import { createLogger } from './logger.service.js';
 
 const logger = createLogger('services:concept-generator');
 
 dotenv.config();
+
+/**
+ * Exclusion data for previously generated concepts
+ */
+export interface ConceptExclusions {
+  titles: string[];
+  protagonistNames: string[];
+  centralConflicts: string[];
+}
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -25,6 +35,7 @@ export interface StoryPreferences {
   additionalNotes?: string;
   customIdeas?: string;
   regenerationTimestamp?: number;
+  timeframe?: string; // Era/year setting (e.g., "1920s", "Medieval Era", "Year 2350")
 }
 
 export interface StoryConcept {
@@ -38,6 +49,69 @@ export interface StoryConcept {
 }
 
 /**
+ * Short concept summary for first-stage generation
+ */
+export interface ConceptSummary {
+  id: string;
+  title: string;
+  logline: string;
+}
+
+/**
+ * Fetch exclusion data from previously saved concepts and projects
+ */
+function fetchExclusions(): ConceptExclusions {
+  const exclusions: ConceptExclusions = {
+    titles: [],
+    protagonistNames: [],
+    centralConflicts: [],
+  };
+
+  try {
+    // Get titles and protagonist hints from saved concepts
+    const savedConceptsStmt = db.prepare(`
+      SELECT title, protagonist_hint, logline FROM saved_concepts
+      WHERE status IN ('saved', 'used')
+      LIMIT 50
+    `);
+    const savedConcepts = savedConceptsStmt.all() as { title: string; protagonist_hint: string | null; logline: string }[];
+
+    for (const concept of savedConcepts) {
+      exclusions.titles.push(concept.title);
+      if (concept.protagonist_hint) {
+        // Extract name from hint like "Kira - street thief with..."
+        const nameMatch = concept.protagonist_hint.match(/^([A-Z][a-z]+)/);
+        if (nameMatch) {
+          exclusions.protagonistNames.push(nameMatch[1]);
+        }
+      }
+      exclusions.centralConflicts.push(concept.logline.substring(0, 100));
+    }
+
+    // Get titles from existing projects
+    const projectsStmt = db.prepare(`
+      SELECT title FROM projects
+      LIMIT 50
+    `);
+    const projects = projectsStmt.all() as { title: string }[];
+
+    for (const project of projects) {
+      exclusions.titles.push(project.title);
+    }
+
+    logger.info({
+      titlesCount: exclusions.titles.length,
+      namesCount: exclusions.protagonistNames.length,
+      conflictsCount: exclusions.centralConflicts.length,
+    }, 'Loaded exclusions for concept generation');
+  } catch (error) {
+    logger.warn({ error }, 'Failed to fetch exclusions, proceeding without them');
+  }
+
+  return exclusions;
+}
+
+/**
  * Generate 5 diverse story concepts based on user preferences
  */
 export async function generateConcepts(
@@ -45,8 +119,11 @@ export async function generateConcepts(
 ): Promise<StoryConcept[]> {
   const { genre, subgenre, tone, themes, targetLength, additionalNotes } = preferences;
 
-  // Build the prompt for concept generation
-  const prompt = buildConceptPrompt(preferences);
+  // Fetch exclusions from database
+  const exclusions = fetchExclusions();
+
+  // Build the prompt for concept generation with exclusions
+  const prompt = buildConceptPrompt(preferences, exclusions);
 
   logger.info('[ConceptGenerator] Calling Claude API...');
 
@@ -87,8 +164,8 @@ export async function generateConcepts(
 /**
  * Build the prompt for concept generation
  */
-function buildConceptPrompt(preferences: StoryPreferences): string {
-  const { tone, tones, themes, customTheme, targetLength, additionalNotes, customIdeas, regenerationTimestamp } = preferences;
+function buildConceptPrompt(preferences: StoryPreferences, exclusions?: ConceptExclusions): string {
+  const { tone, tones, themes, customTheme, targetLength, additionalNotes, customIdeas, regenerationTimestamp, timeframe } = preferences;
 
   const genreText = formatGenre(preferences);
   const subgenreText = formatSubgenre(preferences);
@@ -103,9 +180,21 @@ function buildConceptPrompt(preferences: StoryPreferences): string {
   const wordCountContext = getWordCountContext(targetLength);
 
   const uniqueSeed = regenerationTimestamp || Date.now();
-  const seedHint = `[Generation ID: ${uniqueSeed}]`;
+  const seedHint = `[Generation ID: ${uniqueSeed} - Use this to ensure maximum randomization]`;
 
-  return `You are a master storyteller and concept developer. Generate 5 diverse, compelling story concepts based on these preferences:
+  // Build exclusion section
+  let exclusionSection = '';
+  if (exclusions && (exclusions.titles.length > 0 || exclusions.protagonistNames.length > 0)) {
+    exclusionSection = `
+**MANDATORY EXCLUSIONS - DO NOT USE ANY OF THESE:**
+${exclusions.titles.length > 0 ? `- Titles to AVOID: ${exclusions.titles.slice(0, 20).join(', ')}` : ''}
+${exclusions.protagonistNames.length > 0 ? `- Character names to AVOID: ${exclusions.protagonistNames.slice(0, 30).join(', ')}` : ''}
+
+You MUST generate completely original titles and character names that are NOT similar to any in the exclusion list.
+`;
+  }
+
+  return `You are a master storyteller and concept developer. Your task is to generate 5 COMPLETELY UNIQUE and RADICALLY DIFFERENT story concepts.
 
 ${seedHint}
 
@@ -113,42 +202,43 @@ ${seedHint}
 **Subgenre:** ${subgenreText}
 **Tone:** ${toneText}
 **Themes:** ${themesText}
+${timeframe ? `**Time Period/Era:** ${timeframe}` : ''}
 **Target Length:** ${targetLength.toLocaleString()} words (${wordCountContext})
 ${additionalNotes ? `**Additional Notes:** ${additionalNotes}` : ''}
 ${customIdeas ? `**Custom Ideas to Incorporate:** ${customIdeas}` : ''}
+${exclusionSection}
 
-Generate 5 DISTINCT story concepts that:
-1. Fit the genre and subgenre conventions
-2. Match the specified tone
-3. Explore the selected themes in different ways
-4. Have compelling hooks that grab readers immediately
-5. Feature unique protagonists with clear goals and conflicts
-6. Are appropriate for the target length
+**CRITICAL UNIQUENESS REQUIREMENTS:**
+1. Each concept MUST have a completely ORIGINAL title - no generic titles like "The Shadow's Edge" or "The Last Guardian"
+2. Each protagonist MUST have a UNIQUE NAME - use unusual, memorable names from diverse cultural backgrounds
+3. Each central conflict MUST be DISTINCTIVE - avoid clichéd "chosen one" or "save the world" plots unless given a truly unique twist
+4. Settings should be SPECIFIC and VIVID - not generic "kingdoms" or "cities"
+5. The 5 concepts must explore DIFFERENT subthemes, protagonist archetypes, and narrative structures
 
-For EACH concept, provide:
-- **title**: A compelling, genre-appropriate title
-- **logline**: A one-sentence hook (25-40 words)
+**For EACH concept, provide:**
+- **title**: A UNIQUE, memorable title (avoid common words like Shadow, Last, Dark, Rising, Fallen)
+- **logline**: A one-sentence hook (25-40 words) with a specific, intriguing premise
 - **synopsis**: A 3-paragraph synopsis covering setup, conflict, and stakes (150-200 words)
-- **hook**: What makes this story unique and compelling (1-2 sentences)
-- **protagonistHint**: Brief description of the protagonist (name, role, key trait)
+- **hook**: What makes this story TRULY unique (1-2 sentences)
+- **protagonistHint**: Protagonist with UNIQUE NAME, specific role, and distinctive trait
 - **conflictType**: The primary conflict type (internal, external, both)
 
-IMPORTANT:
-- Make each concept VERY DIFFERENT from the others
-- Vary the protagonist types, conflict structures, and story approaches
-- Ensure strong story hooks that intrigue readers
-- Match the genre conventions and tone precisely
-- Make concepts appropriate for the target word count
+**DIVERSITY CHECKLIST - Across your 5 concepts, vary these elements:**
+- Protagonist age ranges (young adult, middle-aged, elderly)
+- Protagonist professions/roles (not all warriors/royalty/chosen ones)
+- Narrative POV styles (first person, third limited, unreliable narrator)
+- Story structures (linear, non-linear, frame narrative)
+- Relationship dynamics (solo journey, ensemble, mentor-student)
 
 Return ONLY a JSON array of 5 concepts in this exact format:
 [
   {
     "id": "concept-1",
-    "title": "The Shadow's Bargain",
-    "logline": "When a street thief discovers she can steal memories, she must choose between saving her dying sister or preventing a tyrannical emperor from erasing an entire rebellion from history.",
-    "synopsis": "Kira has survived the slums of Ashenthal by stealing what she can and staying invisible. But when she accidentally absorbs a dying woman's memories, she discovers an ability she never wanted: memory theft. Each stolen memory comes with its own burden, forcing Kira to live fragments of other lives.\n\nHer world shatters when her younger sister falls ill with the same wasting disease that killed their mother. The only cure lies in the imperial palace, where the Emperor hoards magical remedies for his elite. To save her sister, Kira must infiltrate the palace and steal the cure—but she discovers something far more sinister. The Emperor is using memory magic to erase all knowledge of a growing rebellion, condemning thousands to forget why they fight.\n\nNow Kira faces an impossible choice: save her sister with the cure she came for, or risk everything to preserve the memories of a revolution. If she fails, an entire people will forget they were ever oppressed. If she succeeds, her sister dies. And the Emperor's memory hunters are already on her trail.",
-    "hook": "A thief who steals memories must choose between family and revolution in a world where forgetting is the ultimate weapon.",
-    "protagonistHint": "Kira - street thief with newly discovered memory-stealing powers, fiercely protective of her sister",
+    "title": "Your unique title here",
+    "logline": "Your unique premise here",
+    "synopsis": "Your detailed synopsis here",
+    "hook": "What makes this truly unique",
+    "protagonistHint": "UniqueNameHere - specific role and distinctive trait",
     "conflictType": "both"
   },
   ...
@@ -163,7 +253,7 @@ export async function refineConcepts(
   existingConcepts: StoryConcept[],
   feedback: string
 ): Promise<StoryConcept[]> {
-  const { tone, tones, themes, customTheme, targetLength, additionalNotes } = preferences;
+  const { tone, tones, themes, customTheme, targetLength, additionalNotes, timeframe } = preferences;
 
   const genreText = formatGenre(preferences);
   const subgenreText = formatSubgenre(preferences);
@@ -188,6 +278,7 @@ export async function refineConcepts(
 - Subgenre: ${subgenreText}
 - Tone: ${toneText}
 - Themes: ${themesText}
+${timeframe ? `- Time Period/Era: ${timeframe}` : ''}
 - Target Length: ${targetLength.toLocaleString()} words (${wordCountContext})
 ${additionalNotes ? `- Additional Notes: ${additionalNotes}` : ''}
 
@@ -290,4 +381,231 @@ function parseConceptsResponse(responseText: string): StoryConcept[] {
     logger.error({ responseText }, 'Concept response text');
     throw new Error(`Failed to parse concepts: ${error.message}`);
   }
+}
+
+/**
+ * Generate 10 short concept summaries (title + logline only)
+ * This is Stage 1 of the two-stage concept workflow
+ */
+export async function generateConceptSummaries(
+  preferences: StoryPreferences
+): Promise<ConceptSummary[]> {
+  // Fetch exclusions from database
+  const exclusions = fetchExclusions();
+
+  const prompt = buildSummaryPrompt(preferences, exclusions);
+
+  logger.info('[ConceptGenerator] Calling Claude API for summaries...');
+
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-opus-4-5-20251101',
+      max_tokens: 2000,
+      temperature: 1.0, // High creativity
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+    });
+
+    const responseText = message.content[0].type === 'text'
+      ? message.content[0].text
+      : '';
+
+    const summaries = parseSummariesResponse(responseText);
+
+    if (!summaries || summaries.length === 0) {
+      throw new Error('Failed to parse summaries from Claude response');
+    }
+
+    logger.info(`[ConceptGenerator] Successfully generated ${summaries.length} concept summaries`);
+
+    return summaries;
+  } catch (error: any) {
+    logger.error({ error }, 'Summary generation error');
+    throw error;
+  }
+}
+
+/**
+ * Build prompt for generating concept summaries
+ */
+function buildSummaryPrompt(preferences: StoryPreferences, exclusions?: ConceptExclusions): string {
+  const { tone, tones, themes, customTheme, targetLength, additionalNotes, customIdeas, regenerationTimestamp, timeframe } = preferences;
+
+  const genreText = formatGenre(preferences);
+  const subgenreText = formatSubgenre(preferences);
+  const modifiersText = formatModifiers(preferences.modifiers);
+  const toneText = tones && tones.length > 0 ? tones.join(' + ') : tone;
+  const allThemes = customTheme ? [...themes, customTheme] : themes;
+  const themesText = allThemes.join(', ');
+
+  const uniqueSeed = regenerationTimestamp || Date.now();
+
+  // Build exclusion section
+  let exclusionSection = '';
+  if (exclusions && (exclusions.titles.length > 0 || exclusions.protagonistNames.length > 0)) {
+    exclusionSection = `
+**DO NOT USE ANY OF THESE TITLES:** ${exclusions.titles.slice(0, 20).join(', ')}
+`;
+  }
+
+  return `You are a master storyteller. Generate 10 SHORT concept summaries - just titles and loglines.
+
+[Generation ID: ${uniqueSeed}]
+
+**Genre:** ${genreText}${modifiersText ? ` (with ${modifiersText} elements)` : ''}
+**Subgenre:** ${subgenreText}
+**Tone:** ${toneText}
+**Themes:** ${themesText}
+${timeframe ? `**Time Period/Era:** ${timeframe}` : ''}
+**Target Length:** ${targetLength.toLocaleString()} words
+${additionalNotes ? `**Notes:** ${additionalNotes}` : ''}
+${customIdeas ? `**Custom Ideas:** ${customIdeas}` : ''}
+${exclusionSection}
+
+**REQUIREMENTS:**
+- Generate 10 UNIQUE concept summaries
+- Each must have a completely ORIGINAL title (no generic titles)
+- Each logline must be a compelling 2-sentence hook
+- Vary protagonist types, settings, and conflict structures
+- Make them dramatically different from each other
+
+Return ONLY a JSON array in this exact format:
+[
+  {
+    "id": "summary-1",
+    "title": "Unique Title Here",
+    "logline": "A compelling two-sentence hook that makes readers want more. Include the protagonist, their challenge, and the stakes."
+  },
+  ...
+]`;
+}
+
+/**
+ * Parse concept summaries from Claude's response
+ */
+function parseSummariesResponse(responseText: string): ConceptSummary[] {
+  try {
+    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      throw new Error('No JSON array found in response');
+    }
+
+    const summaries = JSON.parse(jsonMatch[0]);
+
+    if (!Array.isArray(summaries)) {
+      throw new Error('Response is not an array');
+    }
+
+    // Validate each summary
+    for (const summary of summaries) {
+      if (!summary.id || !summary.title || !summary.logline) {
+        throw new Error('Summary missing required fields');
+      }
+    }
+
+    return summaries;
+  } catch (error: any) {
+    logger.error({ error }, 'Summary parse error');
+    throw new Error(`Failed to parse summaries: ${error.message}`);
+  }
+}
+
+/**
+ * Expand selected summaries into full detailed concepts
+ * This is Stage 2 of the two-stage concept workflow
+ */
+export async function expandSummariesToConcepts(
+  preferences: StoryPreferences,
+  selectedSummaries: ConceptSummary[]
+): Promise<StoryConcept[]> {
+  const prompt = buildExpansionPrompt(preferences, selectedSummaries);
+
+  logger.info(`[ConceptGenerator] Expanding ${selectedSummaries.length} summaries to full concepts...`);
+
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-opus-4-5-20251101',
+      max_tokens: 6000,
+      temperature: 0.8, // Slightly lower for consistent expansion
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+    });
+
+    const responseText = message.content[0].type === 'text'
+      ? message.content[0].text
+      : '';
+
+    const concepts = parseConceptsResponse(responseText);
+
+    if (!concepts || concepts.length === 0) {
+      throw new Error('Failed to parse expanded concepts from Claude response');
+    }
+
+    logger.info(`[ConceptGenerator] Successfully expanded ${concepts.length} concepts`);
+
+    return concepts;
+  } catch (error: any) {
+    logger.error({ error }, 'Concept expansion error');
+    throw error;
+  }
+}
+
+/**
+ * Build prompt for expanding summaries to full concepts
+ */
+function buildExpansionPrompt(preferences: StoryPreferences, summaries: ConceptSummary[]): string {
+  const { tone, tones, themes, customTheme, targetLength, timeframe } = preferences;
+
+  const genreText = formatGenre(preferences);
+  const subgenreText = formatSubgenre(preferences);
+  const toneText = tones && tones.length > 0 ? tones.join(' + ') : tone;
+  const allThemes = customTheme ? [...themes, customTheme] : themes;
+  const themesText = allThemes.join(', ');
+  const wordCountContext = getWordCountContext(targetLength);
+
+  const summariesList = summaries.map((s, i) =>
+    `${i + 1}. "${s.title}": ${s.logline}`
+  ).join('\n');
+
+  return `You are a master storyteller. Expand these selected concept summaries into full, detailed story concepts.
+
+**Genre:** ${genreText}
+**Subgenre:** ${subgenreText}
+**Tone:** ${toneText}
+**Themes:** ${themesText}
+${timeframe ? `**Time Period/Era:** ${timeframe}` : ''}
+**Target Length:** ${targetLength.toLocaleString()} words (${wordCountContext})
+
+**SELECTED SUMMARIES TO EXPAND:**
+${summariesList}
+
+For EACH summary, create a FULL concept with:
+- Keep the same **title** from the summary
+- Keep the same **logline** from the summary
+- **synopsis**: A detailed 3-paragraph synopsis (150-200 words) covering setup, conflict, and stakes
+- **hook**: What makes this story truly unique (1-2 sentences)
+- **protagonistHint**: Full protagonist description with UNIQUE NAME, specific role, key trait, and motivation
+- **conflictType**: The primary conflict type (internal, external, both)
+
+Return ONLY a JSON array matching the number of summaries provided:
+[
+  {
+    "id": "concept-1",
+    "title": "Same title as summary",
+    "logline": "Same logline as summary",
+    "synopsis": "Detailed three-paragraph synopsis...",
+    "hook": "What makes this unique",
+    "protagonistHint": "UniqueNameHere - role, trait, motivation",
+    "conflictType": "both"
+  },
+  ...
+]`;
 }

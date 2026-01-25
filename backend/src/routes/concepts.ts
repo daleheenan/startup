@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { generateConcepts, refineConcepts } from '../services/concept-generator.js';
+import { generateConcepts, refineConcepts, generateConceptSummaries, expandSummariesToConcepts } from '../services/concept-generator.js';
 import { sendBadRequest, sendInternalError, sendRateLimitError, isRateLimitError } from '../utils/response-helpers.js';
-import { validateNonEmptyArray } from '../utils/validation.js';
 import { createLogger } from '../services/logger.service.js';
+import { generateConceptsSchema, refineConceptsSchema, validateRequest } from '../utils/schemas.js';
 
 const router = Router();
 const logger = createLogger('routes:concepts');
@@ -13,37 +13,34 @@ const logger = createLogger('routes:concepts');
  */
 router.post('/generate', async (req, res) => {
   try {
-    const { preferences } = req.body;
-
-    if (!preferences) {
-      return sendBadRequest(res, 'Missing preferences in request body');
+    // Validate request body with Zod
+    const validation = validateRequest(generateConceptsSchema, req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error });
     }
 
-    const { genre, genres, subgenre, subgenres, tone, themes, targetLength } = preferences;
+    const { preferences } = validation.data;
 
-    const hasGenre = genre || (genres && genres.length > 0);
-    const hasSubgenre = subgenre || (subgenres && subgenres.length > 0);
-
-    if (!hasGenre || !hasSubgenre || !tone || !themes || !targetLength) {
-      return sendBadRequest(res, 'Missing required preference fields');
-    }
-
-    const validationError = validateNonEmptyArray(themes, 'themes');
-    if (validationError) {
-      return sendBadRequest(res, validationError);
-    }
+    // Normalize preferences: ensure genre is set from genres array if needed
+    const normalizedPreferences = {
+      ...preferences,
+      genre: preferences.genre || (preferences.genres && preferences.genres[0]) || '',
+      targetLength: typeof preferences.targetLength === 'string'
+        ? parseInt(preferences.targetLength, 10)
+        : preferences.targetLength,
+    };
 
     logger.info({
-      genre: genre || genres?.join(' + '),
-      subgenre: subgenre || subgenres?.join(', '),
-      tone,
-      themesCount: themes.length,
+      genre: normalizedPreferences.genre || preferences.genres?.join(' + '),
+      subgenre: preferences.subgenre || preferences.subgenres?.join(', '),
+      tone: preferences.tone,
+      themesCount: preferences.themes.length,
     }, 'Generating concepts for preferences');
 
-    const concepts = await generateConcepts(preferences);
+    const concepts = await generateConcepts(normalizedPreferences as any);
 
     res.json({ success: true, concepts });
-  } catch (error: any) {
+  } catch (error) {
     if (isRateLimitError(error)) {
       return sendRateLimitError(res);
     }
@@ -57,34 +54,103 @@ router.post('/generate', async (req, res) => {
  */
 router.post('/refine', async (req, res) => {
   try {
-    const { preferences, existingConcepts, feedback } = req.body;
-
-    if (!preferences || !existingConcepts || !feedback) {
-      return sendBadRequest(res, 'Missing preferences, existingConcepts, or feedback in request body');
+    // Validate request body with Zod
+    const validation = validateRequest(refineConceptsSchema, req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error });
     }
 
-    const validationError = validateNonEmptyArray(existingConcepts, 'existingConcepts');
-    if (validationError) {
-      return sendBadRequest(res, validationError);
-    }
-
-    if (typeof feedback !== 'string' || feedback.trim().length === 0) {
-      return sendBadRequest(res, 'feedback must be a non-empty string');
-    }
+    const { preferences, existingConcepts, feedback } = validation.data;
 
     logger.info({
       existingCount: existingConcepts.length,
       feedbackLength: feedback.length,
     }, 'Refining concepts with feedback');
 
-    const concepts = await refineConcepts(preferences, existingConcepts, feedback.trim());
+    const concepts = await refineConcepts(preferences as any, existingConcepts, feedback.trim());
 
     res.json({ success: true, concepts });
-  } catch (error: any) {
+  } catch (error) {
     if (isRateLimitError(error)) {
       return sendRateLimitError(res);
     }
     sendInternalError(res, error, 'refining concepts');
+  }
+});
+
+/**
+ * POST /api/concepts/summaries
+ * Generate 10 short concept summaries (Stage 1 of two-stage workflow)
+ */
+router.post('/summaries', async (req, res) => {
+  try {
+    const { preferences } = req.body;
+
+    if (!preferences) {
+      return sendBadRequest(res, 'Missing preferences');
+    }
+
+    // Normalize preferences
+    const normalizedPreferences = {
+      ...preferences,
+      genre: preferences.genre || (preferences.genres && preferences.genres[0]) || '',
+      targetLength: typeof preferences.targetLength === 'string'
+        ? parseInt(preferences.targetLength, 10)
+        : preferences.targetLength,
+    };
+
+    logger.info({
+      genre: normalizedPreferences.genre || preferences.genres?.join(' + '),
+    }, 'Generating concept summaries');
+
+    const summaries = await generateConceptSummaries(normalizedPreferences as any);
+
+    res.json({ success: true, summaries });
+  } catch (error) {
+    if (isRateLimitError(error)) {
+      return sendRateLimitError(res);
+    }
+    sendInternalError(res, error, 'generating summaries');
+  }
+});
+
+/**
+ * POST /api/concepts/expand
+ * Expand selected summaries into full concepts (Stage 2 of two-stage workflow)
+ */
+router.post('/expand', async (req, res) => {
+  try {
+    const { preferences, selectedSummaries } = req.body;
+
+    if (!preferences || !selectedSummaries) {
+      return sendBadRequest(res, 'Missing preferences or selectedSummaries');
+    }
+
+    if (!Array.isArray(selectedSummaries) || selectedSummaries.length === 0) {
+      return sendBadRequest(res, 'selectedSummaries must be a non-empty array');
+    }
+
+    // Normalize preferences
+    const normalizedPreferences = {
+      ...preferences,
+      genre: preferences.genre || (preferences.genres && preferences.genres[0]) || '',
+      targetLength: typeof preferences.targetLength === 'string'
+        ? parseInt(preferences.targetLength, 10)
+        : preferences.targetLength,
+    };
+
+    logger.info({
+      selectedCount: selectedSummaries.length,
+    }, 'Expanding summaries to full concepts');
+
+    const concepts = await expandSummariesToConcepts(normalizedPreferences as any, selectedSummaries);
+
+    res.json({ success: true, concepts });
+  } catch (error) {
+    if (isRateLimitError(error)) {
+      return sendRateLimitError(res);
+    }
+    sendInternalError(res, error, 'expanding concepts');
   }
 });
 

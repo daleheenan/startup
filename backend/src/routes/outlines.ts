@@ -1,10 +1,30 @@
 import { Router } from 'express';
 import db from '../db/connection.js';
 import { randomUUID } from 'crypto';
-import type { Outline, StoryStructure, Project, Book } from '../shared/types/index.js';
+import type { Outline, StoryStructure, Project, Book, StoryStructureType } from '../shared/types/index.js';
 import { generateOutline, type OutlineContext } from '../services/outline-generator.js';
 import { getAllStructureTemplates } from '../services/structure-templates.js';
+import { generateStoryDNA } from '../services/story-dna-generator.js';
 import { createLogger } from '../services/logger.service.js';
+import {
+  generateOutlineSchema,
+  updateOutlineSchema,
+  validateRequest,
+  type GenerateOutlineInput,
+  type UpdateOutlineInput,
+} from '../utils/schemas.js';
+
+/**
+ * Helper: Safely parse JSON with fallback
+ */
+function safeJsonParse(jsonString: string | null | undefined, fallback: any = null): any {
+  if (!jsonString) return fallback;
+  try {
+    return JSON.parse(jsonString as any);
+  } catch {
+    return fallback;
+  }
+}
 
 const router = Router();
 const logger = createLogger('routes:outlines');
@@ -60,13 +80,12 @@ router.get('/book/:bookId', (req, res) => {
  */
 router.post('/generate', async (req, res) => {
   try {
-    const { projectId, bookId, structureType, targetWordCount } = req.body;
-
-    if (!projectId || !bookId || !structureType) {
-      return res.status(400).json({
-        error: { code: 'INVALID_REQUEST', message: 'Missing required fields' },
-      });
+    const validation = validateRequest(generateOutlineSchema, req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error });
     }
+
+    const { projectId, bookId, structureType, targetWordCount, logline, synopsis } = validation.data;
 
     // Get project data
     const projectStmt = db.prepare<[string], Project>(`
@@ -93,14 +112,36 @@ router.post('/generate', async (req, res) => {
     }
 
     // Parse project data
-    const storyDNA = project.story_dna ? JSON.parse(project.story_dna as any) : null;
-    const storyBible = project.story_bible ? JSON.parse(project.story_bible as any) : null;
+    let storyDNA = safeJsonParse(project.story_dna as any, null);
+    const storyBible = safeJsonParse(project.story_bible as any, null);
 
-    if (!storyDNA || !storyBible) {
+    // Auto-generate Story DNA if it doesn't exist
+    if (!storyDNA) {
+      logger.info({ projectId }, 'No Story DNA found, auto-generating...');
+      storyDNA = await generateStoryDNA({
+        title: project.title,
+        logline: logline || synopsis || project.title,
+        synopsis: synopsis || logline || 'A compelling story',
+        genre: project.genre,
+        subgenre: project.genre,
+        tone: 'dramatic',
+        themes: [],
+      });
+
+      // Save Story DNA immediately
+      const dnaStmt = db.prepare(`
+        UPDATE projects SET story_dna = ?, updated_at = ? WHERE id = ?
+      `);
+      dnaStmt.run(JSON.stringify(storyDNA), new Date().toISOString(), projectId);
+      logger.info({ projectId }, 'Story DNA auto-generated and saved');
+    }
+
+    // Check Story Bible - it must have characters or world elements
+    if (!storyBible || (!storyBible.characters?.length && !storyBible.world)) {
       return res.status(400).json({
         error: {
           code: 'INVALID_STATE',
-          message: 'Project must have Story DNA and Story Bible before generating outline',
+          message: 'Project must have Story Bible with characters or world elements before generating outline. Please generate characters first.',
         },
       });
     }
@@ -109,13 +150,13 @@ router.post('/generate', async (req, res) => {
     const context: OutlineContext = {
       concept: {
         title: book.title,
-        logline: req.body.logline || project.title,
-        synopsis: req.body.synopsis || '',
+        logline: logline || project.title,
+        synopsis: synopsis || '',
       },
       storyDNA,
       characters: storyBible.characters || [],
       world: storyBible.world || { locations: [], factions: [], systems: [] },
-      structureType,
+      structureType: structureType as StoryStructureType,
       targetWordCount: targetWordCount || 80000,
     };
 
@@ -179,13 +220,12 @@ router.post('/generate', async (req, res) => {
  */
 router.put('/:id', (req, res) => {
   try {
-    const { structure } = req.body;
-
-    if (!structure) {
-      return res.status(400).json({
-        error: { code: 'INVALID_REQUEST', message: 'Structure is required' },
-      });
+    const validation = validateRequest(updateOutlineSchema, req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error });
     }
+
+    const { structure } = validation.data;
 
     // Calculate total chapters
     const totalChapters = structure.acts.reduce(

@@ -18,9 +18,10 @@ interface ConceptCardProps {
   onSelect: () => void;
   onSave?: () => void;
   disabled: boolean;
+  isSaved?: boolean;
 }
 
-export default function ConceptCard({ concept, isSelected, onSelect, onSave, disabled }: ConceptCardProps) {
+export default function ConceptCard({ concept, isSelected, onSelect, onSave, disabled, isSaved = false }: ConceptCardProps) {
   return (
     <div
       onClick={disabled ? undefined : onSelect}
@@ -152,19 +153,25 @@ export default function ConceptCard({ concept, isSelected, onSelect, onSave, dis
         <button
           onClick={(e) => {
             e.stopPropagation();
-            onSave();
+            if (!isSaved) {
+              onSave();
+            }
           }}
-          disabled={disabled}
+          disabled={disabled || isSaved}
           style={{
             width: '100%',
             padding: '0.625rem',
-            background: 'transparent',
-            border: `1px solid ${colors.border}`,
+            background: isSaved
+              ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(22, 163, 74, 0.1) 100%)'
+              : 'transparent',
+            border: isSaved
+              ? '1px solid #22C55E'
+              : `1px solid ${colors.border}`,
             borderRadius: borderRadius.sm,
-            color: colors.textSecondary,
+            color: isSaved ? '#16A34A' : colors.textSecondary,
             fontSize: '0.875rem',
             fontWeight: 500,
-            cursor: disabled ? 'not-allowed' : 'pointer',
+            cursor: disabled || isSaved ? 'not-allowed' : 'pointer',
             transition: 'all 0.2s',
             display: 'flex',
             alignItems: 'center',
@@ -172,7 +179,14 @@ export default function ConceptCard({ concept, isSelected, onSelect, onSave, dis
             gap: '0.5rem',
           }}
         >
-          <span>Save for Later</span>
+          {isSaved ? (
+            <>
+              <span style={{ color: '#22C55E' }}>✓</span>
+              <span>Saved</span>
+            </>
+          ) : (
+            <span>Save for Later</span>
+          )}
         </button>
       )}
     </div>
