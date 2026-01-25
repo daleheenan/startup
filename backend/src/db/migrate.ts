@@ -293,7 +293,7 @@ export function runMigrations() {
       runMigration(4, 'Saved Concepts', cleanedMigration);
     }
 
-    // Migrations 005-018: Run from migration files
+    // Migrations 005-019: Run from migration files
     const migrationFiles = [
       '005_analytics_insights.sql',
       '006_chapter_edits.sql',
@@ -309,6 +309,7 @@ export function runMigrations() {
       '016_timeframe_support.sql',
       '017_migration_registry.sql',
       '018_concept_summaries.sql',
+      '019_enhanced_tracking_and_query_perf.sql',
     ];
 
     for (let i = 0; i < migrationFiles.length; i++) {
@@ -403,6 +404,7 @@ export function getMigrationStatus(): {
     '016_timeframe_support.sql',
     '017_migration_registry.sql',
     '018_concept_summaries.sql',
+    '019_enhanced_tracking_and_query_perf.sql',
   ];
 
   const pendingMigrations: string[] = [];

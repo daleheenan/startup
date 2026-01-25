@@ -39,3 +39,14 @@ export {
   type ParsedChapter,
   type ChapterWithContext,
 } from './chapters.repository.js';
+
+// Mysteries repository
+export {
+  MysteriesRepository,
+  createMysteriesRepository,
+  type ParsedMystery,
+  type MysteryWithTimeline,
+  type MysteryStats,
+  type MysteryStatus,
+  type MysteryImportance,
+} from './mysteries.repository.js';

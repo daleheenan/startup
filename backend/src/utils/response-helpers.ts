@@ -32,9 +32,10 @@ export function sendNotFound(res: Response, resource: string): void {
 /**
  * Send 500 Internal Server Error
  */
-export function sendInternalError(res: Response, error: any, context: string): void {
-  logger.error({ error, context }, 'Internal error');
-  sendError(res, 500, 'INTERNAL_ERROR', error.message || `Failed to ${context}`);
+export function sendInternalError(res: Response, error: unknown, context: string): void {
+  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+  logger.error({ error: errorMessage, context }, 'Internal error');
+  sendError(res, 500, 'INTERNAL_ERROR', errorMessage || `Failed to ${context}`);
 }
 
 /**
@@ -47,6 +48,12 @@ export function sendRateLimitError(res: Response): void {
 /**
  * Check if error is a rate limit error
  */
-export function isRateLimitError(error: any): boolean {
-  return error.message?.includes('rate limit') || error.status === 429;
+export function isRateLimitError(error: unknown): boolean {
+  if (error instanceof Error) {
+    return error.message.includes('rate limit');
+  }
+  if (typeof error === 'object' && error !== null && 'status' in error) {
+    return (error as { status?: number }).status === 429;
+  }
+  return false;
 }

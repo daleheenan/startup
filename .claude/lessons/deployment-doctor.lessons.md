@@ -1,7 +1,7 @@
-# Lessons Learned: Deployment Doctor Agent
+# Lessons Learned: Deployment Doctor
 
 <!--
-This file stores accumulated lessons learned by the deployment-doctor agent.
+This file stores accumulated lessons learned by the deployment-doctor agent (Dr. Ibe Kovacs).
 It is automatically read before each task and updated after task completion.
 
 MAINTENANCE RULES:
@@ -16,7 +16,7 @@ MAINTENANCE RULES:
 - **Total lessons recorded**: 0
 - **Last updated**: 2026-01-25
 - **Proven lessons** (score >= 5): 0
-- **Top themes**: diagnosis, railway, health-check, debugging, production
+- **Top themes**: None yet
 
 ---
 
@@ -32,7 +32,7 @@ MAINTENANCE RULES:
 
 <!-- New lessons are added at the top of this section -->
 
-*No lessons recorded yet. First diagnosis will populate this section.*
+*No active lessons yet. Start recording lessons after diagnosing deployment issues.*
 
 ---
 
@@ -44,59 +44,12 @@ MAINTENANCE RULES:
 
 ---
 
-## Common Issue Patterns Database
+## Tag Categories for Deployment Diagnosis
 
-Keep track of recurring issues and their solutions here:
+Use consistent tags for searchability:
 
-### Health Check Issues
-| Symptom | Root Cause | Fix | Occurrences |
-|---------|------------|-----|-------------|
-| Unhealthy status | Wrong path | Update railway.toml | 0 |
-| Timeout on startup | Slow migrations | Increase timeout | 0 |
-
-### Build Issues
-| Symptom | Root Cause | Fix | Occurrences |
-|---------|------------|-----|-------------|
-| Native module fail | Missing deps | Add to nixpacks | 0 |
-| TypeScript error | Code issue | Fix locally first | 0 |
-
-### Runtime Issues
-| Symptom | Root Cause | Fix | Occurrences |
-|---------|------------|-----|-------------|
-| Immediate crash | Missing env var | Set variable | 0 |
-| OOM (exit 137) | Memory leak | Fix code/upgrade | 0 |
-
----
-
-## Lesson Format Reference
-
-When adding a new lesson, use this format:
-
-```markdown
-### YYYY-MM-DD | Task: {Brief Diagnosis Description}
-
-**Date**: YYYY-MM-DD
-**Task**: What deployment issue was diagnosed?
-**Context**: What environment and symptoms?
-
-**Symptoms Observed**:
-- Symptom 1
-- Symptom 2
-
-**Root Cause**: What was actually wrong?
-
-**Solution Applied**: What fixed it?
-
-**Lesson**: Clear insight for diagnosing similar issues.
-
-**Application Score**: 0
-
-**Tags**: #diagnosis #railway #health-check #build-failure
-```
-
-### Tag Categories for Deployment Doctor
-
-- **Issue Type**: #health-check #build-failure #crash #oom #cors #env-vars
-- **Platform**: #railway #vercel #aws #github-actions
-- **Severity**: #critical #high #medium #low
-- **Phase**: #triage #diagnosis #treatment #verification
+- **Failure Types**: #health-check #build-failure #crash #oom #timeout
+- **Root Causes**: #env-vars #dependencies #config #database #cors
+- **Platforms**: #railway #github-actions #docker #kubernetes
+- **Resolution**: #quick-fix #rollback #config-change #code-fix
+- **Severity**: #p1 #p2 #p3 #p4

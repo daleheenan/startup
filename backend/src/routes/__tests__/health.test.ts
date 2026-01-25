@@ -1,6 +1,9 @@
-import { describe, it, expect, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import request from 'supertest';
 import express from 'express';
+
+jest.mock('../../db/connection.js');
+
 import healthRouter from '../health';
 
 describe('Health Router', () => {

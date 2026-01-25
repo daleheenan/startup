@@ -1,6 +1,15 @@
 import express from 'express';
 import { lessonsService } from '../services/lessons.js';
 import { createLogger } from '../services/logger.service.js';
+import {
+  createLessonSchema,
+  updateLessonSchema,
+  updateLessonScoreSchema,
+  pruneLessonsSchema,
+  validateRequest,
+  type CreateLessonInput,
+  type UpdateLessonInput,
+} from '../utils/schemas.js';
 
 const router = express.Router();
 const logger = createLogger('routes:lessons');
@@ -52,14 +61,14 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { agent_type, scope, category, title, content, context, tags } = req.body;
-
-    // Validation
-    if (!agent_type || !scope || !category || !title || !content) {
+    const validation = validateRequest(createLessonSchema, req.body);
+    if (!validation.success) {
       return res.status(400).json({
-        error: 'Missing required fields: agent_type, scope, category, title, content',
+        error: validation.error.message,
       });
     }
+
+    const { agent_type, scope, category, title, content, context, tags } = validation.data;
 
     const lesson = await lessonsService.create({
       agent_type,
@@ -84,7 +93,14 @@ router.post('/', async (req, res) => {
  */
 router.patch('/:id', async (req, res) => {
   try {
-    const { title, content, category, scope, context, tags } = req.body;
+    const validation = validateRequest(updateLessonSchema, req.body);
+    if (!validation.success) {
+      return res.status(400).json({
+        error: validation.error.message,
+      });
+    }
+
+    const { title, content, category, scope, context, tags } = validation.data;
 
     await lessonsService.update(req.params.id, {
       title,
@@ -109,11 +125,12 @@ router.patch('/:id', async (req, res) => {
  */
 router.patch('/:id/score', async (req, res) => {
   try {
-    const { increment } = req.body;
-
-    if (typeof increment !== 'number') {
-      return res.status(400).json({ error: 'increment must be a number' });
+    const validation = validateRequest(updateLessonScoreSchema, req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error.message });
     }
+
+    const { increment } = validation.data;
 
     await lessonsService.updateScore(req.params.id, increment);
 
@@ -145,8 +162,9 @@ router.delete('/:id', async (req, res) => {
  */
 router.post('/prune', async (req, res) => {
   try {
-    const { threshold } = req.body;
-    const count = await lessonsService.pruneNegativeScores(threshold || -2);
+    const validation = validateRequest(pruneLessonsSchema, req.body);
+    const threshold = validation.success ? validation.data.threshold : -2;
+    const count = await lessonsService.pruneNegativeScores(threshold ?? -2);
 
     res.json({
       success: true,

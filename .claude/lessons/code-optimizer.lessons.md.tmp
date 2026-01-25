@@ -1,0 +1,100 @@
+const fetchDataRef = useRef(fetchData);
+fetchDataRef.current = fetchData;
+
+useEffect(() => {
+  fetchDataRef.current(); // Initial call
+  const interval = setInterval(() => fetchDataRef.current(), 5000);
+  return () => clearInterval(interval);
+}, []); // Safe empty deps
+```
+
+---
+
+## Anti-Patterns Observed
+
+### Anti-Pattern 1: Premature Optimization
+**Observed**: Thinking about optimizing small components (<100 lines)
+**Why Bad**: Development time > performance gain
+**Fix**: Profile first, optimize only hot paths
+
+### Anti-Pattern 2: Lazy Loading Everything
+**Observed**: Tendency to lazy load all components
+**Why Bad**: Adds complexity, can make initial load slower (extra chunks to fetch)
+**Fix**: Only lazy load route-specific or conditionally rendered components
+
+### Anti-Pattern 3: Ignoring Cleanup
+**Observed**: 1/8 components had missing cleanup (Toast)
+**Why Bad**: Memory leaks accumulate over time, hard to debug
+**Fix**: Always ask "what if this component unmounts?" for every effect
+
+---
+
+## Measurement Techniques
+
+### Bundle Size Analysis
+```bash
+# Before changes
+npm run build > build-before.txt
+
+# After changes
+npm run build > build-after.txt
+
+# Visual analysis
+ANALYZE=true npm run build
+```
+
+### Memory Leak Detection
+1. Chrome DevTools > Memory > Take heap snapshot
+2. Navigate around app (5-10 page changes)
+3. Take another heap snapshot
+4. Compare - look for:
+   - Detached DOM nodes
+   - Growing event listener counts
+   - Retained timers/intervals
+
+### Performance Profiling
+1. React DevTools > Profiler
+2. Record interaction
+3. Look for:
+   - Unnecessary re-renders
+   - Long render times
+   - Expensive component updates
+
+---
+
+## Benchmarks (NovelForge)
+
+- **Good**: 87-100 kB shared bundle for Next.js 14 app
+- **Good**: <5 kB per route-specific code
+- **Excellent**: All cleanup functions present (100%)
+- **Target**: <100ms time to interactive (TTI)
+
+---
+
+## Tools Used
+
+1. **@next/bundle-analyzer** - Visualize webpack bundles
+2. **next/dynamic** - Code splitting
+3. **Chrome DevTools Memory** - Detect leaks
+4. **React DevTools Profiler** - Component performance
+5. **grep/ripgrep** - Find patterns (setTimeout, addEventListener, etc.)
+
+---
+
+## Key Insights
+
+1. **Most React codebases have memory leaks** - Usually in timers/events (87.5% had proper cleanup before audit)
+2. **Code splitting has diminishing returns** - Focus on largest components first
+3. **Always measure** - Baseline → Change → Measure → Verify
+4. **Cleanup is not optional** - Even if React 18 handles it better, it's still wrong
+5. **Production config matters** - Console removal, minification, source maps all impact performance
+
+---
+
+## Future Areas to Explore
+
+1. **Virtual scrolling** - For large lists (100+ items)
+2. **Service workers** - Offline support, caching
+3. **Web Vitals** - Real user monitoring
+4. **Concurrent rendering** - React 18+ features
+5. **CSS-in-JS performance** - styled-components vs inline vs modules

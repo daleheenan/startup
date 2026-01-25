@@ -130,10 +130,9 @@ export default function ProjectsPage() {
   };
 
   const navItems = [
-    { id: 'projects', icon: '🏗️', label: 'Architect', href: '/projects' },
-    { id: 'bible', icon: '📖', label: 'Bible', href: '#' },
-    { id: 'engine', icon: '⚙️', label: 'Engine', href: '#' },
-    { id: 'exports', icon: '📦', label: 'Exports', href: '#' },
+    { id: 'projects', icon: '📚', label: 'Projects', href: '/projects' },
+    { id: 'new', icon: '✨', label: 'New Project', href: '/new' },
+    { id: 'settings', icon: '⚙️', label: 'Settings', href: '/settings' },
   ];
 
   if (isLoading) {
@@ -173,29 +172,34 @@ export default function ProjectsPage() {
       background: '#F8FAFC',
     }}>
       {/* Left Sidebar */}
-      <aside style={{
-        width: '72px',
-        background: '#FFFFFF',
-        borderRight: '1px solid #E2E8F0',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        padding: '1.5rem 0',
-      }}>
-        {/* Logo */}
-        <div style={{
-          width: '40px',
-          height: '40px',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          borderRadius: '10px',
+      <aside
+        role="navigation"
+        aria-label="Main navigation"
+        style={{
+          width: '72px',
+          background: '#FFFFFF',
+          borderRight: '1px solid #E2E8F0',
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: '2rem',
-          color: '#FFFFFF',
-          fontWeight: '700',
-          fontSize: '1.25rem',
+          padding: '1.5rem 0',
         }}>
+        {/* Logo */}
+        <div
+          aria-label="NovelForge logo"
+          style={{
+            width: '40px',
+            height: '40px',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            borderRadius: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: '2rem',
+            color: '#FFFFFF',
+            fontWeight: '700',
+            fontSize: '1.25rem',
+          }}>
           N
         </div>
 
@@ -206,6 +210,8 @@ export default function ProjectsPage() {
               key={item.id}
               href={item.href}
               onClick={() => setActiveNav(item.id)}
+              aria-label={item.label}
+              aria-current={activeNav === item.id ? 'page' : undefined}
               style={{
                 width: '48px',
                 height: '48px',
@@ -218,9 +224,16 @@ export default function ProjectsPage() {
                 background: activeNav === item.id ? '#F1F5F9' : 'transparent',
                 transition: 'all 0.2s',
               }}
+              onFocus={(e) => {
+                e.currentTarget.style.outline = '2px solid #667eea';
+                e.currentTarget.style.outlineOffset = '2px';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.outline = 'none';
+              }}
               title={item.label}
             >
-              {item.icon}
+              <span aria-hidden="true">{item.icon}</span>
             </Link>
           ))}
         </nav>
@@ -228,6 +241,7 @@ export default function ProjectsPage() {
         {/* Logout */}
         <button
           onClick={handleLogout}
+          aria-label="Logout from NovelForge"
           style={{
             width: '48px',
             height: '48px',
@@ -241,23 +255,32 @@ export default function ProjectsPage() {
             cursor: 'pointer',
             transition: 'all 0.2s',
           }}
+          onFocus={(e) => {
+            e.currentTarget.style.outline = '2px solid #667eea';
+            e.currentTarget.style.outlineOffset = '2px';
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.outline = 'none';
+          }}
           title="Logout"
         >
-          🚪
+          <span aria-hidden="true">🚪</span>
         </button>
       </aside>
 
       {/* Main Content */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         {/* Top Bar */}
-        <header style={{
-          padding: '1rem 2rem',
-          background: '#FFFFFF',
-          borderBottom: '1px solid #E2E8F0',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}>
+        <header
+          role="banner"
+          style={{
+            padding: '1rem 2rem',
+            background: '#FFFFFF',
+            borderBottom: '1px solid #E2E8F0',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}>
           <div>
             <h1 style={{
               fontSize: '1.5rem',
@@ -267,18 +290,21 @@ export default function ProjectsPage() {
             }}>
               Story Architect
             </h1>
-            <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
+            <p style={{ fontSize: '0.875rem', color: '#475569', margin: 0 }}>
               Create and manage your novel projects
             </p>
           </div>
 
           {/* Claude Max Status */}
           {queueStats && (
-            <div style={{
-              display: 'flex',
-              gap: '1rem',
-              alignItems: 'center',
-            }}>
+            <div
+              role="complementary"
+              aria-label="System status"
+              style={{
+                display: 'flex',
+                gap: '1rem',
+                alignItems: 'center',
+              }}>
               <div style={{
                 padding: '0.75rem 1rem',
                 background: '#F1F5F9',
@@ -287,15 +313,21 @@ export default function ProjectsPage() {
                 alignItems: 'center',
                 gap: '0.75rem',
               }}>
-                <div style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '50%',
-                  background: `conic-gradient(#667eea ${(queueStats.session.requestsThisSession / 45) * 100}%, #E2E8F0 0%)`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
+                <div
+                  role="progressbar"
+                  aria-label="Claude Max usage"
+                  aria-valuenow={queueStats.session.requestsThisSession}
+                  aria-valuemin={0}
+                  aria-valuemax={45}
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    background: `conic-gradient(#667eea ${(queueStats.session.requestsThisSession / 45) * 100}%, #E2E8F0 0%)`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
                   <div style={{
                     width: '28px',
                     height: '28px',
@@ -312,7 +344,7 @@ export default function ProjectsPage() {
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748B' }}>Claude Max</div>
+                  <div style={{ fontSize: '0.75rem', color: '#475569' }}>Claude Max</div>
                   <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1A1A2E' }}>
                     Reset in {queueStats.session.timeRemaining || '5h 0m'}
                   </div>
@@ -324,7 +356,7 @@ export default function ProjectsPage() {
                 background: '#F1F5F9',
                 borderRadius: '8px',
               }}>
-                <div style={{ fontSize: '0.75rem', color: '#64748B' }}>Job Queue</div>
+                <div style={{ fontSize: '0.75rem', color: '#475569' }}>Job Queue</div>
                 <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1A1A2E' }}>
                   PENDING: {queueStats.queue.pending}
                 </div>
@@ -334,21 +366,26 @@ export default function ProjectsPage() {
         </header>
 
         {/* Content Area */}
-        <div style={{ flex: 1, padding: '2rem', overflow: 'auto' }}>
+        <div
+          role="main"
+          style={{ flex: 1, padding: '2rem', overflow: 'auto' }}>
           {/* Error Message */}
           {error && (
-            <div style={{
-              background: '#FEF2F2',
-              border: '1px solid #FECACA',
-              borderRadius: '12px',
-              padding: '1rem 1.5rem',
-              marginBottom: '1.5rem',
-              color: '#DC2626',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-            }}>
-              <span>⚠️</span>
+            <div
+              role="alert"
+              aria-live="assertive"
+              style={{
+                background: '#FEF2F2',
+                border: '1px solid #FECACA',
+                borderRadius: '12px',
+                padding: '1rem 1.5rem',
+                marginBottom: '1.5rem',
+                color: '#DC2626',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+              }}>
+              <span aria-hidden="true">⚠️</span>
               {error}
             </div>
           )}
@@ -371,30 +408,42 @@ export default function ProjectsPage() {
             <div style={{ display: 'flex', gap: '0.75rem' }}>
               <Link
                 href="/saved-concepts"
+                aria-label="View saved story concepts"
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '0.5rem',
                   padding: '0.75rem 1.25rem',
+                  minHeight: '44px',
                   background: '#FFFFFF',
-                  color: '#374151',
+                  color: '#1A1A2E',
                   border: '1px solid #E2E8F0',
                   borderRadius: '8px',
                   textDecoration: 'none',
                   fontWeight: '600',
                   fontSize: '0.875rem',
+                  transition: 'all 0.2s',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.outline = '2px solid #667eea';
+                  e.currentTarget.style.outlineOffset = '2px';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.outline = 'none';
                 }}
               >
-                <span>💡</span>
+                <span aria-hidden="true">💡</span>
                 Saved Concepts
               </Link>
               <Link
                 href="/new"
+                aria-label="Create a new novel project"
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '0.5rem',
                   padding: '0.75rem 1.25rem',
+                  minHeight: '44px',
                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   color: '#FFFFFF',
                   borderRadius: '8px',
@@ -402,9 +451,17 @@ export default function ProjectsPage() {
                   fontWeight: '600',
                   fontSize: '0.875rem',
                   boxShadow: '0 4px 14px rgba(102, 126, 234, 0.3)',
+                  transition: 'all 0.2s',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.outline = '2px solid #667eea';
+                  e.currentTarget.style.outlineOffset = '2px';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.outline = 'none';
                 }}
               >
-                <span>+</span>
+                <span aria-hidden="true">+</span>
                 New Project
               </Link>
             </div>
@@ -412,24 +469,29 @@ export default function ProjectsPage() {
 
           {/* Projects Grid */}
           {projects.length === 0 ? (
-            <div style={{
-              textAlign: 'center',
-              padding: '4rem 2rem',
-              background: '#FFFFFF',
-              borderRadius: '16px',
-              border: '2px dashed #E2E8F0',
-            }}>
-              <div style={{
-                width: '64px',
-                height: '64px',
-                margin: '0 auto 1.5rem',
-                background: '#F1F5F9',
+            <div
+              role="status"
+              aria-label="No projects found"
+              style={{
+                textAlign: 'center',
+                padding: '4rem 2rem',
+                background: '#FFFFFF',
                 borderRadius: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '2rem',
+                border: '2px dashed #E2E8F0',
               }}>
+              <div
+                aria-hidden="true"
+                style={{
+                  width: '64px',
+                  height: '64px',
+                  margin: '0 auto 1.5rem',
+                  background: '#F1F5F9',
+                  borderRadius: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '2rem',
+                }}>
                 📖
               </div>
               <h3 style={{
@@ -442,7 +504,7 @@ export default function ProjectsPage() {
               </h3>
               <p style={{
                 fontSize: '0.875rem',
-                color: '#64748B',
+                color: '#475569',
                 marginBottom: '1.5rem',
                 maxWidth: '300px',
                 margin: '0 auto 1.5rem',
@@ -451,32 +513,47 @@ export default function ProjectsPage() {
               </p>
               <Link
                 href="/new"
+                aria-label="Create your first novel project"
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '0.5rem',
                   padding: '0.875rem 1.5rem',
+                  minHeight: '44px',
                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   color: '#FFFFFF',
                   borderRadius: '8px',
                   textDecoration: 'none',
                   fontWeight: '600',
                   boxShadow: '0 4px 14px rgba(102, 126, 234, 0.4)',
+                  transition: 'all 0.2s',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.outline = '2px solid #667eea';
+                  e.currentTarget.style.outlineOffset = '2px';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.outline = 'none';
                 }}
               >
                 Create Your First Novel
               </Link>
             </div>
           ) : (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-              gap: '1rem',
-            }}>
+            <div
+              role="list"
+              aria-label="Your novel projects"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                gap: '1rem',
+              }}>
               {projects.map(project => (
                 <Link
                   key={project.id}
                   href={`/projects/${project.id}`}
+                  role="listitem"
+                  aria-label={`Open project: ${project.title}`}
                   style={{
                     display: 'block',
                     padding: '1.5rem',
@@ -486,6 +563,13 @@ export default function ProjectsPage() {
                     textDecoration: 'none',
                     transition: 'all 0.2s',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.outline = '2px solid #667eea';
+                    e.currentTarget.style.outlineOffset = '2px';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.outline = 'none';
                   }}
                 >
                   <div style={{
@@ -519,22 +603,26 @@ export default function ProjectsPage() {
                     display: 'flex',
                     gap: '0.75rem',
                     fontSize: '0.813rem',
-                    color: '#64748B',
+                    color: '#475569',
                     marginBottom: '0.75rem',
                   }}>
-                    <span style={{
-                      padding: '0.25rem 0.5rem',
-                      background: '#F1F5F9',
-                      borderRadius: '4px',
-                    }}>
+                    <span
+                      aria-label={`Genre: ${project.genre}`}
+                      style={{
+                        padding: '0.25rem 0.5rem',
+                        background: '#F1F5F9',
+                        borderRadius: '4px',
+                      }}>
                       {project.genre}
                     </span>
-                    <span style={{
-                      padding: '0.25rem 0.5rem',
-                      background: '#F1F5F9',
-                      borderRadius: '4px',
-                      textTransform: 'capitalize',
-                    }}>
+                    <span
+                      aria-label={`Type: ${project.type}`}
+                      style={{
+                        padding: '0.25rem 0.5rem',
+                        background: '#F1F5F9',
+                        borderRadius: '4px',
+                        textTransform: 'capitalize',
+                      }}>
                       {project.type}
                     </span>
                   </div>
@@ -607,7 +695,7 @@ export default function ProjectsPage() {
                     paddingTop: '0.75rem',
                     borderTop: '1px solid #F1F5F9',
                     fontSize: '0.75rem',
-                    color: '#94A3B8',
+                    color: '#64748B',
                   }}>
                     Created {new Date(project.created_at).toLocaleDateString()}
                   </div>

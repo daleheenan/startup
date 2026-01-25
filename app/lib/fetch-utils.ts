@@ -4,19 +4,25 @@ import { API_BASE_URL } from './constants';
 
 interface FetchOptions extends RequestInit {
   skipAuth?: boolean;
+  timeout?: number; // BUG-012 FIX: Allow custom timeout
 }
 
 // BUG-001 FIX: Singleton flag to prevent multiple logout operations
 let isLoggingOut = false;
 
+// BUG-012 FIX: Default timeout for all fetch requests
+const DEFAULT_TIMEOUT = 30000; // 30 seconds
+
 /**
  * Fetch with authentication and standardized error handling
+ *
+ * BUG-012 FIX: Added AbortController for request timeouts
  */
 export async function fetchWithAuth(
   endpoint: string,
   options: FetchOptions = {}
 ): Promise<Response> {
-  const { skipAuth, ...fetchOptions } = options;
+  const { skipAuth, timeout = DEFAULT_TIMEOUT, ...fetchOptions } = options;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -37,22 +43,40 @@ export async function fetchWithAuth(
 
   const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
 
-  const response = await fetch(url, {
-    ...fetchOptions,
-    headers,
-  });
+  // BUG-012 FIX: Create AbortController for timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-  if (response.status === 401) {
-    // BUG-001 FIX: Only logout once even with multiple simultaneous 401s
-    if (!isLoggingOut) {
-      isLoggingOut = true;
-      logout();
-      window.location.href = '/login';
+  try {
+    const response = await fetch(url, {
+      ...fetchOptions,
+      headers,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (response.status === 401) {
+      // BUG-001 FIX: Only logout once even with multiple simultaneous 401s
+      if (!isLoggingOut) {
+        isLoggingOut = true;
+        logout();
+        window.location.href = '/login';
+      }
+      throw new Error('Session expired. Please log in again.');
     }
-    throw new Error('Session expired. Please log in again.');
-  }
 
-  return response;
+    return response;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+
+    // BUG-012 FIX: Handle AbortError from timeout
+    if (error.name === 'AbortError') {
+      throw new Error(`Request timeout after ${timeout}ms`);
+    }
+
+    throw error;
+  }
 }
 
 /**

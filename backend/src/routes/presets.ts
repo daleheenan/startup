@@ -3,6 +3,13 @@ import db from '../db/connection.js';
 import { randomUUID } from 'crypto';
 import { cache } from '../services/cache.service.js';
 import { createLogger } from '../services/logger.service.js';
+import {
+  createPresetSchema,
+  updatePresetSchema,
+  validateRequest,
+  type CreatePresetInput,
+  type UpdatePresetInput,
+} from '../utils/schemas.js';
 
 const router = Router();
 const logger = createLogger('routes:presets');
@@ -134,13 +141,12 @@ router.get('/:id', (req, res) => {
  */
 router.post('/', (req, res) => {
   try {
-    const { name, description, genres, subgenres, modifiers, tones, themes, customTheme, targetLength } = req.body;
-
-    if (!name || !genres || !subgenres) {
-      return res.status(400).json({
-        error: { code: 'INVALID_REQUEST', message: 'Name, genres, and subgenres are required' },
-      });
+    const validation = validateRequest(createPresetSchema, req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error });
     }
+
+    const { name, description, genres, subgenres, modifiers, tones, themes, customTheme, targetLength } = validation.data;
 
     const presetId = randomUUID();
     const now = new Date().toISOString();
@@ -195,7 +201,12 @@ router.post('/', (req, res) => {
  */
 router.put('/:id', (req, res) => {
   try {
-    const { name, description, genres, subgenres, modifiers, tones, themes, customTheme, targetLength } = req.body;
+    const validation = validateRequest(updatePresetSchema, req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error });
+    }
+
+    const { name, description, genres, subgenres, modifiers, tones, themes, customTheme, targetLength } = validation.data;
 
     // Check if preset exists and is not a default
     const checkStmt = db.prepare(`SELECT is_default FROM book_style_presets WHERE id = ?`);

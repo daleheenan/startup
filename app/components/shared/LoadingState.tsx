@@ -8,9 +8,17 @@ interface LoadingStateProps {
 
 export default function LoadingState({ message = 'Loading...' }: LoadingStateProps) {
   return (
-    <div style={loadingContainer}>
+    <div
+      role="status"
+      aria-live="polite"
+      aria-label={message}
+      style={loadingContainer}
+    >
       <div style={{ textAlign: 'center' }}>
-        <div style={loadingSpinner} />
+        <div
+          aria-hidden="true"
+          style={loadingSpinner}
+        />
         <p style={loadingText}>{message}</p>
       </div>
       <style jsx>{`

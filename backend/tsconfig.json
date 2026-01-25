@@ -15,7 +15,7 @@
     "declarationMap": true,
     "sourceMap": true,
     "types": ["node", "jest"],
-    "noImplicitAny": false
+    "noImplicitAny": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/**/__tests__/**", "src/tests/**"]

@@ -383,7 +383,7 @@ describe('Trilogy API Integration Tests', () => {
         all: jest.fn(),
       };
 
-      mockDb.prepare.mockImplementation((sql: any) => {
+      (mockDb.prepare as any).mockImplementation((sql: any) => {
         if (typeof sql === 'string' && sql.includes('SELECT * FROM books')) {
           return getBookStmt;
         }

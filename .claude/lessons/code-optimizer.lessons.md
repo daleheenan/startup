@@ -7,14 +7,96 @@ Format: Each lesson includes context, what was learned, application score, and t
 
 ## Summary Statistics
 
-- **Total lessons recorded**: 7
+- **Total lessons recorded**: 10
 - **Last updated**: 2026-01-25
-- **Foundational lessons** (score >= 5): 3
-- **Project**: NovelForge Sprint 15 Frontend Optimization
+- **Foundational lessons** (score >= 5): 5
+- **Project**: NovelForge Code Quality & Optimization
 
 ---
 
 ## Foundational Lessons (Score >= 5)
+
+### 2026-01-25 | TypeScript noImplicitAny Must Be Enabled
+
+**Context**: Enabling strict TypeScript in NovelForge backend (74 files with `any`)
+
+**Lesson**: `noImplicitAny: false` defeats the purpose of TypeScript. Pattern:
+1. Developers leave it disabled "to move fast"
+2. `any` types proliferate (74 files in this project)
+3. Type safety is lost - runtime errors that should be compile-time errors
+4. Refactoring becomes dangerous
+
+**Why Enable It**:
+- Catches bugs at compile time instead of production
+- Better IDE autocomplete and refactoring
+- Forces proper error handling (no `catch (error: any)`)
+- Documents expected types for future developers
+
+**Migration Strategy**:
+```typescript
+// Bad pattern found everywhere
+catch (error: any) {
+  logger.error({ error: error.message }, 'Context');
+}
+
+// Good pattern after strict mode
+catch (error) {
+  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+  logger.error({ error: errorMessage }, 'Context');
+}
+```
+
+**Results**: All 74 files now compile with `noImplicitAny: true`. Found 111 error handlers that lost type safety.
+
+**Application Score**: 10
+
+**Tags**: #typescript #type-safety #noImplicitAny #strictMode #errorHandling
+
+---
+
+### 2026-01-25 | Server-Side Validation Is Non-Optional
+
+**Context**: NovelForge API had manual validation (`if (!field)`)
+
+**Lesson**: **Client validation is UX. Server validation is security.** Use schema libraries (Zod, Yup, Joi):
+1. Manual validation is error-prone and inconsistent
+2. DevTools can bypass client validation entirely
+3. Direct API calls skip UI validation
+4. Type-unsafe validation (`any` types) defeats TypeScript
+
+**Why Zod Specifically**:
+- Type inference: `z.infer<typeof schema>` gives TypeScript types for free
+- Composable: Build complex schemas from simple ones
+- Great error messages: Helps users fix validation errors
+- Integration: Works with TypeScript, Express, tRPC, etc.
+
+**Pattern**:
+```typescript
+// Before: Manual, unsafe, no types
+if (!req.body.title || !req.body.projectId) {
+  return res.status(400).json({ error: 'Missing fields' });
+}
+
+// After: Schema-validated, type-safe
+const createBookSchema = z.object({
+  projectId: z.string().uuid(),
+  title: z.string().min(1).max(500),
+});
+
+const validation = validateRequest(createBookSchema, req.body);
+if (!validation.success) {
+  return res.status(400).json({ error: validation.error });
+}
+// validation.data is now typed!
+```
+
+**Application Score**: 10
+
+**Tags**: #validation #zod #security #api #input-validation
+
+---
+
+## Foundational Lessons (Score >= 5) - Continued
 
 ### 2026-01-25 | Toast Timer Pattern - Common Memory Leak
 
@@ -339,3 +421,113 @@ ANALYZE=true npm run build
 3. **Web Vitals** - Real user monitoring
 4. **Concurrent rendering** - React 18+ features
 5. **CSS-in-JS performance** - styled-components vs inline vs modules
+
+---
+
+### 2026-01-25 | Inline Styles Performance Pattern
+
+**Context**: Optimizing NovelForge landing page with 15+ inline style objects
+
+**Lesson**: Inline styles inside component functions create **new object references on every render**, preventing React optimization (memo, PureComponent).
+
+**Performance Impact**:
+- Every render creates new objects
+- React can't use reference equality to skip re-renders
+- Wastes memory (garbage collection overhead)
+- Minor on simple pages, major on complex dashboards
+
+**Pattern**:
+```typescript
+// BAD - New object every render
+function Component() {
+  return <div style={{ padding: '1rem', color: '#333' }} />;
+}
+
+// GOOD - Stable reference
+const STYLES = {
+  container: { padding: '1rem', color: '#333' } as const,
+};
+
+function Component() {
+  return <div style={STYLES.container} />;
+}
+```
+
+**When It Matters**:
+- Components that re-render frequently (dashboards, lists)
+- Large style objects (10+ properties)
+- Pages with many components (>20)
+
+**When It Doesn't Matter**:
+- Root layout (renders once)
+- Error pages (rarely rendered)
+- Dynamic styles (must change with props/state)
+
+**Application Score**: 7
+
+**Tags**: #react #performance #styles #optimization #rendering
+
+---
+
+## Active Lessons (Most Recent First)
+
+### 2026-01-25 | Database Parameter Type Safety
+
+**Context**: Fixing `params: any[]` in database query code
+
+**Lesson**: Database query parameters should have proper union types, not `any[]`.
+
+**Pattern**:
+```typescript
+// Before
+const params: any[] = [];
+params.push(title, projectId, bookNumber);
+
+// After
+const params: (string | number | null)[] = [];
+params.push(title, projectId, bookNumber);
+```
+
+**Why**:
+- Catches type mismatches at compile time
+- Documents expected parameter types
+- Prevents SQL type coercion bugs
+
+**Application Score**: 6
+
+**Tags**: #typescript #database #type-safety #sql
+
+---
+
+### 2026-01-25 | Zod Schema Organization
+
+**Context**: Creating centralized validation schemas for NovelForge
+
+**Lesson**: Keep all Zod schemas in a central file (`utils/schemas.ts`) instead of scattered across routes.
+
+**Benefits**:
+1. Reusable across routes and tests
+2. Single source of truth for validation rules
+3. Easy to update validation logic project-wide
+4. Generated TypeScript types from schemas
+
+**Pattern**:
+```typescript
+// utils/schemas.ts
+export const createBookSchema = z.object({
+  projectId: z.string().uuid(),
+  title: z.string().min(1).max(500),
+});
+
+// Type inference for free!
+export type CreateBookRequest = z.infer<typeof createBookSchema>;
+```
+
+**Gotcha**: Remember to export helper functions like `validateRequest()` for DRY.
+
+**Application Score**: 8
+
+**Tags**: #zod #validation #organization #type-safety
+
+---
+

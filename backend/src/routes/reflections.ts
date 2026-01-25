@@ -1,6 +1,13 @@
 import express from 'express';
 import { reflectionsService } from '../services/reflections.js';
 import { createLogger } from '../services/logger.service.js';
+import {
+  createReflectionSchema,
+  promoteReflectionSchema,
+  validateRequest,
+  type CreateReflectionInput,
+  type PromoteReflectionInput,
+} from '../utils/schemas.js';
 
 const router = express.Router();
 const logger = createLogger('routes:reflections');
@@ -54,14 +61,14 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { job_id, agent_type, chapter_id, project_id, reflection } = req.body;
-
-    // Validation
-    if (!job_id || !agent_type || !reflection) {
+    const validation = validateRequest(createReflectionSchema, req.body);
+    if (!validation.success) {
       return res.status(400).json({
-        error: 'Missing required fields: job_id, agent_type, reflection',
+        error: validation.error.message,
       });
     }
+
+    const { job_id, agent_type, chapter_id, project_id, reflection } = validation.data;
 
     const created = await reflectionsService.create({
       job_id,
@@ -84,11 +91,12 @@ router.post('/', async (req, res) => {
  */
 router.patch('/:id/promote', async (req, res) => {
   try {
-    const { lesson_id } = req.body;
-
-    if (!lesson_id) {
-      return res.status(400).json({ error: 'lesson_id is required' });
+    const validation = validateRequest(promoteReflectionSchema, req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error.message });
     }
+
+    const { lesson_id } = validation.data;
 
     await reflectionsService.linkToLesson(req.params.id, lesson_id);
 

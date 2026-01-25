@@ -2,6 +2,11 @@ import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { createLogger } from '../services/logger.service.js';
+import {
+  loginSchema,
+  validateRequest,
+  type LoginInput,
+} from '../utils/schemas.js';
 
 const router = express.Router();
 const logger = createLogger('routes:auth');
@@ -23,13 +28,14 @@ const logger = createLogger('routes:auth');
  */
 router.post('/login', async (req, res) => {
   try {
-    const { password } = req.body;
-
-    if (!password) {
+    const validation = validateRequest(loginSchema, req.body);
+    if (!validation.success) {
       return res.status(400).json({
-        error: 'Password is required'
+        error: validation.error.message
       });
     }
+
+    const { password } = validation.data;
 
     const passwordHash = process.env.OWNER_PASSWORD_HASH;
     const jwtSecret = process.env.JWT_SECRET;

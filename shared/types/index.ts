@@ -16,6 +16,8 @@ export interface Project {
   book_count: number;                 // Sprint 8: Number of books in series
   universe_id: string | null;         // Link to shared universe
   is_universe_root: boolean;          // Is this the origin project for a universe?
+  time_period_type: TimePeriodType | null;  // Phase 4: Time period setting
+  specific_year: number | null;             // Phase 4: Custom year for time period
   created_at: string;
   updated_at: string;
 }
@@ -42,7 +44,61 @@ export interface StoryDNA {
   tone: string;
   themes: string[];
   proseStyle: string;
+  timeframe?: string;  // Era/year setting (e.g., "1920s", "Medieval Era", "Year 2350")
+  timePeriod?: TimePeriod;  // Structured time period setting
 }
+
+// Time Period Types - for structured story era setting
+export type TimePeriodType = 'past' | 'present' | 'future' | 'unknown' | 'custom';
+
+export interface TimePeriod {
+  type: TimePeriodType;
+  year?: number;           // Specific year for custom type
+  description?: string;    // Human-readable description (e.g., "500 years in the past")
+}
+
+// Time period presets for UI selection
+export const TIME_PERIOD_PRESETS: Array<{
+  type: TimePeriodType;
+  label: string;
+  description: string;
+  yearOffset?: number;  // Offset from current year (negative for past)
+  emoji: string;
+}> = [
+  {
+    type: 'past',
+    label: '500 Years Ago',
+    description: 'A distant past with medieval or renaissance elements',
+    yearOffset: -500,
+    emoji: '\u{1F3F0}' // castle emoji
+  },
+  {
+    type: 'present',
+    label: 'Modern Day',
+    description: 'Contemporary setting with current technology and culture',
+    yearOffset: 0,
+    emoji: '\u{1F4F1}' // mobile phone emoji
+  },
+  {
+    type: 'future',
+    label: '500 Years Ahead',
+    description: 'A future with advanced technology and transformed society',
+    yearOffset: 500,
+    emoji: '\u{1F680}' // rocket emoji
+  },
+  {
+    type: 'unknown',
+    label: 'Unknown/Distant',
+    description: 'An unspecified or impossibly distant time period',
+    emoji: '\u{2728}' // sparkles emoji
+  },
+  {
+    type: 'custom',
+    label: 'Custom Year',
+    description: 'Specify an exact year for your story',
+    emoji: '\u{1F4C5}' // calendar emoji
+  },
+];
 
 export interface StoryBible {
   characters: Character[];

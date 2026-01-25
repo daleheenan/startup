@@ -39,16 +39,19 @@ export default function LoginPage() {
       background: 'linear-gradient(135deg, #FAFAFA 0%, #F0F4F8 100%)',
     }}>
       {/* Left Panel - Branding */}
-      <div style={{
-        flex: 1,
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: '3rem',
-        color: '#FFFFFF',
-      }}>
+      <div
+        role="complementary"
+        aria-label="NovelForge features"
+        style={{
+          flex: 1,
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: '3rem',
+          color: '#FFFFFF',
+        }}>
         <div style={{ maxWidth: '400px', textAlign: 'center' }}>
           <h1 style={{
             fontSize: '2.5rem',
@@ -59,38 +62,43 @@ export default function LoginPage() {
           </h1>
           <p style={{
             fontSize: '1.125rem',
-            opacity: 0.9,
+            opacity: 0.95,
             lineHeight: 1.6,
             marginBottom: '2rem',
           }}>
             AI-powered novel generation with a 5-agent editing ensemble.
-            Fire-and-forget your story ideas.
+            Autonomous generation brings your story ideas to life.
           </p>
 
-          <div style={{
-            display: 'grid',
-            gap: '1rem',
-            textAlign: 'left',
-          }}>
+          <ul
+            role="list"
+            style={{
+              display: 'grid',
+              gap: '1rem',
+              textAlign: 'left',
+              listStyle: 'none',
+              padding: 0,
+              margin: 0,
+            }}>
             {[
               { icon: '🏗️', text: 'Story Architect' },
               { icon: '📖', text: 'Story Bible' },
               { icon: '⚙️', text: 'Writing Engine' },
               { icon: '📦', text: 'Export Portal' },
             ].map((item, i) => (
-              <div key={i} style={{
+              <li key={i} style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.75rem',
                 padding: '0.75rem 1rem',
-                background: 'rgba(255,255,255,0.1)',
+                background: 'rgba(255,255,255,0.15)',
                 borderRadius: '8px',
               }}>
-                <span style={{ fontSize: '1.25rem' }}>{item.icon}</span>
+                <span aria-hidden="true" style={{ fontSize: '1.25rem' }}>{item.icon}</span>
                 <span style={{ fontWeight: '500' }}>{item.text}</span>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       </div>
 
@@ -108,44 +116,60 @@ export default function LoginPage() {
         }}>
           <Link
             href="/"
+            aria-label="Back to home page"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: '0.5rem',
-              color: '#64748B',
+              color: '#475569',
               textDecoration: 'none',
               fontSize: '0.875rem',
               marginBottom: '2rem',
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.outline = '2px solid #667eea';
+              e.currentTarget.style.outlineOffset = '2px';
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.outline = 'none';
             }}
           >
             ← Back to home
           </Link>
 
-          <div style={{
-            background: '#FFFFFF',
-            border: '1px solid #E2E8F0',
-            borderRadius: '16px',
-            padding: '2.5rem',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
-          }}>
-            <h2 style={{
-              fontSize: '1.5rem',
-              fontWeight: '700',
-              color: '#1A1A2E',
-              marginBottom: '0.5rem',
+          <div
+            role="main"
+            aria-labelledby="login-heading"
+            style={{
+              background: '#FFFFFF',
+              border: '1px solid #E2E8F0',
+              borderRadius: '16px',
+              padding: '2.5rem',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
             }}>
+            <h2
+              id="login-heading"
+              style={{
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                color: '#1A1A2E',
+                marginBottom: '0.5rem',
+              }}>
               Welcome back
             </h2>
 
             <p style={{
               fontSize: '0.875rem',
-              color: '#64748B',
+              color: '#475569',
               marginBottom: '2rem',
             }}>
               Enter your password to access NovelForge
             </p>
 
-            <form onSubmit={handleSubmit}>
+            <form
+              onSubmit={handleSubmit}
+              aria-label="Login form"
+            >
               <div style={{ marginBottom: '1.5rem' }}>
                 <label
                   htmlFor="password"
@@ -190,19 +214,22 @@ export default function LoginPage() {
               </div>
 
               {error && (
-                <div style={{
-                  padding: '0.875rem 1rem',
-                  marginBottom: '1.5rem',
-                  background: '#FEF2F2',
-                  border: '1px solid #FECACA',
-                  borderRadius: '8px',
-                  color: '#DC2626',
-                  fontSize: '0.875rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                }}>
-                  <span>⚠️</span>
+                <div
+                  role="alert"
+                  aria-live="assertive"
+                  style={{
+                    padding: '0.875rem 1rem',
+                    marginBottom: '1.5rem',
+                    background: '#FEF2F2',
+                    border: '1px solid #FECACA',
+                    borderRadius: '8px',
+                    color: '#DC2626',
+                    fontSize: '0.875rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                  }}>
+                  <span aria-hidden="true">⚠️</span>
                   {error}
                 </div>
               )}
@@ -210,6 +237,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
+                aria-label={loading ? 'Signing in, please wait' : 'Sign in to NovelForge'}
                 style={{
                   width: '100%',
                   padding: '0.875rem',
@@ -222,6 +250,16 @@ export default function LoginPage() {
                   cursor: loading ? 'not-allowed' : 'pointer',
                   transition: 'all 0.2s',
                   boxShadow: loading ? 'none' : '0 4px 14px rgba(102, 126, 234, 0.4)',
+                  minHeight: '44px',
+                }}
+                onFocus={(e) => {
+                  if (!loading) {
+                    e.currentTarget.style.outline = '2px solid #667eea';
+                    e.currentTarget.style.outlineOffset = '2px';
+                  }
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.outline = 'none';
                 }}
               >
                 {loading ? (

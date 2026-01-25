@@ -19,6 +19,8 @@ import type {
  * - Other Characters: ~450 tokens
  * - Last Chapter Summary: ~200 tokens
  * - System Prompts: ~500 tokens
+ *
+ * BUG-008 FIX: Added comprehensive null safety checks
  */
 export class ContextAssemblyService {
   /**
@@ -38,31 +40,47 @@ export class ContextAssemblyService {
       throw new Error('Project missing Story DNA or Story Bible');
     }
 
+    // BUG-008 FIX: Validate scene_cards exists and has content
     if (!chapter.scene_cards || chapter.scene_cards.length === 0) {
-      throw new Error('Chapter missing scene cards');
+      throw new Error(`Chapter ${chapterId} has no scene cards - cannot generate without scenes`);
     }
 
     const storyDNA = project.story_dna;
-    const povCharacterName = chapter.scene_cards[0].povCharacter;
+
+    // BUG-008 FIX: Safely access first scene card with optional chaining
+    const firstScene = chapter.scene_cards[0];
+    if (!firstScene) {
+      throw new Error(`Chapter ${chapterId} scene_cards array is empty`);
+    }
+
+    const povCharacterName = firstScene.povCharacter;
+    if (!povCharacterName) {
+      throw new Error(`First scene card in chapter ${chapterId} is missing POV character`);
+    }
+
+    // BUG-008 FIX: Safe character lookup with null check
     const povCharacter = this.findCharacter(
       project.story_bible?.characters || [],
       povCharacterName
     );
 
     if (!povCharacter) {
-      throw new Error(`POV character not found: ${povCharacterName}`);
+      throw new Error(`POV character not found in story bible: ${povCharacterName}`);
     }
 
     // Get characters appearing in this chapter's scenes
     const characterNames = new Set<string>();
     chapter.scene_cards.forEach((scene) => {
-      scene.characters.forEach((name) => characterNames.add(name));
+      if (scene.characters && Array.isArray(scene.characters)) {
+        scene.characters.forEach((name) => characterNames.add(name));
+      }
     });
     characterNames.delete(povCharacterName); // Remove POV character from "others"
 
+    // BUG-008 FIX: Use type guard to ensure only Character objects are in array
     const otherCharacters = Array.from(characterNames)
       .map((name) => this.findCharacter(project.story_bible?.characters || [], name))
-      .filter((char) => char !== null) as Character[];
+      .filter((char): char is Character => char !== null);
 
     // Get previous chapter summary for context
     const lastChapterSummary = this.getLastChapterSummary(chapter.book_id, chapter.chapter_number);
@@ -95,7 +113,7 @@ export class ContextAssemblyService {
    * Build Author Agent system prompt with genre-specific persona
    */
   private buildAuthorAgentPrompt(storyDNA: StoryDNA, povCharacter: Character): string {
-    const { genre, subgenre, tone, themes, proseStyle } = storyDNA;
+    const { genre, subgenre, tone, themes, proseStyle, timeframe } = storyDNA;
 
     return `AUTHOR AGENT - ${genre.toUpperCase()} SPECIALIST
 
@@ -105,6 +123,7 @@ GENRE & STYLE:
 - Genre: ${genre} (${subgenre})
 - Tone: ${tone}
 - Themes: ${themes.join(', ')}
+${timeframe ? `- Time Period/Era: ${timeframe} - Ensure historical accuracy, appropriate technology level, and cultural context for this era` : ''}
 - Prose Style: ${proseStyle}
 
 WRITING PRINCIPLES:

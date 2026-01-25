@@ -195,9 +195,13 @@ router.post('/', (req, res) => {
       universeId = universeService.getOrCreateUniverse(preferences.sourceProjectId);
     }
 
+    // Extract time period settings (Phase 4)
+    const timePeriodType = preferences.timePeriodType || preferences.timePeriod?.type || null;
+    const specificYear = preferences.specificYear || preferences.timePeriod?.year || null;
+
     const stmt = db.prepare(`
-      INSERT INTO projects (id, title, type, genre, status, book_count, universe_id, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO projects (id, title, type, genre, status, book_count, universe_id, time_period_type, specific_year, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -208,6 +212,8 @@ router.post('/', (req, res) => {
       'setup',
       bookCount,
       universeId,
+      timePeriodType,
+      specificYear,
       now,
       now
     );
@@ -217,6 +223,8 @@ router.post('/', (req, res) => {
       projectType,
       bookCount,
       universeId,
+      timePeriodType,
+      specificYear,
     }, 'Created new project');
 
     res.status(201).json({
@@ -225,6 +233,8 @@ router.post('/', (req, res) => {
       type: projectType,
       book_count: bookCount,
       universe_id: universeId,
+      time_period_type: timePeriodType,
+      specific_year: specificYear,
       status: 'setup',
     });
   } catch (error: any) {
@@ -1150,6 +1160,130 @@ Return ONLY the new name, nothing else. Just the full name.`;
     res.json({ characters: updatedCharacters });
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack }, 'Error regenerating all character names');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * GET /api/projects/:id/books-with-chapters
+ * Fetch a project with all its books and chapters in a single optimized query
+ *
+ * This endpoint fixes the N+1 query problem by using JOINs to fetch:
+ * - Project details
+ * - All books for the project
+ * - All chapters for all books
+ *
+ * Query parameters:
+ * - chapterLimit: Max chapters per book (default: 100, max: 500)
+ * - chapterOffset: Offset for chapter pagination per book (default: 0)
+ * - includeContent: Whether to include chapter content (default: false, can be large)
+ *
+ * @returns {ProjectWithBooksAndChapters} Nested structure with project, books, and chapters
+ */
+router.get('/:id/books-with-chapters', (req, res) => {
+  try {
+    const projectId = req.params.id;
+
+    // Parse pagination parameters with sensible defaults
+    const chapterLimit = Math.min(
+      Math.max(1, parseInt(req.query.chapterLimit as string, 10) || 100),
+      500
+    );
+    const chapterOffset = Math.max(0, parseInt(req.query.chapterOffset as string, 10) || 0);
+    const includeContent = req.query.includeContent === 'true';
+
+    // Step 1: Fetch project
+    const projectStmt = db.prepare<[string], Project>(`
+      SELECT * FROM projects WHERE id = ?
+    `);
+    const project = projectStmt.get(projectId);
+
+    if (!project) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project not found' },
+      });
+    }
+
+    // Step 2: Fetch all books for the project in a single query
+    const booksStmt = db.prepare(`
+      SELECT id, project_id, book_number, title, status, word_count, created_at, updated_at
+      FROM books
+      WHERE project_id = ?
+      ORDER BY book_number ASC
+    `);
+    const books = booksStmt.all(projectId) as any[];
+
+    // Step 3: Fetch all chapters for all books in a single query using JOIN
+    // This is the key optimization - one query instead of N queries (one per book)
+    const chapterFields = includeContent
+      ? 'c.id, c.book_id, c.chapter_number, c.title, c.status, c.word_count, c.content, c.summary, c.scene_cards, c.flags, c.created_at, c.updated_at'
+      : 'c.id, c.book_id, c.chapter_number, c.title, c.status, c.word_count, c.summary, c.created_at, c.updated_at';
+
+    const chaptersStmt = db.prepare(`
+      SELECT ${chapterFields}
+      FROM chapters c
+      INNER JOIN books b ON c.book_id = b.id
+      WHERE b.project_id = ?
+      ORDER BY b.book_number ASC, c.chapter_number ASC
+    `);
+    const allChapters = chaptersStmt.all(projectId) as any[];
+
+    // Step 4: Group chapters by book_id for efficient lookup
+    const chaptersByBook = new Map<string, any[]>();
+    for (const chapter of allChapters) {
+      if (!chaptersByBook.has(chapter.book_id)) {
+        chaptersByBook.set(chapter.book_id, []);
+      }
+      chaptersByBook.get(chapter.book_id)!.push(chapter);
+    }
+
+    // Step 5: Apply pagination to each book's chapters and attach to books
+    let totalChapters = 0;
+    const booksWithChapters = books.map((book) => {
+      const bookChapters = chaptersByBook.get(book.id) || [];
+      totalChapters += bookChapters.length;
+
+      // Apply pagination per book
+      const paginatedChapters = bookChapters.slice(
+        chapterOffset,
+        chapterOffset + chapterLimit
+      );
+
+      // Parse JSON fields in chapters
+      const parsedChapters = paginatedChapters.map((ch: any) => ({
+        ...ch,
+        scene_cards: ch.scene_cards ? safeJsonParse(ch.scene_cards, []) : undefined,
+        flags: ch.flags ? safeJsonParse(ch.flags, []) : undefined,
+      }));
+
+      return {
+        ...book,
+        chapters: parsedChapters,
+        chapterCount: bookChapters.length,
+        hasMoreChapters: bookChapters.length > chapterOffset + chapterLimit,
+      };
+    });
+
+    // Step 6: Parse project JSON fields
+    const parsedProject = {
+      ...project,
+      story_dna: safeJsonParse(project.story_dna as any, null),
+      story_bible: safeJsonParse(project.story_bible as any, null),
+    };
+
+    // Return the nested structure
+    res.json({
+      project: parsedProject,
+      books: booksWithChapters,
+      totalChapters,
+      pagination: {
+        chapterLimit,
+        chapterOffset,
+        includeContent,
+      },
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error fetching project with books and chapters');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });

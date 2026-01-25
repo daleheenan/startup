@@ -5,6 +5,13 @@ import { seriesBibleGeneratorService } from '../services/series-bible-generator.
 import { bookTransitionService } from '../services/book-transition.service.js';
 import { cache } from '../services/cache.service.js';
 import { createLogger } from '../services/logger.service.js';
+import {
+  createTransitionSchema,
+  convertToTrilogySchema,
+  validateRequest,
+  type CreateTransitionInput,
+  type ConvertToTrilogyInput,
+} from '../utils/schemas.js';
 
 const router = Router();
 const logger = createLogger('routes:trilogy');
@@ -160,13 +167,12 @@ router.get('/projects/:projectId/series-bible', (req, res) => {
  */
 router.post('/transitions', async (req, res) => {
   try {
-    const { projectId, fromBookId, toBookId, timeGap } = req.body;
-
-    if (!projectId || !fromBookId || !toBookId || !timeGap) {
-      return res.status(400).json({
-        error: { code: 'INVALID_REQUEST', message: 'Missing required fields' },
-      });
+    const validation = validateRequest(createTransitionSchema, req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error });
     }
+
+    const { projectId, fromBookId, toBookId, timeGap } = validation.data;
 
     const transition = await bookTransitionService.generateBookTransition(
       projectId,
@@ -235,13 +241,13 @@ router.get('/projects/:projectId/transitions', (req, res) => {
 router.post('/projects/:projectId/convert-to-trilogy', (req, res) => {
   try {
     const { projectId } = req.params;
-    const { bookTitles } = req.body;  // Array of book titles
 
-    if (!bookTitles || !Array.isArray(bookTitles) || bookTitles.length < 2) {
-      return res.status(400).json({
-        error: { code: 'INVALID_REQUEST', message: 'Provide at least 2 book titles' },
-      });
+    const validation = validateRequest(convertToTrilogySchema, req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error });
     }
+
+    const { bookTitles } = validation.data;
 
     // Update project type
     const updateProjectStmt = db.prepare(`

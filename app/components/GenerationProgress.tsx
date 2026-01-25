@@ -82,6 +82,10 @@ export default function GenerationProgress({
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="progress-title"
+      aria-describedby="progress-description"
       style={{
         position: 'fixed',
         top: 0,
@@ -141,6 +145,7 @@ export default function GenerationProgress({
           </div>
 
           <h2
+            id="progress-title"
             style={{
               fontSize: '1.5rem',
               fontWeight: 700,
@@ -151,7 +156,9 @@ export default function GenerationProgress({
             {error ? 'Generation Failed' : title}
           </h2>
           {subtitle && !error && (
-            <p style={{ color: '#64748B', margin: '0.5rem 0 0', fontSize: '0.875rem' }}>
+            <p
+              id="progress-description"
+              style={{ color: '#475569', margin: '0.5rem 0 0', fontSize: '0.875rem' }}>
               {subtitle}
             </p>
           )}
@@ -161,6 +168,9 @@ export default function GenerationProgress({
           /* Error State */
           <div>
             <div
+              role="alert"
+              aria-live="assertive"
+              id="progress-description"
               style={{
                 background: '#FEF2F2',
                 border: '1px solid #FECACA',
@@ -176,9 +186,11 @@ export default function GenerationProgress({
             {onCancel && (
               <button
                 onClick={onCancel}
+                aria-label="Try generation again"
                 style={{
                   width: '100%',
                   padding: '0.875rem',
+                  minHeight: '44px',
                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   border: 'none',
                   borderRadius: '8px',
@@ -186,6 +198,14 @@ export default function GenerationProgress({
                   fontSize: '1rem',
                   fontWeight: 600,
                   cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.outline = '2px solid #667eea';
+                  e.currentTarget.style.outlineOffset = '2px';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.outline = 'none';
                 }}
               >
                 Try Again
@@ -198,6 +218,11 @@ export default function GenerationProgress({
             {/* Progress Bar */}
             <div style={{ marginBottom: '1.5rem' }}>
               <div
+                role="progressbar"
+                aria-valuenow={Math.round(progress)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label="Generation progress"
                 style={{
                   height: '8px',
                   background: '#E2E8F0',
@@ -221,7 +246,7 @@ export default function GenerationProgress({
                   justifyContent: 'space-between',
                   marginTop: '0.5rem',
                   fontSize: '0.75rem',
-                  color: '#64748B',
+                  color: '#475569',
                 }}
               >
                 <span>{formatTime(elapsedTime)} elapsed</span>
@@ -231,6 +256,9 @@ export default function GenerationProgress({
 
             {/* Current Action */}
             <div
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
               style={{
                 background: '#F8FAFC',
                 border: '1px solid #E2E8F0',
@@ -247,17 +275,18 @@ export default function GenerationProgress({
                 }}
               >
                 <div
+                  aria-hidden="true"
                   style={{
                     width: '8px',
                     height: '8px',
-                    background: '#10B981',
+                    background: '#059669',
                     borderRadius: '50%',
                     animation: 'blink 1s ease-in-out infinite',
                   }}
                 />
                 <span
                   style={{
-                    color: '#374151',
+                    color: '#1A1A2E',
                     fontSize: '0.875rem',
                     fontWeight: 500,
                   }}
@@ -335,16 +364,25 @@ export default function GenerationProgress({
             {onCancel && (
               <button
                 onClick={onCancel}
+                aria-label="Cancel the generation process"
                 style={{
                   width: '100%',
                   padding: '0.75rem',
+                  minHeight: '44px',
                   background: 'transparent',
                   border: '1px solid #E2E8F0',
                   borderRadius: '8px',
-                  color: '#64748B',
+                  color: '#475569',
                   fontSize: '0.875rem',
                   cursor: 'pointer',
                   transition: 'all 0.2s',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.outline = '2px solid #667eea';
+                  e.currentTarget.style.outlineOffset = '2px';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.outline = 'none';
                 }}
               >
                 Cancel Generation

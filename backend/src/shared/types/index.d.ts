@@ -17,6 +17,7 @@ export interface StoryDNA {
     tone: string;
     themes: string[];
     proseStyle: string;
+    timeframe?: string;
 }
 export interface StoryBible {
     characters: Character[];

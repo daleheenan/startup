@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import type { Book } from '../shared/types/index.js';
 import { createLogger } from '../services/logger.service.js';
 import { cache } from '../services/cache.service.js';
+import { createBookSchema, updateBookSchema, validateRequest } from '../utils/schemas.js';
 
 const router = Router();
 const logger = createLogger('routes:books');
@@ -21,9 +22,10 @@ router.get('/project/:projectId', (req, res) => {
     const books = stmt.all(req.params.projectId);
 
     res.json({ books });
-  } catch (error: any) {
-    logger.error({ error: error.message, stack: error.stack, projectId: req.params.projectId }, 'Error fetching books');
-    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error({ error: errorMessage, projectId: req.params.projectId }, 'Error fetching books');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: errorMessage } });
   }
 });
 
@@ -46,9 +48,10 @@ router.get('/:id', (req, res) => {
     }
 
     res.json(book);
-  } catch (error: any) {
-    logger.error({ error: error.message, stack: error.stack, bookId: req.params.id }, 'Error fetching book');
-    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error({ error: errorMessage, bookId: req.params.id }, 'Error fetching book');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: errorMessage } });
   }
 });
 
@@ -58,13 +61,13 @@ router.get('/:id', (req, res) => {
  */
 router.post('/', (req, res) => {
   try {
-    const { projectId, title, bookNumber } = req.body;
-
-    if (!projectId || !title) {
-      return res.status(400).json({
-        error: { code: 'INVALID_REQUEST', message: 'Missing required fields' },
-      });
+    // Validate request body
+    const validation = validateRequest(createBookSchema, req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error });
     }
+
+    const { projectId, title, bookNumber } = validation.data;
 
     const bookId = randomUUID();
     const now = new Date().toISOString();
@@ -74,21 +77,22 @@ router.post('/', (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    stmt.run(bookId, projectId, bookNumber || 1, title, 'setup', 0, now, now);
+    stmt.run(bookId, projectId, bookNumber, title, 'setup', 0, now, now);
 
     res.status(201).json({
       id: bookId,
       project_id: projectId,
-      book_number: bookNumber || 1,
+      book_number: bookNumber,
       title,
       status: 'setup',
       word_count: 0,
       created_at: now,
       updated_at: now,
     });
-  } catch (error: any) {
-    logger.error({ error: error.message, stack: error.stack, projectId: req.body.projectId, title: req.body.title }, 'Error creating book');
-    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error({ error: errorMessage, projectId: req.body?.projectId, title: req.body?.title }, 'Error creating book');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: errorMessage } });
   }
 });
 
@@ -98,10 +102,16 @@ router.post('/', (req, res) => {
  */
 router.put('/:id', (req, res) => {
   try {
-    const { title, status, wordCount } = req.body;
+    // Validate request body
+    const validation = validateRequest(updateBookSchema, req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error });
+    }
+
+    const { title, status, wordCount } = validation.data;
 
     const updates: string[] = [];
-    const params: any[] = [];
+    const params: (string | number)[] = [];
 
     if (title) {
       updates.push('title = ?');
@@ -144,9 +154,10 @@ router.put('/:id', (req, res) => {
     }
 
     res.json({ success: true });
-  } catch (error: any) {
-    logger.error({ error: error.message, stack: error.stack, bookId: req.params.id }, 'Error updating book');
-    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error({ error: errorMessage, bookId: req.params.id }, 'Error updating book');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: errorMessage } });
   }
 });
 
@@ -169,9 +180,10 @@ router.delete('/:id', (req, res) => {
     }
 
     res.status(204).send();
-  } catch (error: any) {
-    logger.error({ error: error.message, stack: error.stack, bookId: req.params.id }, 'Error deleting book');
-    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error({ error: errorMessage, bookId: req.params.id }, 'Error deleting book');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: errorMessage } });
   }
 });
 

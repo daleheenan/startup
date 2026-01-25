@@ -3,6 +3,13 @@ import db from '../db/connection.js';
 import { editingService } from '../services/editing.service.js';
 import { QueueWorker } from '../queue/worker.js';
 import { createLogger } from '../services/logger.service.js';
+import {
+  editChapterContentSchema,
+  chapterLockSchema,
+  validateRequest,
+  type EditChapterContentInput,
+  type ChapterLockInput,
+} from '../utils/schemas.js';
 
 const router = express.Router();
 const logger = createLogger('routes:editing');
@@ -289,11 +296,13 @@ router.get('/chapters/:chapterId/edit', (req, res) => {
 router.post('/chapters/:chapterId/edit', (req, res) => {
   try {
     const { chapterId } = req.params;
-    const { content, isLocked, editNotes } = req.body;
 
-    if (!content) {
-      return res.status(400).json({ error: 'Content is required' });
+    const validation = validateRequest(editChapterContentSchema, req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error.message });
     }
+
+    const { content, isLocked, editNotes } = validation.data;
 
     // Calculate word count
     const wordCount = content.trim().split(/\s+/).length;
@@ -424,11 +433,13 @@ router.get('/chapters/:chapterId/comparison', (req, res) => {
 router.post('/chapters/:chapterId/lock', (req, res) => {
   try {
     const { chapterId } = req.params;
-    const { isLocked } = req.body;
 
-    if (typeof isLocked !== 'boolean') {
-      return res.status(400).json({ error: 'isLocked must be a boolean' });
+    const validation = validateRequest(chapterLockSchema, req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error.message });
     }
+
+    const { isLocked } = validation.data;
 
     // Get or create edit
     const existingEdit = db.prepare(`

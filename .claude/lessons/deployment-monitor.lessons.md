@@ -1,7 +1,7 @@
-# Lessons Learned: Deployment Monitor Agent
+# Lessons Learned: Deployment Monitor
 
 <!--
-This file stores accumulated lessons learned by the deployment-monitor agent.
+This file stores accumulated lessons learned by the deployment-monitor agent (Zara Hassan).
 It is automatically read before each task and updated after task completion.
 
 MAINTENANCE RULES:
@@ -16,7 +16,7 @@ MAINTENANCE RULES:
 - **Total lessons recorded**: 0
 - **Last updated**: 2026-01-25
 - **Proven lessons** (score >= 5): 0
-- **Top themes**: monitoring, alerts, health-check, performance, production
+- **Top themes**: None yet
 
 ---
 
@@ -32,7 +32,7 @@ MAINTENANCE RULES:
 
 <!-- New lessons are added at the top of this section -->
 
-*No lessons recorded yet. First monitoring session will populate this section.*
+*No active lessons yet. Start recording lessons after completing monitoring tasks.*
 
 ---
 
@@ -44,53 +44,12 @@ MAINTENANCE RULES:
 
 ---
 
-## Performance Baselines
+## Tag Categories for Deployment Monitoring
 
-Track normal performance metrics here for comparison:
+Use consistent tags for searchability:
 
-### Response Times
-| Endpoint | Baseline | Warning | Critical |
-|----------|----------|---------|----------|
-| /api/health | < 100ms | > 500ms | > 2000ms |
-| /api/health/detailed | < 200ms | > 1000ms | > 3000ms |
-
-### Error Rates
-| Metric | Normal | Warning | Critical |
-|--------|--------|---------|----------|
-| 5xx errors | < 0.1% | > 1% | > 5% |
-| 4xx errors | < 5% | > 10% | > 25% |
-
----
-
-## Lesson Format Reference
-
-When adding a new lesson, use this format:
-
-```markdown
-### YYYY-MM-DD | Task: {Brief Monitoring Description}
-
-**Date**: YYYY-MM-DD
-**Task**: What was being monitored?
-**Context**: Post-deployment check, ongoing monitoring, or incident response?
-
-**What Worked Well**:
-- Detection method that worked
-- Alert threshold that was accurate
-
-**What Didn't Work**:
-- False positive/negative
-- Missed detection
-
-**Lesson**: Clear insight for better monitoring.
-
-**Application Score**: 0
-
-**Tags**: #monitoring #alerts #performance #health-check
-```
-
-### Tag Categories for Deployment Monitor
-
-- **Check Type**: #health-check #performance #error-rate #response-time
-- **Alert Level**: #critical #high #medium #informational
-- **Status**: #healthy #degraded #unhealthy
-- **Action**: #auto-remediate #escalate #document
+- **Health**: #health-check #endpoint #response-time #timeout
+- **Alerts**: #critical #high #medium #low #false-positive
+- **Metrics**: #performance #latency #error-rate #uptime
+- **Platform**: #railway #github-actions #vercel #aws
+- **Patterns**: #degradation #outage #recovery #spike

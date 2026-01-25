@@ -42,6 +42,7 @@ export interface StoryDNA {
   tone: string;
   themes: string[];
   proseStyle: string;
+  timeframe?: string;  // Era/year setting (e.g., "1920s", "Medieval Era", "Year 2350")
 }
 
 export interface StoryBible {

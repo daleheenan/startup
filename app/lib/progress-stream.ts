@@ -3,6 +3,10 @@ import { getToken } from './auth';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+// BUG-007 FIX: Constants for array size limits
+const MAX_JOB_UPDATES = 50;
+const MAX_CHAPTER_COMPLETIONS = 100;
+
 export interface JobUpdate {
   id: string;
   type: string;
@@ -53,6 +57,9 @@ export interface ProgressStreamState {
 
 /**
  * React hook for subscribing to real-time progress updates via Server-Sent Events
+ *
+ * BUG-007 FIX: Limits array growth to prevent memory leaks
+ * BUG-019 FIX: Validates parsed JSON structure
  */
 export function useProgressStream(): ProgressStreamState & { reconnect: () => void } {
   const [connected, setConnected] = useState(false);
@@ -92,32 +99,71 @@ export function useProgressStream(): ProgressStreamState & { reconnect: () => vo
       setConnected(true);
     });
 
+    // BUG-019 FIX: Validate JSON parse and structure
     es.addEventListener('job:update', (e) => {
-      const job: JobUpdate = JSON.parse(e.data);
-      setJobUpdates((prev) => {
-        const updated = [...prev, job];
-        return updated.length > 50 ? updated.slice(-50) : updated;
-      });
+      try {
+        const job: JobUpdate = JSON.parse(e.data);
+        if (job?.id && job?.status) {
+          setJobUpdates((prev) => {
+            const updated = [...prev, job];
+            // BUG-007 FIX: Limit array size
+            return updated.length > MAX_JOB_UPDATES ? updated.slice(-MAX_JOB_UPDATES) : updated;
+          });
+        }
+      } catch (error) {
+        console.error('[ProgressStream] Failed to parse job update:', error);
+      }
     });
 
+    // BUG-007 FIX: Add size limit to chapter completions
     es.addEventListener('chapter:complete', (e) => {
-      const chapter: ChapterComplete = JSON.parse(e.data);
-      setChapterCompletions((prev) => [...prev, chapter]);
+      try {
+        const chapter: ChapterComplete = JSON.parse(e.data);
+        if (chapter?.id) {
+          setChapterCompletions((prev) => {
+            const updated = [...prev, chapter];
+            // BUG-007 FIX: Prevent unbounded growth
+            return updated.length > MAX_CHAPTER_COMPLETIONS
+              ? updated.slice(-MAX_CHAPTER_COMPLETIONS)
+              : updated;
+          });
+        }
+      } catch (error) {
+        console.error('[ProgressStream] Failed to parse chapter completion:', error);
+      }
     });
 
     es.addEventListener('chapter:progress', (e) => {
-      const progress: ChapterProgress = JSON.parse(e.data);
-      setCurrentProgress(progress);
+      try {
+        const progress: ChapterProgress = JSON.parse(e.data);
+        if (progress?.chapter_id) {
+          setCurrentProgress(progress);
+        }
+      } catch (error) {
+        console.error('[ProgressStream] Failed to parse chapter progress:', error);
+      }
     });
 
     es.addEventListener('session:update', (e) => {
-      const session: SessionUpdate = JSON.parse(e.data);
-      setSessionStatus(session);
+      try {
+        const session: SessionUpdate = JSON.parse(e.data);
+        if (session && typeof session.is_active === 'boolean') {
+          setSessionStatus(session);
+        }
+      } catch (error) {
+        console.error('[ProgressStream] Failed to parse session update:', error);
+      }
     });
 
     es.addEventListener('queue:stats', (e) => {
-      const stats: QueueStats = JSON.parse(e.data);
-      setQueueStats(stats);
+      try {
+        const stats: QueueStats = JSON.parse(e.data);
+        if (stats && typeof stats.total === 'number') {
+          setQueueStats(stats);
+        }
+      } catch (error) {
+        console.error('[ProgressStream] Failed to parse queue stats:', error);
+      }
     });
 
     es.onerror = (error) => {

@@ -1,6 +1,13 @@
 import { Router } from 'express';
 import { universeService } from '../services/universe.service.js';
 import { createLogger } from '../services/logger.service.js';
+import {
+  createUniverseSchema,
+  linkProjectToUniverseSchema,
+  validateRequest,
+  type CreateUniverseInput,
+  type LinkProjectToUniverseInput,
+} from '../utils/schemas.js';
 
 const router = Router();
 const logger = createLogger('routes:universes');
@@ -100,13 +107,12 @@ router.get('/:id/inherit', (req, res) => {
  */
 router.post('/', (req, res) => {
   try {
-    const { sourceProjectId, name, description } = req.body;
-
-    if (!sourceProjectId) {
-      return res.status(400).json({
-        error: { code: 'INVALID_REQUEST', message: 'sourceProjectId is required' },
-      });
+    const validation = validateRequest(createUniverseSchema, req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error });
     }
+
+    const { sourceProjectId, name, description } = validation.data;
 
     const universe = universeService.createFromProject(sourceProjectId, name, description);
     res.status(201).json(universe);
@@ -127,13 +133,12 @@ router.post('/', (req, res) => {
  */
 router.post('/:id/link', (req, res) => {
   try {
-    const { projectId } = req.body;
-
-    if (!projectId) {
-      return res.status(400).json({
-        error: { code: 'INVALID_REQUEST', message: 'projectId is required' },
-      });
+    const validation = validateRequest(linkProjectToUniverseSchema, req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error });
     }
+
+    const { projectId } = validation.data;
 
     universeService.linkProjectToUniverse(projectId, req.params.id);
     res.json({ success: true });

@@ -6,6 +6,13 @@ import { chapterOrchestratorService } from '../services/chapter-orchestrator.ser
 import { sendBadRequest, sendNotFound, sendInternalError } from '../utils/response-helpers.js';
 import { createLogger } from '../services/logger.service.js';
 import { cache } from '../services/cache.service.js';
+import {
+  createChapterSchema,
+  updateChapterSchema,
+  validateRequest,
+  type CreateChapterInput,
+  type UpdateChapterInput,
+} from '../utils/schemas.js';
 
 const router = Router();
 const logger = createLogger('routes:chapters');
@@ -72,11 +79,12 @@ router.get('/:id', (req, res) => {
  */
 router.post('/', (req, res) => {
   try {
-    const { bookId, chapterNumber, title, sceneCards } = req.body;
-
-    if (!bookId || !chapterNumber) {
-      return sendBadRequest(res, 'Missing required fields');
+    const validation = validateRequest(createChapterSchema, req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error });
     }
+
+    const { bookId, chapterNumber, title, sceneCards } = validation.data;
 
     const chapterId = randomUUID();
     const now = new Date().toISOString();
@@ -123,7 +131,12 @@ router.post('/', (req, res) => {
  */
 router.put('/:id', (req, res) => {
   try {
-    const { title, sceneCards, content, summary, status, flags } = req.body;
+    const validation = validateRequest(updateChapterSchema, req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error });
+    }
+
+    const { title, sceneCards, content, summary, status, flags } = validation.data;
 
     const updates: string[] = [];
     const params: any[] = [];

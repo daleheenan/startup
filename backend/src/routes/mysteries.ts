@@ -1,6 +1,13 @@
 import { Router } from 'express';
 import { mysteryTrackingService } from '../services/mystery-tracking.service.js';
 import { createLogger } from '../services/logger.service.js';
+import {
+  extractMysteriesSchema,
+  updateMysterySchema,
+  validateRequest,
+  type ExtractMysteriesInput,
+  type UpdateMysteryInput,
+} from '../utils/schemas.js';
 
 const router = Router();
 const logger = createLogger('routes:mysteries');
@@ -69,13 +76,13 @@ router.get('/series/:seriesId/timeline', (req, res) => {
 router.post('/chapters/:chapterId/extract', async (req, res) => {
   try {
     const { chapterId } = req.params;
-    const { content } = req.body;
 
-    if (!content) {
-      return res.status(400).json({
-        error: { code: 'INVALID_REQUEST', message: 'Content is required' },
-      });
+    const validation = validateRequest(extractMysteriesSchema, req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error });
     }
+
+    const { content } = validation.data;
 
     const mysteries = await mysteryTrackingService.extractMysteriesFromChapter(
       chapterId,
@@ -98,13 +105,13 @@ router.post('/chapters/:chapterId/extract', async (req, res) => {
 router.post('/chapters/:chapterId/find-resolutions', async (req, res) => {
   try {
     const { chapterId } = req.params;
-    const { content } = req.body;
 
-    if (!content) {
-      return res.status(400).json({
-        error: { code: 'INVALID_REQUEST', message: 'Content is required' },
-      });
+    const validation = validateRequest(extractMysteriesSchema, req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error });
     }
+
+    const { content } = validation.data;
 
     const resolutions = await mysteryTrackingService.findMysteryResolutions(
       chapterId,
@@ -127,16 +134,13 @@ router.post('/chapters/:chapterId/find-resolutions', async (req, res) => {
 router.patch('/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const { status, answer, answeredBook, answeredChapter } = req.body;
 
-    if (!status || !['open', 'resolved', 'red_herring'].includes(status)) {
-      return res.status(400).json({
-        error: {
-          code: 'INVALID_REQUEST',
-          message: 'Valid status is required (open, resolved, red_herring)',
-        },
-      });
+    const validation = validateRequest(updateMysterySchema, req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error });
     }
+
+    const { status, answer, answeredBook, answeredChapter } = validation.data;
 
     const mystery = mysteryTrackingService.updateMysteryStatus(
       id,

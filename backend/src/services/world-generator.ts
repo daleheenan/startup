@@ -31,6 +31,7 @@ export interface WorldGenerationContext {
   tone: string;
   themes: string[];
   protagonistName: string;
+  timeframe?: string;
 }
 
 /**
@@ -72,7 +73,7 @@ export async function generateWorldElements(
 }
 
 function buildWorldPrompt(context: WorldGenerationContext): string {
-  const { title, synopsis, genre, subgenre, tone, themes, protagonistName } = context;
+  const { title, synopsis, genre, subgenre, tone, themes, protagonistName, timeframe } = context;
 
   const needsMagic = ['fantasy', 'urban fantasy', 'paranormal'].some(g =>
     genre.toLowerCase().includes(g) || subgenre.toLowerCase().includes(g)
@@ -91,6 +92,7 @@ Genre: ${genre}
 Subgenre: ${subgenre}
 Tone: ${tone}
 Themes: ${themes.join(', ')}
+${timeframe ? `Time Period/Era: ${timeframe}` : ''}
 Protagonist: ${protagonistName}
 
 Create world elements across these categories:

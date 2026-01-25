@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react';
 import { getToken } from '../lib/auth';
 import { AUTHOR_STYLES, getRecommendedAuthors, AuthorStyle } from '../../shared/author-styles';
+import { TimePeriodSelector, getTimeframeDescription } from './TimePeriodSelector';
+import type { TimePeriod, TimePeriodType } from '../../shared/types';
+import StoryIdeasGenerator, { GeneratedIdea } from './StoryIdeasGenerator';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -41,6 +44,12 @@ export interface StoryPreferences {
   timeGapFromSource?: string; // e.g., "5 years later"
   // Author style reference
   authorStyleId?: string; // ID of author style to emulate
+  // Timeframe/Era
+  timeframe?: string; // Story time period (e.g., "1920s", "Medieval Era", "Year 2350")
+  // Structured Time Period (Phase 4)
+  timePeriod?: TimePeriod;
+  timePeriodType?: TimePeriodType;
+  specificYear?: number;
 }
 
 interface SourceProject {
@@ -574,7 +583,10 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
   const [targetLength, setTargetLength] = useState(80000);
   const [additionalNotes, setAdditionalNotes] = useState('');
   const [customIdeas, setCustomIdeas] = useState('');
+  const [timeframe, setTimeframe] = useState('');
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>({ type: 'present' });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showStoryIdeasGenerator, setShowStoryIdeasGenerator] = useState(false);
 
   // UX improvements state
   const [genreSearch, setGenreSearch] = useState('');
@@ -873,6 +885,29 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
     return Object.keys(newErrors).length === 0;
   };
 
+  /**
+   * Handle selecting a generated idea from the StoryIdeasGenerator
+   * Populates the customIdeas field with the selected idea's content
+   */
+  const handleSelectGeneratedIdea = (idea: GeneratedIdea) => {
+    // Build a formatted string from the generated idea
+    const ideaContent = [
+      `Story Concept: ${idea.storyIdea}`,
+      '',
+      'Character Concepts:',
+      ...idea.characterConcepts.map(c => `- ${c}`),
+      '',
+      'Plot Elements:',
+      ...idea.plotElements.map(p => `- ${p}`),
+      '',
+      'Unique Twists:',
+      ...idea.uniqueTwists.map(t => `- ${t}`),
+    ].join('\n');
+
+    setCustomIdeas(ideaContent);
+    setShowStoryIdeasGenerator(false);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -911,6 +946,12 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
       timeGapFromSource: useExistingUniverse && timeGapFromSource.trim() ? timeGapFromSource.trim() : undefined,
       // Author style reference
       authorStyleId: selectedAuthorStyle || undefined,
+      // Timeframe/Era - support both legacy string and new structured format
+      timeframe: timePeriod.type !== 'present' ? getTimeframeDescription(timePeriod) : (timeframe.trim() || undefined),
+      // Structured Time Period (Phase 4)
+      timePeriod: timePeriod.type !== 'present' ? timePeriod : undefined,
+      timePeriodType: timePeriod.type !== 'present' ? timePeriod.type : undefined,
+      specificYear: timePeriod.type === 'custom' ? timePeriod.year : undefined,
     };
 
     onSubmit(preferences);
@@ -2470,12 +2511,68 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
         {errors.targetLength && <div style={errorStyle}>{errors.targetLength}</div>}
       </div>
 
-      {/* Custom Story Ideas */}
+      {/* Time Period Setting (Phase 4) */}
       <div style={sectionStyle}>
         <label style={labelStyle}>
-          Your Story Ideas
-          <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Optional - describe concepts you want explored)</span>
+          Story Time Period
+          <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Optional)</span>
         </label>
+        <div style={{ marginBottom: '1rem' }}>
+          <TimePeriodSelector
+            value={timePeriod}
+            onChange={setTimePeriod}
+            disabled={isLoading}
+          />
+          <div style={{ marginTop: '1rem', fontSize: '0.813rem', color: '#64748B' }}>
+            Select when your story takes place. This helps establish historical context, technology level, and cultural setting.
+          </div>
+          {/* Legacy custom timeframe input for more specific descriptions */}
+          {timePeriod.type !== 'custom' && (
+            <div style={{ marginTop: '1rem' }}>
+              <input
+                type="text"
+                value={timeframe}
+                onChange={(e) => setTimeframe(e.target.value)}
+                placeholder="Additional era details (e.g., 'Victorian London', 'Post-Apocalyptic wasteland')"
+                style={inputStyle}
+                disabled={isLoading}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Custom Story Ideas */}
+      <div style={sectionStyle}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+          <label style={{ ...labelStyle, marginBottom: 0 }}>
+            Your Story Ideas
+            <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Optional - describe concepts you want explored)</span>
+          </label>
+          <button
+            type="button"
+            onClick={() => setShowStoryIdeasGenerator(true)}
+            disabled={isLoading || genres.length === 0}
+            style={{
+              padding: '0.5rem 1rem',
+              background: genres.length === 0 ? '#94A3B8' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              border: 'none',
+              borderRadius: '6px',
+              color: '#FFFFFF',
+              fontSize: '0.813rem',
+              fontWeight: 600,
+              cursor: genres.length === 0 ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.375rem',
+              transition: 'all 0.2s',
+              boxShadow: genres.length === 0 ? 'none' : '0 2px 8px rgba(102, 126, 234, 0.3)',
+            }}
+          >
+            <span style={{ fontSize: '1rem' }}>*</span>
+            Generate Ideas
+          </button>
+        </div>
         <textarea
           value={customIdeas}
           onChange={(e) => setCustomIdeas(e.target.value)}
@@ -2490,8 +2587,27 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
         />
         <div style={{ marginTop: '0.5rem', fontSize: '0.813rem', color: '#64748B' }}>
           Be specific! The more detail you provide, the more tailored your concepts will be.
+          {genres.length === 0 && (
+            <span style={{ marginLeft: '0.5rem', color: '#F59E0B' }}>
+              (Select a genre to enable AI idea generation)
+            </span>
+          )}
         </div>
       </div>
+
+      {/* Story Ideas Generator Modal */}
+      {showStoryIdeasGenerator && (
+        <StoryIdeasGenerator
+          preferences={{
+            genre: genres.map(g => GENRES.find(genre => genre.value === g)?.label || g).join(' + '),
+            subgenre: subgenres.length > 0 ? subgenres[0] : undefined,
+            tone: tones.length > 0 ? tones[0] : undefined,
+            themes: themes,
+          }}
+          onSelectIdea={handleSelectGeneratedIdea}
+          onClose={() => setShowStoryIdeasGenerator(false)}
+        />
+      )}
 
       {/* Additional Notes */}
       <div style={sectionStyle}>

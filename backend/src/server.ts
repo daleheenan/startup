@@ -10,9 +10,12 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 
-console.log('[Server] Starting NovelForge Backend...');
-console.log('[Server] NODE_ENV:', process.env.NODE_ENV);
-console.log('[Server] DATABASE_PATH:', process.env.DATABASE_PATH);
+// Early logging before logger is fully initialized
+if (process.env.NODE_ENV !== 'test') {
+  console.log('[Server] Starting NovelForge Backend...');
+  console.log('[Server] NODE_ENV:', process.env.NODE_ENV);
+  console.log('[Server] DATABASE_PATH:', process.env.DATABASE_PATH);
+}
 
 // Import database and migrations after env is loaded
 import { runMigrations } from './db/migrate.js';
@@ -35,6 +38,7 @@ import editingRouter from './routes/editing.js';
 import exportRouter from './routes/export.js';
 import trilogyRouter from './routes/trilogy.js';
 import savedConceptsRouter from './routes/saved-concepts.js';
+import savedConceptSummariesRouter from './routes/saved-concept-summaries.js';
 import regenerationRouter from './routes/regeneration.js';
 import genreTropesRouter from './routes/genre-tropes.js';
 import genreConventionsRouter from './routes/genre-conventions.js';
@@ -43,14 +47,18 @@ import analyticsRouter from './routes/analytics.js';
 import presetsRouter from './routes/presets.js';
 import mysteriesRouter from './routes/mysteries.js';
 import universesRouter from './routes/universes.js';
+import userSettingsRouter from './routes/user-settings.js';
+import storyIdeasRouter from './routes/story-ideas.js';
 
 // Run database migrations
 try {
-  console.log('[Server] Running migrations...');
+  if (process.env.NODE_ENV !== 'test') {
+    console.log('[Server] Running migrations...');
+  }
   runMigrations();
-  console.log('[Server] Migrations complete');
+  logger.info('Database migrations complete');
 } catch (error) {
-  console.error('[Server] Migration failed:', error);
+  logger.error({ error }, 'Database migration failed');
   if (error instanceof Error) {
     captureException(error, { context: 'database_migration' });
   }
@@ -131,6 +139,7 @@ app.use('/api/editing', apiLimiter, requireAuth, editingRouter);
 app.use('/api/export', apiLimiter, requireAuth, exportRouter);
 app.use('/api/trilogy', apiLimiter, requireAuth, trilogyRouter);
 app.use('/api/saved-concepts', apiLimiter, requireAuth, savedConceptsRouter);
+app.use('/api/saved-concept-summaries', apiLimiter, requireAuth, savedConceptSummariesRouter);
 app.use('/api/regeneration', apiLimiter, requireAuth, regenerationRouter);
 app.use('/api/genre-tropes', apiLimiter, requireAuth, genreTropesRouter);
 app.use('/api/genre-conventions', apiLimiter, requireAuth, genreConventionsRouter);
@@ -139,6 +148,8 @@ app.use('/api/analytics', apiLimiter, requireAuth, analyticsRouter);
 app.use('/api/presets', apiLimiter, requireAuth, presetsRouter);
 app.use('/api/mysteries', apiLimiter, requireAuth, mysteriesRouter);
 app.use('/api/universes', apiLimiter, requireAuth, universesRouter);
+app.use('/api/user-settings', apiLimiter, requireAuth, userSettingsRouter);
+app.use('/api/story-ideas', apiLimiter, requireAuth, storyIdeasRouter);
 
 // Sentry error handler - must be BEFORE custom error handlers
 app.use(sentryErrorHandler());

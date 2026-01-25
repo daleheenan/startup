@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import GenerationProgress from '../components/GenerationProgress';
+import { TimePeriodSelector, getTimeframeDescription } from '../components/TimePeriodSelector';
+import type { TimePeriod } from '../../shared/types';
 import { getToken } from '../lib/auth';
 
 // Lazy load GenrePreferenceForm - form with complex validation
@@ -80,6 +82,7 @@ export default function NewProjectPage() {
   // Quick mode state
   const [quickGenre, setQuickGenre] = useState<string>('');
   const [quickPrompt, setQuickPrompt] = useState<string>('');
+  const [quickTimePeriod, setQuickTimePeriod] = useState<TimePeriod>({ type: 'present' });
 
   // Generation mode: 'full' = 5 detailed concepts, 'summaries' = 10 short summaries
   const [generateMode, setGenerateMode] = useState<'full' | 'summaries'>('full');
@@ -226,6 +229,11 @@ export default function NewProjectPage() {
       customIdeas: quickPrompt.trim() || undefined,
       targetLength: 80000,
       projectType: 'standalone' as const,
+      // Time period settings
+      timeframe: quickTimePeriod.type !== 'present' ? getTimeframeDescription(quickTimePeriod) : undefined,
+      timePeriod: quickTimePeriod.type !== 'present' ? quickTimePeriod : undefined,
+      timePeriodType: quickTimePeriod.type !== 'present' ? quickTimePeriod.type : undefined,
+      specificYear: quickTimePeriod.type === 'custom' ? quickTimePeriod.year : undefined,
     };
 
     await handleSubmit(quickPreferences);
@@ -489,6 +497,25 @@ export default function NewProjectPage() {
                       boxSizing: 'border-box',
                     }}
                     disabled={isGenerating}
+                  />
+                </div>
+
+                {/* Time Period Selection */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '0.75rem',
+                    color: '#374151',
+                    fontWeight: 600,
+                    fontSize: '0.875rem',
+                  }}>
+                    Time Period <span style={{ fontWeight: 400, color: '#64748B' }}>(optional)</span>
+                  </label>
+                  <TimePeriodSelector
+                    value={quickTimePeriod}
+                    onChange={setQuickTimePeriod}
+                    disabled={isGenerating}
+                    compact={true}
                   />
                 </div>
 

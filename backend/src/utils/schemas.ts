@@ -9,6 +9,16 @@ import { z } from 'zod';
 // PROJECTS
 // ============================================================================
 
+// Time period type enum for validation
+const timePeriodTypeSchema = z.enum(['past', 'present', 'future', 'unknown', 'custom']);
+
+// Time period object schema
+const timePeriodSchema = z.object({
+  type: timePeriodTypeSchema,
+  year: z.number().int().optional(),
+  description: z.string().optional(),
+}).optional();
+
 export const createProjectSchema = z.object({
   concept: z.object({
     title: z.string().min(1, 'Title is required').max(500, 'Title too long'),
@@ -24,6 +34,11 @@ export const createProjectSchema = z.object({
     bookCount: z.number().int().positive().optional(),
     universeId: z.string().uuid().optional(),
     sourceProjectId: z.string().uuid().optional(),
+    // Time period fields (Phase 4)
+    timePeriod: timePeriodSchema,
+    timePeriodType: timePeriodTypeSchema.optional(),
+    specificYear: z.number().int().optional(),
+    timeframe: z.string().optional(),  // Legacy timeframe string
   }),
 });
 
@@ -389,11 +404,89 @@ export const updatePresetSchema = z.object({
 });
 
 // ============================================================================
+// STORY IDEAS
+// ============================================================================
+
+export const generateStoryIdeasSchema = z.object({
+  genre: z.string().min(1, 'Genre is required'),
+  subgenre: z.string().optional(),
+  tone: z.string().optional(),
+  themes: z.array(z.string()).optional(),
+  count: z.number().int().min(1).max(10).optional().default(5),
+});
+
+export const regenerateSectionSchema = z.object({
+  ideaId: z.string().min(1, 'Idea ID is required'),
+  section: z.enum(['characters', 'plot', 'twists'], {
+    errorMap: () => ({ message: 'Section must be one of: characters, plot, twists' }),
+  }),
+  context: z.object({
+    id: z.string(),
+    storyIdea: z.string().min(1, 'Story idea is required'),
+    characterConcepts: z.array(z.string()),
+    plotElements: z.array(z.string()),
+    uniqueTwists: z.array(z.string()),
+  }),
+});
+
+// ============================================================================
 // ANALYTICS
 // ============================================================================
 
 // Note: Analytics routes primarily use URL parameters and don't have complex request bodies
 // The analyze endpoints don't require body validation as they fetch data from the database
+
+// ============================================================================
+// USER SETTINGS - Custom Genres, Exclusions, and Genre Recipes
+// ============================================================================
+
+export const createUserGenreSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100, 'Name too long'),
+  description: z.string().max(500, 'Description too long').optional(),
+  parentGenre: z.string().max(100).optional(),
+});
+
+export const updateUserGenreSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100, 'Name too long'),
+  description: z.string().max(500, 'Description too long').optional(),
+  parentGenre: z.string().max(100).optional(),
+});
+
+export const createUserExclusionSchema = z.object({
+  type: z.enum(['name', 'word', 'theme', 'trope'], {
+    errorMap: () => ({ message: 'Type must be one of: name, word, theme, trope' })
+  }),
+  value: z.string().min(1, 'Value is required').max(200, 'Value too long'),
+  reason: z.string().max(500, 'Reason too long').optional(),
+});
+
+export const updateUserExclusionSchema = z.object({
+  type: z.enum(['name', 'word', 'theme', 'trope'], {
+    errorMap: () => ({ message: 'Type must be one of: name, word, theme, trope' })
+  }),
+  value: z.string().min(1, 'Value is required').max(200, 'Value too long'),
+  reason: z.string().max(500, 'Reason too long').optional(),
+});
+
+export const createGenreRecipeSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100, 'Name too long'),
+  description: z.string().max(500, 'Description too long').optional(),
+  genres: z.array(z.string()).min(1, 'At least one genre is required'),
+  tones: z.array(z.string()).min(1, 'At least one tone is required'),
+  themes: z.array(z.string()).optional().default([]),
+  modifiers: z.array(z.string()).optional().default([]),
+  targetLength: z.number().int().positive().optional().default(80000),
+});
+
+export const updateGenreRecipeSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100, 'Name too long'),
+  description: z.string().max(500, 'Description too long').optional(),
+  genres: z.array(z.string()).min(1, 'At least one genre is required'),
+  tones: z.array(z.string()).min(1, 'At least one tone is required'),
+  themes: z.array(z.string()).optional().default([]),
+  modifiers: z.array(z.string()).optional().default([]),
+  targetLength: z.number().int().positive().optional().default(80000),
+});
 
 // ============================================================================
 // TYPE EXPORTS
@@ -429,3 +522,11 @@ export type CreateUniverseInput = z.infer<typeof createUniverseSchema>;
 export type LinkProjectToUniverseInput = z.infer<typeof linkProjectToUniverseSchema>;
 export type CreatePresetInput = z.infer<typeof createPresetSchema>;
 export type UpdatePresetInput = z.infer<typeof updatePresetSchema>;
+export type CreateUserGenreInput = z.infer<typeof createUserGenreSchema>;
+export type UpdateUserGenreInput = z.infer<typeof updateUserGenreSchema>;
+export type CreateUserExclusionInput = z.infer<typeof createUserExclusionSchema>;
+export type UpdateUserExclusionInput = z.infer<typeof updateUserExclusionSchema>;
+export type CreateGenreRecipeInput = z.infer<typeof createGenreRecipeSchema>;
+export type UpdateGenreRecipeInput = z.infer<typeof updateGenreRecipeSchema>;
+export type GenerateStoryIdeasInput = z.infer<typeof generateStoryIdeasSchema>;
+export type RegenerateSectionInput = z.infer<typeof regenerateSectionSchema>;

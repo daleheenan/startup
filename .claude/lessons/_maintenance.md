@@ -2,17 +2,36 @@
 
 This document describes how to maintain the self-reinforcement learning system, including pruning, scoring, searching, and cross-agent learning.
 
+**Key Principle**: Context is precious. Every lesson loaded costs agent attention. Curate aggressively to maintain high signal-to-noise ratio.
+
 ---
 
 ## System Overview
 
 ```
 .claude/lessons/
-├── _template.md          # Template for new lesson files
-├── _maintenance.md       # This file - maintenance instructions
-├── shared.lessons.md     # Cross-cutting lessons for all agents
-└── {agent}.lessons.md    # Per-agent lesson files (created on first use)
+├── _template.md              # Template for new lesson files
+├── _maintenance.md           # This file - maintenance instructions
+├── _archived.lessons.md      # Archived lessons (agents DO NOT read this)
+├── _agent-learning-section.md # Standard learning section for agents
+├── shared.lessons.md         # Cross-cutting lessons for all agents
+└── {agent}.lessons.md        # Per-agent lesson files (created on first use)
 ```
+
+### Critical File: _archived.lessons.md
+
+Archived lessons are moved to `_archived.lessons.md` and are **NOT loaded by agents**. This file:
+- Preserves history for audit purposes
+- Reduces context load on active agents
+- Allows revival of lessons if they become relevant again
+
+### Curation Agent: lessons-curator
+
+The `lessons-curator` agent can be invoked to perform systematic curation:
+- Monthly or when files exceed limits
+- Archives low-value lessons
+- Promotes high-value lessons
+- Produces curation reports
 
 ---
 
@@ -53,53 +72,76 @@ When a lesson in `shared.lessons.md` reaches score 10:
 
 ---
 
-## 2. Lesson Pruning
+## 2. Lesson Pruning (Aggressive Curation)
 
-### Automatic Pruning Rules
+### Core Principle: Less is More
 
-To prevent lesson files from growing unbounded:
+**Target**: Each agent file should have 15-25 high-quality lessons, not 50+ mediocre ones.
 
-#### Per-Agent Files (`{agent}.lessons.md`)
-- **Maximum lessons**: 50 active + 20 proven = 70 total
-- **Archive trigger**: When active lessons exceed 50
-- **Archive count**: Move oldest 10 lessons to "Archived Lessons"
+A lesson that isn't regularly applied is consuming context without providing value.
 
-#### Shared Lessons (`shared.lessons.md`)
-- **Maximum lessons**: 30 active + 10 foundational = 40 total
-- **Higher bar**: Only universally applicable lessons
+### Strict Archive Criteria
+
+Archive lessons that meet ANY of these criteria:
+
+| Criterion | Threshold | Reason |
+|-----------|-----------|--------|
+| Never applied | Score = 0 after 10+ tasks | Not useful in practice |
+| Low value | Score < 3 after 6+ months | Rarely helpful |
+| One-time | Only applied once ever | Too specific |
+| Superseded | Better lesson exists | Redundant |
+| Obsolete | Tech/pattern changed | No longer relevant |
+| Vague | "Be careful with X" | Not actionable |
+| Obvious | Any agent would know | Wastes context |
+
+### File Limits (Stricter than before)
+
+| File Type | Max Lessons | Action When Exceeded |
+|-----------|-------------|---------------------|
+| Per-agent active | 25 | Archive lowest-scoring 10 |
+| Per-agent proven | 10 | Only truly proven lessons |
+| Shared active | 20 | Higher bar for inclusion |
+| Shared foundational | 10 | Only universal truths |
 
 ### Pruning Process
 
 When a lesson file exceeds limits:
 
-1. **Identify candidates for archival**:
-   - Lessons older than 6 months with score < 3
-   - Lessons that are superseded by newer, better lessons
-   - Lessons that are too specific to one-time situations
+1. **Invoke lessons-curator agent** for systematic review
 
-2. **Move to Archived section**:
+2. **Archive to _archived.lessons.md** (NOT in-file archive):
    ```markdown
-   ## Archived Lessons
+   ### [ARCHIVED 2026-01-25] Original lesson title
 
-   ### [ARCHIVED 2026-01-20] Original lesson title
-   **Reason**: Superseded by newer lesson on X
+   **Original Agent**: developer
    **Original Date**: 2025-06-15
-   ...rest of lesson...
+   **Final Score**: 1
+   **Archive Reason**: LOW_VALUE - Score < 3 after 6 months
+
+   [Original lesson content]
    ```
 
-3. **Consider deletion** for:
-   - Lessons that were wrong or misleading
-   - Lessons with score 0 after 10+ tasks
-   - Duplicate lessons
+3. **Remove from active file entirely** - agents will not load archived lessons
 
-### Quarterly Review
+4. **Update statistics** in the active file
 
-Every 3 months, review lesson files:
-- [ ] Remove lessons that are no longer relevant
-- [ ] Merge similar lessons
-- [ ] Promote high-scoring lessons
-- [ ] Archive low-value lessons
-- [ ] Update summary statistics
+### Monthly Curation (Mandatory)
+
+Every month, invoke lessons-curator:
+```
+Task: lessons-curator
+Prompt: "Monthly curation. Review all lesson files. Archive aggressively.
+Target: Each agent file should have 15-25 high-quality lessons."
+```
+
+Checklist:
+- [ ] Archive lessons with score 0 (never applied)
+- [ ] Archive lessons with score < 3 older than 3 months
+- [ ] Archive one-time situational lessons
+- [ ] Merge duplicate lessons
+- [ ] Promote lessons with score >= 5 to shared
+- [ ] Update all statistics
+- [ ] Produce curation report
 
 ---
 

@@ -2,6 +2,12 @@ import { Router } from 'express';
 import { QueueWorker } from '../queue/worker.js';
 import { sessionTracker } from '../services/session-tracker.js';
 import { createLogger } from '../services/logger.service.js';
+import type { JobType } from '../shared/types/index.js';
+import {
+  createQueueJobSchema,
+  validateRequest,
+  type CreateQueueJobInput,
+} from '../utils/schemas.js';
 
 const router = Router();
 const logger = createLogger('routes:queue');
@@ -31,15 +37,14 @@ router.get('/stats', (req, res) => {
  */
 router.post('/test', (req, res) => {
   try {
-    const { type, targetId } = req.body;
-
-    if (!type || !targetId) {
-      return res.status(400).json({
-        error: { code: 'INVALID_REQUEST', message: 'Missing type or targetId' },
-      });
+    const validation = validateRequest(createQueueJobSchema, req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error });
     }
 
-    const jobId = QueueWorker.createJob(type, targetId);
+    const { type, targetId } = validation.data;
+
+    const jobId = QueueWorker.createJob(type as JobType, targetId);
 
     res.status(201).json({
       jobId,

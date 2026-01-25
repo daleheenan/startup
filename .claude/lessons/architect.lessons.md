@@ -12,11 +12,11 @@ MAINTENANCE RULES:
 
 ## Summary Statistics
 
-- **Total tasks completed**: 0
-- **Total lessons recorded**: 5
+- **Total tasks completed**: 1
+- **Total lessons recorded**: 6
 - **Last updated**: 2026-01-25
 - **Proven lessons** (score >= 5): 0
-- **Top themes**: #architecture #patterns #database #api #typescript
+- **Top themes**: #architecture #patterns #database #api #typescript #repository-pattern #circuit-breaker
 
 ---
 
@@ -29,6 +29,35 @@ MAINTENANCE RULES:
 ---
 
 ## Active Lessons (Most Recent First)
+
+### 2026-01-25 | Task: Sprint 18 - Database & Architecture Improvements
+
+**Date**: 2026-01-25
+**Task**: Designing database migration improvements, repository layer abstraction, and circuit breaker pattern for NovelForge backend
+**Context**: Production-grade backend architecture using SQLite, Express.js, TypeScript, and Anthropic Claude API
+
+**What Worked Well**:
+- Reading existing codebase patterns first (migrate.ts, services, repositories) before designing new patterns
+- Loading lessons from developer and code-reviewer agents to understand implementation challenges
+- Breaking large architecture changes into phases with minimal dependencies
+- Designing non-breaking changes first (database improvements), breaking changes last (repository layer)
+- Providing specific file paths and code examples in implementation tasks
+- Creating detailed acceptance criteria with clear success metrics
+- Including rollback strategy and deployment order in technical design
+- Using existing patterns as references (mystery-tracking.service.ts as repository refactor example)
+- Estimating task time at 1-3 hours per task for granular tracking
+
+**What Didn't Work**:
+- Initial design considered using external circuit breaker libraries (Opossum, Cockatiel) - decided custom implementation is simpler for single API
+- Almost missed integration points between new services (backup service needs to be called by migration service)
+
+**Lesson**: When designing major architectural improvements, always read the existing codebase patterns first, especially implementations from the same domain. Break changes into phases: non-breaking changes deploy first, breaking changes deploy last with rollback plans. Provide concrete code examples in tasks, not just interfaces - developers implement faster with reference code. Size tasks at 1-3 hours each for realistic tracking. For external dependencies (circuit breakers, ORMs), evaluate if custom implementation (<100 lines) is simpler than library integration (200KB+ dependencies).
+
+**Application Score**: 0
+
+**Tags**: #architecture #repository-pattern #circuit-breaker #migrations #solid-principles #phased-deployment
+
+---
 
 ### 2026-01-25 | Task: Database Schema Design
 

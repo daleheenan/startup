@@ -36,6 +36,14 @@ export interface StoryPreferences {
   customIdeas?: string;
   regenerationTimestamp?: number;
   timeframe?: string; // Era/year setting (e.g., "1920s", "Medieval Era", "Year 2350")
+  // Structured time period (Phase 4)
+  timePeriod?: {
+    type: 'past' | 'present' | 'future' | 'unknown' | 'custom';
+    year?: number;
+    description?: string;
+  };
+  timePeriodType?: 'past' | 'present' | 'future' | 'unknown' | 'custom';
+  specificYear?: number;
 }
 
 export interface StoryConcept {
@@ -217,14 +225,137 @@ export async function generateConcepts(
 }
 
 /**
+ * Build detailed time context for story generation based on time period settings
+ */
+function buildTimeContext(preferences: StoryPreferences): { timeframeText: string; timeGuidance: string } {
+  const { timeframe, timePeriod, timePeriodType, specificYear } = preferences;
+  const currentYear = new Date().getFullYear();
+
+  // Build timeframe text from either legacy or new format
+  let timeframeText = '';
+  let timeGuidance = '';
+
+  if (timePeriod) {
+    // New structured time period
+    switch (timePeriod.type) {
+      case 'past':
+        timeframeText = `Historical setting, approximately ${currentYear - 500} CE (500 years in the past)`;
+        timeGuidance = `
+**TIME PERIOD GUIDANCE (Historical - 500 years past):**
+- Technology level: Pre-industrial, limited to hand tools, basic metallurgy, horse-drawn transport
+- Communication: Written letters, messengers, no telecommunications
+- Naming conventions: Use period-appropriate names from the relevant culture
+- Social structure: Consider feudal systems, guilds, rigid class hierarchies
+- Avoid anachronisms: No modern conveniences, electricity, or industrial technology`;
+        break;
+      case 'present':
+        timeframeText = `Contemporary/Modern day setting (${currentYear})`;
+        timeGuidance = `
+**TIME PERIOD GUIDANCE (Contemporary):**
+- Technology level: Smartphones, internet, AI emerging, social media prevalent
+- Communication: Instant digital communication, video calls, social platforms
+- Naming conventions: Use modern names from diverse global cultures
+- Social structure: Consider current social dynamics, global connectivity
+- Include realistic modern references without dating the story`;
+        break;
+      case 'future':
+        timeframeText = `Futuristic setting, approximately year ${currentYear + 500} (500 years in the future)`;
+        timeGuidance = `
+**TIME PERIOD GUIDANCE (Far Future - 500 years ahead):**
+- Technology level: Advanced AI, potential FTL travel, genetic engineering, terraforming
+- Communication: Direct neural interfaces possible, instant galactic communication
+- Naming conventions: Consider evolved or entirely new naming conventions
+- Social structure: Post-scarcity possible, new forms of government, human augmentation
+- Include plausible extrapolations of current technological trends`;
+        break;
+      case 'unknown':
+        timeframeText = 'An undefined or impossibly distant time period';
+        timeGuidance = `
+**TIME PERIOD GUIDANCE (Unknown/Distant):**
+- Technology level: Undefined - could range from primitive to impossibly advanced
+- This allows maximum creative freedom - technology can be inconsistent or magical
+- Naming conventions: Create unique names that feel timeless or otherworldly
+- Social structure: Can be entirely invented without historical constraints
+- Perfect for fantasy settings with non-Earth histories`;
+        break;
+      case 'custom':
+        if (timePeriod.year !== undefined) {
+          const year = timePeriod.year;
+          if (year < 0) {
+            timeframeText = `Ancient setting, ${Math.abs(year)} BCE`;
+            timeGuidance = `
+**TIME PERIOD GUIDANCE (Ancient - ${Math.abs(year)} BCE):**
+- Technology level: Bronze or Iron Age depending on region, no writing in some cultures
+- Communication: Oral traditions, early writing systems
+- Naming conventions: Use names from relevant ancient cultures (Egyptian, Greek, Chinese, etc.)
+- Social structure: City-states, early empires, priest-kings`;
+          } else if (year < 500) {
+            timeframeText = `Late Ancient/Early Medieval setting, year ${year}`;
+            timeGuidance = `
+**TIME PERIOD GUIDANCE (Late Ancient - Year ${year}):**
+- Technology level: Roman-era technology in decline, early medieval tools
+- Communication: Written manuscripts rare, messenger networks
+- Naming conventions: Latin, Germanic, or regional names appropriate to setting`;
+          } else if (year < 1500) {
+            timeframeText = `Medieval setting, year ${year}`;
+            timeGuidance = `
+**TIME PERIOD GUIDANCE (Medieval - Year ${year}):**
+- Technology level: Castles, swords, early firearms if late period
+- Communication: Written letters among literate few, town criers
+- Naming conventions: Use medieval European or regional names`;
+          } else if (year < 1900) {
+            timeframeText = `Historical setting, year ${year}`;
+            timeGuidance = `
+**TIME PERIOD GUIDANCE (Historical - Year ${year}):**
+- Research specific era characteristics (Renaissance, Colonial, Victorian, etc.)
+- Technology varies significantly: printing press to early electricity
+- Naming conventions: Match the specific culture and time period`;
+          } else if (year <= currentYear) {
+            timeframeText = `Recent historical/Contemporary setting, year ${year}`;
+            timeGuidance = `
+**TIME PERIOD GUIDANCE (Recent History - Year ${year}):**
+- Research specific decade characteristics for accuracy
+- Technology: Consider what existed vs what didn't exist yet
+- Cultural references: Be accurate to the specific year`;
+          } else if (year < currentYear + 100) {
+            timeframeText = `Near future setting, year ${year}`;
+            timeGuidance = `
+**TIME PERIOD GUIDANCE (Near Future - Year ${year}):**
+- Technology level: Extrapolate current trends - more AI, renewable energy, space tourism
+- Consider climate change impacts on society
+- Naming conventions: Similar to present with some evolution`;
+          } else {
+            timeframeText = `Far future setting, year ${year}`;
+            timeGuidance = `
+**TIME PERIOD GUIDANCE (Far Future - Year ${year}):**
+- Technology level: Speculative - could include space colonization, radical life extension
+- Consider major societal transformations from current day
+- Naming conventions: Could be radically different or evolved from current trends`;
+          }
+        }
+        break;
+    }
+  } else if (timeframe) {
+    // Legacy timeframe string
+    timeframeText = timeframe;
+    timeGuidance = `\n**TIME PERIOD:** ${timeframe}\n- Ensure all story elements are appropriate to this time period`;
+  }
+
+  return { timeframeText, timeGuidance };
+}
+
+/**
  * Build the prompt for concept generation
  */
 function buildConceptPrompt(preferences: StoryPreferences, exclusions?: ConceptExclusions): string {
-  const { tone, tones, themes, customTheme, targetLength, additionalNotes, customIdeas, regenerationTimestamp, timeframe } = preferences;
+  const { tone, tones, themes, customTheme, targetLength, additionalNotes, customIdeas, regenerationTimestamp } = preferences;
 
   const genreText = formatGenre(preferences);
   const subgenreText = formatSubgenre(preferences);
   const modifiersText = formatModifiers(preferences.modifiers);
+
+  // Build time context
+  const { timeframeText, timeGuidance } = buildTimeContext(preferences);
 
   // Support multi-tone (use tones array if available, fall back to single tone)
   const toneText = tones && tones.length > 0 ? tones.join(' + ') : tone;
@@ -272,10 +403,11 @@ ${seedHint}
 **Subgenre:** ${subgenreText}
 **Tone:** ${toneText}
 **Themes:** ${themesText}
-${timeframe ? `**Time Period/Era:** ${timeframe}` : ''}
+${timeframeText ? `**Time Period/Era:** ${timeframeText}` : ''}
 **Target Length:** ${targetLength.toLocaleString()} words (${wordCountContext})
 ${additionalNotes ? `**Additional Notes:** ${additionalNotes}` : ''}
 ${customIdeas ? `**Custom Ideas to Incorporate:** ${customIdeas}` : ''}
+${timeGuidance}
 ${exclusionSection}
 
 **CRITICAL UNIQUENESS REQUIREMENTS:**
@@ -284,6 +416,7 @@ ${exclusionSection}
 3. Each central conflict MUST be DISTINCTIVE - avoid clichéd "chosen one" or "save the world" plots unless given a truly unique twist
 4. Settings should be SPECIFIC and VIVID - not generic "kingdoms" or "cities"
 5. The 5 concepts must explore DIFFERENT subthemes, protagonist archetypes, and narrative structures
+${timeframeText ? '6. All concepts MUST be appropriate for the specified time period - no anachronisms!' : ''}
 
 **For EACH concept, provide:**
 - **title**: A UNIQUE, memorable title (avoid common words like Shadow, Last, Dark, Rising, Fallen)
@@ -556,7 +689,7 @@ export async function generateConceptSummaries(
  * Build prompt for generating concept summaries
  */
 function buildSummaryPrompt(preferences: StoryPreferences, exclusions?: ConceptExclusions): string {
-  const { tone, tones, themes, customTheme, targetLength, additionalNotes, customIdeas, regenerationTimestamp, timeframe } = preferences;
+  const { tone, tones, themes, customTheme, targetLength, additionalNotes, customIdeas, regenerationTimestamp } = preferences;
 
   const genreText = formatGenre(preferences);
   const subgenreText = formatSubgenre(preferences);
@@ -564,6 +697,9 @@ function buildSummaryPrompt(preferences: StoryPreferences, exclusions?: ConceptE
   const toneText = tones && tones.length > 0 ? tones.join(' + ') : tone;
   const allThemes = customTheme ? [...themes, customTheme] : themes;
   const themesText = allThemes.join(', ');
+
+  // Build time context
+  const { timeframeText, timeGuidance } = buildTimeContext(preferences);
 
   const uniqueSeed = regenerationTimestamp || Date.now();
 
@@ -592,10 +728,11 @@ ${GENERIC_TITLE_WORDS.join(' | ')}
 **Subgenre:** ${subgenreText}
 **Tone:** ${toneText}
 **Themes:** ${themesText}
-${timeframe ? `**Time Period/Era:** ${timeframe}` : ''}
+${timeframeText ? `**Time Period/Era:** ${timeframeText}` : ''}
 **Target Length:** ${targetLength.toLocaleString()} words
 ${additionalNotes ? `**Notes:** ${additionalNotes}` : ''}
 ${customIdeas ? `**Custom Ideas:** ${customIdeas}` : ''}
+${timeGuidance ? `${timeGuidance}` : ''}
 ${exclusionSection}
 
 **REQUIREMENTS:**
@@ -604,6 +741,7 @@ ${exclusionSection}
 - Each logline must be a compelling 2-sentence hook
 - Vary protagonist types, settings, and conflict structures
 - Make them dramatically different from each other
+${timeframeText ? '- All concepts MUST be appropriate for the specified time period' : ''}
 
 Return ONLY a JSON array in this exact format:
 [
