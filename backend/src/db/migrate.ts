@@ -4,11 +4,16 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { createLogger } from '../services/logger.service.js';
+import { backupService } from '../services/backup.service.js';
+import { createMigrationRegistry, type MigrationDefinition } from './migration-registry.js';
 
 const logger = createLogger('db:migrate');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Get database path for backup
+const DATABASE_PATH = process.env.DATABASE_PATH || path.join(__dirname, '../../../data/novelforge.db');
 
 /**
  * Parse SQL file into individual statements, properly handling:
@@ -83,10 +88,86 @@ function parseSqlStatements(sql: string): string[] {
   return statements.filter(s => s.length > 0);
 }
 
+/**
+ * Create backup before running migrations (synchronous)
+ */
+function createPreMigrationBackup(): boolean {
+  if (!fs.existsSync(DATABASE_PATH)) {
+    logger.info('[Migrations] No existing database to backup');
+    return true;
+  }
+
+  logger.info('[Migrations] Creating pre-migration backup...');
+  const result = backupService.createBackupSync(DATABASE_PATH, 'pre-migration');
+
+  if (result.success) {
+    logger.info({ backupPath: result.backupPath, durationMs: result.duration }, '[Migrations] Backup created successfully');
+    return true;
+  } else {
+    logger.error({ error: result.error }, '[Migrations] Backup failed');
+    return false;
+  }
+}
+
+/**
+ * Run a single migration with proper error handling
+ */
+function runMigration(version: number, name: string, sql: string): boolean {
+  logger.info(`[Migrations] Applying migration ${String(version).padStart(3, '0')}: ${name}`);
+
+  db.exec('BEGIN TRANSACTION');
+
+  try {
+    const statements = parseSqlStatements(sql);
+
+    for (const statement of statements) {
+      try {
+        db.exec(statement);
+      } catch (execError: any) {
+        // Silently skip ALTER TABLE errors for columns that already exist
+        // Also skip duplicate trigger/table/index errors
+        if (execError.code === 'SQLITE_ERROR') {
+          const msg = execError.message?.toLowerCase() || '';
+          if (statement.includes('ALTER TABLE') ||
+              msg.includes('already exists') ||
+              msg.includes('duplicate column')) {
+            logger.info(`[Migrations] Skipping (already exists): ${statement.substring(0, 60)}...`);
+            continue;
+          }
+        }
+        throw execError;
+      }
+    }
+
+    db.prepare(`INSERT INTO schema_migrations (version) VALUES (?)`).run(version);
+    db.exec('COMMIT');
+    logger.info(`[Migrations] Migration ${String(version).padStart(3, '0')} applied successfully`);
+    return true;
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+}
+
+/**
+ * Main migration function (synchronous for server startup)
+ */
 export function runMigrations() {
   logger.info('[Migrations] Running database migrations...');
 
   try {
+    // Create backup before any migrations
+    const backupSuccess = createPreMigrationBackup();
+    if (!backupSuccess) {
+      logger.warn('[Migrations] Proceeding without backup (backup failed)');
+    }
+
+    // Initialize migration registry
+    const registry = createMigrationRegistry(db);
+
+    // Migrate old schema_migrations data to new registry
+    registry.migrateFromOldSchema();
+
     // Create migrations tracking table if it doesn't exist
     db.exec(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -105,33 +186,12 @@ export function runMigrations() {
 
     // Migration 001 is the base schema (schema.sql)
     if (currentVersion < 1) {
-      logger.info('[Migrations] Applying migration 001: Base schema');
       const schemaPath = path.join(__dirname, 'schema.sql');
       const schema = fs.readFileSync(schemaPath, 'utf-8');
-
-      db.exec('BEGIN TRANSACTION');
-
-      try {
-        // Split by semicolons and execute each statement
-        const statements = schema
-          .split(';')
-          .map(s => s.trim())
-          .filter(s => s.length > 0);
-
-        for (const statement of statements) {
-          db.exec(statement);
-        }
-
-        db.prepare(`INSERT INTO schema_migrations (version) VALUES (1)`).run();
-        db.exec('COMMIT');
-        logger.info('[Migrations] Migration 001 applied successfully');
-      } catch (error) {
-        db.exec('ROLLBACK');
-        throw error;
-      }
+      runMigration(1, 'Base schema', schema);
     }
 
-    // Migration 002: Trilogy support
+    // Migration 002: Trilogy support (inline for backward compatibility)
     if (currentVersion < 2) {
       logger.info('[Migrations] Applying migration 002: Trilogy support');
 
@@ -204,76 +264,36 @@ export function runMigrations() {
 
     // Migration 003: Agent Learning System
     if (currentVersion < 3) {
-      logger.info('[Migrations] Applying migration 003: Agent Learning System');
       const migrationPath = path.join(__dirname, 'migrations', '003_agent_learning.sql');
       const migration = fs.readFileSync(migrationPath, 'utf-8');
 
-      db.exec('BEGIN TRANSACTION');
+      // Remove comment-only lines but preserve inline comments in statements
+      const lines = migration.split('\n');
+      const cleanedLines = lines.filter(line => {
+        const trimmed = line.trim();
+        return trimmed.length === 0 || !trimmed.startsWith('--');
+      });
+      const cleanedMigration = cleanedLines.join('\n');
 
-      try {
-        // Remove comment-only lines but preserve inline comments in statements
-        const lines = migration.split('\n');
-        const cleanedLines = lines.filter(line => {
-          const trimmed = line.trim();
-          // Keep lines that are not purely comments
-          return trimmed.length === 0 || !trimmed.startsWith('--');
-        });
-        const cleanedMigration = cleanedLines.join('\n');
-
-        // Split by semicolons and execute each statement
-        const statements = cleanedMigration
-          .split(';')
-          .map(s => s.trim())
-          .filter(s => s.length > 0);
-
-        for (const statement of statements) {
-          db.exec(statement);
-        }
-
-        db.prepare(`INSERT INTO schema_migrations (version) VALUES (3)`).run();
-        db.exec('COMMIT');
-        logger.info('[Migrations] Migration 003 applied successfully');
-      } catch (error) {
-        db.exec('ROLLBACK');
-        throw error;
-      }
+      runMigration(3, 'Agent Learning System', cleanedMigration);
     }
 
     // Migration 004: Saved Concepts
     if (currentVersion < 4) {
-      logger.info('[Migrations] Applying migration 004: Saved Concepts');
       const migrationPath = path.join(__dirname, 'migrations', '004_saved_concepts.sql');
       const migration = fs.readFileSync(migrationPath, 'utf-8');
 
-      db.exec('BEGIN TRANSACTION');
+      const lines = migration.split('\n');
+      const cleanedLines = lines.filter(line => {
+        const trimmed = line.trim();
+        return trimmed.length === 0 || !trimmed.startsWith('--');
+      });
+      const cleanedMigration = cleanedLines.join('\n');
 
-      try {
-        const lines = migration.split('\n');
-        const cleanedLines = lines.filter(line => {
-          const trimmed = line.trim();
-          return trimmed.length === 0 || !trimmed.startsWith('--');
-        });
-        const cleanedMigration = cleanedLines.join('\n');
-
-        const statements = cleanedMigration
-          .split(';')
-          .map(s => s.trim())
-          .filter(s => s.length > 0);
-
-        for (const statement of statements) {
-          db.exec(statement);
-        }
-
-        db.prepare(`INSERT INTO schema_migrations (version) VALUES (4)`).run();
-        db.exec('COMMIT');
-        logger.info('[Migrations] Migration 004 applied successfully');
-      } catch (error) {
-        db.exec('ROLLBACK');
-        throw error;
-      }
+      runMigration(4, 'Saved Concepts', cleanedMigration);
     }
 
-    // Migrations 005-015: Run from migration files
+    // Migrations 005-017: Run from migration files
     const migrationFiles = [
       '005_analytics_insights.sql',
       '006_chapter_edits.sql',
@@ -286,6 +306,8 @@ export function runMigrations() {
       '013_performance_indexes.sql',
       '014_universe_support.sql',
       '015_plot_structure.sql',
+      '016_timeframe_support.sql',
+      '017_migration_registry.sql',
     ];
 
     for (let i = 0; i < migrationFiles.length; i++) {
@@ -293,7 +315,6 @@ export function runMigrations() {
       const filename = migrationFiles[i];
 
       if (currentVersion < version) {
-        logger.info(`[Migrations] Applying migration ${String(version).padStart(3, '0')}: ${filename}`);
         const migrationPath = path.join(__dirname, 'migrations', filename);
 
         if (!fs.existsSync(migrationPath)) {
@@ -302,43 +323,12 @@ export function runMigrations() {
         }
 
         const migration = fs.readFileSync(migrationPath, 'utf-8');
-
-        db.exec('BEGIN TRANSACTION');
-
-        try {
-          // Parse SQL statements properly handling triggers and multi-statement blocks
-          const statements = parseSqlStatements(migration);
-
-          for (const statement of statements) {
-            try {
-              db.exec(statement);
-            } catch (execError: any) {
-              // Silently skip ALTER TABLE errors for columns that already exist
-              // Also skip duplicate trigger/table/index errors
-              if (execError.code === 'SQLITE_ERROR') {
-                const msg = execError.message?.toLowerCase() || '';
-                if (statement.includes('ALTER TABLE') ||
-                    msg.includes('already exists') ||
-                    msg.includes('duplicate column')) {
-                  logger.info(`[Migrations] Skipping (already exists): ${statement.substring(0, 60)}...`);
-                  continue;
-                }
-              }
-              throw execError;
-            }
-          }
-
-          db.prepare(`INSERT INTO schema_migrations (version) VALUES (${version})`).run();
-          db.exec('COMMIT');
-          logger.info(`[Migrations] Migration ${String(version).padStart(3, '0')} applied successfully`);
-        } catch (error) {
-          db.exec('ROLLBACK');
-          throw error;
-        }
+        runMigration(version, filename, migration);
       }
     }
 
     logger.info('[Migrations] All migrations complete');
+
   } catch (error) {
     try {
       db.exec('ROLLBACK');
@@ -348,6 +338,84 @@ export function runMigrations() {
     logger.error({ error }, 'Migration failed');
     throw error;
   }
+}
+
+/**
+ * Rollback the last migration (if supported)
+ */
+export async function rollbackLastMigration(): Promise<boolean> {
+  const registry = createMigrationRegistry(db);
+  const applied = registry.getAppliedMigrations();
+
+  if (applied.length === 0) {
+    logger.info('[Migrations] No migrations to rollback');
+    return false;
+  }
+
+  const lastMigration = applied[applied.length - 1];
+
+  if (!lastMigration.can_rollback) {
+    logger.error({ version: lastMigration.version, name: lastMigration.name },
+      '[Migrations] Last migration does not support rollback');
+    return false;
+  }
+
+  // Create backup before rollback
+  await backupService.createBackup(DATABASE_PATH, 'pre-rollback');
+
+  // For now, we need the down SQL to be provided
+  // In a full implementation, you would store the down SQL with the migration
+  logger.warn('[Migrations] Rollback requires manual intervention - down SQL not stored');
+  return false;
+}
+
+/**
+ * Get migration status
+ */
+export function getMigrationStatus(): {
+  currentVersion: number;
+  appliedMigrations: number;
+  pendingMigrations: string[];
+} {
+  const getVersionStmt = db.prepare<[], { version: number }>(`
+    SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1
+  `);
+  const currentVersion = getVersionStmt.get()?.version || 0;
+
+  const countStmt = db.prepare<[], { count: number }>(`
+    SELECT COUNT(*) as count FROM schema_migrations
+  `);
+  const appliedMigrations = countStmt.get()?.count || 0;
+
+  const migrationFiles = [
+    '005_analytics_insights.sql',
+    '006_chapter_edits.sql',
+    '007_regeneration_variations.sql',
+    '008_project_metrics.sql',
+    '009_genre_tropes.sql',
+    '010_prose_style_control.sql',
+    '011_book_style_presets.sql',
+    '012_mystery_tracking.sql',
+    '013_performance_indexes.sql',
+    '014_universe_support.sql',
+    '015_plot_structure.sql',
+    '016_timeframe_support.sql',
+    '017_migration_registry.sql',
+  ];
+
+  const pendingMigrations: string[] = [];
+  for (let i = 0; i < migrationFiles.length; i++) {
+    const version = 5 + i;
+    if (version > currentVersion) {
+      pendingMigrations.push(migrationFiles[i]);
+    }
+  }
+
+  return {
+    currentVersion,
+    appliedMigrations,
+    pendingMigrations,
+  };
 }
 
 // Run migrations if this file is executed directly via tsx
@@ -361,6 +429,11 @@ const isMainModule = scriptPath && (
 );
 
 if (isMainModule) {
-  runMigrations();
-  process.exit(0);
+  try {
+    runMigrations();
+    process.exit(0);
+  } catch (error) {
+    console.error('Migration failed:', error);
+    process.exit(1);
+  }
 }

@@ -97,6 +97,151 @@ export class BackupService {
   }
 
   /**
+   * Create a backup of the database (synchronous version)
+   * Used during migrations when async isn't possible
+   *
+   * @param databasePath - Path to the source database file
+   * @param reason - Reason for the backup (e.g., 'pre-migration', 'manual')
+   * @returns BackupResult with success status and backup path
+   */
+  createBackupSync(databasePath: string, reason: string = 'manual'): BackupResult {
+    const startTime = Date.now();
+
+    try {
+      // Verify source database exists
+      if (!fs.existsSync(databasePath)) {
+        return {
+          success: false,
+          error: `Source database not found: ${databasePath}`,
+        };
+      }
+
+      const filename = this.generateBackupFilename(reason);
+      const backupPath = path.join(this.config.backupDir, filename);
+
+      // Copy the database file
+      fs.copyFileSync(databasePath, backupPath);
+
+      // Also backup WAL file if it exists (for WAL mode databases)
+      const walPath = `${databasePath}-wal`;
+      if (fs.existsSync(walPath)) {
+        fs.copyFileSync(walPath, `${backupPath}-wal`);
+      }
+
+      // Also backup SHM file if it exists
+      const shmPath = `${databasePath}-shm`;
+      if (fs.existsSync(shmPath)) {
+        fs.copyFileSync(shmPath, `${backupPath}-shm`);
+      }
+
+      const duration = Date.now() - startTime;
+      const stats = fs.statSync(backupPath);
+
+      logger.info({
+        backupPath,
+        reason,
+        sizeBytes: stats.size,
+        durationMs: duration,
+      }, 'Database backup created (sync)');
+
+      // Apply retention policy synchronously
+      this.applyRetentionPolicySync();
+
+      return {
+        success: true,
+        backupPath,
+        duration,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: errorMessage, databasePath, reason }, 'Backup failed');
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  /**
+   * Apply retention policy synchronously
+   */
+  applyRetentionPolicySync(): void {
+    try {
+      const backups = this.listBackupsSync();
+
+      if (backups.length <= this.config.maxBackups) {
+        return;
+      }
+
+      // Sort by creation time, newest first
+      backups.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+      // Remove backups beyond the retention limit
+      const backupsToRemove = backups.slice(this.config.maxBackups);
+
+      for (const backup of backupsToRemove) {
+        fs.unlinkSync(backup.path);
+
+        // Also remove associated WAL and SHM files
+        const walPath = `${backup.path}-wal`;
+        const shmPath = `${backup.path}-shm`;
+        if (fs.existsSync(walPath)) fs.unlinkSync(walPath);
+        if (fs.existsSync(shmPath)) fs.unlinkSync(shmPath);
+
+        logger.info({ filename: backup.filename }, 'Removed old backup');
+      }
+
+      logger.info({
+        removed: backupsToRemove.length,
+        remaining: this.config.maxBackups,
+      }, 'Retention policy applied');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: errorMessage }, 'Failed to apply retention policy');
+    }
+  }
+
+  /**
+   * List all available backups (synchronous version)
+   */
+  listBackupsSync(): BackupInfo[] {
+    const backups: BackupInfo[] = [];
+
+    try {
+      const files = fs.readdirSync(this.config.backupDir);
+
+      for (const file of files) {
+        // Only include .db files, skip WAL and SHM files
+        if (!file.endsWith('.db')) continue;
+
+        const filePath = path.join(this.config.backupDir, file);
+        const stats = fs.statSync(filePath);
+
+        // Extract reason from filename
+        const match = file.match(/novelforge_[\d-]+_[\d-]+_(.+)\.db$/);
+        const reason = match ? match[1].replace(/-/g, ' ') : 'unknown';
+
+        backups.push({
+          filename: file,
+          path: filePath,
+          createdAt: stats.birthtime,
+          sizeBytes: stats.size,
+          reason,
+        });
+      }
+
+      // Sort by creation time, newest first
+      backups.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+      return backups;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: errorMessage }, 'Failed to list backups');
+      return [];
+    }
+  }
+
+  /**
    * Create a backup of the database
    *
    * @param databasePath - Path to the source database file
