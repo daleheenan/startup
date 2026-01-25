@@ -81,6 +81,15 @@ export default function SettingsPage() {
       count: stats.recipes,
       countLabel: 'recipes',
     },
+    {
+      title: 'API Diagnostics',
+      description: 'Test Claude API connectivity and verify outline and chapter generation are working correctly.',
+      href: '/settings/api-diagnostics',
+      icon: 'D',
+      iconBg: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
+      count: null,
+      countLabel: '',
+    },
   ];
 
   return (
@@ -244,14 +253,17 @@ export default function SettingsPage() {
                       color: loading ? '#94A3B8' : '#667eea',
                       fontWeight: '500',
                     }}>
-                      {loading ? 'Loading...' : `${section.count} ${section.countLabel}`}
+                      {section.count !== null
+                        ? (loading ? 'Loading...' : `${section.count} ${section.countLabel}`)
+                        : 'Run tests'
+                      }
                     </span>
                     <span style={{
                       fontSize: '0.875rem',
                       color: '#667eea',
                       fontWeight: '500',
                     }}>
-                      Manage
+                      {section.count !== null ? 'Manage' : 'Open'}
                     </span>
                   </div>
                 </Link>

@@ -150,4 +150,228 @@ router.get('/claude', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/health/diagnostics
+ *
+ * Full API diagnostics with test generation snippets
+ * Tests outline generation and chapter generation with short snippets
+ */
+router.get('/diagnostics', async (req, res) => {
+  const diagnostics: Record<string, any> = {
+    timestamp: new Date().toISOString(),
+    tests: {},
+  };
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey || apiKey === 'placeholder-key-will-be-set-later') {
+    return res.status(503).json({
+      status: 'unhealthy',
+      error: 'API key not configured',
+      diagnostics,
+    });
+  }
+
+  const client = new Anthropic({ apiKey });
+  const model = process.env.ANTHROPIC_MODEL || 'claude-opus-4-5-20251101';
+
+  // Test 1: Basic API connectivity
+  try {
+    const startTime = Date.now();
+    const response = await client.messages.create({
+      model: 'claude-3-haiku-20240307',
+      max_tokens: 50,
+      messages: [{ role: 'user', content: 'Reply with exactly: "API Connected"' }],
+    });
+    const content = response.content[0].type === 'text' ? response.content[0].text : '';
+    diagnostics.tests.basicApi = {
+      status: 'ok',
+      latency: Date.now() - startTime,
+      response: content.substring(0, 100),
+      model: 'claude-3-haiku-20240307',
+    };
+  } catch (error: any) {
+    diagnostics.tests.basicApi = {
+      status: 'error',
+      error: error.message,
+    };
+  }
+
+  // Test 2: Outline generation (JSON array output)
+  try {
+    const startTime = Date.now();
+    const response = await client.messages.create({
+      model,
+      max_tokens: 500,
+      temperature: 0.7,
+      system: 'You are a JSON API. Always respond with valid JSON only, no markdown, no explanations.',
+      messages: [{
+        role: 'user',
+        content: `Generate a simple 3-act story structure for a short mystery story. Return ONLY a JSON array:
+[
+  {"number": 1, "name": "Setup", "description": "Brief description"},
+  {"number": 2, "name": "Confrontation", "description": "Brief description"},
+  {"number": 3, "name": "Resolution", "description": "Brief description"}
+]`
+      }],
+    });
+    const content = response.content[0].type === 'text' ? response.content[0].text : '';
+
+    // Try to parse the JSON
+    let parsed = null;
+    let parseError = null;
+    try {
+      // Try direct parse first
+      parsed = JSON.parse(content.trim());
+    } catch (e1) {
+      // Try extracting from code block
+      const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        try {
+          parsed = JSON.parse(codeBlockMatch[1].trim());
+        } catch (e2) {
+          parseError = 'Failed to parse JSON from code block';
+        }
+      } else {
+        // Try to find array brackets
+        const arrayMatch = content.match(/\[[\s\S]*\]/);
+        if (arrayMatch) {
+          try {
+            parsed = JSON.parse(arrayMatch[0]);
+          } catch (e3) {
+            parseError = 'Failed to parse extracted JSON array';
+          }
+        } else {
+          parseError = 'No JSON array found in response';
+        }
+      }
+    }
+
+    diagnostics.tests.outlineGeneration = {
+      status: parsed ? 'ok' : 'error',
+      latency: Date.now() - startTime,
+      model,
+      rawResponse: content.substring(0, 500),
+      parsedSuccessfully: !!parsed,
+      parseError,
+      parsedData: parsed ? (Array.isArray(parsed) ? `Array with ${parsed.length} items` : 'Not an array') : null,
+    };
+  } catch (error: any) {
+    diagnostics.tests.outlineGeneration = {
+      status: 'error',
+      error: error.message,
+      model,
+    };
+  }
+
+  // Test 3: Chapter text generation (prose output)
+  try {
+    const startTime = Date.now();
+    const response = await client.messages.create({
+      model,
+      max_tokens: 300,
+      temperature: 0.8,
+      messages: [{
+        role: 'user',
+        content: `Write 2-3 sentences of opening prose for a mystery novel chapter. The scene is: A detective arrives at an old mansion on a rainy night. Write ONLY the prose, no commentary.`
+      }],
+    });
+    const content = response.content[0].type === 'text' ? response.content[0].text : '';
+    const wordCount = content.split(/\s+/).filter(w => w.length > 0).length;
+
+    diagnostics.tests.chapterGeneration = {
+      status: wordCount > 10 ? 'ok' : 'error',
+      latency: Date.now() - startTime,
+      model,
+      wordCount,
+      sampleText: content.substring(0, 300),
+      hasContent: content.length > 50,
+    };
+  } catch (error: any) {
+    diagnostics.tests.chapterGeneration = {
+      status: 'error',
+      error: error.message,
+      model,
+    };
+  }
+
+  // Test 4: JSON object generation (for characters/world)
+  try {
+    const startTime = Date.now();
+    const response = await client.messages.create({
+      model,
+      max_tokens: 400,
+      temperature: 0.7,
+      system: 'You are a JSON API. Always respond with valid JSON only, no markdown, no explanations.',
+      messages: [{
+        role: 'user',
+        content: `Generate a simple character profile. Return ONLY a JSON object:
+{
+  "name": "Character Name",
+  "role": "protagonist",
+  "description": "Brief description",
+  "goals": ["goal1", "goal2"]
+}`
+      }],
+    });
+    const content = response.content[0].type === 'text' ? response.content[0].text : '';
+
+    let parsed = null;
+    let parseError = null;
+    try {
+      parsed = JSON.parse(content.trim());
+    } catch (e1) {
+      const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        try {
+          parsed = JSON.parse(codeBlockMatch[1].trim());
+        } catch {
+          parseError = 'Failed to parse JSON from code block';
+        }
+      } else {
+        const objMatch = content.match(/\{[\s\S]*\}/);
+        if (objMatch) {
+          try {
+            parsed = JSON.parse(objMatch[0]);
+          } catch {
+            parseError = 'Failed to parse extracted JSON object';
+          }
+        } else {
+          parseError = 'No JSON object found in response';
+        }
+      }
+    }
+
+    diagnostics.tests.characterGeneration = {
+      status: parsed ? 'ok' : 'error',
+      latency: Date.now() - startTime,
+      model,
+      rawResponse: content.substring(0, 400),
+      parsedSuccessfully: !!parsed,
+      parseError,
+      parsedFields: parsed ? Object.keys(parsed) : null,
+    };
+  } catch (error: any) {
+    diagnostics.tests.characterGeneration = {
+      status: 'error',
+      error: error.message,
+      model,
+    };
+  }
+
+  // Calculate overall status
+  const testResults = Object.values(diagnostics.tests);
+  const allOk = testResults.every((t: any) => t.status === 'ok');
+  const anyError = testResults.some((t: any) => t.status === 'error');
+
+  diagnostics.overallStatus = allOk ? 'healthy' : anyError ? 'unhealthy' : 'degraded';
+  diagnostics.summary = {
+    total: testResults.length,
+    passed: testResults.filter((t: any) => t.status === 'ok').length,
+    failed: testResults.filter((t: any) => t.status === 'error').length,
+  };
+
+  const statusCode = diagnostics.overallStatus === 'healthy' ? 200 : 503;
+  res.status(statusCode).json(diagnostics);
+});
+
 export default router;
