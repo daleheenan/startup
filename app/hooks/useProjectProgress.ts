@@ -13,13 +13,33 @@ interface ProjectData {
   };
   story_bible?: {
     characters?: any[];
-    world?: {
+    // World can be either a flat array of WorldElement[] or an object with categories
+    world?: any[] | {
       locations?: any[];
       factions?: any[];
       systems?: any[];
     };
   };
   book_count?: number;
+}
+
+// Helper to count world elements regardless of structure
+function countWorldElements(world: any): number {
+  if (!world) return 0;
+  if (Array.isArray(world)) {
+    return world.length;
+  }
+  // Object with categories
+  return (
+    (world.locations?.length || 0) +
+    (world.factions?.length || 0) +
+    (world.systems?.length || 0)
+  );
+}
+
+// Helper to check if world has elements
+function hasWorldElements(world: any): boolean {
+  return countWorldElements(world) > 0;
 }
 
 interface BookData {
@@ -90,13 +110,7 @@ export function useProjectProgress(project: ProjectData | null, books: BookData[
     }
 
     // Check world building (has any world elements - optional)
-    const worldElements = project.story_bible?.world;
-    if (
-      worldElements &&
-      (worldElements.locations?.length ||
-        worldElements.factions?.length ||
-        worldElements.systems?.length)
-    ) {
+    if (hasWorldElements(project.story_bible?.world)) {
       completedSteps.push('world');
     }
 
@@ -135,15 +149,17 @@ export function useProjectProgress(project: ProjectData | null, books: BookData[
 
 export function useProjectNavigation(
   projectId: string,
-  project: ProjectData | null
+  project: ProjectData | null,
+  outline?: any // Optional outline data for completion check
 ): { projectId: string; tabs: any[] } {
   const tabs = useMemo(() => {
     const characterCount = project?.story_bible?.characters?.length || 0;
-    const worldElements = project?.story_bible?.world;
-    const worldCount =
-      (worldElements?.locations?.length || 0) +
-      (worldElements?.factions?.length || 0) +
-      (worldElements?.systems?.length || 0);
+    const worldCount = countWorldElements(project?.story_bible?.world);
+
+    // Determine completion status for required sections
+    const hasCharacters = characterCount > 0;
+    const hasWorld = worldCount > 0;
+    const hasOutline = outline && outline.structure?.acts?.length > 0;
 
     return [
       {
@@ -151,6 +167,7 @@ export function useProjectNavigation(
         label: 'Overview',
         route: '',
         icon: '📋',
+        status: 'neutral' as const,
       },
       {
         id: 'characters',
@@ -158,6 +175,8 @@ export function useProjectNavigation(
         route: '/characters',
         icon: '👥',
         badge: characterCount > 0 ? characterCount : undefined,
+        required: true,
+        status: hasCharacters ? 'completed' : 'required' as const,
       },
       {
         id: 'world',
@@ -165,39 +184,48 @@ export function useProjectNavigation(
         route: '/world',
         icon: '🌍',
         badge: worldCount > 0 ? worldCount : undefined,
+        required: false,
+        status: hasWorld ? 'completed' : 'optional' as const,
       },
       {
         id: 'outline',
         label: 'Outline',
         route: '/outline',
         icon: '📝',
+        required: true,
+        status: hasOutline ? 'completed' : 'required' as const,
       },
       {
         id: 'chapters',
         label: 'Chapters',
         route: '/progress',
         icon: '📖',
+        status: 'neutral' as const,
       },
       {
         id: 'plot',
         label: 'Plot',
         route: '/plot',
         icon: '📊',
+        required: false,
+        status: 'optional' as const,
       },
       {
         id: 'style',
         label: 'Style',
         route: '/prose-style',
         icon: '✨',
+        status: 'neutral' as const,
       },
       {
         id: 'analytics',
         label: 'Analytics',
         route: '/analytics',
         icon: '📈',
+        status: 'neutral' as const,
       },
     ];
-  }, [project]);
+  }, [project, outline]);
 
   return {
     projectId,

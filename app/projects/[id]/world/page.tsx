@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getToken, logout } from '../../../lib/auth';
+import ProjectNavigation from '../../../components/shared/ProjectNavigation';
+import { useProjectNavigation } from '../../../hooks/useProjectProgress';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -28,6 +30,10 @@ export default function WorldPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [project, setProject] = useState<any>(null);
+
+  // IMPORTANT: All hooks must be called before any early returns
+  const navigation = useProjectNavigation(projectId, project);
 
   useEffect(() => {
     fetchWorldElements();
@@ -51,11 +57,12 @@ export default function WorldPage() {
         throw new Error('Failed to fetch project');
       }
 
-      const project = await response.json();
-      if (project.story_bible?.world) {
-        setWorldElements(project.story_bible.world);
-        if (project.story_bible.world.length > 0) {
-          setSelectedElement(project.story_bible.world[0]);
+      const projectData = await response.json();
+      setProject(projectData);
+      if (projectData.story_bible?.world) {
+        setWorldElements(projectData.story_bible.world);
+        if (projectData.story_bible.world.length > 0) {
+          setSelectedElement(projectData.story_bible.world[0]);
         }
       }
     } catch (err: any) {
@@ -253,7 +260,7 @@ export default function WorldPage() {
             </p>
           </div>
           <Link
-            href={`/projects/${projectId}/characters`}
+            href={`/projects/${projectId}`}
             style={{
               padding: '0.5rem 1rem',
               color: '#64748B',
@@ -261,9 +268,12 @@ export default function WorldPage() {
               fontSize: '0.875rem',
             }}
           >
-            ← Back to Characters
+            ← Back to Project
           </Link>
         </header>
+
+        {/* Project Navigation */}
+        <ProjectNavigation projectId={projectId} tabs={navigation.tabs} />
 
         {/* Content Area */}
         <div style={{

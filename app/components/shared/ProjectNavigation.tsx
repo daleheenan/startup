@@ -5,10 +5,23 @@ import { usePathname } from 'next/navigation';
 import { colors, borderRadius } from '@/app/lib/constants';
 import type { ProjectNavigationTab } from '@/shared/types';
 
+interface ExtendedTab extends ProjectNavigationTab {
+  required?: boolean;
+  status?: 'required' | 'completed' | 'optional' | 'neutral';
+}
+
 interface ProjectNavigationProps {
   projectId: string;
-  tabs: ProjectNavigationTab[];
+  tabs: ExtendedTab[];
 }
+
+// Status indicator colors
+const STATUS_COLORS = {
+  required: '#DC2626', // Red - needs to be completed
+  completed: '#10B981', // Green - done
+  optional: '#94A3B8', // Gray - optional, not done
+  neutral: 'transparent', // No indicator
+};
 
 export default function ProjectNavigation({ projectId, tabs }: ProjectNavigationProps) {
   const pathname = usePathname();
@@ -48,6 +61,8 @@ export default function ProjectNavigation({ projectId, tabs }: ProjectNavigation
         {tabs.map((tab) => {
           const isActive = activeTabId === tab.id;
           const fullRoute = `/projects/${projectId}${tab.route}`;
+          const statusColor = tab.status ? STATUS_COLORS[tab.status] : 'transparent';
+          const showStatusIndicator = tab.status && tab.status !== 'neutral';
 
           return (
             <Link
@@ -58,7 +73,11 @@ export default function ProjectNavigation({ projectId, tabs }: ProjectNavigation
                 alignItems: 'center',
                 gap: '0.5rem',
                 padding: '0.75rem 1rem',
-                borderBottom: isActive ? `2px solid ${colors.brandText}` : '2px solid transparent',
+                borderBottom: isActive
+                  ? `2px solid ${colors.brandText}`
+                  : showStatusIndicator
+                    ? `2px solid ${statusColor}`
+                    : '2px solid transparent',
                 color: isActive ? colors.brandText : colors.textSecondary,
                 textDecoration: 'none',
                 fontSize: '0.875rem',
@@ -68,6 +87,12 @@ export default function ProjectNavigation({ projectId, tabs }: ProjectNavigation
                 position: 'relative',
               }}
               aria-current={isActive ? 'page' : undefined}
+              title={
+                tab.status === 'required' ? 'Required - not yet completed' :
+                tab.status === 'completed' ? 'Completed' :
+                tab.status === 'optional' ? 'Optional' :
+                undefined
+              }
             >
               {tab.icon && (
                 <span aria-hidden="true" style={{ fontSize: '1rem' }}>

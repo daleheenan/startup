@@ -5,6 +5,8 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import FlagsSummary from '../../../components/FlagsSummary';
 import { getToken, logout } from '../../../lib/auth';
+import ProjectNavigation from '../../../components/shared/ProjectNavigation';
+import { useProjectNavigation } from '../../../hooks/useProjectProgress';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -67,6 +69,10 @@ export default function ProgressPage() {
   const [progress, setProgress] = useState<ProgressData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [project, setProject] = useState<any>(null);
+
+  // IMPORTANT: All hooks must be called before any early returns
+  const navigation = useProjectNavigation(projectId, project);
 
   useEffect(() => {
     if (projectId) {
@@ -106,14 +112,15 @@ export default function ProgressPage() {
 
         if (!projectRes.ok) throw new Error('Failed to fetch project');
 
-        const project = await projectRes.json();
+        const projectData = await projectRes.json();
+        setProject(projectData);
         const queue = queueRes.ok ? await queueRes.json() : { queue: { pending: 0, running: 0, completed: 0, paused: 0 } };
 
         setProgress({
           project: {
-            id: project.id,
-            title: project.title,
-            status: project.status,
+            id: projectData.id,
+            title: projectData.title,
+            status: projectData.status,
           },
           chapters: {
             total: 0,
@@ -267,6 +274,9 @@ export default function ProgressPage() {
             ← Back to Project
           </Link>
         </header>
+
+        {/* Project Navigation */}
+        <ProjectNavigation projectId={projectId} tabs={navigation.tabs} />
 
         {/* Content Area */}
         <div style={{

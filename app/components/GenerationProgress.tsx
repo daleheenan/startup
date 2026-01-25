@@ -46,6 +46,7 @@ export default function GenerationProgress({
 }: GenerationProgressProps) {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [messageIndex, setMessageIndex] = useState(0);
+  const [simulatedWordCount, setSimulatedWordCount] = useState(0);
   const startTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -53,6 +54,7 @@ export default function GenerationProgress({
       startTimeRef.current = Date.now();
       setElapsedTime(0);
       setMessageIndex(0);
+      setSimulatedWordCount(0);
 
       const timer = setInterval(() => {
         if (startTimeRef.current) {
@@ -64,19 +66,34 @@ export default function GenerationProgress({
         setMessageIndex((prev) => (prev + 1) % MESSAGES.length);
       }, 4000);
 
+      // Simulate word count progress - increases every 5 seconds
+      const wordCountTimer = setInterval(() => {
+        if (targetWordCount > 0) {
+          setSimulatedWordCount((prev) => {
+            // Simulate generating outline words at ~500 words per 5 seconds
+            // but cap at 95% of target to not give false completion signals
+            const increment = Math.floor(Math.random() * 300 + 400);
+            const maxSimulated = Math.floor(targetWordCount * 0.15); // Outline is ~15% of final target
+            return Math.min(prev + increment, maxSimulated);
+          });
+        }
+      }, 5000);
+
       return () => {
         clearInterval(timer);
         clearInterval(messageTimer);
+        clearInterval(wordCountTimer);
       };
     } else {
       startTimeRef.current = null;
     }
-  }, [isActive]);
+  }, [isActive, targetWordCount]);
 
   if (!isActive && !error) return null;
 
   const progress = Math.min((elapsedTime / estimatedTime) * 100, 95);
   const displayMessage = currentStep || MESSAGES[messageIndex];
+  const displayWordCount = wordCount > 0 ? wordCount : simulatedWordCount;
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -258,7 +275,7 @@ export default function GenerationProgress({
               </div>
 
               {/* Word Count Progress */}
-              {(wordCount > 0 || targetWordCount > 0) && (
+              {(displayWordCount > 0 || targetWordCount > 0) && (
                 <div
                   style={{
                     display: 'flex',
@@ -270,8 +287,8 @@ export default function GenerationProgress({
                   }}
                 >
                   <span>
-                    {wordCount.toLocaleString()} words
-                    {targetWordCount > 0 && ` / ${targetWordCount.toLocaleString()} target`}
+                    {displayWordCount > 0 ? `~${displayWordCount.toLocaleString()} outline words` : ''}
+                    {targetWordCount > 0 && ` (${targetWordCount.toLocaleString()} final target)`}
                   </span>
                 </div>
               )}

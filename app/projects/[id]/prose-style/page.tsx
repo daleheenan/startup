@@ -1,8 +1,12 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import ProjectNavigation from '../../../components/shared/ProjectNavigation';
+import { useProjectNavigation } from '../../../hooks/useProjectProgress';
+import { fetchJson } from '../../../lib/fetch-utils';
 
 // Lazy load ProseStyleEditor - large editor component
 const ProseStyleEditor = dynamic(() => import('../../../components/ProseStyleEditor'), {
@@ -17,30 +21,96 @@ const ProseStyleEditor = dynamic(() => import('../../../components/ProseStyleEdi
 export default function ProseStylePage() {
   const params = useParams();
   const projectId = params.id as string;
+  const [project, setProject] = useState<any>(null);
+
+  // IMPORTANT: All hooks must be called before any early returns
+  const navigation = useProjectNavigation(projectId, project);
+
+  useEffect(() => {
+    fetchJson(`/api/projects/${projectId}`).then(setProject).catch(console.error);
+  }, [projectId]);
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f5f5f5' }}>
-      {/* Navigation */}
-      <nav style={{
-        background: 'white',
-        borderBottom: '1px solid #ddd',
-        padding: '16px 24px',
-        marginBottom: '24px'
+    <div style={{
+      display: 'flex',
+      minHeight: '100vh',
+      background: '#F8FAFC',
+    }}>
+      {/* Left Sidebar */}
+      <aside style={{
+        width: '72px',
+        background: '#FFFFFF',
+        borderRight: '1px solid #E2E8F0',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: '1.5rem 0',
       }}>
         <Link
-          href={`/projects/${projectId}`}
+          href="/projects"
           style={{
-            color: '#2196F3',
+            width: '40px',
+            height: '40px',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            borderRadius: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#FFFFFF',
+            fontWeight: '700',
+            fontSize: '1.25rem',
             textDecoration: 'none',
-            fontWeight: '500'
           }}
         >
-          ← Back to Project
+          N
         </Link>
-      </nav>
+      </aside>
 
       {/* Main Content */}
-      <ProseStyleEditor projectId={projectId} />
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        {/* Top Bar */}
+        <header style={{
+          padding: '1rem 2rem',
+          background: '#FFFFFF',
+          borderBottom: '1px solid #E2E8F0',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}>
+          <div>
+            <h1 style={{
+              fontSize: '1.5rem',
+              fontWeight: '700',
+              color: '#1A1A2E',
+              margin: 0,
+            }}>
+              Prose Style
+            </h1>
+            <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
+              {project?.title || 'Loading...'}
+            </p>
+          </div>
+          <Link
+            href={`/projects/${projectId}`}
+            style={{
+              padding: '0.5rem 1rem',
+              color: '#64748B',
+              textDecoration: 'none',
+              fontSize: '0.875rem',
+            }}
+          >
+            ← Back to Project
+          </Link>
+        </header>
+
+        {/* Project Navigation */}
+        <ProjectNavigation projectId={projectId} tabs={navigation.tabs} />
+
+        {/* Main Content */}
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          <ProseStyleEditor projectId={projectId} />
+        </div>
+      </main>
     </div>
   );
 }

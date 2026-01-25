@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getToken, logout } from '../../../lib/auth';
 import GenerationProgress from '../../../components/GenerationProgress';
+import ProjectNavigation from '../../../components/shared/ProjectNavigation';
+import { useProjectNavigation } from '../../../hooks/useProjectProgress';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -93,6 +95,9 @@ export default function OutlinePage() {
   const [error, setError] = useState<string | null>(null);
   const [expandedChapter, setExpandedChapter] = useState<number | null>(null);
   const [generationStep, setGenerationStep] = useState<string>('');
+
+  // IMPORTANT: All hooks must be called before any early returns
+  const navigation = useProjectNavigation(projectId, project, outline);
 
   useEffect(() => {
     if (projectId) {
@@ -389,6 +394,9 @@ export default function OutlinePage() {
             ← Back to Project
           </Link>
         </header>
+
+        {/* Project Navigation */}
+        <ProjectNavigation projectId={projectId} tabs={navigation.tabs} />
 
         {/* Content Area */}
         <div style={{
@@ -746,6 +754,7 @@ export default function OutlinePage() {
               currentStep={generationStep}
               estimatedTime={90}
               error={error}
+              targetWordCount={targetWordCount}
               onCancel={() => {
                 setIsGenerating(false);
                 setError(null);
