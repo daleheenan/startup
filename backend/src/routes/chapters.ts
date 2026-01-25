@@ -7,11 +7,21 @@ import { sendBadRequest, sendNotFound, sendInternalError } from '../utils/respon
 
 const router = Router();
 
+function safeJsonParse(jsonString: string | null | undefined, fallback: any = []): any {
+  if (!jsonString) return fallback;
+  try {
+    return JSON.parse(jsonString);
+  } catch (error) {
+    console.error('[Chapters] JSON parse error:', error);
+    return fallback;
+  }
+}
+
 function parseChapterRow(row: any) {
   return {
     ...row,
-    scene_cards: row.scene_cards ? JSON.parse(row.scene_cards) : [],
-    flags: row.flags ? JSON.parse(row.flags) : [],
+    scene_cards: safeJsonParse(row.scene_cards, []),
+    flags: safeJsonParse(row.flags, []),
   };
 }
 
@@ -129,11 +139,12 @@ router.put('/:id', (req, res) => {
       updates.push('content = ?');
       params.push(content);
 
-      if (content) {
-        const wordCount = content.split(/\s+/).length;
-        updates.push('word_count = ?');
-        params.push(wordCount);
-      }
+      // Calculate word count - handle empty/whitespace-only content correctly
+      const wordCount = content
+        ? content.split(/\s+/).filter((w: string) => w.length > 0).length
+        : 0;
+      updates.push('word_count = ?');
+      params.push(wordCount);
     }
 
     if (summary !== undefined) {

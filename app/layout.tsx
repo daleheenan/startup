@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { ToastProvider } from './components/shared/Toast'
 
 export const metadata: Metadata = {
   title: 'NovelForge - AI-Powered Novel Writing',
@@ -18,7 +19,9 @@ export default function RootLayout({
         backgroundColor: '#F8FAFC',
         color: '#1A1A2E'
       }}>
-        {children}
+        <ToastProvider>
+          {children}
+        </ToastProvider>
       </body>
     </html>
   )

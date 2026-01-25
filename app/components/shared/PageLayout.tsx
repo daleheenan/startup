@@ -25,10 +25,46 @@ export default function PageLayout({
       minHeight: '100vh',
       background: colors.background,
     }}>
+      {/* Skip link for accessibility */}
+      <a
+        href="#main-content"
+        style={{
+          position: 'absolute',
+          left: '-9999px',
+          top: 'auto',
+          width: '1px',
+          height: '1px',
+          overflow: 'hidden',
+        }}
+        onFocus={(e) => {
+          e.currentTarget.style.left = '1rem';
+          e.currentTarget.style.top = '1rem';
+          e.currentTarget.style.width = 'auto';
+          e.currentTarget.style.height = 'auto';
+          e.currentTarget.style.padding = '1rem';
+          e.currentTarget.style.background = colors.brandStart;
+          e.currentTarget.style.color = 'white';
+          e.currentTarget.style.borderRadius = '4px';
+          e.currentTarget.style.zIndex = '9999';
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.left = '-9999px';
+          e.currentTarget.style.width = '1px';
+          e.currentTarget.style.height = '1px';
+        }}
+      >
+        Skip to main content
+      </a>
+
       {/* Left Sidebar */}
-      <aside style={sidebar}>
+      <aside
+        style={sidebar}
+        aria-label="Main navigation"
+        role="navigation"
+      >
         <Link
           href="/projects"
+          aria-label="NovelForge Home - Go to Projects"
           style={{
             width: '40px',
             height: '40px',
@@ -43,14 +79,18 @@ export default function PageLayout({
             textDecoration: 'none',
           }}
         >
-          N
+          <span aria-hidden="true">N</span>
         </Link>
       </aside>
 
       {/* Main Content */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <main
+        id="main-content"
+        style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
+        role="main"
+      >
         {/* Top Bar */}
-        <header style={header}>
+        <header style={header} role="banner">
           <div>
             <h1 style={pageTitle}>{title}</h1>
             {subtitle && <p style={pageSubtitle}>{subtitle}</p>}
@@ -58,6 +98,7 @@ export default function PageLayout({
           {backLink && (
             <Link
               href={backLink}
+              aria-label={`Navigate back: ${backText.replace('←', '').trim()}`}
               style={{
                 padding: '0.5rem 1rem',
                 color: colors.textSecondary,

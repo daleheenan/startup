@@ -19,6 +19,8 @@ interface Project {
   status: string;
   story_dna: any;
   story_bible: any;
+  series_bible: any;
+  book_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -265,6 +267,25 @@ export default function ProjectDetailPage() {
                     }}
                   >
                     Create Story Outline →
+                  </Link>
+                )}
+                {(project.type === 'trilogy' || (project.book_count && project.book_count > 1)) && (
+                  <Link
+                    href={`/projects/${project.id}/series`}
+                    style={{
+                      display: 'block',
+                      padding: '1rem',
+                      background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+                      border: 'none',
+                      borderRadius: '8px',
+                      color: '#fff',
+                      textAlign: 'center',
+                      textDecoration: 'none',
+                      fontSize: '1rem',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Series Management {project.series_bible ? '✓' : ''} →
                   </Link>
                 )}
               </div>
