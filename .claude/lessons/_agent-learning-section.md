@@ -6,75 +6,56 @@ This is the standard section to append to all agents. Copy everything below the 
 
 ## Self-Reinforcement Learning
 
-This agent uses a lessons learned system for continuous improvement. Follow these steps for every task.
+This agent uses a lessons learned system for continuous improvement. **Context is precious** - load only relevant lessons, record only valuable insights.
 
-### Pre-Task: Load Lessons
+### Pre-Task: Selective Lesson Loading
 
-Before starting any task:
+Before starting any task, load lessons **selectively** (not exhaustively):
 
-1. **Read your lessons file**: `.claude/lessons/{agent-name}.lessons.md`
-   - If it doesn't exist, that's OK - you'll create it after your first task
-   - Focus on "Proven Lessons" section first (score >= 5)
-   - Then scan "Active Lessons" for relevant entries
+1. **Read ONLY the Proven Lessons section** from your lessons file: `.claude/lessons/{agent-name}.lessons.md`
+   - Skip lessons with score < 3 unless directly relevant to current task
+   - Don't load the entire file - focus on proven, high-value lessons
 
-2. **Read shared lessons**: `.claude/lessons/shared.lessons.md`
-   - Always read the "Foundational Lessons" section
-   - Scan "Active Lessons" for anything relevant to your task
+2. **Read ONLY the Foundational Lessons section** from shared lessons: `.claude/lessons/shared.lessons.md`
+   - These are universal truths with score >= 10
+   - Skip Active Lessons unless specifically relevant
 
-3. **Search for relevant lessons** by task type:
-   ```bash
-   grep -r "#relevant-tag" .claude/lessons/
-   ```
+3. **For specific task types**, optionally check ONE relevant cross-agent file:
 
-4. **Note applicable lessons**: Mentally note which lessons apply to your current task
+   | Your Task Type | Check ONE of these |
+   |----------------|-------------------|
+   | Bug fixing | `bug-hunter` |
+   | Security work | `security-hardener` |
+   | Testing | `qa-test-engineer` |
+   | Architecture | `architect` |
+   | Deployment | `deployer` |
 
-5. **Check cross-agent lessons** using this lookup table:
-
-   | Your Task Type | Read These Lesson Files |
-   |----------------|------------------------|
-   | Bug fixing | `bug-hunter`, `developer`, `code-reviewer` |
-   | New feature | `developer`, `architect`, `code-reviewer` |
-   | Security audit | `security-hardener`, `pen-test` |
-   | Testing | `qa-test-engineer`, `qa-tester`, `developer` |
-   | Code review | `code-reviewer`, `code-quality-inspector` |
-   | Architecture | `architect`, `software-architect-designer` |
-   | Performance | `code-optimizer`, `architect` |
-   | Project planning | `project-director`, `agile-product-strategist` |
+**NEVER read _archived.lessons.md** - those lessons are archived for a reason.
 
 ### During Task: Apply and Track
 
 As you work:
+1. Apply relevant lessons proactively
+2. Note when a lesson actually helps (for score increment)
+3. Note genuinely new insights (not obvious things)
 
-1. **Apply relevant lessons** proactively
-2. **When a lesson helps**, make a note to increment its score
-3. **When you discover something new**, note it for post-task reflection
-4. **When you make a mistake**, note what went wrong
+### Post-Task: Selective Recording
 
-### Post-Task: Reflect and Record
+**Only record a lesson if it meets ALL these criteria:**
 
-After completing each task, perform a lessons learned reflection:
+| Criterion | Test |
+|-----------|------|
+| **Specific** | Does it say exactly what to do? (Not "be careful") |
+| **Actionable** | Can another agent follow this guidance? |
+| **Reusable** | Will this apply to future tasks? (Not one-time) |
+| **Non-obvious** | Would a competent agent not already know this? |
+| **Verified** | Did you actually experience this? (Not theory) |
 
-#### Step 1: Reflect (30 seconds)
+If ANY criterion fails, **do not record the lesson**.
 
-Ask yourself:
-- What was challenging about this task?
-- What worked well that I should repeat?
-- What didn't work that I should avoid?
-- Did I apply any existing lessons? Did they help?
-- What would I do differently next time?
+#### Recording a Lesson
 
-#### Step 2: Update Scores
-
-For each lesson you successfully applied:
-1. Read the lesson file
-2. Find the lesson entry
-3. Increment the `**Application Score**` by 1
-4. If score reaches 5, move to "Proven Lessons" section
-5. If score reaches 10 and universally applicable, consider adding to `shared.lessons.md`
-
-#### Step 3: Record New Lesson (if applicable)
-
-If you learned something new, append a lesson to your lessons file:
+If all criteria pass, append to your lessons file:
 
 ```markdown
 ### YYYY-MM-DD | Task: {Brief Task Description}
@@ -84,52 +65,42 @@ If you learned something new, append a lesson to your lessons file:
 **Context**: What was the environment/situation?
 
 **What Worked Well**:
-- Specific successful approach or technique
-- Tool or pattern that helped
+- Specific successful approach (be precise)
 
 **What Didn't Work**:
-- Specific challenge or mistake made
-- Time wasted on wrong approach
+- Specific challenge (what to avoid)
 
-**Lesson**: Clear, actionable insight in 1-3 sentences.
+**Lesson**: One clear, actionable takeaway. If you can't state it in 1-2 sentences, it's too vague.
 
 **Application Score**: 0
 
-**Tags**: #relevant #tags #here
+**Tags**: #specific #tags
 ```
 
-#### Step 4: Update Statistics
+#### Update Scores for Applied Lessons
 
-Update the Summary Statistics at the top of your lessons file:
-- Increment "Total tasks completed"
-- Increment "Total lessons recorded" if you added a lesson
-- Update "Last updated" date
-- Recalculate "Proven lessons" count if any crossed threshold
+When a lesson helps you, increment its score. This is critical for curation:
+- Score 0-2: Active, unproven
+- Score 3-4: Validated, worth keeping
+- Score 5-9: Proven, high value
+- Score 10+: Foundational, universal
 
-#### Step 5: Cross-Agent Lessons
+### Lesson Quality Bar
 
-If your lesson applies to other agents or is universally valuable:
-1. Consider adding to `shared.lessons.md`
-2. Note in the lesson: `**Cross-Agent Relevance**: [which agents]`
+**GOOD lesson example:**
+> "When modifying SQLite queries, always run `EXPLAIN QUERY PLAN` to verify indexes are used. Queries without index hits on large tables cause timeouts."
 
-### Lesson Quality Guidelines
-
-**Good lessons are:**
-- **Specific**: Not "be careful" but "always check X before Y"
-- **Actionable**: Clear guidance on what to do
-- **Contextual**: Explains when it applies
-- **Verified**: Based on actual experience
-
-**Bad lessons are:**
-- Too vague ("code should be good")
-- Too specific (only applies to one exact situation)
-- Unverified (theory without experience)
+**BAD lesson examples (do NOT record):**
+- "Be careful with database queries" (too vague)
+- "Fixed the bug in users.ts line 42" (too specific, one-time)
+- "Always test your code" (obvious)
+- "TypeScript is useful for catching errors" (not actionable)
 
 ### Maintenance
 
-When your lessons file exceeds 50 active lessons:
-1. Archive the oldest 10 lessons with score < 3
-2. Merge similar lessons
-3. Review and prune irrelevant lessons
+When your lessons file exceeds **25 active lessons**:
+1. Request curation from `lessons-curator` agent
+2. Or manually archive lessons with score < 3 to `_archived.lessons.md`
+3. Never keep lessons that haven't been applied after 10+ tasks
 
-See `.claude/lessons/_maintenance.md` for detailed maintenance procedures.
+See `.claude/lessons/_maintenance.md` for detailed procedures.
