@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getToken } from '../lib/auth';
+import { AUTHOR_STYLES, getRecommendedAuthors, AuthorStyle } from '../../shared/author-styles';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -38,6 +39,8 @@ export interface StoryPreferences {
   universeId?: string; // Link to existing universe
   sourceProjectId?: string; // Create universe from this project
   timeGapFromSource?: string; // e.g., "5 years later"
+  // Author style reference
+  authorStyleId?: string; // ID of author style to emulate
 }
 
 interface SourceProject {
@@ -372,6 +375,195 @@ const COMMON_THEMES = [
   { value: 'Greed and Generosity', description: 'Selfishness versus selflessness, material versus spiritual wealth' },
 ];
 
+// Popular genre combination recipes - pre-defined combinations that work well
+interface GenreRecipe {
+  id: string;
+  name: string;
+  description: string;
+  genres: string[];
+  subgenres: string[];
+  modifiers: string[];
+  tones: string[];
+  themes: string[];
+  icon: string;
+  popularity: 'hot' | 'popular' | 'niche';
+}
+
+const GENRE_RECIPES: GenreRecipe[] = [
+  {
+    id: 'romantasy-classic',
+    name: 'Romantasy',
+    description: 'Fantasy romance with magical courts and forbidden love',
+    genres: ['romantasy'],
+    subgenres: ['Fae Romance'],
+    modifiers: ['romantic'],
+    tones: ['Romantic and Passionate', 'Epic and Grand'],
+    themes: ['Forbidden Love', 'Power and Corruption'],
+    icon: '💕✨',
+    popularity: 'hot',
+  },
+  {
+    id: 'cozy-mystery',
+    name: 'Cozy Fantasy Mystery',
+    description: 'Low-stakes magical mysteries in charming settings',
+    genres: ['cozy-fantasy', 'mystery'],
+    subgenres: ['Cozy Mystery Fantasy', 'Cozy Mystery'],
+    modifiers: [],
+    tones: ['Light and Humorous', 'Mysterious and Suspenseful'],
+    themes: ['Secrets and Lies', 'Family and Loyalty'],
+    icon: '🍵🔍',
+    popularity: 'hot',
+  },
+  {
+    id: 'space-opera-romance',
+    name: 'Sci-Fi Romance',
+    description: 'Love among the stars with epic space adventures',
+    genres: ['science-fiction', 'romance'],
+    subgenres: ['Space Opera', 'Slow Burn'],
+    modifiers: ['romantic', 'adventure'],
+    tones: ['Epic and Grand', 'Romantic and Passionate'],
+    themes: ['Love and Sacrifice', 'Survival'],
+    icon: '🚀💫',
+    popularity: 'popular',
+  },
+  {
+    id: 'dark-academia',
+    name: 'Dark Academia Thriller',
+    description: 'Sinister secrets at prestigious institutions',
+    genres: ['thriller', 'mystery'],
+    subgenres: ['Psychological Thriller', 'Whodunit'],
+    modifiers: ['dark', 'psychological'],
+    tones: ['Dark and Gritty', 'Mysterious and Suspenseful'],
+    themes: ['Secrets and Lies', 'Ambition and Hubris'],
+    icon: '📚🖤',
+    popularity: 'popular',
+  },
+  {
+    id: 'epic-grimdark',
+    name: 'Epic Grimdark Fantasy',
+    description: 'Brutal, morally grey epic fantasy with political intrigue',
+    genres: ['grimdark', 'fantasy'],
+    subgenres: ['Grimdark Fantasy', 'Epic Fantasy'],
+    modifiers: ['political', 'military', 'dark'],
+    tones: ['Dark and Gritty', 'Epic and Grand'],
+    themes: ['Power and Corruption', 'Betrayal and Trust'],
+    icon: '⚔️🩸',
+    popularity: 'popular',
+  },
+  {
+    id: 'litrpg-cultivation',
+    name: 'Progression Fantasy',
+    description: 'Power growth, leveling systems, and cultivation',
+    genres: ['litrpg', 'fantasy'],
+    subgenres: ['Progression Fantasy', 'Cultivation'],
+    modifiers: ['action', 'adventure'],
+    tones: ['Epic and Grand', 'Tense and Fast-Paced'],
+    themes: ['Identity and Self-Discovery', 'Survival'],
+    icon: '⚔️📈',
+    popularity: 'popular',
+  },
+  {
+    id: 'historical-romance',
+    name: 'Historical Romance',
+    description: 'Sweeping love stories set in bygone eras',
+    genres: ['historical', 'romance'],
+    subgenres: ['Victorian Era', 'Historical Romance'],
+    modifiers: ['romantic'],
+    tones: ['Romantic and Passionate', 'Epic and Grand'],
+    themes: ['Forbidden Love', 'Class and Society'],
+    icon: '👗💕',
+    popularity: 'popular',
+  },
+  {
+    id: 'supernatural-thriller',
+    name: 'Supernatural Thriller',
+    description: 'Fast-paced horror with relentless supernatural threats',
+    genres: ['horror', 'thriller'],
+    subgenres: ['Supernatural Horror', 'Action Thriller'],
+    modifiers: ['action', 'dark'],
+    tones: ['Tense and Fast-Paced', 'Dark and Gritty'],
+    themes: ['Survival', 'Good vs Evil'],
+    icon: '👻⚡',
+    popularity: 'popular',
+  },
+  {
+    id: 'solarpunk-hopeful',
+    name: 'Hopepunk Solarpunk',
+    description: 'Optimistic eco-futures with community and hope',
+    genres: ['solarpunk'],
+    subgenres: ['Eco-Utopia', 'Community-Focused SF'],
+    modifiers: ['adventure'],
+    tones: ['Hopeful and Uplifting', 'Whimsical and Fantastical'],
+    themes: ['Nature vs Technology', 'Family and Loyalty'],
+    icon: '🌱☀️',
+    popularity: 'niche',
+  },
+  {
+    id: 'afrofuturist-epic',
+    name: 'Afrofuturist Epic',
+    description: 'African diaspora perspectives in sweeping speculative narratives',
+    genres: ['afrofuturism', 'fantasy'],
+    subgenres: ['Afrofuturist Fantasy', 'African Mythology SF'],
+    modifiers: ['epic'],
+    tones: ['Epic and Grand', 'Hopeful and Uplifting'],
+    themes: ['Legacy and Heritage', 'Identity and Self-Discovery'],
+    icon: '🌍✨',
+    popularity: 'niche',
+  },
+  {
+    id: 'wuxia-romance',
+    name: 'Martial Arts Romance',
+    description: 'Love and honor among martial artists',
+    genres: ['wuxia', 'romance'],
+    subgenres: ['Wuxia Romance', 'Slow Burn'],
+    modifiers: ['action', 'romantic'],
+    tones: ['Epic and Grand', 'Romantic and Passionate'],
+    themes: ['Love and Sacrifice', 'Forbidden Love'],
+    icon: '🥋💕',
+    popularity: 'niche',
+  },
+  {
+    id: 'weird-horror',
+    name: 'Cosmic Weird Horror',
+    description: 'Reality-bending horror with cosmic dread',
+    genres: ['new-weird', 'horror'],
+    subgenres: ['Weird Horror', 'Cosmic Horror'],
+    modifiers: ['psychological', 'dark'],
+    tones: ['Dark and Gritty', 'Melancholic and Reflective'],
+    themes: ['Fate vs Free Will', 'Isolation and Connection'],
+    icon: '👁️🌀',
+    popularity: 'niche',
+  },
+];
+
+// Genre compatibility suggestions - which genres work well together
+const GENRE_COMPATIBILITY: Record<string, string[]> = {
+  'fantasy': ['romance', 'mystery', 'horror', 'historical'],
+  'science-fiction': ['thriller', 'mystery', 'horror', 'romance'],
+  'romance': ['fantasy', 'mystery', 'historical', 'contemporary'],
+  'mystery': ['thriller', 'historical', 'romance', 'horror'],
+  'thriller': ['mystery', 'science-fiction', 'horror', 'romance'],
+  'horror': ['mystery', 'thriller', 'fantasy', 'science-fiction'],
+  'historical': ['romance', 'mystery', 'fantasy', 'literary'],
+  'literary': ['contemporary', 'historical', 'romance'],
+  'contemporary': ['romance', 'literary', 'mystery', 'thriller'],
+  'western': ['romance', 'mystery', 'historical'],
+  'romantasy': ['cozy-fantasy', 'fantasy'],
+  'cozy-fantasy': ['romantasy', 'mystery'],
+  'grimdark': ['fantasy', 'science-fiction'],
+  'litrpg': ['fantasy', 'science-fiction'],
+  'afrofuturism': ['science-fiction', 'fantasy'],
+  'climate-fiction': ['science-fiction', 'thriller'],
+  'solarpunk': ['science-fiction', 'romance'],
+  'steampunk': ['mystery', 'romance', 'fantasy'],
+  'new-weird': ['horror', 'fantasy', 'science-fiction'],
+  'paranormal': ['romance', 'mystery', 'thriller'],
+  'wuxia': ['fantasy', 'romance'],
+  'legal-drama': ['thriller', 'romance', 'mystery'],
+  'medical-drama': ['romance', 'thriller', 'mystery'],
+  'sports-fiction': ['romance', 'contemporary'],
+};
+
 export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePreferenceFormProps) {
   const [genres, setGenres] = useState<string[]>([]);
   const [subgenres, setSubgenres] = useState<string[]>([]);
@@ -383,6 +575,21 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
   const [additionalNotes, setAdditionalNotes] = useState('');
   const [customIdeas, setCustomIdeas] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // UX improvements state
+  const [genreSearch, setGenreSearch] = useState('');
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    classic: true,
+    specialist: true,
+    modifiers: true,
+    tones: true,
+    themes: true,
+  });
+  const [showRecipes, setShowRecipes] = useState(false);
+
+  // Author style state
+  const [selectedAuthorStyle, setSelectedAuthorStyle] = useState<string | null>(null);
+  const [showAllAuthors, setShowAllAuthors] = useState(false);
 
   // Project structure state
   const [projectType, setProjectType] = useState<'standalone' | 'trilogy' | 'series'>('standalone');
@@ -465,6 +672,16 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
     setThemes(preset.themes || []);
     setCustomTheme(preset.custom_theme || '');
     setTargetLength(preset.target_length || 80000);
+    setErrors({});
+  };
+
+  // Apply a genre recipe
+  const applyRecipe = (recipe: GenreRecipe) => {
+    setGenres(recipe.genres);
+    setSubgenres(recipe.subgenres);
+    setModifiers(recipe.modifiers);
+    setTones(recipe.tones);
+    setThemes(recipe.themes);
     setErrors({});
   };
 
@@ -585,6 +802,63 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
   // Get available subgenres based on selected genres
   const availableSubgenres: SubgenreOption[] = genres.flatMap(g => SUBGENRES[g] || []);
 
+  // Toggle section expansion
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  // Filter genres based on search
+  const filterGenres = (genreList: typeof CLASSIC_GENRES) => {
+    if (!genreSearch.trim()) return genreList;
+    const search = genreSearch.toLowerCase();
+    return genreList.filter(g =>
+      g.label.toLowerCase().includes(search) ||
+      g.description.toLowerCase().includes(search) ||
+      g.value.toLowerCase().includes(search)
+    );
+  };
+
+  // Get recommended genres based on current selection
+  const getRecommendedGenres = (): string[] => {
+    if (genres.length === 0) return [];
+    const recommendations = new Set<string>();
+    genres.forEach(g => {
+      const compatible = GENRE_COMPATIBILITY[g] || [];
+      compatible.forEach(c => {
+        if (!genres.includes(c)) {
+          recommendations.add(c);
+        }
+      });
+    });
+    return Array.from(recommendations).slice(0, 3);
+  };
+
+  // Clear all selections in a category
+  const clearSelection = (category: 'genres' | 'subgenres' | 'modifiers' | 'tones' | 'themes') => {
+    switch (category) {
+      case 'genres':
+        setGenres([]);
+        setSubgenres([]);
+        break;
+      case 'subgenres':
+        setSubgenres([]);
+        break;
+      case 'modifiers':
+        setModifiers([]);
+        break;
+      case 'tones':
+        setTones([]);
+        break;
+      case 'themes':
+        setThemes([]);
+        break;
+    }
+  };
+
+  const recommendedGenres = getRecommendedGenres();
+  const filteredClassicGenres = filterGenres(CLASSIC_GENRES);
+  const filteredSpecialistGenres = filterGenres(SPECIALIST_GENRES);
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
@@ -635,6 +909,8 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
       universeId: useExistingUniverse && universeSource === 'universe' ? selectedUniverseId : undefined,
       sourceProjectId: useExistingUniverse && universeSource === 'project' ? selectedSourceProjectId : undefined,
       timeGapFromSource: useExistingUniverse && timeGapFromSource.trim() ? timeGapFromSource.trim() : undefined,
+      // Author style reference
+      authorStyleId: selectedAuthorStyle || undefined,
     };
 
     onSubmit(preferences);
@@ -926,6 +1202,340 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
             </span>
           )}
         </div>
+      </div>
+
+      {/* Genre Combination Recipes */}
+      <div style={{
+        ...sectionStyle,
+        padding: '1rem',
+        background: '#FFF7ED',
+        border: '1px solid #FDBA74',
+        borderRadius: '8px',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+          <label style={{ ...labelStyle, marginBottom: 0 }}>
+            Genre Recipes
+            <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Popular combinations)</span>
+          </label>
+          <button
+            type="button"
+            onClick={() => setShowRecipes(!showRecipes)}
+            style={{
+              padding: '0.375rem 0.75rem',
+              background: '#FFFFFF',
+              border: '1px solid #E2E8F0',
+              borderRadius: '6px',
+              color: '#64748B',
+              fontSize: '0.75rem',
+              cursor: 'pointer',
+            }}
+          >
+            {showRecipes ? 'Hide' : 'Show'} Recipes
+          </button>
+        </div>
+
+        {showRecipes && (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+            gap: '0.75rem',
+          }}>
+            {GENRE_RECIPES.map(recipe => (
+              <button
+                key={recipe.id}
+                type="button"
+                onClick={() => applyRecipe(recipe)}
+                disabled={isLoading}
+                style={{
+                  padding: '0.75rem',
+                  background: '#FFFFFF',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '8px',
+                  textAlign: 'left',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                  <span style={{ fontSize: '1.25rem' }}>{recipe.icon}</span>
+                  <span style={{ fontWeight: 600, fontSize: '0.875rem', color: '#1A1A2E' }}>
+                    {recipe.name}
+                  </span>
+                  {recipe.popularity === 'hot' && (
+                    <span style={{
+                      fontSize: '0.625rem',
+                      background: '#EF4444',
+                      color: '#fff',
+                      padding: '0.125rem 0.375rem',
+                      borderRadius: '4px',
+                      fontWeight: 600,
+                    }}>🔥 HOT</span>
+                  )}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#64748B', lineHeight: 1.4 }}>
+                  {recipe.description}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {!showRecipes && (
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {GENRE_RECIPES.filter(r => r.popularity === 'hot').slice(0, 4).map(recipe => (
+              <button
+                key={recipe.id}
+                type="button"
+                onClick={() => applyRecipe(recipe)}
+                disabled={isLoading}
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  background: '#FFFFFF',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '6px',
+                  fontSize: '0.813rem',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.375rem',
+                }}
+              >
+                <span>{recipe.icon}</span>
+                <span style={{ fontWeight: 500 }}>{recipe.name}</span>
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setShowRecipes(true)}
+              style={{
+                padding: '0.5rem 0.75rem',
+                background: 'transparent',
+                border: '1px dashed #94A3B8',
+                borderRadius: '6px',
+                color: '#64748B',
+                fontSize: '0.813rem',
+                cursor: 'pointer',
+              }}
+            >
+              +{GENRE_RECIPES.length - 4} more...
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Published Author Style Library */}
+      <div style={{
+        ...sectionStyle,
+        padding: '1rem',
+        background: '#F0FDF4',
+        border: '1px solid #BBF7D0',
+        borderRadius: '8px',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+          <label style={{ ...labelStyle, marginBottom: 0 }}>
+            Author Style Reference
+            <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Optional - emulate a famous author's style)</span>
+          </label>
+          {selectedAuthorStyle && (
+            <button
+              type="button"
+              onClick={() => setSelectedAuthorStyle(null)}
+              style={{
+                padding: '0.25rem 0.5rem',
+                background: 'none',
+                border: '1px solid #E2E8F0',
+                borderRadius: '4px',
+                color: '#64748B',
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+              }}
+            >
+              Clear Selection
+            </button>
+          )}
+        </div>
+
+        {/* Selected Author Display */}
+        {selectedAuthorStyle && (
+          <div style={{
+            padding: '1rem',
+            background: '#FFFFFF',
+            border: '2px solid #10B981',
+            borderRadius: '8px',
+            marginBottom: '1rem',
+          }}>
+            {(() => {
+              const author = AUTHOR_STYLES.find(a => a.id === selectedAuthorStyle);
+              if (!author) return null;
+              return (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '2rem' }}>{author.icon}</span>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '1rem', color: '#1A1A2E' }}>{author.fullName}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748B' }}>{author.era} • {author.nationality}</div>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: '0.875rem', color: '#64748B', marginBottom: '0.75rem' }}>
+                    {author.styleDescription}
+                  </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    {author.characteristics.toneSignature.map((tone, i) => (
+                      <span
+                        key={i}
+                        style={{
+                          padding: '0.25rem 0.5rem',
+                          background: '#EEF2FF',
+                          borderRadius: '4px',
+                          fontSize: '0.625rem',
+                          color: '#667eea',
+                          fontWeight: 500,
+                          textTransform: 'capitalize',
+                        }}
+                      >
+                        {tone}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* Recommended Authors (based on selected genres) */}
+        {genres.length > 0 && !showAllAuthors && (
+          <>
+            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#15803D', marginBottom: '0.5rem' }}>
+              Recommended for your genres:
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
+              {getRecommendedAuthors(genres).slice(0, 6).map(author => (
+                <button
+                  key={author.id}
+                  type="button"
+                  onClick={() => setSelectedAuthorStyle(author.id)}
+                  disabled={isLoading}
+                  style={{
+                    padding: '0.75rem',
+                    background: selectedAuthorStyle === author.id ? '#10B981' : '#FFFFFF',
+                    border: selectedAuthorStyle === author.id ? '2px solid #10B981' : '1px solid #E2E8F0',
+                    borderRadius: '8px',
+                    cursor: isLoading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                    minWidth: '90px',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  <span style={{ fontSize: '1.5rem' }}>{author.icon}</span>
+                  <span style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 500,
+                    color: selectedAuthorStyle === author.id ? '#FFFFFF' : '#1A1A2E',
+                  }}>
+                    {author.name}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Show All Authors Toggle */}
+        <button
+          type="button"
+          onClick={() => setShowAllAuthors(!showAllAuthors)}
+          style={{
+            padding: '0.5rem 1rem',
+            background: '#FFFFFF',
+            border: '1px solid #E2E8F0',
+            borderRadius: '6px',
+            color: '#64748B',
+            fontSize: '0.813rem',
+            cursor: 'pointer',
+            marginBottom: showAllAuthors ? '1rem' : 0,
+          }}
+        >
+          {showAllAuthors ? 'Hide Full Library' : `Browse All Authors (${AUTHOR_STYLES.length})`}
+        </button>
+
+        {/* Full Author Library */}
+        {showAllAuthors && (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            gap: '0.75rem',
+          }}>
+            {AUTHOR_STYLES.map(author => (
+              <button
+                key={author.id}
+                type="button"
+                onClick={() => setSelectedAuthorStyle(author.id)}
+                disabled={isLoading}
+                style={{
+                  padding: '1rem',
+                  background: selectedAuthorStyle === author.id
+                    ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
+                    : '#FFFFFF',
+                  border: selectedAuthorStyle === author.id
+                    ? '2px solid #10B981'
+                    : '1px solid #E2E8F0',
+                  borderRadius: '8px',
+                  textAlign: 'left',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                  <span style={{ fontSize: '1.5rem' }}>{author.icon}</span>
+                  <div>
+                    <div style={{
+                      fontWeight: 600,
+                      fontSize: '0.938rem',
+                      color: selectedAuthorStyle === author.id ? '#FFFFFF' : '#1A1A2E',
+                    }}>
+                      {author.fullName}
+                    </div>
+                    <div style={{
+                      fontSize: '0.625rem',
+                      color: selectedAuthorStyle === author.id ? 'rgba(255,255,255,0.8)' : '#64748B',
+                    }}>
+                      {author.era} • {author.nationality}
+                    </div>
+                  </div>
+                </div>
+                <p style={{
+                  fontSize: '0.75rem',
+                  color: selectedAuthorStyle === author.id ? 'rgba(255,255,255,0.9)' : '#64748B',
+                  marginBottom: '0.5rem',
+                  lineHeight: 1.4,
+                }}>
+                  {author.styleDescription}
+                </p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
+                  {author.genres.slice(0, 3).map((genre, i) => (
+                    <span
+                      key={i}
+                      style={{
+                        padding: '0.125rem 0.375rem',
+                        background: selectedAuthorStyle === author.id ? 'rgba(255,255,255,0.2)' : '#F1F5F9',
+                        borderRadius: '4px',
+                        fontSize: '0.625rem',
+                        color: selectedAuthorStyle === author.id ? '#FFFFFF' : '#64748B',
+                        textTransform: 'capitalize',
+                      }}
+                    >
+                      {genre}
+                    </span>
+                  ))}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Project Structure Selection */}
@@ -1239,10 +1849,136 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
 
       {/* Primary Genre Selection */}
       <div style={sectionStyle}>
-        <label style={labelStyle}>
-          Primary Genre <span style={{ color: '#DC2626' }}>*</span>
-          <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Select 1-3)</span>
-        </label>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <label style={{ ...labelStyle, marginBottom: 0 }}>
+            Primary Genre <span style={{ color: '#DC2626' }}>*</span>
+            <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Select 1-3)</span>
+          </label>
+          {genres.length > 0 && (
+            <button
+              type="button"
+              onClick={() => clearSelection('genres')}
+              style={{
+                padding: '0.25rem 0.5rem',
+                background: 'none',
+                border: '1px solid #E2E8F0',
+                borderRadius: '4px',
+                color: '#64748B',
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+              }}
+            >
+              Clear All
+            </button>
+          )}
+        </div>
+
+        {/* Genre Search */}
+        <div style={{ marginBottom: '0.75rem' }}>
+          <input
+            type="text"
+            value={genreSearch}
+            onChange={(e) => setGenreSearch(e.target.value)}
+            placeholder="Search genres... (e.g., 'fantasy', 'romance', 'magic')"
+            style={{
+              ...inputStyle,
+              padding: '0.625rem 1rem',
+              fontSize: '0.875rem',
+            }}
+            disabled={isLoading}
+          />
+        </div>
+
+        {/* Selected Genres Summary */}
+        {genres.length > 0 && (
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '0.5rem',
+            marginBottom: '0.75rem',
+            padding: '0.75rem',
+            background: '#EEF2FF',
+            borderRadius: '8px',
+          }}>
+            <span style={{ fontSize: '0.75rem', color: '#64748B', alignSelf: 'center' }}>Selected:</span>
+            {genres.map(g => {
+              const genreInfo = GENRES.find(genre => genre.value === g);
+              return (
+                <span
+                  key={g}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                    padding: '0.375rem 0.75rem',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    borderRadius: '16px',
+                    color: '#FFFFFF',
+                    fontSize: '0.813rem',
+                    fontWeight: 500,
+                  }}
+                >
+                  {genreInfo?.label}
+                  <button
+                    type="button"
+                    onClick={() => handleGenreToggle(g)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#FFFFFF',
+                      cursor: 'pointer',
+                      padding: '0 0.25rem',
+                      fontSize: '1rem',
+                      lineHeight: 1,
+                    }}
+                  >
+                    ×
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Recommended Genres */}
+        {recommendedGenres.length > 0 && genres.length < 3 && (
+          <div style={{
+            marginBottom: '0.75rem',
+            padding: '0.75rem',
+            background: '#F0FDF4',
+            border: '1px solid #BBF7D0',
+            borderRadius: '8px',
+          }}>
+            <span style={{ fontSize: '0.75rem', color: '#15803D', fontWeight: 600, marginRight: '0.5rem' }}>
+              💡 Pairs well with:
+            </span>
+            {recommendedGenres.map(g => {
+              const genreInfo = GENRES.find(genre => genre.value === g);
+              return (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => handleGenreToggle(g)}
+                  disabled={isLoading}
+                  style={{
+                    marginRight: '0.5rem',
+                    padding: '0.25rem 0.75rem',
+                    background: '#FFFFFF',
+                    border: '1px solid #10B981',
+                    borderRadius: '16px',
+                    color: '#15803D',
+                    fontSize: '0.75rem',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                  }}
+                >
+                  + {genreInfo?.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         <div style={{ fontSize: '0.75rem', color: '#64748B', marginBottom: '0.75rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
           <span>🔥 Hot = Trending now</span>
           <span>📈 Rising = Growing popularity</span>
@@ -1251,15 +1987,35 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
 
         {/* Classic Genres */}
         <div style={{ marginBottom: '1rem' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748B', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Classic Genres
-          </div>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-            gap: '0.625rem',
-          }}>
-            {CLASSIC_GENRES.map(g => (
+          <button
+            type="button"
+            onClick={() => toggleSection('classic')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              color: '#64748B',
+              marginBottom: '0.5rem',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
+            }}
+          >
+            <span style={{ transform: expandedSections.classic ? 'rotate(90deg)' : 'rotate(0)', transition: 'transform 0.2s' }}>▶</span>
+            Classic Genres ({filteredClassicGenres.length})
+          </button>
+          {expandedSections.classic && (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+              gap: '0.625rem',
+            }}>
+            {filteredClassicGenres.map(g => (
               <button
                 key={g.value}
                 type="button"
@@ -1294,20 +2050,41 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
                 </div>
               </button>
             ))}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Specialist Genres */}
         <div>
-          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748B', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Specialist Genres
-          </div>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-            gap: '0.625rem',
-          }}>
-            {SPECIALIST_GENRES.map(g => (
+          <button
+            type="button"
+            onClick={() => toggleSection('specialist')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              color: '#64748B',
+              marginBottom: '0.5rem',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
+            }}
+          >
+            <span style={{ transform: expandedSections.specialist ? 'rotate(90deg)' : 'rotate(0)', transition: 'transform 0.2s' }}>▶</span>
+            Specialist Genres ({filteredSpecialistGenres.length})
+          </button>
+          {expandedSections.specialist && (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+              gap: '0.625rem',
+            }}>
+            {filteredSpecialistGenres.map(g => (
               <button
                 key={g.value}
                 type="button"
@@ -1342,10 +2119,16 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
                 </div>
               </button>
             ))}
-          </div>
+            </div>
+          )}
         </div>
         <div style={{ marginTop: '0.625rem', fontSize: '0.813rem', color: '#64748B' }}>
           Selected: {genres.length}/3
+          {genreSearch && filteredClassicGenres.length === 0 && filteredSpecialistGenres.length === 0 && (
+            <span style={{ marginLeft: '1rem', color: '#DC2626' }}>
+              No genres match "{genreSearch}" - try a different search term
+            </span>
+          )}
         </div>
         {errors.genres && <div style={errorStyle}>{errors.genres}</div>}
       </div>
@@ -1406,10 +2189,78 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
 
       {/* Tone Selection - Multi-select with descriptions */}
       <div style={sectionStyle}>
-        <label style={labelStyle}>
-          Tone <span style={{ color: '#DC2626' }}>*</span>
-          <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Select 1-3 to combine)</span>
-        </label>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <label style={{ ...labelStyle, marginBottom: 0 }}>
+            Tone <span style={{ color: '#DC2626' }}>*</span>
+            <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Select 1-3 to combine)</span>
+          </label>
+          {tones.length > 0 && (
+            <button
+              type="button"
+              onClick={() => clearSelection('tones')}
+              style={{
+                padding: '0.25rem 0.5rem',
+                background: 'none',
+                border: '1px solid #E2E8F0',
+                borderRadius: '4px',
+                color: '#64748B',
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+              }}
+            >
+              Clear All
+            </button>
+          )}
+        </div>
+
+        {/* Selected Tones Summary */}
+        {tones.length > 0 && (
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '0.5rem',
+            marginBottom: '0.75rem',
+            padding: '0.75rem',
+            background: '#EEF2FF',
+            borderRadius: '8px',
+          }}>
+            <span style={{ fontSize: '0.75rem', color: '#64748B', alignSelf: 'center' }}>Selected:</span>
+            {tones.map(t => (
+              <span
+                key={t}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  padding: '0.375rem 0.75rem',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  borderRadius: '16px',
+                  color: '#FFFFFF',
+                  fontSize: '0.813rem',
+                  fontWeight: 500,
+                }}
+              >
+                {t}
+                <button
+                  type="button"
+                  onClick={() => handleToneToggle(t)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#FFFFFF',
+                    cursor: 'pointer',
+                    padding: '0 0.25rem',
+                    fontSize: '1rem',
+                    lineHeight: 1,
+                  }}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
         <div style={{ fontSize: '0.75rem', color: '#64748B', marginBottom: '0.75rem' }}>
           Combine tones for richer storytelling - e.g., "Epic and Grand" + "Tense and Fast-Paced" for action-packed epics
         </div>
@@ -1461,10 +2312,78 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
 
       {/* Themes Selection */}
       <div style={sectionStyle}>
-        <label style={labelStyle}>
-          Themes <span style={{ color: '#DC2626' }}>*</span>
-          <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Select up to 5, or add your own)</span>
-        </label>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <label style={{ ...labelStyle, marginBottom: 0 }}>
+            Themes <span style={{ color: '#DC2626' }}>*</span>
+            <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Select up to 5, or add your own)</span>
+          </label>
+          {themes.length > 0 && (
+            <button
+              type="button"
+              onClick={() => clearSelection('themes')}
+              style={{
+                padding: '0.25rem 0.5rem',
+                background: 'none',
+                border: '1px solid #E2E8F0',
+                borderRadius: '4px',
+                color: '#64748B',
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+              }}
+            >
+              Clear All
+            </button>
+          )}
+        </div>
+
+        {/* Selected Themes Summary */}
+        {themes.length > 0 && (
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '0.5rem',
+            marginBottom: '0.75rem',
+            padding: '0.75rem',
+            background: '#EEF2FF',
+            borderRadius: '8px',
+          }}>
+            <span style={{ fontSize: '0.75rem', color: '#64748B', alignSelf: 'center' }}>Selected:</span>
+            {themes.map(t => (
+              <span
+                key={t}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  padding: '0.375rem 0.75rem',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  borderRadius: '16px',
+                  color: '#FFFFFF',
+                  fontSize: '0.813rem',
+                  fontWeight: 500,
+                }}
+              >
+                {t}
+                <button
+                  type="button"
+                  onClick={() => handleThemeToggle(t)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#FFFFFF',
+                    cursor: 'pointer',
+                    padding: '0 0.25rem',
+                    fontSize: '1rem',
+                    lineHeight: 1,
+                  }}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',

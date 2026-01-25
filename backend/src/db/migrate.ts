@@ -270,7 +270,7 @@ export function runMigrations() {
       }
     }
 
-    // Migrations 005-014: Run from migration files
+    // Migrations 005-015: Run from migration files
     const migrationFiles = [
       '005_analytics_insights.sql',
       '006_chapter_edits.sql',
@@ -282,6 +282,7 @@ export function runMigrations() {
       '012_mystery_tracking.sql',
       '013_performance_indexes.sql',
       '014_universe_support.sql',
+      '015_plot_structure.sql',
     ];
 
     for (let i = 0; i < migrationFiles.length; i++) {

@@ -119,8 +119,11 @@ export default function CharactersPage() {
     }
   };
 
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
   const handleSaveCharacter = async (updatedCharacter: Character) => {
     setIsSaving(true);
+    setSuccessMessage(null);
     try {
       const token = getToken();
       const response = await fetch(
@@ -137,9 +140,26 @@ export default function CharactersPage() {
 
       if (!response.ok) throw new Error('Failed to save character');
 
-      const saved = await response.json();
+      const result = await response.json();
+      const saved = result.character || result;
       setCharacters(chars => chars.map(c => c.id === saved.id ? saved : c));
       setSelectedCharacter(saved);
+
+      // Show propagation results if name was changed
+      if (result.propagation) {
+        const { updatedSceneCards, updatedRelationships, updatedTimeline, updatedChapters } = result.propagation;
+        const total = updatedSceneCards + updatedRelationships + updatedTimeline + updatedChapters;
+        if (total > 0) {
+          const parts = [];
+          if (updatedSceneCards > 0) parts.push(`${updatedSceneCards} scene card${updatedSceneCards !== 1 ? 's' : ''}`);
+          if (updatedRelationships > 0) parts.push(`${updatedRelationships} relationship${updatedRelationships !== 1 ? 's' : ''}`);
+          if (updatedTimeline > 0) parts.push(`${updatedTimeline} timeline event${updatedTimeline !== 1 ? 's' : ''}`);
+          if (updatedChapters > 0) parts.push(`${updatedChapters} chapter${updatedChapters !== 1 ? 's' : ''}`);
+          setSuccessMessage(`Name updated across ${parts.join(', ')}`);
+          // Auto-hide after 5 seconds
+          setTimeout(() => setSuccessMessage(null), 5000);
+        }
+      }
     } catch (err: any) {
       console.error('Error saving character:', err);
       setError(err.message);
@@ -244,6 +264,23 @@ export default function CharactersPage() {
       backText="← Back to Project"
     >
       {error && <ErrorMessage message={error} />}
+
+      {successMessage && (
+        <div style={{
+          padding: '1rem',
+          background: '#ECFDF5',
+          border: '1px solid #10B981',
+          borderRadius: '8px',
+          marginBottom: '1.5rem',
+          color: '#065F46',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+        }}>
+          <span style={{ fontSize: '1.25rem' }}>✓</span>
+          {successMessage}
+        </div>
+      )}
 
       {characters.length === 0 ? (
         <div style={{
@@ -383,6 +420,7 @@ export default function CharactersPage() {
                 {selectedCharacter && (
                   <CharacterEditor
                     character={selectedCharacter}
+                    projectId={projectId}
                     onSave={handleSaveCharacter}
                     onRegenerateName={handleRegenerateName}
                     isSaving={isSaving}
@@ -395,23 +433,45 @@ export default function CharactersPage() {
   );
 }
 
+interface NameReferences {
+  sceneCards: number;
+  relationships: number;
+  timeline: number;
+  chapters: number;
+}
+
+interface PropagationResult {
+  updatedSceneCards: number;
+  updatedRelationships: number;
+  updatedTimeline: number;
+  updatedChapters: number;
+}
+
 function CharacterEditor({
   character,
+  projectId,
   onSave,
   onRegenerateName,
   isSaving,
   isRegenerating,
 }: {
   character: Character;
-  onSave: (char: Character) => void;
+  projectId: string;
+  onSave: (char: Character, propagationResult?: PropagationResult) => void;
   onRegenerateName: (characterId: string, currentData?: Partial<Character>) => void;
   isSaving: boolean;
   isRegenerating: boolean;
 }) {
   const [editedChar, setEditedChar] = useState(character);
+  const [originalName, setOriginalName] = useState(character.name);
+  const [showNameChangeDialog, setShowNameChangeDialog] = useState(false);
+  const [nameReferences, setNameReferences] = useState<NameReferences | null>(null);
+  const [includeChapterContent, setIncludeChapterContent] = useState(true);
+  const [isLoadingReferences, setIsLoadingReferences] = useState(false);
 
   useEffect(() => {
     setEditedChar(character);
+    setOriginalName(character.name);
   }, [character]);
 
   const handleChange = (field: string, value: any) => {
@@ -426,8 +486,49 @@ function CharacterEditor({
     });
   };
 
-  const handleSave = () => {
+  const fetchNameReferences = async () => {
+    setIsLoadingReferences(true);
+    try {
+      const token = getToken();
+      const response = await fetch(
+        `${API_BASE_URL}/api/projects/${projectId}/characters/${character.id}/name-references`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setNameReferences(data);
+      }
+    } catch (err) {
+      console.error('Error fetching name references:', err);
+    } finally {
+      setIsLoadingReferences(false);
+    }
+  };
+
+  const handleSave = async () => {
+    // Check if name changed
+    if (editedChar.name !== originalName) {
+      // Fetch references to show impact
+      await fetchNameReferences();
+      setShowNameChangeDialog(true);
+    } else {
+      // No name change, save directly
+      onSave(editedChar);
+    }
+  };
+
+  const handleConfirmNameChange = () => {
     onSave(editedChar);
+    setShowNameChangeDialog(false);
+    setOriginalName(editedChar.name);
+  };
+
+  const handleCancelNameChange = () => {
+    setShowNameChangeDialog(false);
   };
 
   return (
@@ -593,6 +694,102 @@ function CharacterEditor({
           />
         </div>
       </div>
+
+      {/* Name Change Confirmation Dialog */}
+      {showNameChangeDialog && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: '12px',
+            padding: '2rem',
+            maxWidth: '500px',
+            width: '90%',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          }}>
+            <h3 style={{ fontSize: '1.25rem', marginBottom: '1rem', color: '#1A1A2E' }}>
+              Confirm Name Change
+            </h3>
+            <p style={{ marginBottom: '1rem', color: '#64748B' }}>
+              You are changing <strong>"{originalName}"</strong> to <strong>"{editedChar.name}"</strong>.
+            </p>
+
+            {isLoadingReferences ? (
+              <p style={{ color: '#64748B', fontStyle: 'italic' }}>Loading impact preview...</p>
+            ) : nameReferences ? (
+              <div style={{
+                background: '#F8FAFC',
+                borderRadius: '8px',
+                padding: '1rem',
+                marginBottom: '1.5rem',
+              }}>
+                <p style={{ fontWeight: 600, marginBottom: '0.5rem', color: '#1A1A2E' }}>
+                  This will update references in:
+                </p>
+                <ul style={{ margin: 0, paddingLeft: '1.5rem', color: '#64748B' }}>
+                  {nameReferences.sceneCards > 0 && (
+                    <li>{nameReferences.sceneCards} scene card{nameReferences.sceneCards !== 1 ? 's' : ''}</li>
+                  )}
+                  {nameReferences.relationships > 0 && (
+                    <li>{nameReferences.relationships} relationship{nameReferences.relationships !== 1 ? 's' : ''}</li>
+                  )}
+                  {nameReferences.timeline > 0 && (
+                    <li>{nameReferences.timeline} timeline event{nameReferences.timeline !== 1 ? 's' : ''}</li>
+                  )}
+                  {nameReferences.chapters > 0 && (
+                    <li>{nameReferences.chapters} chapter{nameReferences.chapters !== 1 ? 's' : ''} (content)</li>
+                  )}
+                  {nameReferences.sceneCards === 0 && nameReferences.relationships === 0 &&
+                   nameReferences.timeline === 0 && nameReferences.chapters === 0 && (
+                    <li style={{ fontStyle: 'italic' }}>No references found to update</li>
+                  )}
+                </ul>
+              </div>
+            ) : null}
+
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button
+                onClick={handleCancelNameChange}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: '#fff',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '8px',
+                  color: '#64748B',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmNameChange}
+                disabled={isSaving}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  cursor: isSaving ? 'not-allowed' : 'pointer',
+                  opacity: isSaving ? 0.7 : 1,
+                }}
+              >
+                {isSaving ? 'Saving...' : 'Confirm & Update All'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

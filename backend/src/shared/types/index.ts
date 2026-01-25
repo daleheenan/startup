@@ -403,6 +403,39 @@ export interface SeriesTimelineEntry {
   majorEvents: string[];
 }
 
+// Plot Layer Types for Multi-Layered Story Tracking
+export type PlotPhase = 'setup' | 'rising' | 'midpoint' | 'crisis' | 'climax' | 'falling' | 'resolution';
+
+export interface PlotPoint {
+  id: string;
+  chapter_number: number;
+  description: string;
+  phase: PlotPhase;
+  impact_level: 1 | 2 | 3 | 4 | 5; // 1=minor, 5=major turning point
+}
+
+export interface PlotLayer {
+  id: string;
+  name: string;
+  description: string;
+  type: 'main' | 'subplot' | 'mystery' | 'romance' | 'character-arc';
+  color: string; // For visualization
+  points: PlotPoint[];
+  status: 'active' | 'resolved' | 'abandoned';
+  resolution_chapter?: number;
+}
+
+export interface PlotStructure {
+  plot_layers: PlotLayer[];
+  act_structure: {
+    act_one_end: number; // Chapter number
+    act_two_midpoint: number;
+    act_two_end: number;
+    act_three_climax: number;
+  };
+  pacing_notes: string;
+}
+
 export interface SeriesMystery {
   id: string;
   question: string;
@@ -448,142 +481,6 @@ export interface WorldTransitionChange {
   type: string;
   description: string;
   impact: string;
-}
-
-// Sprint 16: Interactive Editing Workspace Types
-
-export interface ChapterEdit {
-  id: string;
-  chapter_id: string;
-  user_id: string | null;
-  edited_content: string;
-  word_count: number;
-  is_locked: number;  // SQLite BOOLEAN (1 = true, 0 = false)
-  edit_notes: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface ChapterEditResponse {
-  chapterId: string;
-  hasEdit: boolean;
-  edit: ChapterEdit | null;
-  original: {
-    content: string;
-    wordCount: number;
-  };
-}
-
-export interface VersionComparison {
-  original: {
-    content: string;
-    wordCount: number;
-    generatedAt: string;
-  };
-  edited: {
-    content: string;
-    wordCount: number;
-    lastEditedAt: string;
-  } | null;
-  diff: {
-    addedWords: number;
-    removedWords: number;
-    percentChanged: number;
-  } | null;
-}
-
-export interface DiffStats {
-  addedWords: number;
-  removedWords: number;
-  percentChanged: number;
-}
-
-// Sprint 17: Regeneration & Variation Tools Types
-
-export type RegenerationMode = 'general' | 'dialogue' | 'description' | 'scene';
-export type RegenerationActionType = 'generate_variations' | 'apply_variation' | 'scene_regen';
-
-export interface RegenerationVariation {
-  id: string;
-  chapter_id: string;
-  selection_start: number;
-  selection_end: number;
-  original_text: string;
-  variation_1: string;
-  variation_2: string;
-  variation_3: string;
-  selected_variation: number | null;  // 0=original, 1-3=variation, null=not selected
-  regeneration_mode: RegenerationMode;
-  context_before: string | null;
-  context_after: string | null;
-  created_at: string;
-}
-
-export interface RegenerationHistory {
-  id: string;
-  chapter_id: string;
-  variation_id: string | null;
-  action_type: RegenerationActionType;
-  selection_start: number | null;
-  selection_end: number | null;
-  original_text: string | null;
-  final_text: string | null;
-  regeneration_mode: RegenerationMode | null;
-  created_at: string;
-}
-
-export interface VariationResult {
-  variationId: string;
-  originalText: string;
-  variations: [string, string, string];
-  contextBefore: string;
-  contextAfter: string;
-  mode: RegenerationMode;
-}
-
-export interface ApplyVariationResult {
-  success: boolean;
-  updatedContent: string;
-  wordCount: number;
-  historyId: string;
-}
-
-export interface SceneRegenerationResult {
-  success: boolean;
-  sceneContent: string;
-  fullContent: string;
-  sceneIndex: number;
-  historyId: string;
-}
-
-export interface HistoryResult {
-  history: Array<{
-    id: string;
-    actionType: RegenerationActionType;
-    originalText: string | null;
-    finalText: string | null;
-    mode: RegenerationMode | null;
-    selectionStart: number | null;
-    selectionEnd: number | null;
-    createdAt: string;
-  }>;
-  total: number;
-}
-
-export interface RegenerateSelectionRequest {
-  selectionStart: number;
-  selectionEnd: number;
-  mode: RegenerationMode;
-  contextTokens?: number;
-}
-
-export interface ApplyVariationRequest {
-  variationId: string;
-  selectedVariation: number;  // 0-3
-}
-
-export interface RegenerateSceneRequest {
-  sceneIndex: number;
 }
 
 // Sprint 18: Advanced Prose Control Types

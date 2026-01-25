@@ -288,6 +288,25 @@ export default function ProjectDetailPage() {
                     Series Management {project.series_bible ? '✓' : ''} →
                   </Link>
                 )}
+                {project.story_bible?.characters?.length > 0 && (
+                  <Link
+                    href={`/projects/${project.id}/plot`}
+                    style={{
+                      display: 'block',
+                      padding: '1rem',
+                      background: 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)',
+                      border: 'none',
+                      borderRadius: '8px',
+                      color: '#fff',
+                      textAlign: 'center',
+                      textDecoration: 'none',
+                      fontSize: '1rem',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Plot Structure & Timeline →
+                  </Link>
+                )}
               </div>
             </div>
       </div>

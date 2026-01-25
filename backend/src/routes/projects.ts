@@ -440,13 +440,178 @@ router.post('/:id/world', async (req, res) => {
 });
 
 /**
+ * Helper: Propagate character name changes throughout the project
+ * Updates scene cards, relationships, timelines, and optionally chapter content
+ */
+function propagateCharacterNameChange(
+  projectId: string,
+  oldName: string,
+  newName: string,
+  options: { updateChapterContent?: boolean } = {}
+): { updatedSceneCards: number; updatedRelationships: number; updatedTimeline: number; updatedChapters: number } {
+  const stats = { updatedSceneCards: 0, updatedRelationships: 0, updatedTimeline: 0, updatedChapters: 0 };
+
+  if (oldName === newName) return stats;
+
+  // Get all books for this project
+  const booksStmt = db.prepare<[string], any>(`
+    SELECT id FROM books WHERE project_id = ?
+  `);
+  const books = booksStmt.all(projectId);
+
+  // Update scene cards in all chapters
+  for (const book of books) {
+    const chaptersStmt = db.prepare<[string], any>(`
+      SELECT id, scene_cards, content, summary FROM chapters WHERE book_id = ?
+    `);
+    const chapters = chaptersStmt.all(book.id);
+
+    for (const chapter of chapters) {
+      let needsUpdate = false;
+      let sceneCards = safeJsonParse(chapter.scene_cards, []);
+      let content = chapter.content || '';
+      let summary = chapter.summary || '';
+
+      // Update scene cards
+      for (const scene of sceneCards) {
+        // Update characters array
+        if (scene.characters && Array.isArray(scene.characters)) {
+          const idx = scene.characters.indexOf(oldName);
+          if (idx !== -1) {
+            scene.characters[idx] = newName;
+            stats.updatedSceneCards++;
+            needsUpdate = true;
+          }
+        }
+        // Update POV character
+        if (scene.povCharacter === oldName) {
+          scene.povCharacter = newName;
+          stats.updatedSceneCards++;
+          needsUpdate = true;
+        }
+      }
+
+      // Optionally update chapter content (generated prose)
+      if (options.updateChapterContent && content) {
+        // Use word boundary regex to avoid partial replacements
+        const nameRegex = new RegExp(`\\b${escapeRegex(oldName)}\\b`, 'g');
+        if (nameRegex.test(content)) {
+          content = content.replace(nameRegex, newName);
+          stats.updatedChapters++;
+          needsUpdate = true;
+        }
+        if (summary && nameRegex.test(summary)) {
+          summary = summary.replace(nameRegex, newName);
+          needsUpdate = true;
+        }
+      }
+
+      if (needsUpdate) {
+        const updateChapterStmt = db.prepare(`
+          UPDATE chapters SET scene_cards = ?, content = ?, summary = ?, updated_at = ? WHERE id = ?
+        `);
+        updateChapterStmt.run(
+          JSON.stringify(sceneCards),
+          content,
+          summary,
+          new Date().toISOString(),
+          chapter.id
+        );
+      }
+    }
+  }
+
+  // Update story bible (relationships, timeline)
+  const projectStmt = db.prepare<[string], any>(`
+    SELECT story_bible, series_bible FROM projects WHERE id = ?
+  `);
+  const project = projectStmt.get(projectId);
+
+  if (project?.story_bible) {
+    const storyBible = safeJsonParse(project.story_bible, null);
+    if (storyBible) {
+      // Update relationships in all characters
+      for (const character of storyBible.characters || []) {
+        if (character.relationships && Array.isArray(character.relationships)) {
+          for (const rel of character.relationships) {
+            if (rel.characterName === oldName) {
+              rel.characterName = newName;
+              stats.updatedRelationships++;
+            }
+          }
+        }
+      }
+
+      // Update timeline participants
+      if (storyBible.timeline && Array.isArray(storyBible.timeline)) {
+        for (const event of storyBible.timeline) {
+          if (event.participants && Array.isArray(event.participants)) {
+            const idx = event.participants.indexOf(oldName);
+            if (idx !== -1) {
+              event.participants[idx] = newName;
+              stats.updatedTimeline++;
+            }
+          }
+        }
+      }
+
+      // Save updated story bible
+      const updateProjectStmt = db.prepare(`
+        UPDATE projects SET story_bible = ?, updated_at = ? WHERE id = ?
+      `);
+      updateProjectStmt.run(JSON.stringify(storyBible), new Date().toISOString(), projectId);
+    }
+  }
+
+  // Update series bible if exists
+  if (project?.series_bible) {
+    const seriesBible = safeJsonParse(project.series_bible, null);
+    if (seriesBible) {
+      // Update character entries
+      if (seriesBible.characters && Array.isArray(seriesBible.characters)) {
+        for (const entry of seriesBible.characters) {
+          if (entry.name === oldName) {
+            entry.name = newName;
+          }
+          // Update development text
+          if (entry.development && Array.isArray(entry.development)) {
+            for (const dev of entry.development) {
+              if (dev.changes && typeof dev.changes === 'string') {
+                const nameRegex = new RegExp(`\\b${escapeRegex(oldName)}\\b`, 'g');
+                dev.changes = dev.changes.replace(nameRegex, newName);
+              }
+            }
+          }
+        }
+      }
+
+      const updateSeriesStmt = db.prepare(`
+        UPDATE projects SET series_bible = ?, updated_at = ? WHERE id = ?
+      `);
+      updateSeriesStmt.run(JSON.stringify(seriesBible), new Date().toISOString(), projectId);
+    }
+  }
+
+  return stats;
+}
+
+/**
+ * Helper: Escape special regex characters in a string
+ */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * PUT /api/projects/:id/characters/:characterId
  * Update a character
+ * If name changes, propagates the change to scene cards and relationships
  */
 router.put('/:id/characters/:characterId', (req, res) => {
   try {
     const { id: projectId, characterId } = req.params;
     const updatedCharacter = req.body;
+    const { propagateToContent } = req.query; // Optional: also update chapter content
 
     // Get current story bible
     const getStmt = db.prepare<[string], Project>(`
@@ -475,7 +640,11 @@ router.put('/:id/characters/:characterId', (req, res) => {
       });
     }
 
-    storyBible.characters[charIndex] = { ...storyBible.characters[charIndex], ...updatedCharacter };
+    const oldCharacter = storyBible.characters[charIndex];
+    const oldName = oldCharacter.name;
+    const newName = updatedCharacter.name;
+
+    storyBible.characters[charIndex] = { ...oldCharacter, ...updatedCharacter };
 
     // Save to database
     const updateStmt = db.prepare(`
@@ -486,9 +655,180 @@ router.put('/:id/characters/:characterId', (req, res) => {
 
     updateStmt.run(JSON.stringify(storyBible), new Date().toISOString(), projectId);
 
-    res.json(storyBible.characters[charIndex]);
+    // If name changed, propagate to scene cards and relationships
+    let propagationStats: { updatedSceneCards: number; updatedRelationships: number; updatedTimeline: number; updatedChapters: number } | null = null;
+    if (oldName && newName && oldName !== newName) {
+      propagationStats = propagateCharacterNameChange(projectId, oldName, newName, {
+        updateChapterContent: propagateToContent === 'true',
+      });
+      logger.info({ projectId, oldName, newName, stats: propagationStats }, 'Character name propagated');
+    }
+
+    res.json({
+      character: storyBible.characters[charIndex],
+      propagation: propagationStats,
+    });
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack }, 'Error updating character');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * POST /api/projects/:id/characters/:characterId/propagate-name
+ * Explicitly propagate a character's current name to all references
+ * Useful after manual name edits or to fix inconsistencies
+ */
+router.post('/:id/characters/:characterId/propagate-name', (req, res) => {
+  try {
+    const { id: projectId, characterId } = req.params;
+    const { oldName, updateChapterContent } = req.body;
+
+    if (!oldName) {
+      return res.status(400).json({
+        error: { code: 'INVALID_REQUEST', message: 'oldName is required' },
+      });
+    }
+
+    // Get current character name
+    const getStmt = db.prepare<[string], any>(`
+      SELECT story_bible FROM projects WHERE id = ?
+    `);
+    const project = getStmt.get(projectId);
+
+    if (!project?.story_bible) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Story bible not found' },
+      });
+    }
+
+    const storyBible = safeJsonParse(project.story_bible, null);
+    const character = storyBible?.characters?.find((c: any) => c.id === characterId);
+
+    if (!character) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Character not found' },
+      });
+    }
+
+    const newName = character.name;
+
+    // Propagate the name change
+    const stats = propagateCharacterNameChange(projectId, oldName, newName, {
+      updateChapterContent: updateChapterContent === true,
+    });
+
+    logger.info({ projectId, characterId, oldName, newName, stats }, 'Character name propagated');
+
+    res.json({
+      success: true,
+      oldName,
+      newName,
+      stats,
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error propagating character name');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * GET /api/projects/:id/characters/:characterId/name-references
+ * Get a preview of all places where a character name appears
+ * Useful before changing a name to show impact
+ */
+router.get('/:id/characters/:characterId/name-references', (req, res) => {
+  try {
+    const { id: projectId, characterId } = req.params;
+
+    // Get character
+    const getStmt = db.prepare<[string], any>(`
+      SELECT story_bible FROM projects WHERE id = ?
+    `);
+    const project = getStmt.get(projectId);
+
+    if (!project?.story_bible) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Story bible not found' },
+      });
+    }
+
+    const storyBible = safeJsonParse(project.story_bible, null);
+    const character = storyBible?.characters?.find((c: any) => c.id === characterId);
+
+    if (!character) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Character not found' },
+      });
+    }
+
+    const characterName = character.name;
+    const references: {
+      sceneCards: number;
+      povScenes: number;
+      relationships: number;
+      timelineEvents: number;
+      chaptersWithContent: number;
+    } = {
+      sceneCards: 0,
+      povScenes: 0,
+      relationships: 0,
+      timelineEvents: 0,
+      chaptersWithContent: 0,
+    };
+
+    // Count scene card references
+    const booksStmt = db.prepare<[string], any>(`SELECT id FROM books WHERE project_id = ?`);
+    const books = booksStmt.all(projectId);
+
+    for (const book of books) {
+      const chaptersStmt = db.prepare<[string], any>(`
+        SELECT scene_cards, content FROM chapters WHERE book_id = ?
+      `);
+      const chapters = chaptersStmt.all(book.id);
+
+      for (const chapter of chapters) {
+        const sceneCards = safeJsonParse(chapter.scene_cards, []);
+        for (const scene of sceneCards) {
+          if (scene.characters?.includes(characterName)) {
+            references.sceneCards++;
+          }
+          if (scene.povCharacter === characterName) {
+            references.povScenes++;
+          }
+        }
+        // Check chapter content
+        if (chapter.content && chapter.content.includes(characterName)) {
+          references.chaptersWithContent++;
+        }
+      }
+    }
+
+    // Count relationship references
+    for (const char of storyBible.characters || []) {
+      if (char.id !== characterId && char.relationships) {
+        for (const rel of char.relationships) {
+          if (rel.characterName === characterName) {
+            references.relationships++;
+          }
+        }
+      }
+    }
+
+    // Count timeline references
+    for (const event of storyBible.timeline || []) {
+      if (event.participants?.includes(characterName)) {
+        references.timelineEvents++;
+      }
+    }
+
+    res.json({
+      characterName,
+      references,
+      totalReferences: Object.values(references).reduce((a, b) => a + b, 0),
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error getting name references');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -817,6 +1157,82 @@ router.put('/:id/world/:elementId', (req, res) => {
     res.json(storyBible.world[elemIndex]);
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack }, 'Error updating world element');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * PUT /api/projects/:id/plot-structure
+ * Update plot structure for multi-layered story tracking
+ */
+router.put('/:id/plot-structure', (req, res) => {
+  try {
+    const { id: projectId } = req.params;
+    const { plot_structure } = req.body;
+
+    if (!plot_structure) {
+      return res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'plot_structure is required' },
+      });
+    }
+
+    // Validate structure
+    if (plot_structure.plot_layers && !Array.isArray(plot_structure.plot_layers)) {
+      return res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'plot_layers must be an array' },
+      });
+    }
+
+    const updateStmt = db.prepare(`
+      UPDATE projects
+      SET plot_structure = ?, updated_at = ?
+      WHERE id = ?
+    `);
+
+    updateStmt.run(JSON.stringify(plot_structure), new Date().toISOString(), projectId);
+
+    logger.info({ projectId, layerCount: plot_structure.plot_layers?.length || 0 }, 'Plot structure updated');
+
+    res.json({ success: true, plot_structure });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error updating plot structure');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * GET /api/projects/:id/plot-structure
+ * Get plot structure for a project
+ */
+router.get('/:id/plot-structure', (req, res) => {
+  try {
+    const { id: projectId } = req.params;
+
+    const stmt = db.prepare<[string], any>(`
+      SELECT plot_structure FROM projects WHERE id = ?
+    `);
+    const project = stmt.get(projectId);
+
+    if (!project) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project not found' },
+      });
+    }
+
+    const plotStructure = safeJsonParse(project.plot_structure, {
+      plot_layers: [],
+      act_structure: {
+        act_one_end: 5,
+        act_two_midpoint: 12,
+        act_two_end: 20,
+        act_three_climax: 23,
+      },
+      pacing_notes: '',
+    });
+
+    res.json(plotStructure);
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error fetching plot structure');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });

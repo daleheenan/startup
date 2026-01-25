@@ -403,6 +403,39 @@ export interface SeriesTimelineEntry {
   majorEvents: string[];
 }
 
+// Plot Layer Types for Multi-Layered Story Tracking
+export type PlotPhase = 'setup' | 'rising' | 'midpoint' | 'crisis' | 'climax' | 'falling' | 'resolution';
+
+export interface PlotPoint {
+  id: string;
+  chapter_number: number;
+  description: string;
+  phase: PlotPhase;
+  impact_level: 1 | 2 | 3 | 4 | 5; // 1=minor, 5=major turning point
+}
+
+export interface PlotLayer {
+  id: string;
+  name: string;
+  description: string;
+  type: 'main' | 'subplot' | 'mystery' | 'romance' | 'character-arc';
+  color: string; // For visualization
+  points: PlotPoint[];
+  status: 'active' | 'resolved' | 'abandoned';
+  resolution_chapter?: number;
+}
+
+export interface PlotStructure {
+  plot_layers: PlotLayer[];
+  act_structure: {
+    act_one_end: number; // Chapter number
+    act_two_midpoint: number;
+    act_two_end: number;
+    act_three_climax: number;
+  };
+  pacing_notes: string;
+}
+
 export interface SeriesMystery {
   id: string;
   question: string;
