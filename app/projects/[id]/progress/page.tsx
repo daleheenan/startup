@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import FlagsSummary from '../../../components/FlagsSummary';
+import GenerationStatusBanner from '../../../components/GenerationStatusBanner';
 import { getToken, logout } from '../../../lib/auth';
 import ProjectNavigation from '../../../components/shared/ProjectNavigation';
 import { useProjectNavigation } from '../../../hooks/useProjectProgress';
@@ -62,11 +63,28 @@ interface ProgressData {
   };
 }
 
+interface Chapter {
+  id: string;
+  chapter_number: number;
+  title: string | null;
+  status: string;
+  word_count: number;
+}
+
+interface Book {
+  id: string;
+  book_number: number;
+  title: string;
+  chapters: Chapter[];
+}
+
 export default function ProgressPage() {
   const params = useParams();
+  const router = useRouter();
   const projectId = params.id as string;
 
   const [progress, setProgress] = useState<ProgressData | null>(null);
+  const [books, setBooks] = useState<Book[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [project, setProject] = useState<any>(null);
@@ -76,47 +94,42 @@ export default function ProgressPage() {
 
   useEffect(() => {
     if (projectId) {
-      fetchProgress();
-      const interval = setInterval(fetchProgress, 5000);
+      fetchProgressAndChapters();
+      const interval = setInterval(fetchProgressAndChapters, 5000);
       return () => clearInterval(interval);
     }
   }, [projectId]);
 
-  const fetchProgress = async () => {
+  const fetchProgressAndChapters = async () => {
     try {
       const token = getToken();
-      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/progress`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      if (!response.ok) {
-        if (response.status === 401) {
-          logout();
-          window.location.href = '/login';
-          return;
-        }
-        const projectRes = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-        const queueRes = await fetch(`${API_BASE_URL}/api/queue/stats`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      };
 
+      // Fetch progress data
+      const progressResponse = await fetch(`${API_BASE_URL}/api/projects/${projectId}/progress`, {
+        headers,
+      });
+
+      if (progressResponse.status === 401) {
+        logout();
+        window.location.href = '/login';
+        return;
+      }
+
+      let progressData: ProgressData | null = null;
+
+      if (!progressResponse.ok) {
+        // Fallback: construct basic progress data from project
+        const projectRes = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, { headers });
         if (!projectRes.ok) throw new Error('Failed to fetch project');
 
         const projectData = await projectRes.json();
         setProject(projectData);
-        const queue = queueRes.ok ? await queueRes.json() : { queue: { pending: 0, running: 0, completed: 0, paused: 0 } };
 
-        setProgress({
+        progressData = {
           project: {
             id: projectData.id,
             title: projectData.title,
@@ -137,7 +150,7 @@ export default function ProgressPage() {
             averageChapterTime: 0,
             estimatedRemaining: 0,
           },
-          queue: queue.queue || { pending: 0, running: 0, completed: 0, paused: 0 },
+          queue: { pending: 0, running: 0, completed: 0, paused: 0 },
           recentEvents: [],
           flags: {
             total: 0,
@@ -145,10 +158,37 @@ export default function ProgressPage() {
             warning: 0,
             info: 0,
           },
-        });
+        };
       } else {
-        const data = await response.json();
-        setProgress(data);
+        progressData = await progressResponse.json();
+        if (progressData) {
+          setProject({ id: progressData.project.id, title: progressData.project.title, status: progressData.project.status });
+        }
+      }
+
+      if (progressData) {
+        setProgress(progressData);
+      }
+
+      // Fetch books and chapters
+      const booksRes = await fetch(`${API_BASE_URL}/api/projects/${projectId}/books`, { headers });
+      if (booksRes.ok) {
+        const booksData = await booksRes.json();
+        const fetchedBooks = booksData.books || [];
+
+        // Get chapters for each book
+        const booksWithChapters: Book[] = [];
+        for (const book of fetchedBooks) {
+          const chaptersRes = await fetch(`${API_BASE_URL}/api/chapters/book/${book.id}`, { headers });
+          if (chaptersRes.ok) {
+            const chaptersData = await chaptersRes.json();
+            booksWithChapters.push({
+              ...book,
+              chapters: chaptersData.chapters || [],
+            });
+          }
+        }
+        setBooks(booksWithChapters);
       }
 
       setError(null);
@@ -160,21 +200,48 @@ export default function ProgressPage() {
     }
   };
 
-  const formatDuration = (ms: number): string => {
-    if (ms === 0) return 'N/A';
-    const hours = Math.floor(ms / (1000 * 60 * 60));
-    const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    }
-    return `${minutes}m`;
+  const getGenerationStatus = () => {
+    if (!progress) return 'none';
+
+    if (progress.chapters.total === 0) return 'none';
+    if (progress.chapters.completed === progress.chapters.total && progress.chapters.total > 0) return 'completed';
+    if (progress.queue.running > 0 || progress.chapters.inProgress > 0) return 'generating';
+    if (progress.queue.paused > 0) return 'paused';
+
+    return 'none';
   };
 
-  const percentComplete = progress
-    ? progress.chapters.total > 0
-      ? Math.round((progress.chapters.completed / progress.chapters.total) * 100)
-      : 0
-    : 0;
+  const getChapterStatus = (chapter: Chapter) => {
+    if (chapter.status === 'completed') return 'completed';
+    if (chapter.status === 'writing' || chapter.status === 'editing' || chapter.status === 'processing') return 'in-progress';
+    return 'pending';
+  };
+
+  const getChapterStatusBadge = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return {
+          background: '#DCFCE7',
+          color: '#15803D',
+          text: 'Completed',
+          icon: '✓',
+        };
+      case 'in-progress':
+        return {
+          background: '#DBEAFE',
+          color: '#1D4ED8',
+          text: 'Generating...',
+          icon: '⟳',
+        };
+      default:
+        return {
+          background: '#FEF3C7',
+          color: '#B45309',
+          text: 'Waiting',
+          icon: '○',
+        };
+    }
+  };
 
   if (isLoading) {
     return (
@@ -201,6 +268,8 @@ export default function ProgressPage() {
       </div>
     );
   }
+
+  const generationStatus = getGenerationStatus();
 
   return (
     <div style={{
@@ -259,7 +328,7 @@ export default function ProgressPage() {
               {progress.project.title}
             </h1>
             <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
-              Generation Progress
+              Chapter Generation Progress
             </p>
           </div>
           <Link
@@ -285,219 +354,443 @@ export default function ProgressPage() {
           overflow: 'auto',
         }}>
           <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-            {/* Overall Progress Bar */}
-            <div style={{
-              background: '#FFFFFF',
-              border: '1px solid #E2E8F0',
-              borderRadius: '12px',
-              padding: '1.5rem',
-              marginBottom: '1rem',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h2 style={{ fontSize: '1.25rem', color: '#1A1A2E', margin: 0, fontWeight: 600 }}>Overall Progress</h2>
-                <span style={{ fontSize: '2rem', fontWeight: 'bold', color: '#667eea' }}>{percentComplete}%</span>
-              </div>
+            {/* No Generation Started State */}
+            {generationStatus === 'none' && (
               <div style={{
-                width: '100%',
-                height: '40px',
-                background: '#E2E8F0',
-                borderRadius: '20px',
-                overflow: 'hidden'
+                background: '#FFFFFF',
+                border: '1px solid #E2E8F0',
+                borderRadius: '12px',
+                padding: '3rem 2rem',
+                textAlign: 'center',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
               }}>
                 <div style={{
-                  width: `${percentComplete}%`,
-                  height: '100%',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  transition: 'width 0.5s ease'
-                }} />
+                  fontSize: '4rem',
+                  marginBottom: '1.5rem',
+                }}>
+                  📖
+                </div>
+                <h2 style={{
+                  fontSize: '1.5rem',
+                  fontWeight: 600,
+                  color: '#1A1A2E',
+                  marginBottom: '1rem',
+                }}>
+                  No Generation Started
+                </h2>
+                <p style={{
+                  fontSize: '1rem',
+                  color: '#64748B',
+                  marginBottom: '2rem',
+                  maxWidth: '500px',
+                  margin: '0 auto 2rem',
+                }}>
+                  Complete your story outline and submit for novel generation to begin.
+                </p>
+                <Link
+                  href={`/projects/${projectId}/outline`}
+                  style={{
+                    display: 'inline-block',
+                    padding: '0.75rem 1.5rem',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    color: '#FFFFFF',
+                    fontSize: '1rem',
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                    boxShadow: '0 4px 14px rgba(102, 126, 234, 0.3)',
+                  }}
+                >
+                  Go to Outline
+                </Link>
               </div>
-            </div>
+            )}
 
-            {/* Stats Grid */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-              gap: '1rem',
-              marginBottom: '1rem'
-            }}>
-              {/* Chapters */}
-              <div style={{
-                background: '#FFFFFF',
-                border: '1px solid #E2E8F0',
-                borderRadius: '12px',
-                padding: '1.5rem',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-              }}>
-                <h3 style={{ fontSize: '0.875rem', color: '#64748B', marginBottom: '0.5rem', fontWeight: 500 }}>Chapters</h3>
-                <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1A1A2E', margin: 0 }}>
-                  {progress.chapters.completed} / {progress.chapters.total}
-                </p>
-                <p style={{ fontSize: '0.813rem', color: '#64748B', marginTop: '0.5rem' }}>
-                  {progress.chapters.inProgress} in progress, {progress.chapters.pending} pending
-                </p>
-              </div>
-
-              {/* Word Count */}
-              <div style={{
-                background: '#FFFFFF',
-                border: '1px solid #E2E8F0',
-                borderRadius: '12px',
-                padding: '1.5rem',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-              }}>
-                <h3 style={{ fontSize: '0.875rem', color: '#64748B', marginBottom: '0.5rem', fontWeight: 500 }}>Word Count</h3>
-                <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1A1A2E', margin: 0 }}>
-                  {progress.wordCount.current.toLocaleString()}
-                </p>
-                <p style={{ fontSize: '0.813rem', color: '#64748B', marginTop: '0.5rem' }}>
-                  Target: {progress.wordCount.target.toLocaleString()}
-                </p>
-              </div>
-
-              {/* Time Estimates */}
-              <div style={{
-                background: '#FFFFFF',
-                border: '1px solid #E2E8F0',
-                borderRadius: '12px',
-                padding: '1.5rem',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-              }}>
-                <h3 style={{ fontSize: '0.875rem', color: '#64748B', marginBottom: '0.5rem', fontWeight: 500 }}>Time Remaining</h3>
-                <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1A1A2E', margin: 0 }}>
-                  {formatDuration(progress.timeEstimates.estimatedRemaining)}
-                </p>
-                <p style={{ fontSize: '0.813rem', color: '#64748B', marginTop: '0.5rem' }}>
-                  Avg: {formatDuration(progress.timeEstimates.averageChapterTime)}/chapter
-                </p>
-              </div>
-
-              {/* Queue Status */}
-              <div style={{
-                background: '#FFFFFF',
-                border: '1px solid #E2E8F0',
-                borderRadius: '12px',
-                padding: '1.5rem',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-              }}>
-                <h3 style={{ fontSize: '0.875rem', color: '#64748B', marginBottom: '0.5rem', fontWeight: 500 }}>Queue Status</h3>
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-                  <div>
-                    <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#F59E0B', margin: 0 }}>
-                      {progress.queue.pending}
-                    </p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748B' }}>Pending</p>
+            {/* Generation Complete State */}
+            {generationStatus === 'completed' && (
+              <>
+                <div style={{
+                  background: 'linear-gradient(135deg, #DCFCE7 0%, #D1FAE5 100%)',
+                  border: '1px solid #10B981',
+                  borderRadius: '12px',
+                  padding: '2rem',
+                  marginBottom: '1.5rem',
+                  textAlign: 'center',
+                  boxShadow: '0 1px 3px rgba(16, 185, 129, 0.1)',
+                }}>
+                  <div style={{
+                    fontSize: '3rem',
+                    marginBottom: '1rem',
+                  }}>
+                    ✓
                   </div>
-                  <div>
-                    <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#3B82F6', margin: 0 }}>
-                      {progress.queue.running}
-                    </p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748B' }}>Running</p>
-                  </div>
-                  <div>
-                    <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#10B981', margin: 0 }}>
-                      {progress.queue.completed}
-                    </p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748B' }}>Done</p>
+                  <h2 style={{
+                    fontSize: '1.5rem',
+                    fontWeight: 600,
+                    color: '#15803D',
+                    marginBottom: '1rem',
+                  }}>
+                    Generation Complete!
+                  </h2>
+                  <p style={{
+                    fontSize: '1rem',
+                    color: '#166534',
+                    marginBottom: '1.5rem',
+                  }}>
+                    Your novel is ready to read and export.
+                  </p>
+                  <div style={{
+                    display: 'flex',
+                    gap: '1rem',
+                    justifyContent: 'center',
+                  }}>
+                    <button
+                      onClick={() => {
+                        if (books.length > 0 && books[0].chapters.length > 0) {
+                          router.push(`/projects/${projectId}/chapters/${books[0].chapters[0].id}`);
+                        }
+                      }}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        background: '#10B981',
+                        border: 'none',
+                        borderRadius: '8px',
+                        color: '#FFFFFF',
+                        fontSize: '1rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Read Novel
+                    </button>
+                    <Link
+                      href={`/projects/${projectId}`}
+                      style={{
+                        display: 'inline-block',
+                        padding: '0.75rem 1.5rem',
+                        background: '#FFFFFF',
+                        border: '1px solid #10B981',
+                        borderRadius: '8px',
+                        color: '#10B981',
+                        fontSize: '1rem',
+                        fontWeight: 600,
+                        textDecoration: 'none',
+                      }}
+                    >
+                      Export
+                    </Link>
                   </div>
                 </div>
-              </div>
-            </div>
 
-            {/* Rate Limit Status */}
-            {progress.rateLimitStatus && (
-              <div style={{
-                background: '#FFFFFF',
-                border: '1px solid #E2E8F0',
-                borderRadius: '12px',
-                padding: '1.5rem',
-                marginBottom: '1rem',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-              }}>
-                <h3 style={{ fontSize: '0.875rem', color: '#64748B', marginBottom: '0.5rem', fontWeight: 500 }}>Rate Limit</h3>
-                <div style={{ marginTop: '0.5rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <span style={{ color: '#64748B', fontSize: '0.875rem' }}>Status:</span>
-                    <span style={{ color: progress.rateLimitStatus.isActive ? '#10B981' : '#64748B', fontSize: '0.875rem', fontWeight: 'bold' }}>
-                      {progress.rateLimitStatus.isActive ? 'Active' : 'Inactive'}
-                    </span>
-                  </div>
-                  {progress.rateLimitStatus.isActive && (
-                    <>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <span style={{ color: '#64748B', fontSize: '0.875rem' }}>Requests:</span>
-                        <span style={{ color: '#1A1A2E', fontSize: '0.875rem' }}>
-                          {progress.rateLimitStatus.requestsThisSession}
-                        </span>
+                {/* Chapter List for Completed */}
+                <div style={{
+                  background: '#FFFFFF',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '12px',
+                  padding: '1.5rem',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                }}>
+                  <h3 style={{
+                    fontSize: '1.125rem',
+                    fontWeight: 600,
+                    color: '#1A1A2E',
+                    marginBottom: '1rem',
+                  }}>
+                    All Chapters
+                  </h3>
+                  {books.map((book) => (
+                    <div key={book.id} style={{ marginBottom: '1.5rem' }}>
+                      {books.length > 1 && (
+                        <h4 style={{
+                          fontSize: '1rem',
+                          fontWeight: 600,
+                          color: '#374151',
+                          marginBottom: '0.75rem',
+                        }}>
+                          Book {book.book_number}: {book.title}
+                        </h4>
+                      )}
+                      <div style={{
+                        display: 'grid',
+                        gap: '0.5rem',
+                      }}>
+                        {book.chapters.map((chapter) => {
+                          const status = getChapterStatus(chapter);
+                          const badge = getChapterStatusBadge(status);
+
+                          return (
+                            <div
+                              key={chapter.id}
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                padding: '1rem',
+                                background: '#F8FAFC',
+                                border: '1px solid #E2E8F0',
+                                borderRadius: '8px',
+                              }}
+                            >
+                              <div style={{ flex: 1 }}>
+                                <div style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.75rem',
+                                  marginBottom: '0.25rem',
+                                }}>
+                                  <span style={{
+                                    fontSize: '1.25rem',
+                                    color: badge.color,
+                                  }}>
+                                    {badge.icon}
+                                  </span>
+                                  <span style={{
+                                    fontSize: '1rem',
+                                    fontWeight: 'bold',
+                                    color: '#1A1A2E',
+                                  }}>
+                                    Chapter {chapter.chapter_number}
+                                  </span>
+                                  {chapter.title && (
+                                    <span style={{
+                                      fontSize: '0.875rem',
+                                      color: '#64748B',
+                                    }}>
+                                      {chapter.title}
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{
+                                  fontSize: '0.75rem',
+                                  color: '#64748B',
+                                }}>
+                                  {chapter.word_count.toLocaleString()} words
+                                </div>
+                              </div>
+                              <Link
+                                href={`/projects/${projectId}/chapters/${chapter.id}`}
+                                style={{
+                                  padding: '0.5rem 1rem',
+                                  background: 'rgba(16, 185, 129, 0.2)',
+                                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                                  borderRadius: '6px',
+                                  color: '#10B981',
+                                  fontSize: '0.875rem',
+                                  fontWeight: 600,
+                                  textDecoration: 'none',
+                                  transition: 'all 0.2s',
+                                }}
+                              >
+                                Read
+                              </Link>
+                            </div>
+                          );
+                        })}
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ color: '#64748B', fontSize: '0.875rem' }}>Resets in:</span>
-                        <span style={{ color: '#667eea', fontSize: '0.875rem', fontWeight: 'bold' }}>
-                          {progress.rateLimitStatus.timeRemaining}
-                        </span>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Current Activity */}
-            {progress.currentActivity && (
-              <div style={{
-                background: '#EEF2FF',
-                border: '1px solid #C7D2FE',
-                borderRadius: '12px',
-                padding: '1.5rem',
-                marginBottom: '1rem',
-              }}>
-                <h3 style={{ fontSize: '1.125rem', color: '#1A1A2E', marginBottom: '0.5rem', fontWeight: 600 }}>
-                  Current Activity
-                </h3>
-                <p style={{ color: '#64748B', margin: 0 }}>
-                  {progress.currentActivity.jobType} on Chapter {progress.currentActivity.chapterNumber}
-                </p>
-                <p style={{ fontSize: '0.813rem', color: '#94A3B8', marginTop: '0.5rem' }}>
-                  Started {new Date(progress.currentActivity.startedAt).toLocaleTimeString()}
-                </p>
-              </div>
-            )}
-
-            {/* Flagged Issues Summary */}
-            {progress.flags.total > 0 && (
-              <FlagsSummary projectId={projectId} flags={progress.flags} />
-            )}
-
-            {/* Recent Events */}
-            {progress.recentEvents.length > 0 && (
-              <div style={{
-                background: '#FFFFFF',
-                border: '1px solid #E2E8F0',
-                borderRadius: '12px',
-                padding: '1.5rem',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-              }}>
-                <h3 style={{ fontSize: '1.125rem', color: '#1A1A2E', marginBottom: '1rem', fontWeight: 600 }}>
-                  Recent Activity
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {progress.recentEvents.slice(0, 10).map((event, i) => (
-                    <div key={i} style={{
-                      padding: '0.75rem',
-                      background: '#F8FAFC',
-                      borderRadius: '6px',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}>
-                      <span style={{ color: '#374151', fontSize: '0.875rem' }}>{event.message}</span>
-                      <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>
-                        {new Date(event.timestamp).toLocaleTimeString()}
-                      </span>
                     </div>
                   ))}
                 </div>
-              </div>
+              </>
+            )}
+
+            {/* Generation In Progress State */}
+            {(generationStatus === 'generating' || generationStatus === 'paused') && (
+              <>
+                {/* Status Banner */}
+                <GenerationStatusBanner
+                  status={generationStatus}
+                  completedChapters={progress.chapters.completed}
+                  totalChapters={progress.chapters.total}
+                  currentWordCount={progress.wordCount.current}
+                  targetWordCount={progress.wordCount.target}
+                  estimatedTimeRemaining={progress.timeEstimates.estimatedRemaining}
+                  currentActivity={progress.currentActivity}
+                />
+
+                {/* Chapter List */}
+                <div style={{
+                  background: '#FFFFFF',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '12px',
+                  padding: '1.5rem',
+                  marginBottom: '1rem',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                }}>
+                  <h3 style={{
+                    fontSize: '1.125rem',
+                    fontWeight: 600,
+                    color: '#1A1A2E',
+                    marginBottom: '1rem',
+                  }}>
+                    Chapter Progress
+                  </h3>
+                  {books.map((book) => (
+                    <div key={book.id} style={{ marginBottom: '1.5rem' }}>
+                      {books.length > 1 && (
+                        <h4 style={{
+                          fontSize: '1rem',
+                          fontWeight: 600,
+                          color: '#374151',
+                          marginBottom: '0.75rem',
+                        }}>
+                          Book {book.book_number}: {book.title}
+                        </h4>
+                      )}
+                      <div style={{
+                        display: 'grid',
+                        gap: '0.5rem',
+                      }}>
+                        {book.chapters.map((chapter) => {
+                          const status = getChapterStatus(chapter);
+                          const badge = getChapterStatusBadge(status);
+                          const isCurrentlyGenerating = progress.currentActivity?.chapterId === chapter.id;
+
+                          return (
+                            <div
+                              key={chapter.id}
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                padding: '1rem',
+                                background: isCurrentlyGenerating ? '#EEF2FF' : '#F8FAFC',
+                                border: isCurrentlyGenerating ? '1px solid #C7D2FE' : '1px solid #E2E8F0',
+                                borderRadius: '8px',
+                              }}
+                            >
+                              <div style={{ flex: 1 }}>
+                                <div style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.75rem',
+                                  marginBottom: '0.25rem',
+                                }}>
+                                  <span style={{
+                                    fontSize: '1.25rem',
+                                    color: badge.color,
+                                  }}>
+                                    {badge.icon}
+                                  </span>
+                                  <span style={{
+                                    fontSize: '1rem',
+                                    fontWeight: 'bold',
+                                    color: '#1A1A2E',
+                                  }}>
+                                    Chapter {chapter.chapter_number}
+                                  </span>
+                                  {chapter.title && (
+                                    <span style={{
+                                      fontSize: '0.875rem',
+                                      color: '#64748B',
+                                    }}>
+                                      {chapter.title}
+                                    </span>
+                                  )}
+                                  <span style={{
+                                    padding: '0.25rem 0.5rem',
+                                    borderRadius: '4px',
+                                    fontSize: '0.75rem',
+                                    background: badge.background,
+                                    color: badge.color,
+                                    fontWeight: 600,
+                                  }}>
+                                    {badge.text}
+                                  </span>
+                                </div>
+                                <div style={{
+                                  fontSize: '0.75rem',
+                                  color: '#64748B',
+                                }}>
+                                  {chapter.word_count > 0
+                                    ? `${chapter.word_count.toLocaleString()} words`
+                                    : 'Not started'
+                                  }
+                                </div>
+                              </div>
+                              {status === 'completed' && (
+                                <Link
+                                  href={`/projects/${projectId}/chapters/${chapter.id}`}
+                                  style={{
+                                    padding: '0.5rem 1rem',
+                                    background: 'rgba(16, 185, 129, 0.2)',
+                                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                                    borderRadius: '6px',
+                                    color: '#10B981',
+                                    fontSize: '0.875rem',
+                                    fontWeight: 600,
+                                    textDecoration: 'none',
+                                    transition: 'all 0.2s',
+                                  }}
+                                >
+                                  Read
+                                </Link>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Flagged Issues Summary */}
+                {progress.flags.total > 0 && (
+                  <FlagsSummary projectId={projectId} flags={progress.flags} />
+                )}
+
+                {/* Recent Events */}
+                {progress.recentEvents.length > 0 && (
+                  <div style={{
+                    background: '#FFFFFF',
+                    border: '1px solid #E2E8F0',
+                    borderRadius: '12px',
+                    padding: '1.5rem',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                  }}>
+                    <h3 style={{
+                      fontSize: '1.125rem',
+                      color: '#1A1A2E',
+                      marginBottom: '1rem',
+                      fontWeight: 600,
+                    }}>
+                      Recent Activity
+                    </h3>
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.5rem',
+                    }}>
+                      {progress.recentEvents.slice(0, 10).map((event, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            padding: '0.75rem',
+                            background: '#F8FAFC',
+                            borderRadius: '6px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <span style={{
+                            color: '#374151',
+                            fontSize: '0.875rem',
+                          }}>
+                            {event.message}
+                          </span>
+                          <span style={{
+                            fontSize: '0.75rem',
+                            color: '#94A3B8',
+                          }}>
+                            {new Date(event.timestamp).toLocaleTimeString()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

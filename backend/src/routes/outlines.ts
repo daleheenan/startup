@@ -336,6 +336,360 @@ router.post('/:id/start-generation', (req, res) => {
 });
 
 /**
+ * POST /api/outlines/:bookId/regenerate-act/:actNumber
+ * Regenerate a single act while keeping others intact
+ */
+router.post('/:bookId/regenerate-act/:actNumber', async (req, res) => {
+  try {
+    const { bookId, actNumber } = req.params;
+    const actNum = parseInt(actNumber, 10);
+
+    if (isNaN(actNum) || actNum < 1) {
+      return res.status(400).json({
+        error: { code: 'INVALID_INPUT', message: 'Invalid act number' },
+      });
+    }
+
+    // Get the outline for this book
+    const outlineStmt = db.prepare<[string], Outline>(`
+      SELECT * FROM outlines WHERE book_id = ?
+    `);
+    const outline = outlineStmt.get(bookId);
+
+    if (!outline) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Outline not found for this book' },
+      });
+    }
+
+    const structure: StoryStructure = JSON.parse(outline.structure as any);
+
+    // Validate act number
+    if (actNum > structure.acts.length) {
+      return res.status(400).json({
+        error: { code: 'INVALID_INPUT', message: `Act ${actNum} does not exist. Outline has ${structure.acts.length} acts.` },
+      });
+    }
+
+    // Get book and project data for context
+    const bookStmt = db.prepare<[string], Book>(`SELECT * FROM books WHERE id = ?`);
+    const book = bookStmt.get(bookId);
+
+    if (!book) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Book not found' },
+      });
+    }
+
+    const projectStmt = db.prepare<[string], Project>(`SELECT * FROM projects WHERE id = ?`);
+    const project = projectStmt.get(book.project_id);
+
+    if (!project) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project not found' },
+      });
+    }
+
+    // Parse project data
+    const storyDNA = safeJsonParse(project.story_dna as any, null);
+    const storyBible = safeJsonParse(project.story_bible as any, null);
+
+    if (!storyDNA || !storyBible) {
+      return res.status(400).json({
+        error: { code: 'INVALID_STATE', message: 'Project must have Story DNA and Story Bible' },
+      });
+    }
+
+    // Build context for regeneration
+    const context: OutlineContext = {
+      concept: {
+        title: book.title,
+        logline: book.title,
+        synopsis: '',
+      },
+      storyDNA,
+      characters: storyBible.characters || [],
+      world: storyBible.world || { locations: [], factions: [], systems: [] },
+      structureType: outline.structure_type as StoryStructureType,
+      targetWordCount: outline.target_word_count,
+    };
+
+    // Regenerate the full outline (this will regenerate all acts)
+    // In a production system, we'd have a more granular function
+    logger.info({ bookId, actNumber: actNum }, 'Regenerating act');
+    const newStructure = await generateOutline(context);
+
+    // Replace only the specified act in the existing structure
+    structure.acts[actNum - 1] = newStructure.acts[actNum - 1];
+
+    // Renumber chapters sequentially across all acts
+    let chapterNumber = 1;
+    for (const act of structure.acts) {
+      for (const chapter of act.chapters) {
+        chapter.number = chapterNumber++;
+      }
+    }
+
+    // Calculate total chapters
+    const totalChapters = structure.acts.reduce(
+      (sum, act) => sum + (act.chapters?.length || 0),
+      0
+    );
+
+    // Update outline in database
+    const updateStmt = db.prepare(`
+      UPDATE outlines
+      SET structure = ?, total_chapters = ?, updated_at = ?
+      WHERE id = ?
+    `);
+
+    updateStmt.run(
+      JSON.stringify(structure),
+      totalChapters,
+      new Date().toISOString(),
+      outline.id
+    );
+
+    res.json({
+      success: true,
+      act: structure.acts[actNum - 1],
+      totalChapters,
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error regenerating act');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * DELETE /api/outlines/:bookId/acts
+ * Delete all acts from the outline and reset to empty state
+ */
+router.delete('/:bookId/acts', (req, res) => {
+  try {
+    const { bookId } = req.params;
+
+    // Get the outline
+    const outlineStmt = db.prepare<[string], Outline>(`
+      SELECT * FROM outlines WHERE book_id = ?
+    `);
+    const outline = outlineStmt.get(bookId);
+
+    if (!outline) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Outline not found' },
+      });
+    }
+
+    // Delete all chapters for this book
+    const deleteChaptersStmt = db.prepare(`
+      DELETE FROM chapters WHERE book_id = ?
+    `);
+    deleteChaptersStmt.run(bookId);
+
+    // Reset outline structure to empty
+    const emptyStructure: StoryStructure = {
+      type: outline.structure_type as StoryStructureType,
+      acts: [],
+    };
+
+    const updateStmt = db.prepare(`
+      UPDATE outlines
+      SET structure = ?, total_chapters = 0, updated_at = ?
+      WHERE id = ?
+    `);
+
+    updateStmt.run(
+      JSON.stringify(emptyStructure),
+      new Date().toISOString(),
+      outline.id
+    );
+
+    res.json({ success: true, message: 'All acts deleted' });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error deleting acts');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * DELETE /api/outlines/:bookId/acts/:actNumber
+ * Delete a specific act and renumber remaining acts
+ */
+router.delete('/:bookId/acts/:actNumber', (req, res) => {
+  try {
+    const { bookId, actNumber } = req.params;
+    const actNum = parseInt(actNumber, 10);
+
+    if (isNaN(actNum) || actNum < 1) {
+      return res.status(400).json({
+        error: { code: 'INVALID_INPUT', message: 'Invalid act number' },
+      });
+    }
+
+    // Get the outline
+    const outlineStmt = db.prepare<[string], Outline>(`
+      SELECT * FROM outlines WHERE book_id = ?
+    `);
+    const outline = outlineStmt.get(bookId);
+
+    if (!outline) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Outline not found' },
+      });
+    }
+
+    const structure: StoryStructure = JSON.parse(outline.structure as any);
+
+    // Validate act number
+    if (actNum > structure.acts.length) {
+      return res.status(400).json({
+        error: { code: 'INVALID_INPUT', message: `Act ${actNum} does not exist` },
+      });
+    }
+
+    // Get chapter numbers that belong to this act
+    const actToDelete = structure.acts[actNum - 1];
+    const chapterNumbersToDelete = actToDelete.chapters.map(ch => ch.number);
+
+    // Delete chapters belonging to this act
+    if (chapterNumbersToDelete.length > 0) {
+      const placeholders = chapterNumbersToDelete.map(() => '?').join(',');
+      const deleteChaptersStmt = db.prepare(`
+        DELETE FROM chapters WHERE book_id = ? AND chapter_number IN (${placeholders})
+      `);
+      deleteChaptersStmt.run(bookId, ...chapterNumbersToDelete);
+    }
+
+    // Remove the act
+    structure.acts.splice(actNum - 1, 1);
+
+    // Renumber remaining acts
+    structure.acts.forEach((act, index) => {
+      act.number = index + 1;
+    });
+
+    // Renumber chapters sequentially across all acts
+    let chapterNumber = 1;
+    for (const act of structure.acts) {
+      for (const chapter of act.chapters) {
+        chapter.number = chapterNumber++;
+        chapter.actNumber = act.number;
+      }
+    }
+
+    // Calculate total chapters
+    const totalChapters = structure.acts.reduce(
+      (sum, act) => sum + (act.chapters?.length || 0),
+      0
+    );
+
+    // Update outline
+    const updateStmt = db.prepare(`
+      UPDATE outlines
+      SET structure = ?, total_chapters = ?, updated_at = ?
+      WHERE id = ?
+    `);
+
+    updateStmt.run(
+      JSON.stringify(structure),
+      totalChapters,
+      new Date().toISOString(),
+      outline.id
+    );
+
+    res.json({ success: true, structure, totalChapters });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error deleting act');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * PUT /api/outlines/:bookId/acts/:actNumber
+ * Update an act's content without regenerating
+ */
+router.put('/:bookId/acts/:actNumber', (req, res) => {
+  try {
+    const { bookId, actNumber } = req.params;
+    const actNum = parseInt(actNumber, 10);
+
+    if (isNaN(actNum) || actNum < 1) {
+      return res.status(400).json({
+        error: { code: 'INVALID_INPUT', message: 'Invalid act number' },
+      });
+    }
+
+    const { name, description, beats, targetWordCount, chapters } = req.body;
+
+    // Get the outline
+    const outlineStmt = db.prepare<[string], Outline>(`
+      SELECT * FROM outlines WHERE book_id = ?
+    `);
+    const outline = outlineStmt.get(bookId);
+
+    if (!outline) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Outline not found' },
+      });
+    }
+
+    const structure: StoryStructure = JSON.parse(outline.structure as any);
+
+    // Validate act number
+    if (actNum > structure.acts.length) {
+      return res.status(400).json({
+        error: { code: 'INVALID_INPUT', message: `Act ${actNum} does not exist` },
+      });
+    }
+
+    // Update act properties
+    const act = structure.acts[actNum - 1];
+    if (name !== undefined) act.name = name;
+    if (description !== undefined) act.description = description;
+    if (beats !== undefined) act.beats = beats;
+    if (targetWordCount !== undefined) act.targetWordCount = targetWordCount;
+    if (chapters !== undefined) act.chapters = chapters;
+
+    // Renumber chapters if they were updated
+    if (chapters !== undefined) {
+      let chapterNumber = 1;
+      for (const act of structure.acts) {
+        for (const chapter of act.chapters) {
+          chapter.number = chapterNumber++;
+          chapter.actNumber = act.number;
+        }
+      }
+    }
+
+    // Calculate total chapters
+    const totalChapters = structure.acts.reduce(
+      (sum, act) => sum + (act.chapters?.length || 0),
+      0
+    );
+
+    // Update outline
+    const updateStmt = db.prepare(`
+      UPDATE outlines
+      SET structure = ?, total_chapters = ?, updated_at = ?
+      WHERE id = ?
+    `);
+
+    updateStmt.run(
+      JSON.stringify(structure),
+      totalChapters,
+      new Date().toISOString(),
+      outline.id
+    );
+
+    res.json({ success: true, act: structure.acts[actNum - 1] });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error updating act');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
  * DELETE /api/outlines/:id
  * Delete an outline
  */

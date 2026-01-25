@@ -20,6 +20,11 @@ interface PageLayoutProps {
   projectNavigation?: {
     projectId: string;
     tabs: ProjectNavigationTab[];
+    project?: any;
+    plotStructure?: any;
+    outline?: any;
+    proseStyle?: any;
+    isSubmitted?: boolean;
   };
 }
 
@@ -131,6 +136,11 @@ export default function PageLayout({
           <ProjectNavigation
             projectId={projectNavigation.projectId}
             tabs={projectNavigation.tabs}
+            project={projectNavigation.project}
+            plotStructure={projectNavigation.plotStructure}
+            outline={projectNavigation.outline}
+            proseStyle={projectNavigation.proseStyle}
+            isSubmitted={projectNavigation.isSubmitted}
           />
         )}
 

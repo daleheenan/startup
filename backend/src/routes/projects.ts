@@ -63,6 +63,274 @@ router.get('/', (req, res) => {
 });
 
 /**
+ * GET /api/projects/:id/progress
+ * Get comprehensive progress data for a project
+ *
+ * Returns:
+ * - Project details
+ * - Chapter statistics (total, completed, in-progress, pending)
+ * - Word count metrics
+ * - Time estimates
+ * - Queue statistics
+ * - Current activity
+ * - Recent events
+ * - Flagged issues
+ * - Rate limit status
+ */
+router.get('/:id/progress', (req, res) => {
+  try {
+    const projectId = req.params.id;
+
+    // Step 1: Fetch project
+    const projectStmt = db.prepare<[string], Project>(`
+      SELECT * FROM projects WHERE id = ?
+    `);
+    const project = projectStmt.get(projectId);
+
+    if (!project) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project not found' },
+      });
+    }
+
+    // Step 2: Fetch all books for the project
+    const booksStmt = db.prepare<[string], any>(`
+      SELECT id FROM books WHERE project_id = ?
+    `);
+    const books = booksStmt.all(projectId);
+
+    // Step 3: Fetch all chapters for all books with status counts
+    const chaptersStmt = db.prepare(`
+      SELECT
+        c.id,
+        c.book_id,
+        c.chapter_number,
+        c.title,
+        c.status,
+        c.word_count,
+        c.flags,
+        c.created_at,
+        c.updated_at
+      FROM chapters c
+      INNER JOIN books b ON c.book_id = b.id
+      WHERE b.project_id = ?
+      ORDER BY b.book_number ASC, c.chapter_number ASC
+    `);
+    const allChapters = chaptersStmt.all(projectId) as any[];
+
+    // Calculate chapter statistics
+    const chapterStats = {
+      total: allChapters.length,
+      completed: allChapters.filter(ch => ch.status === 'completed').length,
+      inProgress: allChapters.filter(ch => ch.status === 'writing' || ch.status === 'editing').length,
+      pending: allChapters.filter(ch => ch.status === 'pending').length,
+    };
+
+    // Calculate word count metrics
+    const totalWordCount = allChapters.reduce((sum, ch) => sum + (ch.word_count || 0), 0);
+    const targetWordCount = 80000; // Default target
+    const averagePerChapter = chapterStats.completed > 0
+      ? Math.round(totalWordCount / chapterStats.completed)
+      : 2250;
+
+    // Step 4: Fetch queue statistics for this project
+    const queueStmt = db.prepare(`
+      SELECT
+        status,
+        COUNT(*) as count
+      FROM jobs j
+      INNER JOIN chapters c ON j.target_id = c.id
+      INNER JOIN books b ON c.book_id = b.id
+      WHERE b.project_id = ?
+      GROUP BY status
+    `);
+    const queueResults = queueStmt.all(projectId) as any[];
+
+    const queueStats = {
+      pending: 0,
+      running: 0,
+      completed: 0,
+      paused: 0,
+    };
+
+    queueResults.forEach((row: any) => {
+      if (row.status === 'pending') queueStats.pending = row.count;
+      if (row.status === 'running') queueStats.running = row.count;
+      if (row.status === 'completed') queueStats.completed = row.count;
+      if (row.status === 'paused') queueStats.paused = row.count;
+    });
+
+    // Step 5: Get current activity (most recent running job)
+    const currentActivityStmt = db.prepare(`
+      SELECT
+        j.id as job_id,
+        j.type as job_type,
+        j.started_at,
+        c.id as chapter_id,
+        c.chapter_number
+      FROM jobs j
+      INNER JOIN chapters c ON j.target_id = c.id
+      INNER JOIN books b ON c.book_id = b.id
+      WHERE b.project_id = ? AND j.status = 'running'
+      ORDER BY j.started_at DESC
+      LIMIT 1
+    `);
+    const currentActivity = currentActivityStmt.get(projectId) as any;
+
+    // Step 6: Get recent events (last 10 completed jobs)
+    const recentEventsStmt = db.prepare(`
+      SELECT
+        j.id,
+        j.type,
+        j.completed_at,
+        c.chapter_number
+      FROM jobs j
+      INNER JOIN chapters c ON j.target_id = c.id
+      INNER JOIN books b ON c.book_id = b.id
+      WHERE b.project_id = ? AND j.status = 'completed'
+      ORDER BY j.completed_at DESC
+      LIMIT 10
+    `);
+    const recentEvents = (recentEventsStmt.all(projectId) as any[]).map((event: any) => ({
+      timestamp: event.completed_at,
+      type: event.type,
+      message: `${event.type} completed for Chapter ${event.chapter_number}`,
+    }));
+
+    // Step 7: Calculate flag statistics
+    let flagStats = {
+      total: 0,
+      critical: 0,
+      warning: 0,
+      info: 0,
+    };
+
+    for (const chapter of allChapters) {
+      if (chapter.flags) {
+        try {
+          const flags = JSON.parse(chapter.flags);
+          if (Array.isArray(flags)) {
+            flagStats.total += flags.length;
+            flags.forEach((flag: any) => {
+              if (flag.severity === 'critical') flagStats.critical++;
+              else if (flag.severity === 'warning') flagStats.warning++;
+              else if (flag.severity === 'info') flagStats.info++;
+            });
+          }
+        } catch (e) {
+          // Ignore JSON parse errors
+        }
+      }
+    }
+
+    // Step 8: Calculate time estimates
+    const completedJobsStmt = db.prepare(`
+      SELECT
+        j.started_at,
+        j.completed_at
+      FROM jobs j
+      INNER JOIN chapters c ON j.target_id = c.id
+      INNER JOIN books b ON c.book_id = b.id
+      WHERE b.project_id = ?
+        AND j.status = 'completed'
+        AND j.started_at IS NOT NULL
+        AND j.completed_at IS NOT NULL
+      ORDER BY j.completed_at DESC
+      LIMIT 20
+    `);
+    const completedJobs = completedJobsStmt.all(projectId) as any[];
+
+    let averageChapterTime = 0;
+    if (completedJobs.length > 0) {
+      const totalTime = completedJobs.reduce((sum, job) => {
+        const start = new Date(job.started_at).getTime();
+        const end = new Date(job.completed_at).getTime();
+        return sum + (end - start);
+      }, 0);
+      averageChapterTime = totalTime / completedJobs.length;
+    }
+
+    const estimatedRemaining = averageChapterTime * chapterStats.pending;
+
+    // Step 9: Get rate limit status
+    const rateLimitStmt = db.prepare(`
+      SELECT
+        is_active,
+        requests_this_session,
+        session_resets_at
+      FROM session_tracking
+      WHERE id = 1
+    `);
+    const rateLimitData = rateLimitStmt.get() as any;
+
+    let rateLimitStatus = undefined;
+    if (rateLimitData && rateLimitData.is_active) {
+      const resetTime = rateLimitData.session_resets_at ? new Date(rateLimitData.session_resets_at) : null;
+      const now = new Date();
+      const timeRemaining = resetTime ? Math.max(0, resetTime.getTime() - now.getTime()) : 0;
+
+      rateLimitStatus = {
+        isActive: Boolean(rateLimitData.is_active),
+        requestsThisSession: rateLimitData.requests_this_session || 0,
+        timeRemaining: resetTime ? formatTimeRemaining(timeRemaining) : 'N/A',
+        resetTime: resetTime ? resetTime.toISOString() : null,
+      };
+    }
+
+    // Construct response
+    const response = {
+      project: {
+        id: project.id,
+        title: project.title,
+        status: project.status,
+      },
+      chapters: chapterStats,
+      wordCount: {
+        current: totalWordCount,
+        target: targetWordCount,
+        averagePerChapter,
+      },
+      timeEstimates: {
+        averageChapterTime: Math.round(averageChapterTime),
+        estimatedRemaining: Math.round(estimatedRemaining),
+      },
+      queue: queueStats,
+      currentActivity: currentActivity ? {
+        chapterId: currentActivity.chapter_id,
+        chapterNumber: currentActivity.chapter_number,
+        jobType: currentActivity.job_type,
+        startedAt: currentActivity.started_at,
+      } : undefined,
+      recentEvents,
+      flags: flagStats,
+      rateLimitStatus,
+    };
+
+    res.json(response);
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error fetching project progress');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * Helper: Format time remaining in a human-readable format
+ */
+function formatTimeRemaining(ms: number): string {
+  const hours = Math.floor(ms / (1000 * 60 * 60));
+  const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((ms % (1000 * 60)) / 1000);
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  } else if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  } else {
+    return `${seconds}s`;
+  }
+}
+
+/**
  * GET /api/projects/:id
  * Get project details
  *
@@ -1552,13 +1820,52 @@ router.get('/:id/plot-structure', (req, res) => {
 });
 
 /**
+ * Helper: Calculate similarity between two strings (0-1, where 1 is identical)
+ * Uses character-based overlap ratio
+ */
+function calculateStringSimilarity(str1: string, str2: string): number {
+  const s1 = str1.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const s2 = str2.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  if (s1.length === 0 || s2.length === 0) return 0;
+
+  // Count matching characters
+  const longer = s1.length > s2.length ? s1 : s2;
+  const shorter = s1.length > s2.length ? s2 : s1;
+
+  let matches = 0;
+  for (const char of shorter) {
+    if (longer.includes(char)) {
+      matches++;
+    }
+  }
+
+  return matches / longer.length;
+}
+
+/**
+ * Helper: Check if new value is too similar to existing values
+ * Returns the similar value if found, null otherwise
+ */
+function findSimilarValue(newValue: string, existingValues: string[], threshold: number = 0.8): string | null {
+  for (const existing of existingValues) {
+    const similarity = calculateStringSimilarity(newValue, existing);
+    if (similarity >= threshold) {
+      return existing;
+    }
+  }
+  return null;
+}
+
+/**
  * POST /api/projects/:id/generate-plot-layer-field
  * Generate a name or description for a plot layer using AI
+ * Implements uniqueness validation with retry logic
  */
 router.post('/:id/generate-plot-layer-field', async (req, res) => {
   try {
     const { id: projectId } = req.params;
-    const { field, layerType, existingValues } = req.body;
+    const { field, layerType, existingValues: contextValues, existingNames, currentDescription } = req.body;
 
     if (!field || !['name', 'description'].includes(field)) {
       return res.status(400).json({
@@ -1589,16 +1896,34 @@ router.post('/:id/generate-plot-layer-field', async (req, res) => {
     const plotStructure = safeJsonParse((project as any).plot_structure, null);
 
     // Get existing layer names to avoid duplicates
-    const existingLayerNames = plotStructure?.plot_layers?.map((l: any) => l.name) || [];
+    const existingLayerNames = existingNames || plotStructure?.plot_layers?.map((l: any) => l.name) || [];
+
+    // Get existing descriptions if generating description
+    const existingDescriptions = field === 'description'
+      ? plotStructure?.plot_layers?.map((l: any) => l.description).filter(Boolean) || []
+      : [];
 
     // Import Anthropic client
     const { default: Anthropic } = await import('@anthropic-ai/sdk');
     const anthropic = new Anthropic();
 
-    let prompt: string;
+    let generatedValue = '';
+    let attempts = 0;
+    const maxAttempts = 3;
+    let similarTo: string | null = null;
 
-    if (field === 'name') {
-      prompt = `You are a creative story structure expert. Generate a compelling name for a ${layerType} plot layer.
+    // Retry loop for uniqueness
+    while (attempts < maxAttempts) {
+      attempts++;
+
+      let prompt: string;
+
+      if (field === 'name') {
+        const attemptNote = attempts > 1
+          ? `\n\nIMPORTANT: Previous attempt "${generatedValue}" was too similar to "${similarTo}". Generate something COMPLETELY DIFFERENT.`
+          : '';
+
+        prompt = `You are a creative story structure expert. Generate a unique, creative name for a ${layerType} plot layer.
 
 **Story Context:**
 - Title: ${project.title}
@@ -1607,19 +1932,27 @@ ${storyDNA?.tone ? `- Tone: ${storyDNA.tone}` : ''}
 ${storyBible?.characters?.length ? `- Main Characters: ${storyBible.characters.slice(0, 3).map((c: any) => c.name).join(', ')}` : ''}
 
 **Layer Type:** ${layerType}
-${existingValues?.description ? `**Description Hint:** ${existingValues.description}` : ''}
+${contextValues?.description ? `**Description Hint:** ${contextValues.description}` : ''}
 
-**Existing Layer Names (avoid these):** ${existingLayerNames.join(', ') || 'None'}
+**Existing Plot Names (MUST BE DIFFERENT FROM ALL OF THESE):** ${existingLayerNames.join(', ') || 'None'}
 
 Generate a short, evocative name for this plot layer that:
 1. Reflects the type of plot thread (${layerType})
 2. Hints at the emotional or dramatic content
-3. Is distinct from existing layer names
+3. Is distinctly different from all existing names
 4. Is 2-4 words maximum
+5. Should be evocative and memorable
+6. Should hint at the plot's theme without spoilers
+7. Avoid adding 's' or minor word changes to create "variations"
+8. Do NOT create names similar to: ${existingLayerNames.join(', ')}
 
-Return ONLY the name, nothing else.`;
-    } else {
-      prompt = `You are a story structure expert. Generate a brief description for a plot layer.
+Return ONLY the name, nothing else.${attemptNote}`;
+      } else {
+        const attemptNote = attempts > 1
+          ? `\n\nIMPORTANT: Previous attempt was too similar to an existing description. Generate something COMPLETELY DIFFERENT with unique wording and focus.`
+          : '';
+
+        prompt = `You are a story structure expert. Generate a brief, unique description for a plot layer.
 
 **Story Context:**
 - Title: ${project.title}
@@ -1629,31 +1962,84 @@ ${storyBible?.characters?.length ? `- Main Characters: ${storyBible.characters.s
 
 **Layer:**
 - Type: ${layerType}
-${existingValues?.name ? `- Name: ${existingValues.name}` : ''}
+${contextValues?.name ? `- Name: ${contextValues.name}` : ''}
+
+${currentDescription ? `**Current Description (generate something DIFFERENT):** ${currentDescription}` : ''}
 
 Generate a 1-2 sentence description for this plot layer that:
 1. Explains what this thread will explore
 2. Hints at the central conflict or tension
 3. Connects to the genre and tone
 4. Is specific enough to guide plot point creation
+5. Is DISTINCTLY DIFFERENT from any existing plot descriptions
+6. Uses unique wording and perspective
 
-Return ONLY the description, nothing else.`;
+${existingDescriptions.length > 0 ? `**Existing Descriptions (MUST BE DIFFERENT):**\n${existingDescriptions.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}` : ''}
+
+Return ONLY the description, nothing else.${attemptNote}`;
+      }
+
+      const message = await anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 200,
+        temperature: 0.8 + (attempts * 0.1), // Increase temperature on retries for more variety
+        messages: [{ role: 'user', content: prompt }],
+      });
+
+      generatedValue = message.content[0].type === 'text'
+        ? message.content[0].text.trim()
+        : '';
+
+      // Check uniqueness
+      const existingValues = field === 'name' ? existingLayerNames : existingDescriptions;
+      similarTo = findSimilarValue(generatedValue, existingValues);
+
+      if (!similarTo) {
+        // Success - unique value generated
+        logger.info({
+          projectId,
+          field,
+          layerType,
+          generatedValue,
+          attempts
+        }, 'Plot layer field generated (unique)');
+
+        res.json({
+          field,
+          value: generatedValue,
+          attempts,
+          isUnique: true
+        });
+        return;
+      }
+
+      // Log similarity issue and retry
+      logger.warn({
+        projectId,
+        field,
+        attempt: attempts,
+        generatedValue,
+        similarTo
+      }, 'Generated value too similar, retrying');
     }
 
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 200,
-      temperature: 0.8,
-      messages: [{ role: 'user', content: prompt }],
+    // If we get here, we failed to generate a unique value after max attempts
+    logger.warn({
+      projectId,
+      field,
+      attempts,
+      generatedValue,
+      similarTo
+    }, 'Failed to generate unique value after max attempts, returning best attempt');
+
+    res.json({
+      field,
+      value: generatedValue,
+      attempts,
+      isUnique: false,
+      warning: `Generated value may be similar to existing values. Consider editing manually.`
     });
 
-    const generatedValue = message.content[0].type === 'text'
-      ? message.content[0].text.trim()
-      : '';
-
-    logger.info({ projectId, field, layerType, generatedValue }, 'Plot layer field generated');
-
-    res.json({ field, value: generatedValue });
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack }, 'Error generating plot layer field');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
@@ -1770,6 +2156,188 @@ Impact levels: 1 (minor) to 5 (critical turning point)`;
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
+
+/**
+ * POST /api/projects/:id/extract-plots-from-concept
+ * Extract plot elements from story concept description
+ */
+router.post('/:id/extract-plots-from-concept', async (req, res) => {
+  try {
+    const { id: projectId } = req.params;
+
+    // Get project and its story concept
+    const projectStmt = db.prepare<[string], any>(`
+      SELECT id, title, genre, story_dna, story_bible, plot_structure FROM projects WHERE id = ?
+    `);
+    const project = projectStmt.get(projectId);
+
+    if (!project) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project not found' },
+      });
+    }
+
+    // Get concept from saved_concepts or use story_dna
+    const conceptStmt = db.prepare<[string], any>(`
+      SELECT synopsis, logline FROM saved_concepts WHERE id IN (
+        SELECT id FROM saved_concepts WHERE title = ? ORDER BY created_at DESC LIMIT 1
+      )
+    `);
+    const concept = conceptStmt.get(project.title);
+
+    const storyDNA = safeJsonParse(project.story_dna, null);
+    const storyBible = safeJsonParse(project.story_bible, null);
+
+    // Use synopsis from concept or logline from story DNA
+    const conceptDescription = concept?.synopsis || concept?.logline || storyDNA?.themes?.join('. ') || 'A compelling story';
+
+    if (!conceptDescription || conceptDescription === 'A compelling story') {
+      return res.status(400).json({
+        error: { code: 'NO_CONCEPT', message: 'No story concept found. Please create a story concept first.' },
+      });
+    }
+
+    // Build prompt for plot extraction
+    const prompt = `
+Analyze this story concept and extract the key plot elements:
+
+${conceptDescription}
+
+**Story Context:**
+- Title: ${project.title}
+- Genre: ${project.genre}
+${storyDNA?.tone ? `- Tone: ${storyDNA.tone}` : ''}
+${storyBible?.characters?.length ? `- Main Characters: ${storyBible.characters.slice(0, 3).map((c: any) => c.name).join(', ')}` : ''}
+
+Identify:
+1. The MAIN PLOT (golden thread) - the primary narrative arc
+2. KEY SUBPLOTS implied by the concept
+3. CHARACTER ARC plots for main characters mentioned
+4. THEMATIC plots (if any)
+
+For each plot, provide:
+- type: One of 'main_plot' | 'subplot' | 'character_arc' | 'mystery_thread' | 'romance_arc' | 'emotional_arc' | 'thematic_arc'
+- name: A compelling, unique name for this plot thread (2-5 words)
+- description: A detailed description of what this plot involves (1-2 sentences)
+- isKeyPlot: true (all extracted plots are key plots)
+
+Return ONLY a JSON array of plots with this structure:
+[
+  {
+    "type": "main_plot",
+    "name": "Plot name",
+    "description": "Description of the plot thread",
+    "isKeyPlot": true
+  }
+]
+
+Extract 3-6 plot threads total. Focus on the most important narrative arcs.`;
+
+    // Call Claude API
+    const { default: Anthropic } = await import('@anthropic-ai/sdk');
+    const anthropic = new Anthropic();
+
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2000,
+      temperature: 0.7,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const responseText = message.content[0].type === 'text'
+      ? message.content[0].text
+      : '';
+
+    // Parse response - extract JSON array
+    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      throw new Error('Failed to parse plot extraction from AI response');
+    }
+
+    const extractedPlots = JSON.parse(jsonMatch[0]);
+
+    // Map plot types to PlotLayer types
+    const typeMapping: Record<string, 'main' | 'subplot' | 'mystery' | 'romance' | 'character-arc'> = {
+      'main_plot': 'main',
+      'subplot': 'subplot',
+      'character_arc': 'character-arc',
+      'mystery_thread': 'mystery',
+      'romance_arc': 'romance',
+      'emotional_arc': 'character-arc',
+      'thematic_arc': 'subplot',
+    };
+
+    // Transform to response format
+    const plots = extractedPlots.map((plot: any, index: number) => ({
+      id: `extracted-${Date.now()}-${index}`,
+      type: typeMapping[plot.type] || 'subplot',
+      name: plot.name || 'Untitled Plot',
+      description: plot.description || '',
+      isKeyPlot: true,
+      sourceType: 'story_concept',
+      canDelete: false,
+      canEdit: true,
+      color: getPlotColor(typeMapping[plot.type] || 'subplot', index),
+      points: [],
+      status: 'active' as const,
+    }));
+
+    // Update project's plot structure if it exists
+    const plotStructure = safeJsonParse(project.plot_structure, {
+      plot_layers: [],
+      act_structure: {
+        act_one_end: 5,
+        act_two_midpoint: 12,
+        act_two_end: 20,
+        act_three_climax: 23,
+      },
+      pacing_notes: '',
+    });
+
+    // Add extracted plots to plot structure (avoid duplicates by name)
+    const existingNames = new Set(plotStructure.plot_layers.map((l: any) => l.name.toLowerCase()));
+    const newPlots = plots.filter((p: any) => !existingNames.has(p.name.toLowerCase()));
+
+    if (newPlots.length > 0) {
+      plotStructure.plot_layers = [...plotStructure.plot_layers, ...newPlots];
+
+      // Save updated plot structure
+      const updateStmt = db.prepare(`
+        UPDATE projects SET plot_structure = ?, updated_at = ? WHERE id = ?
+      `);
+      updateStmt.run(JSON.stringify(plotStructure), new Date().toISOString(), projectId);
+
+      logger.info({ projectId, extractedCount: plots.length, addedCount: newPlots.length }, 'Plots extracted from concept');
+    } else {
+      logger.info({ projectId, extractedCount: plots.length }, 'Plots extracted but all already exist');
+    }
+
+    res.json({
+      plots,
+      addedToStructure: newPlots.length,
+      totalExtracted: plots.length,
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error extracting plots from concept');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * Helper: Get color for plot type
+ */
+function getPlotColor(type: string, index: number): string {
+  const colorPalette: Record<string, string[]> = {
+    'main': ['#3b82f6', '#2563eb', '#1d4ed8'],
+    'subplot': ['#10b981', '#059669', '#047857'],
+    'mystery': ['#8b5cf6', '#7c3aed', '#6d28d9'],
+    'romance': ['#ec4899', '#db2777', '#be185d'],
+    'character-arc': ['#f59e0b', '#d97706', '#b45309'],
+  };
+
+  const colors = colorPalette[type] || colorPalette['subplot'];
+  return colors[index % colors.length];
+}
 
 /**
  * POST /api/projects/:id/generate-pacing-notes

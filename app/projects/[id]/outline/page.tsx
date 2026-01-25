@@ -7,6 +7,7 @@ import { getToken, logout } from '../../../lib/auth';
 import GenerationProgress from '../../../components/GenerationProgress';
 import ProjectNavigation from '../../../components/shared/ProjectNavigation';
 import { useProjectNavigation } from '../../../hooks/useProjectProgress';
+import ConfirmDialog from '../../../components/shared/ConfirmDialog';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -95,6 +96,23 @@ export default function OutlinePage() {
   const [error, setError] = useState<string | null>(null);
   const [expandedChapter, setExpandedChapter] = useState<number | null>(null);
   const [generationStep, setGenerationStep] = useState<string>('');
+
+  // Act management state
+  const [editingActNumber, setEditingActNumber] = useState<number | null>(null);
+  const [editedActData, setEditedActData] = useState<{ name: string; description: string } | null>(null);
+  const [regeneratingActNumber, setRegeneratingActNumber] = useState<number | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    confirmStyle?: 'danger' | 'primary';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
   // IMPORTANT: All hooks must be called before any early returns
   const navigation = useProjectNavigation(projectId, project, outline);
@@ -260,6 +278,160 @@ export default function OutlinePage() {
       setError(err.message);
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  // Act management functions
+  const handleRegenerateAct = async (actNumber: number) => {
+    if (!outline) return;
+
+    try {
+      setRegeneratingActNumber(actNumber);
+      setGenerationStep(`Regenerating Act ${actNumber}...`);
+      setIsGenerating(true);
+      const token = getToken();
+
+      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/outline/regenerate-act/${actNumber}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          outlineId: outline.id,
+          bookId: outline.book_id,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: { message: 'Failed to regenerate act' } }));
+        throw new Error(errorData.error?.message || 'Failed to regenerate act');
+      }
+
+      const updatedOutline = await response.json();
+      setOutline(updatedOutline);
+    } catch (err: any) {
+      console.error('Error regenerating act:', err);
+      setError(err.message);
+    } finally {
+      setRegeneratingActNumber(null);
+      setIsGenerating(false);
+      setGenerationStep('');
+    }
+  };
+
+  const handleDeleteAct = async (actNumber: number) => {
+    if (!outline) return;
+
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/outline/acts/${actNumber}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete act');
+      }
+
+      await loadData();
+    } catch (err: any) {
+      console.error('Error deleting act:', err);
+      setError(err.message);
+    }
+  };
+
+  const handleDeleteAllActs = async () => {
+    if (!outline) return;
+
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/outline/acts`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete all acts');
+      }
+
+      setOutline(null);
+    } catch (err: any) {
+      console.error('Error deleting all acts:', err);
+      setError(err.message);
+    }
+  };
+
+  const handleRegenerateAllActs = async () => {
+    if (!outline) return;
+
+    try {
+      setIsGenerating(true);
+      setGenerationStep('Regenerating all acts...');
+
+      for (let i = 0; i < outline.structure.acts.length; i++) {
+        const actNumber = outline.structure.acts[i].number;
+        setRegeneratingActNumber(actNumber);
+        setGenerationStep(`Regenerating Act ${actNumber} of ${outline.structure.acts.length}...`);
+        await handleRegenerateAct(actNumber);
+      }
+
+      await loadData();
+    } catch (err: any) {
+      console.error('Error regenerating all acts:', err);
+      setError(err.message);
+    } finally {
+      setRegeneratingActNumber(null);
+      setIsGenerating(false);
+      setGenerationStep('');
+    }
+  };
+
+  const startEditingAct = (act: Act) => {
+    setEditingActNumber(act.number);
+    setEditedActData({
+      name: act.name,
+      description: act.description,
+    });
+  };
+
+  const cancelEditingAct = () => {
+    setEditingActNumber(null);
+    setEditedActData(null);
+  };
+
+  const saveActEdit = async () => {
+    if (!outline || editingActNumber === null || !editedActData) return;
+
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/outline/acts/${editingActNumber}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          outlineId: outline.id,
+          name: editedActData.name,
+          description: editedActData.description,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update act');
+      }
+
+      await loadData();
+      setEditingActNumber(null);
+      setEditedActData(null);
+    } catch (err: any) {
+      console.error('Error updating act:', err);
+      setError(err.message);
     }
   };
 
@@ -575,28 +747,121 @@ export default function OutlinePage() {
                     <h2 style={{ fontSize: '1.25rem', color: '#1A1A2E', fontWeight: 600, margin: 0 }}>
                       {templates.find((t) => t.type === outline.structure_type)?.name}
                     </h2>
+                  </div>
+                  <p style={{ color: '#64748B', fontSize: '0.875rem', margin: 0, marginBottom: '1rem' }}>
+                    {outline.structure_type.replace(/_/g, ' ')} • {outline.structure.acts.length} acts • {outline.total_chapters} chapters planned
+                  </p>
+
+                  <div>
                     <button
                       onClick={startGeneration}
                       disabled={isGenerating}
                       style={{
                         padding: '0.75rem 1.5rem',
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        background: isGenerating
+                          ? '#94A3B8'
+                          : 'linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%)',
                         border: 'none',
                         borderRadius: '8px',
                         color: '#fff',
                         fontSize: '1rem',
                         fontWeight: 600,
-                        cursor: 'pointer',
-                        boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
+                        cursor: isGenerating ? 'not-allowed' : 'pointer',
+                        boxShadow: isGenerating ? 'none' : '0 4px 14px rgba(139, 92, 246, 0.4)',
                       }}
                     >
-                      Start Generation
+                      Submit for Novel Generation
+                    </button>
+                    <p style={{ color: '#64748B', fontSize: '0.813rem', marginTop: '0.5rem', marginBottom: 0 }}>
+                      This will create {outline.total_chapters} chapters ({outline.target_word_count.toLocaleString()} words) and queue them for AI writing.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Bulk Actions */}
+                {outline.structure?.acts && outline.structure.acts.length > 0 && (
+                  <div style={{
+                    background: '#FFFFFF',
+                    border: '1px solid #E2E8F0',
+                    borderRadius: '12px',
+                    padding: '1rem 1.5rem',
+                    marginBottom: '1.5rem',
+                    display: 'flex',
+                    gap: '0.75rem',
+                    alignItems: 'center',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                  }}>
+                    <span style={{ fontSize: '0.875rem', color: '#64748B', fontWeight: 600 }}>
+                      Bulk Actions:
+                    </span>
+                    <button
+                      onClick={() => {
+                        setConfirmDialog({
+                          isOpen: true,
+                          title: 'Regenerate All Acts',
+                          message: 'This will regenerate all acts in the outline. This process may take several minutes. Continue?',
+                          confirmStyle: 'primary',
+                          onConfirm: () => {
+                            setConfirmDialog({ ...confirmDialog, isOpen: false });
+                            handleRegenerateAllActs();
+                          },
+                        });
+                      }}
+                      disabled={isGenerating}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: isGenerating ? '#94A3B8' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        border: 'none',
+                        borderRadius: '6px',
+                        color: '#FFFFFF',
+                        fontSize: '0.813rem',
+                        fontWeight: 500,
+                        cursor: isGenerating ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                      </svg>
+                      Regenerate All Acts
+                    </button>
+                    <button
+                      onClick={() => {
+                        setConfirmDialog({
+                          isOpen: true,
+                          title: 'Delete All Acts',
+                          message: 'This will remove the entire story outline. You\'ll need to regenerate all acts from scratch. This cannot be undone.',
+                          confirmStyle: 'danger',
+                          onConfirm: () => {
+                            setConfirmDialog({ ...confirmDialog, isOpen: false });
+                            handleDeleteAllActs();
+                          },
+                        });
+                      }}
+                      disabled={isGenerating}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: isGenerating ? '#94A3B8' : '#EF4444',
+                        border: 'none',
+                        borderRadius: '6px',
+                        color: '#FFFFFF',
+                        fontSize: '0.813rem',
+                        fontWeight: 500,
+                        cursor: isGenerating ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                      </svg>
+                      Delete All Acts
                     </button>
                   </div>
-                  <p style={{ color: '#64748B', fontSize: '0.875rem', margin: 0 }}>
-                    {outline.total_chapters} chapters • {outline.target_word_count.toLocaleString()} words target
-                  </p>
-                </div>
+                )}
 
                 {/* Acts and Chapters */}
                 {(!outline.structure?.acts || outline.structure.acts.length === 0) ? (
@@ -636,12 +901,210 @@ export default function OutlinePage() {
                       padding: '1.5rem',
                       marginBottom: '1.5rem',
                       boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                      position: 'relative',
                     }}
                   >
-                    <h3 style={{ fontSize: '1.125rem', marginBottom: '0.5rem', color: '#1A1A2E', fontWeight: 600 }}>
-                      {act.name || `Act ${act.number}`}
-                    </h3>
-                    <p style={{ color: '#64748B', marginBottom: '1.5rem', fontSize: '0.875rem' }}>{act.description || 'No description'}</p>
+                    {/* Act Header with Actions */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                      <div style={{ flex: 1 }}>
+                        {editingActNumber === act.number ? (
+                          <div>
+                            <input
+                              type="text"
+                              value={editedActData?.name || ''}
+                              onChange={(e) => setEditedActData({ ...editedActData!, name: e.target.value })}
+                              style={{
+                                width: '100%',
+                                padding: '0.5rem',
+                                fontSize: '1.125rem',
+                                fontWeight: 600,
+                                border: '1px solid #E2E8F0',
+                                borderRadius: '6px',
+                                marginBottom: '0.5rem',
+                              }}
+                              placeholder="Act name"
+                            />
+                            <textarea
+                              value={editedActData?.description || ''}
+                              onChange={(e) => setEditedActData({ ...editedActData!, description: e.target.value })}
+                              style={{
+                                width: '100%',
+                                padding: '0.5rem',
+                                fontSize: '0.875rem',
+                                border: '1px solid #E2E8F0',
+                                borderRadius: '6px',
+                                minHeight: '80px',
+                                resize: 'vertical',
+                              }}
+                              placeholder="Act description"
+                            />
+                          </div>
+                        ) : (
+                          <>
+                            <h3 style={{ fontSize: '1.125rem', marginBottom: '0.5rem', color: '#1A1A2E', fontWeight: 600, margin: 0 }}>
+                              {act.name || `Act ${act.number}`}
+                              {regeneratingActNumber === act.number && (
+                                <span style={{
+                                  marginLeft: '0.5rem',
+                                  fontSize: '0.75rem',
+                                  background: '#667eea',
+                                  color: '#FFFFFF',
+                                  padding: '0.25rem 0.5rem',
+                                  borderRadius: '4px',
+                                }}>
+                                  Regenerating...
+                                </span>
+                              )}
+                            </h3>
+                            <p style={{ color: '#64748B', fontSize: '0.875rem', marginTop: '0.5rem' }}>{act.description || 'No description'}</p>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div style={{ display: 'flex', gap: '0.5rem', marginLeft: '1rem' }}>
+                        {editingActNumber === act.number ? (
+                          <>
+                            <button
+                              onClick={saveActEdit}
+                              title="Save changes"
+                              style={{
+                                padding: '0.5rem',
+                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                border: 'none',
+                                borderRadius: '6px',
+                                color: '#FFFFFF',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '32px',
+                                height: '32px',
+                              }}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polyline points="20 6 9 17 4 12"/>
+                              </svg>
+                            </button>
+                            <button
+                              onClick={cancelEditingAct}
+                              title="Cancel editing"
+                              style={{
+                                padding: '0.5rem',
+                                background: '#F8FAFC',
+                                border: '1px solid #E2E8F0',
+                                borderRadius: '6px',
+                                color: '#64748B',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '32px',
+                                height: '32px',
+                              }}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                <line x1="6" y1="6" x2="18" y2="18"/>
+                              </svg>
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => startEditingAct(act)}
+                              disabled={isGenerating}
+                              title="Edit act"
+                              style={{
+                                padding: '0.5rem',
+                                background: isGenerating ? '#F8FAFC' : '#FFFFFF',
+                                border: '1px solid #E2E8F0',
+                                borderRadius: '6px',
+                                color: isGenerating ? '#94A3B8' : '#667eea',
+                                cursor: isGenerating ? 'not-allowed' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '32px',
+                                height: '32px',
+                              }}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setConfirmDialog({
+                                  isOpen: true,
+                                  title: `Regenerate Act ${act.number}`,
+                                  message: `This will regenerate Act ${act.number} and all its chapters. This may take a few minutes. Continue?`,
+                                  confirmStyle: 'primary',
+                                  onConfirm: () => {
+                                    setConfirmDialog({ ...confirmDialog, isOpen: false });
+                                    handleRegenerateAct(act.number);
+                                  },
+                                });
+                              }}
+                              disabled={isGenerating}
+                              title="Regenerate act"
+                              style={{
+                                padding: '0.5rem',
+                                background: isGenerating ? '#F8FAFC' : '#FFFFFF',
+                                border: '1px solid #E2E8F0',
+                                borderRadius: '6px',
+                                color: isGenerating ? '#94A3B8' : '#667eea',
+                                cursor: isGenerating ? 'not-allowed' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '32px',
+                                height: '32px',
+                              }}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => {
+                                const chaptersCount = act.chapters?.length || 0;
+                                setConfirmDialog({
+                                  isOpen: true,
+                                  title: `Delete Act ${act.number}`,
+                                  message: `This will remove Act ${act.number} and all its ${chaptersCount} chapter${chaptersCount !== 1 ? 's' : ''}. This cannot be undone.`,
+                                  confirmStyle: 'danger',
+                                  onConfirm: () => {
+                                    setConfirmDialog({ ...confirmDialog, isOpen: false });
+                                    handleDeleteAct(act.number);
+                                  },
+                                });
+                              }}
+                              disabled={isGenerating}
+                              title="Delete act"
+                              style={{
+                                padding: '0.5rem',
+                                background: isGenerating ? '#F8FAFC' : '#FFFFFF',
+                                border: '1px solid #E2E8F0',
+                                borderRadius: '6px',
+                                color: isGenerating ? '#94A3B8' : '#EF4444',
+                                cursor: isGenerating ? 'not-allowed' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '32px',
+                                height: '32px',
+                              }}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                              </svg>
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
 
                     {/* Chapters in this act */}
                     <div style={{ display: 'grid', gap: '0.75rem' }}>
@@ -760,6 +1223,16 @@ export default function OutlinePage() {
                 setError(null);
                 setGenerationStep('');
               }}
+            />
+
+            {/* Confirmation Dialog */}
+            <ConfirmDialog
+              isOpen={confirmDialog.isOpen}
+              title={confirmDialog.title}
+              message={confirmDialog.message}
+              confirmStyle={confirmDialog.confirmStyle}
+              onConfirm={confirmDialog.onConfirm}
+              onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
             />
           </div>
         </div>

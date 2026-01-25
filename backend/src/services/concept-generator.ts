@@ -45,6 +45,10 @@ export interface StoryPreferences {
   };
   timePeriodType?: 'past' | 'present' | 'future' | 'unknown' | 'custom';
   specificYear?: number;
+  // Time period constraints (Phase 5E)
+  timePeriodConstraints?: {
+    prohibitions: string[];
+  };
 }
 
 export interface StoryConcept {
@@ -229,7 +233,7 @@ export async function generateConcepts(
  * Build detailed time context for story generation based on time period settings
  */
 function buildTimeContext(preferences: StoryPreferences): { timeframeText: string; timeGuidance: string } {
-  const { timeframe, timePeriod, timePeriodType, specificYear } = preferences;
+  const { timeframe, timePeriod, timePeriodType, specificYear, timePeriodConstraints } = preferences;
   const currentYear = new Date().getFullYear();
 
   // Build timeframe text from either legacy or new format
@@ -258,6 +262,12 @@ function buildTimeContext(preferences: StoryPreferences): { timeframeText: strin
 - Naming conventions: Use modern names from diverse global cultures
 - Social structure: Consider current social dynamics, global connectivity
 - Include realistic modern references without dating the story`;
+
+        // Add constraints if provided
+        if (timePeriodConstraints?.prohibitions) {
+          timeGuidance += `
+- **PROHIBITED ELEMENTS:** ${timePeriodConstraints.prohibitions.join(', ')}`;
+        }
         break;
       case 'future':
         timeframeText = `Futuristic setting, approximately year ${currentYear + 500} (500 years in the future)`;
@@ -630,23 +640,24 @@ function parseConceptsResponse(responseText: string): StoryConcept[] {
 }
 
 /**
- * Generate 10 short concept summaries (title + logline only)
+ * Generate short concept summaries (title + logline only)
  * This is Stage 1 of the two-stage concept workflow
  */
 export async function generateConceptSummaries(
-  preferences: StoryPreferences
+  preferences: StoryPreferences,
+  count: number = 10
 ): Promise<ConceptSummary[]> {
   // Fetch exclusions from database
   const exclusions = fetchExclusions();
 
-  const prompt = buildSummaryPrompt(preferences, exclusions);
+  const prompt = buildSummaryPrompt(preferences, exclusions, count);
 
-  logger.info('[ConceptGenerator] Calling Claude API for summaries...');
+  logger.info(`[ConceptGenerator] Calling Claude API for ${count} summaries...`);
 
   try {
     const message = await anthropic.messages.create({
       model: 'claude-opus-4-5-20251101',
-      max_tokens: 2000,
+      max_tokens: count > 10 ? 4000 : 2000, // More tokens for 20 summaries
       temperature: 1.0, // High creativity
       messages: [
         {
@@ -678,7 +689,7 @@ export async function generateConceptSummaries(
 /**
  * Build prompt for generating concept summaries
  */
-function buildSummaryPrompt(preferences: StoryPreferences, exclusions?: ConceptExclusions): string {
+function buildSummaryPrompt(preferences: StoryPreferences, exclusions?: ConceptExclusions, count: number = 10): string {
   const { tone, tones, themes, customTheme, targetLength, additionalNotes, customIdeas, regenerationTimestamp } = preferences;
 
   const genreText = formatGenre(preferences);
@@ -710,7 +721,7 @@ ${GENERIC_TITLE_WORDS.join(' | ')}
 `;
   }
 
-  return `You are a master storyteller. Generate 10 SHORT concept summaries - just titles and loglines.
+  return `You are a master storyteller. Generate ${count} SHORT concept summaries - just titles and loglines.
 
 [Generation ID: ${uniqueSeed}]
 
@@ -726,7 +737,7 @@ ${timeGuidance ? `${timeGuidance}` : ''}
 ${exclusionSection}
 
 **REQUIREMENTS:**
-- Generate 10 UNIQUE concept summaries
+- Generate ${count} UNIQUE concept summaries
 - Each must have a completely ORIGINAL title (no generic titles)
 - Each logline must be a compelling 2-sentence hook
 - Vary protagonist types, settings, and conflict structures

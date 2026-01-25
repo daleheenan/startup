@@ -597,7 +597,7 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
   const [genreSearch, setGenreSearch] = useState('');
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     classic: true,
-    specialist: true,
+    specialist: false, // Collapsed by default per Phase 5E requirements
     modifiers: true,
     tones: true,
     themes: true,

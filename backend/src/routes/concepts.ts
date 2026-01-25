@@ -80,15 +80,19 @@ router.post('/refine', async (req, res) => {
 
 /**
  * POST /api/concepts/summaries
- * Generate 10 short concept summaries (Stage 1 of two-stage workflow)
+ * Generate short concept summaries (Stage 1 of two-stage workflow)
+ * Supports count parameter (default: 10, can be 20 for quick mode)
  */
 router.post('/summaries', async (req, res) => {
   try {
-    const { preferences } = req.body;
+    const { preferences, count = 10 } = req.body;
 
     if (!preferences) {
       return sendBadRequest(res, 'Missing preferences');
     }
+
+    // Validate count
+    const summaryCount = typeof count === 'number' && count > 0 && count <= 20 ? count : 10;
 
     // Normalize preferences
     const normalizedPreferences = {
@@ -101,9 +105,10 @@ router.post('/summaries', async (req, res) => {
 
     logger.info({
       genre: normalizedPreferences.genre || preferences.genres?.join(' + '),
+      count: summaryCount,
     }, 'Generating concept summaries');
 
-    const summaries = await generateConceptSummaries(normalizedPreferences as any);
+    const summaries = await generateConceptSummaries(normalizedPreferences as any, summaryCount);
 
     res.json({ success: true, summaries });
   } catch (error) {

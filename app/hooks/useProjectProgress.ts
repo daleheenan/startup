@@ -150,8 +150,19 @@ export function useProjectProgress(project: ProjectData | null, books: BookData[
 export function useProjectNavigation(
   projectId: string,
   project: ProjectData | null,
-  outline?: any // Optional outline data for completion check
-): { projectId: string; tabs: any[] } {
+  outline?: any, // Optional outline data for completion check
+  plotStructure?: any, // Optional plot structure data for prerequisite checks
+  proseStyle?: any, // Optional prose style data for prerequisite checks
+  isSubmitted?: boolean // Optional submission status for prerequisite checks
+): {
+  projectId: string;
+  tabs: any[];
+  project?: ProjectData | null;
+  plotStructure?: any;
+  outline?: any;
+  proseStyle?: any;
+  isSubmitted?: boolean;
+} {
   const tabs = useMemo(() => {
     const characterCount = project?.story_bible?.characters?.length || 0;
     const worldCount = countWorldElements(project?.story_bible?.world);
@@ -184,8 +195,16 @@ export function useProjectNavigation(
         route: '/world',
         icon: '🌍',
         badge: worldCount > 0 ? worldCount : undefined,
-        required: false,
-        status: hasWorld ? 'completed' : 'optional' as const,
+        required: true,
+        status: hasWorld ? 'completed' : 'required' as const,
+      },
+      {
+        id: 'plot',
+        label: 'Plot',
+        route: '/plot',
+        icon: '📊',
+        required: true,
+        status: 'optional' as const,
       },
       {
         id: 'outline',
@@ -196,25 +215,18 @@ export function useProjectNavigation(
         status: hasOutline ? 'completed' : 'required' as const,
       },
       {
-        id: 'chapters',
-        label: 'Chapters',
-        route: '/progress',
-        icon: '📖',
-        status: 'neutral' as const,
-      },
-      {
-        id: 'plot',
-        label: 'Plot',
-        route: '/plot',
-        icon: '📊',
-        required: false,
-        status: 'optional' as const,
-      },
-      {
         id: 'style',
         label: 'Style',
         route: '/prose-style',
         icon: '✨',
+        required: true,
+        status: 'neutral' as const,
+      },
+      {
+        id: 'chapters',
+        label: 'Chapters',
+        route: '/progress',
+        icon: '📖',
         status: 'neutral' as const,
       },
       {
@@ -230,5 +242,10 @@ export function useProjectNavigation(
   return {
     projectId,
     tabs,
+    project,
+    plotStructure,
+    outline,
+    proseStyle,
+    isSubmitted,
   };
 }

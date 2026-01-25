@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import PageLayout from '../../../components/shared/PageLayout';
 import PlotLayersVisualization from '../../../components/PlotLayersVisualization';
+import PlotWizard from '../../../components/plot/PlotWizard';
 import { getToken } from '../../../lib/auth';
 import { colors } from '../../../lib/constants';
 import { useProjectNavigation } from '../../../hooks/useProjectProgress';
@@ -51,6 +52,13 @@ interface Chapter {
   id: string;
   chapter_number: number;
   title: string | null;
+}
+
+interface Character {
+  id: string;
+  name: string;
+  role: string;
+  characterArc?: string;
 }
 
 const LAYER_COLORS = [
@@ -102,6 +110,10 @@ export default function PlotStructurePage() {
   const [generatingNewLayer, setGeneratingNewLayer] = useState(false);
   const [generatingField, setGeneratingField] = useState<'name' | 'description' | null>(null);
 
+  // Wizard mode state
+  const [isWizardMode, setIsWizardMode] = useState(false);
+  const [characters, setCharacters] = useState<Character[]>([]);
+
   // Modal state
   const [showLayerModal, setShowLayerModal] = useState(false);
   const [showPointModal, setShowPointModal] = useState(false);
@@ -138,6 +150,13 @@ export default function PlotStructurePage() {
         setProject(projectData);
         if (projectData.plot_structure) {
           setStructure(projectData.plot_structure);
+          // If there are no plot layers, default to wizard mode
+          if (!projectData.plot_structure.plot_layers || projectData.plot_structure.plot_layers.length === 0) {
+            setIsWizardMode(true);
+          }
+        } else {
+          // No plot structure at all, default to wizard mode
+          setIsWizardMode(true);
         }
       }
 
@@ -156,6 +175,13 @@ export default function PlotStructurePage() {
             setTotalChapters(chaptersData.chapters?.length || 25);
           }
         }
+      }
+
+      // Fetch characters
+      const charactersRes = await fetch(`${API_BASE_URL}/api/projects/${projectId}/characters`, { headers });
+      if (charactersRes.ok) {
+        const charactersData = await charactersRes.json();
+        setCharacters(charactersData.characters || []);
       }
     } catch (err: any) {
       console.error('Error fetching data:', err);
@@ -507,6 +533,30 @@ export default function PlotStructurePage() {
     saveStructure(newStructure);
   };
 
+  const handleWizardUpdate = async (plots: PlotLayer[]) => {
+    const newStructure = { ...structure, plot_layers: plots };
+    await saveStructure(newStructure);
+    setIsWizardMode(false);
+
+    // Show success message
+    const successMsg = document.createElement('div');
+    successMsg.style.cssText = `
+      position: fixed;
+      top: 2rem;
+      right: 2rem;
+      padding: 1rem 1.5rem;
+      background: #10B981;
+      color: #FFFFFF;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      z-index: 9999;
+    `;
+    successMsg.textContent = 'Plot structure saved successfully!';
+    document.body.appendChild(successMsg);
+    setTimeout(() => successMsg.remove(), 3000);
+  };
+
   const cardStyle = {
     background: '#FFFFFF',
     border: '1px solid #E2E8F0',
@@ -552,6 +602,9 @@ export default function PlotStructurePage() {
     );
   }
 
+  // Calculate book word count (estimate based on chapters)
+  const bookWordCount = totalChapters * 3000; // Rough estimate: 3000 words per chapter
+
   return (
     <PageLayout
       title="Plot Structure & Timeline"
@@ -574,8 +627,56 @@ export default function PlotStructurePage() {
           </div>
         )}
 
-        {/* Plot Visualization */}
-        <div style={cardStyle}>
+        {/* Mode Toggle */}
+        <div style={{
+          ...cardStyle,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}>
+          <div>
+            <h2 style={{ fontSize: '1.125rem', fontWeight: 600, color: colors.text, marginBottom: '0.5rem' }}>
+              {isWizardMode ? 'Wizard Mode' : 'Advanced Mode'}
+            </h2>
+            <p style={{ fontSize: '0.875rem', color: colors.textSecondary, margin: 0 }}>
+              {isWizardMode
+                ? 'Step-by-step guided workflow for building your plot structure'
+                : 'Full control over plot layers, points, and structure'
+              }
+            </p>
+          </div>
+          <button
+            onClick={() => setIsWizardMode(!isWizardMode)}
+            style={{
+              padding: '0.75rem 1.5rem',
+              background: isWizardMode ? '#FFFFFF' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              border: isWizardMode ? '1px solid #E2E8F0' : 'none',
+              borderRadius: '8px',
+              color: isWizardMode ? '#667eea' : '#FFFFFF',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            {isWizardMode ? 'Switch to Advanced Mode' : 'Switch to Wizard'}
+          </button>
+        </div>
+
+        {/* Wizard Mode */}
+        {isWizardMode ? (
+          <PlotWizard
+            projectId={projectId}
+            project={project}
+            characters={characters}
+            plotLayers={structure.plot_layers}
+            onUpdate={handleWizardUpdate}
+            bookWordCount={bookWordCount}
+          />
+        ) : (
+          <>
+            {/* Advanced Mode - Original UI */}
+            {/* Plot Visualization */}
+            <div style={cardStyle}>
           <h2 style={{ fontSize: '1.125rem', fontWeight: 600, color: colors.text, marginBottom: '1rem' }}>
             Plot Layers Visualization
           </h2>
@@ -1275,6 +1376,8 @@ export default function PlotStructurePage() {
               </div>
             </div>
           </div>
+        )}
+          </>
         )}
       </div>
     </PageLayout>
