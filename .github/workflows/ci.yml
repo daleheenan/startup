@@ -1,0 +1,117 @@
+name: CI - Build & Test
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build-frontend:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Run tests
+        run: npm run test:run
+        continue-on-error: true
+
+  build-backend:
+    name: Build Backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Build
+        working-directory: backend
+        run: npm run build
+
+      - name: Run tests
+        working-directory: backend
+        run: npm test
+        continue-on-error: true
+
+  node-version-check:
+    name: Verify Node Version Config
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check .nvmrc files
+        run: |
+          echo "Checking .nvmrc files..."
+          
+          if [ ! -f ".nvmrc" ]; then
+            echo "ERROR: Missing .nvmrc in root"
+            exit 1
+          fi
+          FRONTEND_NODE=$(cat .nvmrc | tr -d '[:space:]')
+          if [ "$FRONTEND_NODE" -lt 20 ]; then
+            echo "ERROR: Frontend .nvmrc must specify Node >= 20"
+            exit 1
+          fi
+          
+          if [ ! -f "backend/.nvmrc" ]; then
+            echo "ERROR: Missing backend/.nvmrc"
+            exit 1
+          fi
+          BACKEND_NODE=$(cat backend/.nvmrc | tr -d '[:space:]')
+          if [ "$BACKEND_NODE" -lt 20 ]; then
+            echo "ERROR: Backend .nvmrc must specify Node >= 20"
+            exit 1
+          fi
+          
+          echo "OK: All .nvmrc files specify Node 20+"
+
+      - name: Check package.json engines
+        run: |
+          echo "Checking package.json engine requirements..."
+          
+          FRONTEND_ENGINE=$(node -e "console.log(require('./package.json').engines?.node || 'not set')")
+          echo "Frontend engine: $FRONTEND_ENGINE"
+          
+          BACKEND_ENGINE=$(node -e "console.log(require('./backend/package.json').engines?.node || 'not set')")
+          echo "Backend engine: $BACKEND_ENGINE"
+
+      - name: Check nixpacks.toml
+        run: |
+          echo "Checking nixpacks.toml files..."
+          
+          if [ ! -f "nixpacks.toml" ]; then
+            echo "ERROR: Missing nixpacks.toml in root"
+            exit 1
+          fi
+          
+          if [ ! -f "backend/nixpacks.toml" ]; then
+            echo "ERROR: Missing backend/nixpacks.toml"
+            exit 1
+          fi
+          
+          echo "OK: nixpacks.toml files present"
