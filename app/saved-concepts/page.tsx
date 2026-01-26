@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { getToken, logout } from '../lib/auth';
 import { colors, borderRadius, shadows } from '../lib/constants';
 import PrimaryNavigationBar from '../components/shared/PrimaryNavigationBar';
@@ -35,10 +34,14 @@ export default function SavedConceptsPage() {
   const [editingConcept, setEditingConcept] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<SavedConcept>>({});
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterGenre, setFilterGenre] = useState<string>('all');
 
   useEffect(() => {
     loadConcepts();
   }, []);
+
+  // Get unique genres from concepts
+  const genres = Array.from(new Set(concepts.map(c => c.preferences?.genre).filter(Boolean) || []));
 
   const loadConcepts = async () => {
     try {
@@ -167,6 +170,12 @@ export default function SavedConceptsPage() {
     try {
       const token = getToken();
 
+      // Build preferences object, ensuring required fields are present
+      const preferences = {
+        ...concept.preferences,
+        genre: concept.preferences?.genre || 'General Fiction',  // Fallback if missing
+      };
+
       // Create project from concept
       const response = await fetch(`${API_BASE_URL}/api/projects`, {
         method: 'POST',
@@ -184,7 +193,7 @@ export default function SavedConceptsPage() {
             protagonistHint: concept.protagonist_hint,
             conflictType: concept.conflict_type,
           },
-          preferences: concept.preferences
+          preferences: preferences
         }),
       });
 
@@ -216,6 +225,7 @@ export default function SavedConceptsPage() {
   // Filter concepts
   const filteredConcepts = concepts.filter(concept => {
     if (filterStatus !== 'all' && concept.status !== filterStatus) return false;
+    if (filterGenre !== 'all' && concept.preferences?.genre !== filterGenre) return false;
     return true;
   });
 
@@ -258,44 +268,40 @@ export default function SavedConceptsPage() {
         borderBottom: `1px solid ${colors.border}`,
       }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h1 style={{
-                fontSize: '1.75rem',
-                fontWeight: 700,
-                color: colors.text,
-                margin: 0,
-              }}>
-                Story Concepts
-              </h1>
-              <p style={{ fontSize: '0.9375rem', color: colors.textSecondary, margin: '0.25rem 0 0' }}>
-                Detailed story concepts ready to become your next book
-              </p>
-            </div>
-            <Link
-              href="/new"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.75rem 1.5rem',
-                background: `linear-gradient(135deg, ${colors.brandStart} 0%, ${colors.brandEnd} 100%)`,
-                color: 'white',
-                borderRadius: borderRadius.md,
-                textDecoration: 'none',
-                fontSize: '0.9375rem',
-                fontWeight: 500,
-                boxShadow: shadows.md,
-              }}
-            >
-              <span>+</span>
-              <span>Generate New Concepts</span>
-            </Link>
+          <div>
+            <h1 style={{
+              fontSize: '1.75rem',
+              fontWeight: 700,
+              color: colors.text,
+              margin: 0,
+            }}>
+              Story Concepts
+            </h1>
+            <p style={{ fontSize: '0.9375rem', color: colors.textSecondary, margin: '0.25rem 0 0' }}>
+              Detailed story concepts ready to become your next book
+            </p>
           </div>
 
-          {/* Filter */}
+          {/* Filters */}
           {concepts.length > 0 && (
-            <div style={{ marginTop: '1rem' }}>
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+              <select
+                value={filterGenre}
+                onChange={(e) => setFilterGenre(e.target.value)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: borderRadius.sm,
+                  fontSize: '0.875rem',
+                  background: colors.surface,
+                  color: colors.text,
+                }}
+              >
+                <option value="all">All Genres</option>
+                {genres.map(genre => (
+                  <option key={genre} value={genre}>{genre}</option>
+                ))}
+              </select>
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
@@ -346,30 +352,11 @@ export default function SavedConceptsPage() {
               <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: colors.text }}>
                 {concepts.length === 0 ? 'No Saved Concepts Yet' : 'No Matching Concepts'}
               </h2>
-              <p style={{ fontSize: '1rem', color: colors.textSecondary, marginBottom: '2rem' }}>
+              <p style={{ fontSize: '1rem', color: colors.textSecondary }}>
                 {concepts.length === 0
-                  ? 'When you generate story concepts, you can save your favorites to revisit later.'
-                  : 'Try adjusting your filter to see more concepts.'}
+                  ? 'Generate concepts from Quick Start or Full Customization, then save your favorites here.'
+                  : 'Try adjusting your filters to see more concepts.'}
               </p>
-              {concepts.length === 0 && (
-                <Link
-                  href="/new"
-                  style={{
-                    display: 'inline-block',
-                    padding: '1rem 2rem',
-                    background: `linear-gradient(135deg, ${colors.brandStart} 0%, ${colors.brandEnd} 100%)`,
-                    border: 'none',
-                    borderRadius: borderRadius.md,
-                    color: 'white',
-                    fontSize: '1rem',
-                    fontWeight: 600,
-                    textDecoration: 'none',
-                    boxShadow: shadows.md,
-                  }}
-                >
-                  Generate New Concepts
-                </Link>
-              )}
             </div>
           ) : (
             <div style={{ display: 'grid', gap: '1rem' }}>
@@ -528,9 +515,21 @@ export default function SavedConceptsPage() {
                             </span>
                           )}
                         </div>
-                        <p style={{ fontSize: '0.9375rem', color: colors.textSecondary, fontStyle: 'italic', marginBottom: '1rem' }}>
+                        <p style={{ fontSize: '0.9375rem', color: colors.textSecondary, fontStyle: 'italic', marginBottom: '0.5rem' }}>
                           {concept.logline}
                         </p>
+
+                        {/* Save date and genre - always visible */}
+                        <div style={{
+                          fontSize: '0.75rem',
+                          color: colors.textTertiary,
+                          display: 'flex',
+                          gap: '1.5rem',
+                          marginBottom: expandedConcept === concept.id ? '1rem' : 0,
+                        }}>
+                          <span>Genre: {concept.preferences?.genre || 'Not specified'}</span>
+                          <span>Saved: {new Date(concept.created_at).toLocaleDateString()}</span>
+                        </div>
 
                         {expandedConcept === concept.id && (
                           <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: `1px solid ${colors.border}` }}>
@@ -569,16 +568,6 @@ export default function SavedConceptsPage() {
                                 </div>
                               </div>
                             )}
-                            <div style={{
-                              fontSize: '0.75rem',
-                              color: colors.textTertiary,
-                              marginTop: '1rem',
-                              display: 'flex',
-                              gap: '1.5rem',
-                            }}>
-                              <span>Genre: {concept.preferences?.genre || 'Not specified'}</span>
-                              <span>Saved: {new Date(concept.created_at).toLocaleDateString()}</span>
-                            </div>
                           </div>
                         )}
                       </div>

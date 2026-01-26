@@ -28,18 +28,6 @@ export const PRIMARY_NAV_ITEMS: PrimaryNavigationItem[] = [
     icon: '✨',
   },
   {
-    id: 'story-ideas',
-    label: 'Story Ideas',
-    href: '/story-ideas',
-    icon: '💡',
-  },
-  {
-    id: 'story-concepts',
-    label: 'Story Concepts',
-    href: '/saved-concepts',
-    icon: '📝',
-  },
-  {
     id: 'quick-start',
     label: 'Quick Start',
     href: '/quick-start',
@@ -50,6 +38,18 @@ export const PRIMARY_NAV_ITEMS: PrimaryNavigationItem[] = [
     label: 'Full Customization',
     href: '/full-customization',
     icon: '🎨',
+  },
+  {
+    id: 'story-ideas',
+    label: 'Story Ideas',
+    href: '/story-ideas',
+    icon: '💡',
+  },
+  {
+    id: 'story-concepts',
+    label: 'Story Concepts',
+    href: '/saved-concepts',
+    icon: '📝',
   },
   {
     id: 'settings',

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { colors, borderRadius, shadows } from '@/app/lib/constants';
 import PrimaryNavigationBar from '@/app/components/shared/PrimaryNavigationBar';
+import GenerationProgress from '@/app/components/GenerationProgress';
 import {
   useStoryIdeas,
   useDeleteStoryIdea,
@@ -25,6 +26,9 @@ export default function StoryIdeasPage() {
   const [editForm, setEditForm] = useState<Partial<SavedStoryIdea>>({});
   const [filterGenre, setFilterGenre] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [expandingIdeaId, setExpandingIdeaId] = useState<string | null>(null);
+  const [expandingMode, setExpandingMode] = useState<IdeaExpansionMode | null>(null);
+  const [expandError, setExpandError] = useState<string | null>(null);
 
   // Get unique genres from ideas
   const genres = Array.from(new Set(ideas?.map(i => i.genre).filter(Boolean) || []));
@@ -67,13 +71,23 @@ export default function StoryIdeasPage() {
   };
 
   const handleExpand = async (ideaId: string, mode: IdeaExpansionMode) => {
+    setExpandingIdeaId(ideaId);
+    setExpandingMode(mode);
+    setExpandError(null);
     try {
       await expandIdeaMutation.mutateAsync({ id: ideaId, mode });
       // Redirect to saved concepts page to see the new concepts
       router.push('/saved-concepts');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error expanding idea:', err);
+      setExpandError(err.message || 'Failed to generate concepts');
     }
+  };
+
+  const handleCancelExpand = () => {
+    setExpandingIdeaId(null);
+    setExpandingMode(null);
+    setExpandError(null);
   };
 
   if (isLoading) {
@@ -115,39 +129,18 @@ export default function StoryIdeasPage() {
         borderBottom: `1px solid ${colors.border}`,
       }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h1 style={{
-                fontSize: '1.75rem',
-                fontWeight: 700,
-                color: colors.text,
-                margin: 0,
-              }}>
-                Story Ideas
-              </h1>
-              <p style={{ fontSize: '0.9375rem', color: colors.textSecondary, margin: '0.25rem 0 0' }}>
-                Your saved 3-line story premises ready to expand into full concepts
-              </p>
-            </div>
-            <Link
-              href="/new"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.75rem 1.5rem',
-                background: `linear-gradient(135deg, ${colors.brandStart} 0%, ${colors.brandEnd} 100%)`,
-                color: 'white',
-                borderRadius: borderRadius.md,
-                textDecoration: 'none',
-                fontSize: '0.9375rem',
-                fontWeight: 500,
-                boxShadow: shadows.md,
-              }}
-            >
-              <span>+</span>
-              <span>Generate New Ideas</span>
-            </Link>
+          <div>
+            <h1 style={{
+              fontSize: '1.75rem',
+              fontWeight: 700,
+              color: colors.text,
+              margin: 0,
+            }}>
+              Story Ideas
+            </h1>
+            <p style={{ fontSize: '0.9375rem', color: colors.textSecondary, margin: '0.25rem 0 0' }}>
+              Your saved 3-line story premises ready to expand into full concepts
+            </p>
           </div>
 
           {/* Filters */}
@@ -367,10 +360,19 @@ export default function StoryIdeasPage() {
                           fontSize: '1rem',
                           color: colors.text,
                           lineHeight: 1.6,
-                          marginBottom: expandedIdea === idea.id ? '1rem' : 0,
+                          marginBottom: '0.5rem',
                         }}>
                           {idea.story_idea}
                         </p>
+
+                        {/* Save date - always visible */}
+                        <div style={{
+                          fontSize: '0.75rem',
+                          color: colors.textTertiary,
+                          marginBottom: expandedIdea === idea.id ? '1rem' : 0,
+                        }}>
+                          Saved: {new Date(idea.created_at).toLocaleDateString()}
+                        </div>
 
                         {expandedIdea === idea.id && (
                           <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: `1px solid ${colors.border}` }}>
@@ -549,6 +551,17 @@ export default function StoryIdeasPage() {
           )}
         </div>
       </main>
+
+      {/* Progress Modal for Concept Generation */}
+      <GenerationProgress
+        isActive={expandingIdeaId !== null}
+        title="Generating Story Concepts"
+        subtitle={`Creating ${expandingMode === 'concepts_10' ? '10' : '5'} detailed concepts from your story idea`}
+        currentStep={expandIdeaMutation.isPending ? 'Generating concepts with AI...' : 'Preparing...'}
+        estimatedTime={expandingMode === 'concepts_10' ? 120 : 60}
+        error={expandError}
+        onCancel={handleCancelExpand}
+      />
 
       <style jsx>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
