@@ -141,22 +141,172 @@ export default function ProjectDetailPage() {
       projectNavigation={navigation}
     >
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-            {/* Project Details */}
-            <div style={{ ...card, marginBottom: '1rem' }}>
-              <h2 style={{ fontSize: '1.125rem', marginBottom: '1rem', color: '#1A1A2E', fontWeight: 600 }}>
-                Project Details
-              </h2>
-              <div style={{ display: 'grid', gap: '0.75rem', color: '#64748B', fontSize: '0.875rem' }}>
-                <div>
-                  <strong style={{ color: '#374151' }}>Created:</strong>{' '}
-                  {new Date(project.created_at).toLocaleString()}
+            {/* Story Concept Section - Prominent display */}
+            {project.story_concept && (project.story_concept.logline || project.story_concept.synopsis) && (
+              <div style={{
+                ...card,
+                marginBottom: '1.5rem',
+                padding: '1.5rem',
+                background: colors.brandLight,
+                border: `2px solid ${colors.brandBorder}`,
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                  <h2 style={{ fontSize: '1.5rem', color: colors.text, fontWeight: 700, margin: 0 }}>
+                    Story Concept
+                  </h2>
+                  <Link
+                    href="/saved-summaries"
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: colors.surface,
+                      border: `1px solid ${colors.brandBorder}`,
+                      borderRadius: borderRadius.md,
+                      color: colors.brandText,
+                      fontSize: '0.75rem',
+                      fontWeight: 500,
+                      textDecoration: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.375rem',
+                    }}
+                  >
+                    View Saved Summaries
+                  </Link>
                 </div>
-                <div>
-                  <strong style={{ color: '#374151' }}>Last Updated:</strong>{' '}
-                  {new Date(project.updated_at).toLocaleString()}
+
+                <div style={{ display: 'grid', gap: '1.25rem' }}>
+                  {project.story_concept.logline && (
+                    <div>
+                      <strong style={{
+                        color: colors.brandText,
+                        display: 'block',
+                        marginBottom: '0.5rem',
+                        fontSize: '0.875rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        fontWeight: 600,
+                      }}>
+                        Logline
+                      </strong>
+                      <p style={{
+                        margin: 0,
+                        fontStyle: 'italic',
+                        lineHeight: '1.7',
+                        fontSize: '1.125rem',
+                        color: colors.text,
+                      }}>
+                        {project.story_concept.logline}
+                      </p>
+                    </div>
+                  )}
+
+                  {project.story_concept.synopsis && (
+                    <div>
+                      <strong style={{
+                        color: colors.brandText,
+                        display: 'block',
+                        marginBottom: '0.5rem',
+                        fontSize: '0.875rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        fontWeight: 600,
+                      }}>
+                        Synopsis
+                      </strong>
+                      <p style={{
+                        margin: 0,
+                        lineHeight: '1.7',
+                        fontSize: '0.95rem',
+                        color: colors.textSecondary,
+                      }}>
+                        {project.story_concept.synopsis}
+                      </p>
+                    </div>
+                  )}
+
+                  {project.story_concept.hook && (
+                    <div style={{
+                      padding: '1rem',
+                      background: gradients.brand,
+                      borderRadius: borderRadius.md,
+                      border: `1px solid ${colors.brandBorder}`,
+                    }}>
+                      <strong style={{
+                        color: colors.surface,
+                        display: 'block',
+                        marginBottom: '0.5rem',
+                        fontSize: '0.875rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        fontWeight: 600,
+                      }}>
+                        Hook
+                      </strong>
+                      <p style={{
+                        margin: 0,
+                        lineHeight: '1.6',
+                        fontSize: '0.95rem',
+                        color: colors.surface,
+                      }}>
+                        {project.story_concept.hook}
+                      </p>
+                    </div>
+                  )}
+
+                  {(project.story_concept.protagonistHint || project.story_concept.conflictType) && (
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                      gap: '1rem',
+                      marginTop: '0.5rem',
+                    }}>
+                      {project.story_concept.protagonistHint && (
+                        <div>
+                          <strong style={{
+                            color: colors.brandText,
+                            display: 'block',
+                            marginBottom: '0.25rem',
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                          }}>
+                            Protagonist
+                          </strong>
+                          <p style={{
+                            margin: 0,
+                            lineHeight: '1.5',
+                            fontSize: '0.875rem',
+                            color: colors.textSecondary,
+                          }}>
+                            {project.story_concept.protagonistHint}
+                          </p>
+                        </div>
+                      )}
+                      {project.story_concept.conflictType && (
+                        <div>
+                          <strong style={{
+                            color: colors.brandText,
+                            display: 'block',
+                            marginBottom: '0.25rem',
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                          }}>
+                            Core Conflict
+                          </strong>
+                          <p style={{
+                            margin: 0,
+                            lineHeight: '1.5',
+                            fontSize: '0.875rem',
+                            color: colors.textSecondary,
+                          }}>
+                            {project.story_concept.conflictType}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Quick Links - show when no story concept */}
             {(!project.story_concept || (!project.story_concept.logline && !project.story_concept.synopsis)) && (
@@ -202,77 +352,6 @@ export default function ProjectDetailPage() {
                       Saved Concepts
                     </Link>
                   </div>
-                </div>
-              </div>
-            )}
-
-            {/* Story Concept Section */}
-            {project.story_concept && (project.story_concept.logline || project.story_concept.synopsis) && (
-              <div style={{ ...card, marginBottom: '1rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                  <h2 style={{ fontSize: '1.125rem', color: '#1A1A2E', fontWeight: 600, margin: 0 }}>
-                    Story Concept
-                  </h2>
-                  <Link
-                    href="/saved-summaries"
-                    style={{
-                      padding: '0.5rem 1rem',
-                      background: colors.surface,
-                      border: `1px solid ${colors.border}`,
-                      borderRadius: borderRadius.md,
-                      color: colors.brandStart,
-                      fontSize: '0.75rem',
-                      fontWeight: 500,
-                      textDecoration: 'none',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.375rem',
-                    }}
-                  >
-                    View Saved Summaries
-                  </Link>
-                </div>
-                <div style={{ display: 'grid', gap: '1rem', color: '#64748B', fontSize: '0.875rem' }}>
-                  {project.story_concept.logline && (
-                    <div>
-                      <strong style={{ color: '#374151', display: 'block', marginBottom: '0.25rem' }}>Logline</strong>
-                      <p style={{ margin: 0, fontStyle: 'italic', lineHeight: '1.5' }}>
-                        {project.story_concept.logline}
-                      </p>
-                    </div>
-                  )}
-                  {project.story_concept.synopsis && (
-                    <div>
-                      <strong style={{ color: '#374151', display: 'block', marginBottom: '0.25rem' }}>Synopsis</strong>
-                      <p style={{ margin: 0, lineHeight: '1.6' }}>
-                        {project.story_concept.synopsis}
-                      </p>
-                    </div>
-                  )}
-                  {project.story_concept.hook && (
-                    <div>
-                      <strong style={{ color: '#374151', display: 'block', marginBottom: '0.25rem' }}>Hook</strong>
-                      <p style={{ margin: 0, lineHeight: '1.5' }}>
-                        {project.story_concept.hook}
-                      </p>
-                    </div>
-                  )}
-                  {project.story_concept.protagonistHint && (
-                    <div>
-                      <strong style={{ color: '#374151', display: 'block', marginBottom: '0.25rem' }}>Protagonist</strong>
-                      <p style={{ margin: 0, lineHeight: '1.5' }}>
-                        {project.story_concept.protagonistHint}
-                      </p>
-                    </div>
-                  )}
-                  {project.story_concept.conflictType && (
-                    <div>
-                      <strong style={{ color: '#374151', display: 'block', marginBottom: '0.25rem' }}>Core Conflict</strong>
-                      <p style={{ margin: 0, lineHeight: '1.5' }}>
-                        {project.story_concept.conflictType}
-                      </p>
-                    </div>
-                  )}
                 </div>
               </div>
             )}

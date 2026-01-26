@@ -13,6 +13,7 @@ export interface Project {
   story_dna: StoryDNA | null;
   story_bible: StoryBible | null;
   series_bible: SeriesBible | null;  // Sprint 8: Aggregated trilogy data
+  plot_structure?: PlotStructure | null;  // Plot layers and structure
   book_count: number;                 // Sprint 8: Number of books in series
   universe_id: string | null;         // Link to shared universe
   is_universe_root: boolean;          // Is this the origin project for a universe?
@@ -816,4 +817,196 @@ export interface ProjectNavigationTab {
   route: string;
   icon?: string;
   badge?: string | number;
+}
+
+// Plagiarism/Originality Checking Types
+
+export type PlagiarismCheckStatus = 'pending' | 'checking' | 'passed' | 'flagged' | 'requires_review' | 'error';
+
+export interface SimilarWork {
+  title: string;
+  author: string;
+  similarity: number; // 0-100 percentage
+  matchedElements: string[]; // What elements matched (plot, character, setting, etc.)
+  description: string; // Brief description of the similar work
+  publicationYear?: number;
+}
+
+export interface OriginalityScore {
+  overall: number; // 0-100 (100 = completely original)
+  plotOriginality: number;
+  characterOriginality: number;
+  settingOriginality: number;
+  themeOriginality: number;
+  premiseOriginality: number;
+}
+
+export interface PlagiarismFlag {
+  id: string;
+  type: 'plot_similarity' | 'character_similarity' | 'premise_similarity' | 'title_similarity' | 'trope_overuse';
+  severity: 'low' | 'medium' | 'high';
+  description: string;
+  similarTo: string; // What existing work it's similar to
+  suggestion: string; // How to differentiate
+  location?: string; // Where in the content this appears
+}
+
+export interface PlagiarismCheckResult {
+  id: string;
+  contentType: 'concept' | 'summary' | 'chapter' | 'story_idea';
+  contentId: string;
+  checkedAt: string;
+  status: PlagiarismCheckStatus;
+  originalityScore: OriginalityScore;
+  similarWorks: SimilarWork[];
+  flags: PlagiarismFlag[];
+  recommendations: string[];
+  analysisDetails: {
+    tropesIdentified: string[];
+    archetypesUsed: string[];
+    uniqueElements: string[];
+    concerningPatterns: string[];
+  };
+  usage?: {
+    input_tokens: number;
+    output_tokens: number;
+  };
+}
+
+export interface BatchPlagiarismResult {
+  totalChecked: number;
+  passedCount: number;
+  flaggedCount: number;
+  averageOriginalityScore: number;
+  results: PlagiarismCheckResult[];
+}
+
+// ============================================
+// Navigation & Workflow Types (Phase 5D)
+// ============================================
+
+// Primary navigation sections
+export type NavigationSection =
+  | 'projects'
+  | 'new-novel'
+  | 'story-ideas'
+  | 'story-concepts'
+  | 'quick-start'
+  | 'fully-customized'
+  | 'settings';
+
+export interface PrimaryNavigationItem {
+  id: NavigationSection;
+  label: string;
+  href: string;
+  icon: string;
+  badge?: number | string;
+}
+
+// Workflow step types for project creation
+export type WorkflowStep =
+  | 'concept'      // Story concept exists
+  | 'characters'   // Characters created
+  | 'world'        // World elements defined
+  | 'plots'        // Plot layers created
+  | 'outline'      // Outline generated
+  | 'chapters'     // Chapters exist (at least 1)
+  | 'analytics';   // Chapters have content
+
+export interface WorkflowRequirement {
+  step: WorkflowStep;
+  requiredSteps: WorkflowStep[];
+  label: string;
+  route: string;
+  icon: string;
+}
+
+// Tab status for visual indicators
+export type TabStatus = 'active' | 'completed' | 'required' | 'optional' | 'locked';
+
+// Story idea expansion modes
+export type IdeaExpansionMode = 'concepts_5' | 'concepts_10';
+
+export interface StoryIdeaExpansionRequest {
+  ideaId: string;
+  storyIdea: string;
+  characterConcepts: string[];
+  plotElements: string[];
+  uniqueTwists: string[];
+  preferences: {
+    genre?: string;
+    subgenre?: string;
+    tone?: string;
+    themes?: string[];
+    timePeriod?: TimePeriod;
+    projectStructure?: ProjectType;
+  };
+  mode: IdeaExpansionMode;
+}
+
+// Saved Story Idea type (matches database)
+export interface SavedStoryIdea {
+  id: string;
+  story_idea: string;
+  character_concepts: string[];
+  plot_elements: string[];
+  unique_twists: string[];
+  genre: string;
+  subgenre: string | null;
+  tone: string | null;
+  themes: string[];
+  notes: string | null;
+  status: 'saved' | 'used' | 'archived';
+  project_structure?: ProjectType;
+  time_period?: TimePeriod;
+  created_at: string;
+  updated_at: string;
+}
+
+// Saved Story Concept type (matches database)
+export interface SavedStoryConcept {
+  id: string;
+  title: string;
+  logline: string;
+  synopsis: string;
+  hook: string;
+  protagonist_hint: string | null;
+  conflict_type: string | null;
+  preferences: {
+    genre?: string;
+    subgenre?: string;
+    tone?: string;
+    themes?: string[];
+    timePeriod?: TimePeriod;
+    projectStructure?: ProjectType;
+  } | null;
+  notes: string | null;
+  status: 'saved' | 'used' | 'archived';
+  source_idea_id: string | null;  // Link to story idea if expanded from one
+  created_at: string;
+  updated_at: string;
+}
+
+// Extended PlotLayer type with deletable flag
+export interface ExtendedPlotLayer extends PlotLayer {
+  deletable: boolean;
+  editable: boolean;
+}
+
+// Workflow status response
+export interface WorkflowStatus {
+  projectId: string;
+  steps: Record<WorkflowStep, {
+    completed: boolean;
+    updatedAt?: string;
+  }>;
+  canGenerate: boolean;
+  nextStep: WorkflowStep | null;
+}
+
+// Navigation badge counts
+export interface NavigationCounts {
+  storyIdeas: number;
+  savedConcepts: number;
+  activeProjects: number;
 }

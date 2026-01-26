@@ -307,4 +307,128 @@ router.delete('/saved/:id', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/story-ideas/:id/expand
+ * Expand a story idea into full story concepts (5 or 10)
+ */
+router.post('/:id/expand', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { mode, preferences } = req.body;
+
+    // Validate mode
+    if (!mode || !['concepts_5', 'concepts_10'].includes(mode)) {
+      return sendBadRequest(res, 'Invalid mode. Must be concepts_5 or concepts_10');
+    }
+
+    // Get the story idea
+    const stmt = db.prepare('SELECT * FROM saved_story_ideas WHERE id = ?');
+    const row = stmt.get(id) as any;
+
+    if (!row) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Story idea not found' },
+      });
+    }
+
+    const idea = {
+      id: row.id,
+      storyIdea: row.story_idea,
+      characterConcepts: JSON.parse(row.character_concepts || '[]'),
+      plotElements: JSON.parse(row.plot_elements || '[]'),
+      uniqueTwists: JSON.parse(row.unique_twists || '[]'),
+      genre: row.genre,
+      subgenre: row.subgenre,
+      tone: row.tone,
+      themes: JSON.parse(row.themes || '[]'),
+    };
+
+    const conceptCount = mode === 'concepts_5' ? 5 : 10;
+
+    logger.info({
+      ideaId: id,
+      mode,
+      conceptCount,
+    }, 'Expanding story idea into concepts');
+
+    // Generate concepts from the idea using the concept generator service
+    // Import and use the concept generator
+    const { conceptGenerator } = await import('../services/concept-generator.js');
+
+    const concepts = await conceptGenerator.expandFromIdea({
+      idea,
+      count: conceptCount,
+      preferences: preferences || {},
+    });
+
+    // Save each concept to the database
+    const savedConcepts = [];
+    const now = new Date().toISOString();
+
+    for (const concept of concepts) {
+      const conceptId = uuidv4();
+
+      const insertStmt = db.prepare(`
+        INSERT INTO saved_concepts (
+          id, title, logline, synopsis, hook, protagonist_hint, conflict_type,
+          preferences, notes, status, source_idea_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'saved', ?, ?, ?)
+      `);
+
+      insertStmt.run(
+        conceptId,
+        concept.title,
+        concept.logline,
+        concept.synopsis,
+        concept.hook || null,
+        concept.protagonistHint || null,
+        concept.conflictType || null,
+        JSON.stringify({
+          genre: idea.genre,
+          subgenre: idea.subgenre,
+          tone: idea.tone,
+          themes: idea.themes,
+          ...preferences,
+        }),
+        null, // notes
+        id, // source_idea_id
+        now,
+        now
+      );
+
+      // Destructure to exclude original id from concept
+      const { id: _originalId, ...conceptData } = concept;
+      savedConcepts.push({
+        id: conceptId,
+        ...conceptData,
+        status: 'saved',
+        source_idea_id: id,
+        created_at: now,
+      });
+    }
+
+    // Mark the idea as used
+    const updateStmt = db.prepare(`
+      UPDATE saved_story_ideas SET status = 'used', updated_at = ? WHERE id = ?
+    `);
+    updateStmt.run(now, id);
+
+    logger.info({
+      ideaId: id,
+      conceptsCreated: savedConcepts.length,
+    }, 'Story idea expanded successfully');
+
+    res.json({
+      success: true,
+      concepts: savedConcepts,
+      sourceIdeaId: id,
+    });
+  } catch (error) {
+    if (isRateLimitError(error)) {
+      return sendRateLimitError(res);
+    }
+    sendInternalError(res, error, 'expanding story idea');
+  }
+});
+
 export default router;

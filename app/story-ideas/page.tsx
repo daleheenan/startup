@@ -1,205 +1,87 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getToken, logout } from '../lib/auth';
-import { colors, borderRadius, shadows } from '../lib/constants';
-import PrimaryNavigationBar from '../components/shared/PrimaryNavigationBar';
-import OriginalityChecker from '../components/OriginalityChecker';
+import { colors, borderRadius, shadows } from '@/app/lib/constants';
+import PrimaryNavigationBar from '@/app/components/shared/PrimaryNavigationBar';
+import {
+  useStoryIdeas,
+  useDeleteStoryIdea,
+  useUpdateStoryIdea,
+  useExpandStoryIdea,
+} from '@/app/hooks/useStoryIdeas';
+import type { SavedStoryIdea, IdeaExpansionMode } from '@/shared/types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
-interface SavedConcept {
-  id: string;
-  title: string;
-  logline: string;
-  synopsis: string;
-  hook: string | null;
-  protagonist_hint: string | null;
-  conflict_type: string | null;
-  preferences: any;
-  notes: string | null;
-  status: 'saved' | 'used' | 'archived';
-  created_at: string;
-  updated_at: string;
-}
-
-export default function SavedConceptsPage() {
+export default function StoryIdeasPage() {
   const router = useRouter();
-  const [concepts, setConcepts] = useState<SavedConcept[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [expandedConcept, setExpandedConcept] = useState<string | null>(null);
-  const [showOriginalityCheck, setShowOriginalityCheck] = useState<string | null>(null);
-  const [editingConcept, setEditingConcept] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<Partial<SavedConcept>>({});
+  const { data: ideas, isLoading, error } = useStoryIdeas();
+  const deleteIdeaMutation = useDeleteStoryIdea();
+  const updateIdeaMutation = useUpdateStoryIdea();
+  const expandIdeaMutation = useExpandStoryIdea();
+
+  const [expandedIdea, setExpandedIdea] = useState<string | null>(null);
+  const [editingIdea, setEditingIdea] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Partial<SavedStoryIdea>>({});
+  const [showExpansionModal, setShowExpansionModal] = useState<string | null>(null);
+  const [filterGenre, setFilterGenre] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
 
-  useEffect(() => {
-    loadConcepts();
-  }, []);
+  // Get unique genres from ideas
+  const genres = Array.from(new Set(ideas?.map(i => i.genre).filter(Boolean) || []));
 
-  const loadConcepts = async () => {
-    try {
-      setIsLoading(true);
-      const token = getToken();
-      const response = await fetch(`${API_BASE_URL}/api/saved-concepts`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+  // Filter ideas
+  const filteredIdeas = ideas?.filter(idea => {
+    if (filterGenre !== 'all' && idea.genre !== filterGenre) return false;
+    if (filterStatus !== 'all' && idea.status !== filterStatus) return false;
+    return true;
+  });
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          logout();
-          window.location.href = '/login';
-          return;
-        }
-        throw new Error('Failed to load saved concepts');
-      }
-
-      const data = await response.json();
-      setConcepts(data.concepts || data);
-    } catch (err: any) {
-      console.error('Error loading concepts:', err);
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleDelete = async (conceptId: string) => {
-    if (!confirm('Are you sure you want to delete this saved concept?')) {
+  const handleDelete = async (ideaId: string) => {
+    if (!confirm('Are you sure you want to delete this story idea?')) {
       return;
     }
-
-    try {
-      const token = getToken();
-      const response = await fetch(`${API_BASE_URL}/api/saved-concepts/${conceptId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete concept');
-      }
-
-      setConcepts(concepts.filter(c => c.id !== conceptId));
-    } catch (err: any) {
-      console.error('Error deleting concept:', err);
-      setError(err.message);
-    }
+    deleteIdeaMutation.mutate(ideaId);
   };
 
-  const handleStartEdit = (concept: SavedConcept) => {
-    setEditingConcept(concept.id);
+  const handleStartEdit = (idea: SavedStoryIdea) => {
+    setEditingIdea(idea.id);
     setEditForm({
-      title: concept.title,
-      logline: concept.logline,
-      synopsis: concept.synopsis,
-      hook: concept.hook,
-      notes: concept.notes,
+      story_idea: idea.story_idea,
+      character_concepts: [...idea.character_concepts],
+      plot_elements: [...idea.plot_elements],
+      unique_twists: [...idea.unique_twists],
+      notes: idea.notes,
     });
   };
 
   const handleSaveEdit = async () => {
-    if (!editingConcept) return;
-
-    try {
-      const token = getToken();
-      const response = await fetch(`${API_BASE_URL}/api/saved-concepts/${editingConcept}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(editForm),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update concept');
-      }
-
-      const updated = await response.json();
-      setConcepts(concepts.map(c => c.id === editingConcept ? { ...c, ...updated } : c));
-      setEditingConcept(null);
-      setEditForm({});
-    } catch (err: any) {
-      console.error('Error updating concept:', err);
-      setError(err.message);
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setEditingConcept(null);
+    if (!editingIdea) return;
+    await updateIdeaMutation.mutateAsync({ id: editingIdea, updates: editForm });
+    setEditingIdea(null);
     setEditForm({});
   };
 
-  const handleUseConcept = async (concept: SavedConcept) => {
-    try {
-      const token = getToken();
-
-      // Create project from concept
-      const response = await fetch(`${API_BASE_URL}/api/projects`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          concept: {
-            id: concept.id,
-            title: concept.title,
-            logline: concept.logline,
-            synopsis: concept.synopsis,
-            hook: concept.hook,
-            protagonistHint: concept.protagonist_hint,
-            conflictType: concept.conflict_type,
-          },
-          preferences: concept.preferences
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Failed to create project');
-      }
-
-      const project = await response.json();
-
-      // Mark concept as used
-      await fetch(`${API_BASE_URL}/api/saved-concepts/${concept.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status: 'used' }),
-      });
-
-      // Redirect to project page
-      router.push(`/projects/${project.id}`);
-    } catch (err: any) {
-      console.error('Error using concept:', err);
-      setError(err.message);
-    }
+  const handleCancelEdit = () => {
+    setEditingIdea(null);
+    setEditForm({});
   };
 
-  // Filter concepts
-  const filteredConcepts = concepts.filter(concept => {
-    if (filterStatus !== 'all' && concept.status !== filterStatus) return false;
-    return true;
-  });
+  const handleExpand = async (ideaId: string, mode: IdeaExpansionMode) => {
+    try {
+      const result = await expandIdeaMutation.mutateAsync({ id: ideaId, mode });
+      // Redirect to saved concepts page to see the new concepts
+      router.push('/saved-concepts');
+    } catch (err) {
+      console.error('Error expanding idea:', err);
+    }
+    setShowExpansionModal(null);
+  };
 
   if (isLoading) {
     return (
       <div style={{ minHeight: '100vh', background: colors.background }}>
-        <PrimaryNavigationBar activeSection="story-concepts" />
+        <PrimaryNavigationBar activeSection="story-ideas" />
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -216,7 +98,7 @@ export default function SavedConceptsPage() {
               borderRadius: '50%',
               animation: 'spin 1s linear infinite'
             }} />
-            <p style={{ marginTop: '1rem', color: colors.textSecondary }}>Loading saved concepts...</p>
+            <p style={{ marginTop: '1rem', color: colors.textSecondary }}>Loading story ideas...</p>
           </div>
           <style jsx>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
@@ -226,7 +108,7 @@ export default function SavedConceptsPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: colors.background }}>
-      <PrimaryNavigationBar activeSection="story-concepts" />
+      <PrimaryNavigationBar activeSection="story-ideas" />
 
       {/* Header */}
       <header style={{
@@ -243,10 +125,10 @@ export default function SavedConceptsPage() {
                 color: colors.text,
                 margin: 0,
               }}>
-                Story Concepts
+                Story Ideas
               </h1>
               <p style={{ fontSize: '0.9375rem', color: colors.textSecondary, margin: '0.25rem 0 0' }}>
-                Detailed story concepts ready to become your next book
+                Your saved 3-line story premises ready to expand into full concepts
               </p>
             </div>
             <Link
@@ -266,13 +148,34 @@ export default function SavedConceptsPage() {
               }}
             >
               <span>+</span>
-              <span>Generate New Concepts</span>
+              <span>Generate New Ideas</span>
             </Link>
           </div>
 
-          {/* Filter */}
-          {concepts.length > 0 && (
-            <div style={{ marginTop: '1rem' }}>
+          {/* Filters */}
+          {ideas && ideas.length > 0 && (
+            <div style={{
+              display: 'flex',
+              gap: '1rem',
+              marginTop: '1rem',
+            }}>
+              <select
+                value={filterGenre}
+                onChange={(e) => setFilterGenre(e.target.value)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: borderRadius.sm,
+                  fontSize: '0.875rem',
+                  background: colors.surface,
+                  color: colors.text,
+                }}
+              >
+                <option value="all">All Genres</option>
+                {genres.map(genre => (
+                  <option key={genre} value={genre}>{genre}</option>
+                ))}
+              </select>
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
@@ -307,11 +210,11 @@ export default function SavedConceptsPage() {
               marginBottom: '1.5rem',
               color: colors.error,
             }}>
-              {error}
+              Failed to load story ideas. Please try again.
             </div>
           )}
 
-          {filteredConcepts.length === 0 ? (
+          {(!filteredIdeas || filteredIdeas.length === 0) ? (
             <div style={{
               textAlign: 'center',
               padding: '4rem 2rem',
@@ -319,23 +222,22 @@ export default function SavedConceptsPage() {
               borderRadius: borderRadius.lg,
               border: `2px dashed ${colors.border}`,
             }}>
-              <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>📝</div>
+              <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>💡</div>
               <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: colors.text }}>
-                {concepts.length === 0 ? 'No Saved Concepts Yet' : 'No Matching Concepts'}
+                {ideas?.length === 0 ? 'No Story Ideas Yet' : 'No Matching Ideas'}
               </h2>
               <p style={{ fontSize: '1rem', color: colors.textSecondary, marginBottom: '2rem' }}>
-                {concepts.length === 0
-                  ? 'When you generate story concepts, you can save your favorites to revisit later.'
-                  : 'Try adjusting your filter to see more concepts.'}
+                {ideas?.length === 0
+                  ? 'Generate quick story ideas to save and develop later into full concepts.'
+                  : 'Try adjusting your filters to see more ideas.'}
               </p>
-              {concepts.length === 0 && (
+              {ideas?.length === 0 && (
                 <Link
-                  href="/new"
+                  href="/new?mode=quick"
                   style={{
                     display: 'inline-block',
                     padding: '1rem 2rem',
                     background: `linear-gradient(135deg, ${colors.brandStart} 0%, ${colors.brandEnd} 100%)`,
-                    border: 'none',
                     borderRadius: borderRadius.md,
                     color: 'white',
                     fontSize: '1rem',
@@ -344,15 +246,15 @@ export default function SavedConceptsPage() {
                     boxShadow: shadows.md,
                   }}
                 >
-                  Generate New Concepts
+                  Generate Quick Story Ideas
                 </Link>
               )}
             </div>
           ) : (
             <div style={{ display: 'grid', gap: '1rem' }}>
-              {filteredConcepts.map(concept => (
+              {filteredIdeas.map(idea => (
                 <div
-                  key={concept.id}
+                  key={idea.id}
                   style={{
                     background: colors.surface,
                     border: `1px solid ${colors.border}`,
@@ -361,75 +263,24 @@ export default function SavedConceptsPage() {
                     boxShadow: shadows.sm,
                   }}
                 >
-                  {editingConcept === concept.id ? (
+                  {editingIdea === idea.id ? (
                     // Edit Mode
                     <div>
                       <div style={{ marginBottom: '1rem' }}>
                         <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: colors.text, marginBottom: '0.5rem' }}>
-                          Title
-                        </label>
-                        <input
-                          type="text"
-                          value={editForm.title || ''}
-                          onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                          style={{
-                            width: '100%',
-                            padding: '0.75rem',
-                            border: `1px solid ${colors.border}`,
-                            borderRadius: borderRadius.sm,
-                            fontSize: '0.9375rem',
-                          }}
-                        />
-                      </div>
-                      <div style={{ marginBottom: '1rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: colors.text, marginBottom: '0.5rem' }}>
-                          Logline
-                        </label>
-                        <input
-                          type="text"
-                          value={editForm.logline || ''}
-                          onChange={(e) => setEditForm({ ...editForm, logline: e.target.value })}
-                          style={{
-                            width: '100%',
-                            padding: '0.75rem',
-                            border: `1px solid ${colors.border}`,
-                            borderRadius: borderRadius.sm,
-                            fontSize: '0.9375rem',
-                          }}
-                        />
-                      </div>
-                      <div style={{ marginBottom: '1rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: colors.text, marginBottom: '0.5rem' }}>
-                          Synopsis
+                          Story Idea
                         </label>
                         <textarea
-                          value={editForm.synopsis || ''}
-                          onChange={(e) => setEditForm({ ...editForm, synopsis: e.target.value })}
+                          value={editForm.story_idea || ''}
+                          onChange={(e) => setEditForm({ ...editForm, story_idea: e.target.value })}
                           style={{
                             width: '100%',
-                            minHeight: '120px',
+                            minHeight: '80px',
                             padding: '0.75rem',
                             border: `1px solid ${colors.border}`,
                             borderRadius: borderRadius.sm,
                             fontSize: '0.9375rem',
                             resize: 'vertical',
-                          }}
-                        />
-                      </div>
-                      <div style={{ marginBottom: '1rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: colors.text, marginBottom: '0.5rem' }}>
-                          Hook
-                        </label>
-                        <input
-                          type="text"
-                          value={editForm.hook || ''}
-                          onChange={(e) => setEditForm({ ...editForm, hook: e.target.value })}
-                          style={{
-                            width: '100%',
-                            padding: '0.75rem',
-                            border: `1px solid ${colors.border}`,
-                            borderRadius: borderRadius.sm,
-                            fontSize: '0.9375rem',
                           }}
                         />
                       </div>
@@ -455,6 +306,7 @@ export default function SavedConceptsPage() {
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button
                           onClick={handleSaveEdit}
+                          disabled={updateIdeaMutation.isPending}
                           style={{
                             padding: '0.5rem 1rem',
                             background: colors.success,
@@ -466,7 +318,7 @@ export default function SavedConceptsPage() {
                             cursor: 'pointer',
                           }}
                         >
-                          Save
+                          {updateIdeaMutation.isPending ? 'Saving...' : 'Save'}
                         </button>
                         <button
                           onClick={handleCancelEdit}
@@ -489,48 +341,78 @@ export default function SavedConceptsPage() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                          <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: colors.text, margin: 0 }}>
-                            {concept.title}
-                          </h3>
-                          {concept.status !== 'saved' && (
+                          <span style={{
+                            padding: '0.25rem 0.75rem',
+                            background: colors.brandLight,
+                            color: colors.brandText,
+                            fontSize: '0.75rem',
+                            fontWeight: 500,
+                            borderRadius: borderRadius.full,
+                          }}>
+                            {idea.genre}
+                          </span>
+                          {idea.status !== 'saved' && (
                             <span style={{
                               padding: '0.25rem 0.75rem',
-                              background: concept.status === 'used' ? colors.successLight : colors.surfaceHover,
-                              color: concept.status === 'used' ? colors.success : colors.textTertiary,
+                              background: idea.status === 'used' ? colors.successLight : colors.surfaceHover,
+                              color: idea.status === 'used' ? colors.success : colors.textTertiary,
                               fontSize: '0.75rem',
                               fontWeight: 500,
                               borderRadius: borderRadius.full,
                             }}>
-                              {concept.status}
+                              {idea.status}
                             </span>
                           )}
                         </div>
-                        <p style={{ fontSize: '0.9375rem', color: colors.textSecondary, fontStyle: 'italic', marginBottom: '1rem' }}>
-                          {concept.logline}
+
+                        <p style={{
+                          fontSize: '1rem',
+                          color: colors.text,
+                          lineHeight: 1.6,
+                          marginBottom: expandedIdea === idea.id ? '1rem' : 0,
+                        }}>
+                          {idea.story_idea}
                         </p>
 
-                        {expandedConcept === concept.id && (
+                        {expandedIdea === idea.id && (
                           <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: `1px solid ${colors.border}` }}>
-                            <p style={{ fontSize: '0.9375rem', color: colors.text, marginBottom: '1rem', lineHeight: 1.6 }}>
-                              {concept.synopsis}
-                            </p>
-                            {concept.hook && (
-                              <div style={{
-                                background: colors.brandLight,
-                                border: `1px solid ${colors.brandBorder}`,
-                                borderRadius: borderRadius.sm,
-                                padding: '0.75rem',
-                                marginBottom: '0.75rem',
-                              }}>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: colors.brandText, marginBottom: '0.25rem' }}>
-                                  HOOK
+                            {idea.character_concepts?.length > 0 && (
+                              <div style={{ marginBottom: '0.75rem' }}>
+                                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: colors.textTertiary, marginBottom: '0.25rem' }}>
+                                  CHARACTER CONCEPTS
                                 </div>
-                                <div style={{ fontSize: '0.875rem', color: colors.text }}>
-                                  {concept.hook}
-                                </div>
+                                <ul style={{ margin: 0, paddingLeft: '1.25rem', color: colors.textSecondary, fontSize: '0.875rem' }}>
+                                  {idea.character_concepts.map((char, i) => (
+                                    <li key={i}>{char}</li>
+                                  ))}
+                                </ul>
                               </div>
                             )}
-                            {concept.notes && (
+                            {idea.plot_elements?.length > 0 && (
+                              <div style={{ marginBottom: '0.75rem' }}>
+                                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: colors.textTertiary, marginBottom: '0.25rem' }}>
+                                  PLOT ELEMENTS
+                                </div>
+                                <ul style={{ margin: 0, paddingLeft: '1.25rem', color: colors.textSecondary, fontSize: '0.875rem' }}>
+                                  {idea.plot_elements.map((elem, i) => (
+                                    <li key={i}>{elem}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {idea.unique_twists?.length > 0 && (
+                              <div style={{ marginBottom: '0.75rem' }}>
+                                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: colors.textTertiary, marginBottom: '0.25rem' }}>
+                                  UNIQUE TWISTS
+                                </div>
+                                <ul style={{ margin: 0, paddingLeft: '1.25rem', color: colors.textSecondary, fontSize: '0.875rem' }}>
+                                  {idea.unique_twists.map((twist, i) => (
+                                    <li key={i}>{twist}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {idea.notes && (
                               <div style={{
                                 background: colors.warningLight,
                                 border: `1px solid ${colors.warningBorder}`,
@@ -542,7 +424,7 @@ export default function SavedConceptsPage() {
                                   YOUR NOTES
                                 </div>
                                 <div style={{ fontSize: '0.875rem', color: colors.text }}>
-                                  {concept.notes}
+                                  {idea.notes}
                                 </div>
                               </div>
                             )}
@@ -550,11 +432,8 @@ export default function SavedConceptsPage() {
                               fontSize: '0.75rem',
                               color: colors.textTertiary,
                               marginTop: '1rem',
-                              display: 'flex',
-                              gap: '1.5rem',
                             }}>
-                              <span>Genre: {concept.preferences?.genre || 'Not specified'}</span>
-                              <span>Saved: {new Date(concept.created_at).toLocaleDateString()}</span>
+                              Saved: {new Date(idea.created_at).toLocaleDateString()}
                             </div>
                           </div>
                         )}
@@ -562,7 +441,7 @@ export default function SavedConceptsPage() {
 
                       <div style={{ marginLeft: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                         <button
-                          onClick={() => setExpandedConcept(expandedConcept === concept.id ? null : concept.id)}
+                          onClick={() => setExpandedIdea(expandedIdea === idea.id ? null : idea.id)}
                           style={{
                             padding: '0.5rem 1rem',
                             background: colors.surface,
@@ -574,10 +453,10 @@ export default function SavedConceptsPage() {
                             whiteSpace: 'nowrap',
                           }}
                         >
-                          {expandedConcept === concept.id ? 'Show Less' : 'Show More'}
+                          {expandedIdea === idea.id ? 'Show Less' : 'Show More'}
                         </button>
                         <button
-                          onClick={() => handleUseConcept(concept)}
+                          onClick={() => setShowExpansionModal(idea.id)}
                           style={{
                             padding: '0.5rem 1rem',
                             background: `linear-gradient(135deg, ${colors.brandStart} 0%, ${colors.brandEnd} 100%)`,
@@ -590,27 +469,10 @@ export default function SavedConceptsPage() {
                             whiteSpace: 'nowrap',
                           }}
                         >
-                          Use Concept
+                          Expand to Concepts
                         </button>
                         <button
-                          onClick={() => setShowOriginalityCheck(
-                            showOriginalityCheck === concept.id ? null : concept.id
-                          )}
-                          style={{
-                            padding: '0.5rem 1rem',
-                            background: showOriginalityCheck === concept.id ? colors.brandLight : colors.surface,
-                            border: `1px solid ${showOriginalityCheck === concept.id ? colors.brandStart : colors.border}`,
-                            borderRadius: borderRadius.sm,
-                            color: showOriginalityCheck === concept.id ? colors.brandText : colors.text,
-                            fontSize: '0.875rem',
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          Check Originality
-                        </button>
-                        <button
-                          onClick={() => handleStartEdit(concept)}
+                          onClick={() => handleStartEdit(idea)}
                           style={{
                             padding: '0.5rem 1rem',
                             background: colors.surface,
@@ -625,7 +487,8 @@ export default function SavedConceptsPage() {
                           Edit
                         </button>
                         <button
-                          onClick={() => handleDelete(concept.id)}
+                          onClick={() => handleDelete(idea.id)}
+                          disabled={deleteIdeaMutation.isPending}
                           style={{
                             padding: '0.5rem 1rem',
                             background: colors.surface,
@@ -642,22 +505,140 @@ export default function SavedConceptsPage() {
                       </div>
                     </div>
                   )}
-
-                  {showOriginalityCheck === concept.id && (
-                    <div style={{ marginTop: '1rem' }}>
-                      <OriginalityChecker
-                        contentId={concept.id}
-                        contentType="concept"
-                        title={concept.title}
-                      />
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
       </main>
+
+      {/* Expansion Modal */}
+      {showExpansionModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+          onClick={() => setShowExpansionModal(null)}
+        >
+          <div
+            style={{
+              background: colors.surface,
+              borderRadius: borderRadius.lg,
+              padding: '2rem',
+              maxWidth: '480px',
+              width: '90%',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: colors.text, marginBottom: '0.5rem' }}>
+              Expand Story Idea
+            </h2>
+            <p style={{ fontSize: '0.9375rem', color: colors.textSecondary, marginBottom: '1.5rem' }}>
+              Generate detailed story concepts from this idea. Choose how many concepts to create.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <button
+                onClick={() => handleExpand(showExpansionModal, 'concepts_5')}
+                disabled={expandIdeaMutation.isPending}
+                style={{
+                  padding: '1rem 1.5rem',
+                  background: `linear-gradient(135deg, ${colors.brandStart} 0%, ${colors.brandEnd} 100%)`,
+                  border: 'none',
+                  borderRadius: borderRadius.md,
+                  color: 'white',
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <div>Generate 5 Concepts</div>
+                <div style={{ fontSize: '0.875rem', fontWeight: 400, opacity: 0.9 }}>
+                  Faster generation, fewer options
+                </div>
+              </button>
+              <button
+                onClick={() => handleExpand(showExpansionModal, 'concepts_10')}
+                disabled={expandIdeaMutation.isPending}
+                style={{
+                  padding: '1rem 1.5rem',
+                  background: colors.surface,
+                  border: `2px solid ${colors.brandBorder}`,
+                  borderRadius: borderRadius.md,
+                  color: colors.brandText,
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <div>Generate 10 Concepts</div>
+                <div style={{ fontSize: '0.875rem', fontWeight: 400, color: colors.textSecondary }}>
+                  More variety to choose from
+                </div>
+              </button>
+            </div>
+
+            {expandIdeaMutation.isPending && (
+              <div style={{
+                marginTop: '1.5rem',
+                textAlign: 'center',
+                color: colors.textSecondary,
+              }}>
+                <div style={{
+                  display: 'inline-block',
+                  width: '24px',
+                  height: '24px',
+                  border: `2px solid ${colors.border}`,
+                  borderTopColor: colors.brandStart,
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                  marginBottom: '0.5rem',
+                }} />
+                <p style={{ margin: 0 }}>Generating concepts...</p>
+              </div>
+            )}
+
+            {expandIdeaMutation.isError && (
+              <div style={{
+                marginTop: '1rem',
+                padding: '0.75rem 1rem',
+                background: colors.errorLight,
+                border: `1px solid ${colors.errorBorder}`,
+                borderRadius: borderRadius.sm,
+                color: colors.error,
+                fontSize: '0.875rem',
+              }}>
+                Failed to generate concepts. Please try again.
+              </div>
+            )}
+
+            <button
+              onClick={() => setShowExpansionModal(null)}
+              style={{
+                width: '100%',
+                marginTop: '1rem',
+                padding: '0.75rem',
+                background: 'transparent',
+                border: 'none',
+                color: colors.textSecondary,
+                fontSize: '0.9375rem',
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>

@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { colors, gradients, borderRadius } from '@/app/lib/constants';
 import { sidebar, header, pageTitle, pageSubtitle } from '@/app/lib/styles';
-import type { CreationProgressData, ProjectNavigationTab } from '@/shared/types';
+import type { CreationProgressData, Outline, Chapter } from '@/shared/types';
+import type { WorkflowProjectData } from '@/app/hooks/useWorkflowPrerequisites';
 import CreationProgress from './CreationProgress';
 import ProjectNavigation from './ProjectNavigation';
 
@@ -19,12 +20,9 @@ interface PageLayoutProps {
   currentStepId?: string;
   projectNavigation?: {
     projectId: string;
-    tabs: ProjectNavigationTab[];
-    project?: any;
-    plotStructure?: any;
-    outline?: any;
-    proseStyle?: any;
-    isSubmitted?: boolean;
+    project?: WorkflowProjectData | null;
+    outline?: Outline | null;
+    chapters?: Chapter[] | null;
   };
 }
 
@@ -135,12 +133,9 @@ export default function PageLayout({
         {projectNavigation && (
           <ProjectNavigation
             projectId={projectNavigation.projectId}
-            tabs={projectNavigation.tabs}
             project={projectNavigation.project}
-            plotStructure={projectNavigation.plotStructure}
             outline={projectNavigation.outline}
-            proseStyle={projectNavigation.proseStyle}
-            isSubmitted={projectNavigation.isSubmitted}
+            chapters={projectNavigation.chapters}
           />
         )}
 

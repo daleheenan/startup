@@ -114,12 +114,14 @@ CREATE TABLE IF NOT EXISTS saved_concepts (
     preferences TEXT NOT NULL,     -- JSON: The preferences used to generate this concept
     notes TEXT,                    -- User's notes about the concept
     status TEXT NOT NULL CHECK(status IN ('saved', 'used', 'archived')) DEFAULT 'saved',
+    source_idea_id TEXT,           -- References saved_story_ideas.id if expanded from an idea
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_saved_concepts_status ON saved_concepts(status);
 CREATE INDEX IF NOT EXISTS idx_saved_concepts_created ON saved_concepts(created_at);
+CREATE INDEX IF NOT EXISTS idx_saved_concepts_source_idea ON saved_concepts(source_idea_id);
 
 -- Saved Story Ideas table (generated story ideas saved for future use)
 CREATE TABLE IF NOT EXISTS saved_story_ideas (
@@ -196,3 +198,15 @@ CREATE TABLE IF NOT EXISTS agent_lessons (
 
 CREATE INDEX IF NOT EXISTS idx_agent_lessons_type ON agent_lessons(lesson_type);
 CREATE INDEX IF NOT EXISTS idx_agent_lessons_active ON agent_lessons(is_active);
+
+-- User Preferences table (default settings for new projects)
+CREATE TABLE IF NOT EXISTS user_preferences (
+  user_id TEXT PRIMARY KEY DEFAULT 'owner',
+  prose_style TEXT,  -- JSON: Default prose style settings for new projects
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Create default entry for owner user
+INSERT OR IGNORE INTO user_preferences (user_id)
+VALUES ('owner');

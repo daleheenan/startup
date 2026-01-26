@@ -1,27 +1,27 @@
 'use client';
 
 import { useMemo } from 'react';
-import type { Character, PlotStructure, StoryStructure } from '../../shared/types';
+import type { Character, PlotStructure, StoryStructure, Chapter } from '../../shared/types';
 
 /**
  * Workflow Prerequisites Hook
  *
  * Enforces the prerequisite chain for NovelForge workflow:
- * Concept → Characters → World → Plots → Outline → Style → Submit → Chapters (monitoring)
+ * Concept → Characters → World → Plot → Outline → Chapters → Analytics
  *
  * Each step requires the previous step to be completed before it can be accessed.
+ * Note: Style has been moved to global Settings page.
  */
 
-// Workflow step identifiers
+// Workflow step identifiers (updated for new navigation)
 export type WorkflowStep =
   | 'concept'
   | 'characters'
   | 'world'
   | 'plots'
   | 'outline'
-  | 'style'
-  | 'submission'
-  | 'chapters';
+  | 'chapters'
+  | 'analytics';
 
 // Project data structure expected by the hook
 export interface WorkflowProjectData {
@@ -39,6 +39,11 @@ export interface WorkflowProjectData {
     world?: WorldData;
   } | null;
   plot_structure?: PlotStructure | null;
+  story_concept?: {
+    logline?: string;
+    synopsis?: string;
+    hook?: string;
+  } | null;
   generation_submitted_at?: string | null;
 }
 
@@ -53,14 +58,7 @@ export type WorldData = any[] | {
 export interface OutlineData {
   id?: string;
   structure?: StoryStructure;
-}
-
-// Prose style data structure
-export interface ProseStyleData {
-  id?: string;
-  voice_tone?: string;
-  narrative_distance?: string;
-  // Consider style complete if it has at least basic configuration
+  total_chapters?: number;
 }
 
 // Prerequisite check result
@@ -83,6 +81,7 @@ export interface UseWorkflowPrerequisitesResult {
   nextStep: WorkflowStep | null;
   isReadyForGeneration: boolean;
   getMissingItems: (step: WorkflowStep) => string[];
+  getCompletionPercentage: () => number;
 }
 
 /**
@@ -108,8 +107,14 @@ function countWorldElements(world: WorldData | null | undefined): number {
  */
 function hasOutlineContent(outline: OutlineData | null | undefined): boolean {
   if (!outline) return false;
-  if (!outline.structure) return false;
 
+  // Check total_chapters first (new format)
+  if (outline.total_chapters && outline.total_chapters > 0) {
+    return true;
+  }
+
+  // Fallback to checking structure (legacy format)
+  if (!outline.structure) return false;
   const acts = outline.structure.acts;
   if (!acts || acts.length === 0) return false;
 
@@ -124,7 +129,7 @@ function getMissingItemsForStep(
   step: WorkflowStep,
   project: WorkflowProjectData | null,
   outline?: OutlineData | null,
-  proseStyle?: ProseStyleData | null
+  chapters?: Chapter[] | null
 ): string[] {
   const missing: string[] = [];
 
@@ -134,24 +139,25 @@ function getMissingItemsForStep(
 
   switch (step) {
     case 'concept':
-      if (!project.title) missing.push('Project title');
-      if (!project.genre && !project.story_dna?.genre) missing.push('Genre');
-      if (!project.description) missing.push('Project description');
+      // Check for story concept or basic project info
+      const hasConcept = project.story_concept?.logline || project.story_concept?.synopsis;
+      const hasBasicInfo = project.title && (project.genre || project.story_dna?.genre);
+      if (!hasConcept && !hasBasicInfo) {
+        missing.push('Story concept or project details');
+      }
       break;
 
     case 'characters':
       const characters = project.story_bible?.characters || [];
-      const hasProtagonist = characters.some(c =>
-        c.role?.toLowerCase().includes('protagonist') ||
-        c.role?.toLowerCase().includes('main character')
-      );
-      const hasAntagonist = characters.some(c =>
-        c.role?.toLowerCase().includes('antagonist') ||
-        c.role?.toLowerCase().includes('villain')
-      );
-
-      if (!hasProtagonist) missing.push('Protagonist');
-      if (!hasAntagonist) missing.push('Antagonist');
+      if (characters.length === 0) {
+        missing.push('At least one character');
+      } else {
+        const hasProtagonist = characters.some(c =>
+          c.role?.toLowerCase().includes('protagonist') ||
+          c.role?.toLowerCase().includes('main character')
+        );
+        if (!hasProtagonist) missing.push('Protagonist character');
+      }
       break;
 
     case 'world':
@@ -163,38 +169,66 @@ function getMissingItemsForStep(
 
     case 'plots':
       const plotLayers = project.plot_structure?.plot_layers || [];
-      const hasMainPlot = plotLayers.some(layer => layer.type === 'main');
-
-      if (!hasMainPlot) {
-        missing.push('At least one main plot layer');
+      if (plotLayers.length === 0) {
+        missing.push('At least one plot layer');
+      } else {
+        const hasMainPlot = plotLayers.some(layer => layer.type === 'main');
+        if (!hasMainPlot) {
+          missing.push('Main plot layer');
+        }
       }
       break;
 
     case 'outline':
       if (!hasOutlineContent(outline)) {
-        missing.push('Outline with at least one act containing chapters');
-      }
-      break;
-
-    case 'style':
-      if (!proseStyle || !proseStyle.id) {
-        missing.push('Prose style configuration');
-      }
-      break;
-
-    case 'submission':
-      if (!project.generation_submitted_at) {
-        missing.push('Submit project for generation');
+        missing.push('Story outline with chapters');
       }
       break;
 
     case 'chapters':
-      // Chapters step is always accessible after submission
+      // Need outline to be complete first
+      if (!hasOutlineContent(outline)) {
+        missing.push('Complete outline');
+      }
+      break;
+
+    case 'analytics':
+      // Need chapters with content
+      const chaptersWithContent = chapters?.filter(ch => ch.content && ch.content.length > 0) || [];
+      if (chaptersWithContent.length === 0) {
+        missing.push('At least one generated chapter with content');
+      }
       break;
   }
 
   return missing;
 }
+
+/**
+ * Workflow step order for iteration
+ */
+const WORKFLOW_STEPS: WorkflowStep[] = [
+  'concept',
+  'characters',
+  'world',
+  'plots',
+  'outline',
+  'chapters',
+  'analytics',
+];
+
+/**
+ * Step display names
+ */
+const STEP_NAMES: Record<WorkflowStep, string> = {
+  concept: 'Story Concept',
+  characters: 'Characters',
+  world: 'World Building',
+  plots: 'Plot Structure',
+  outline: 'Outline',
+  chapters: 'Chapters',
+  analytics: 'Analytics',
+};
 
 /**
  * useWorkflowPrerequisites Hook
@@ -204,13 +238,13 @@ function getMissingItemsForStep(
  * @param projectId - The project ID
  * @param project - Project data (can be null if not loaded yet)
  * @param outline - Optional outline data
- * @param proseStyle - Optional prose style data
+ * @param chapters - Optional chapters data (for analytics check)
  */
 export function useWorkflowPrerequisites(
   projectId: string | null,
   project: WorkflowProjectData | null,
   outline?: OutlineData | null,
-  proseStyle?: ProseStyleData | null
+  chapters?: Chapter[] | null
 ): UseWorkflowPrerequisitesResult {
   const prerequisites = useMemo<PrerequisitesMap>(() => {
     // Define prerequisite chain
@@ -245,22 +279,16 @@ export function useWorkflowPrerequisites(
         requiresPrevious: 'plots',
         missingItems: [],
       },
-      style: {
+      chapters: {
         isComplete: false,
         isRequired: true,
         requiresPrevious: 'outline',
         missingItems: [],
       },
-      submission: {
+      analytics: {
         isComplete: false,
-        isRequired: true,
-        requiresPrevious: 'style',
-        missingItems: [],
-      },
-      chapters: {
-        isComplete: false,
-        isRequired: false,
-        requiresPrevious: 'submission',
+        isRequired: false, // Analytics is optional
+        requiresPrevious: 'chapters',
         missingItems: [],
       },
     };
@@ -272,23 +300,14 @@ export function useWorkflowPrerequisites(
 
     // Check concept completion
     checks.concept.missingItems = getMissingItemsForStep('concept', project);
-    checks.concept.isComplete =
-      !!project.title &&
-      (!!project.genre || !!project.story_dna?.genre) &&
-      !!project.description;
+    const hasConcept = !!(project.story_concept?.logline || project.story_concept?.synopsis);
+    const hasBasicInfo = !!project.title && (!!project.genre || !!project.story_dna?.genre);
+    checks.concept.isComplete = hasConcept || hasBasicInfo;
 
     // Check characters completion
     checks.characters.missingItems = getMissingItemsForStep('characters', project);
     const characters = project.story_bible?.characters || [];
-    const hasProtagonist = characters.some(c =>
-      c.role?.toLowerCase().includes('protagonist') ||
-      c.role?.toLowerCase().includes('main character')
-    );
-    const hasAntagonist = characters.some(c =>
-      c.role?.toLowerCase().includes('antagonist') ||
-      c.role?.toLowerCase().includes('villain')
-    );
-    checks.characters.isComplete = hasProtagonist && hasAntagonist;
+    checks.characters.isComplete = characters.length > 0;
 
     // Check world completion
     checks.world.missingItems = getMissingItemsForStep('world', project);
@@ -298,27 +317,23 @@ export function useWorkflowPrerequisites(
     // Check plots completion
     checks.plots.missingItems = getMissingItemsForStep('plots', project);
     const plotLayers = project.plot_structure?.plot_layers || [];
-    const hasMainPlot = plotLayers.some(layer => layer.type === 'main');
-    checks.plots.isComplete = hasMainPlot;
+    checks.plots.isComplete = plotLayers.length > 0;
 
     // Check outline completion
     checks.outline.missingItems = getMissingItemsForStep('outline', project, outline);
     checks.outline.isComplete = hasOutlineContent(outline);
 
-    // Check style completion
-    checks.style.missingItems = getMissingItemsForStep('style', project, outline, proseStyle);
-    checks.style.isComplete = !!(proseStyle && proseStyle.id);
+    // Check chapters completion (at least one chapter exists)
+    checks.chapters.missingItems = getMissingItemsForStep('chapters', project, outline, chapters);
+    checks.chapters.isComplete = (chapters?.length ?? 0) > 0;
 
-    // Check submission completion
-    checks.submission.missingItems = getMissingItemsForStep('submission', project);
-    checks.submission.isComplete = !!project.generation_submitted_at;
-
-    // Chapters is complete once submission is done (it's a monitoring step)
-    checks.chapters.isComplete = checks.submission.isComplete;
-    checks.chapters.missingItems = [];
+    // Check analytics completion (at least one chapter has content)
+    checks.analytics.missingItems = getMissingItemsForStep('analytics', project, outline, chapters);
+    const chaptersWithContent = chapters?.filter(ch => ch.content && ch.content.length > 0) || [];
+    checks.analytics.isComplete = chaptersWithContent.length > 0;
 
     return checks;
-  }, [project, outline, proseStyle]);
+  }, [project, outline, chapters]);
 
   // Helper: Can access a step?
   const canAccess = useMemo(() => {
@@ -349,18 +364,7 @@ export function useWorkflowPrerequisites(
       }
 
       const previousCheck = prerequisites[check.requiresPrevious];
-      const stepNames: Record<WorkflowStep, string> = {
-        concept: 'Story Concept',
-        characters: 'Characters',
-        world: 'World Building',
-        plots: 'Plot Structure',
-        outline: 'Outline',
-        style: 'Prose Style',
-        submission: 'Submission',
-        chapters: 'Chapters',
-      };
-
-      const previousStepName = stepNames[check.requiresPrevious];
+      const previousStepName = STEP_NAMES[check.requiresPrevious];
       const missingItems = previousCheck.missingItems;
 
       if (missingItems.length > 0) {
@@ -380,45 +384,23 @@ export function useWorkflowPrerequisites(
 
   // Determine current step (first incomplete required step)
   const currentStep = useMemo<WorkflowStep>(() => {
-    const steps: WorkflowStep[] = [
-      'concept',
-      'characters',
-      'world',
-      'plots',
-      'outline',
-      'style',
-      'submission',
-      'chapters',
-    ];
-
-    for (const step of steps) {
+    for (const step of WORKFLOW_STEPS) {
       const check = prerequisites[step];
       if (check.isRequired && !check.isComplete) {
         return step;
       }
     }
 
-    // All required steps complete, user is on chapters
-    return 'chapters';
+    // All required steps complete, user is on analytics or complete
+    return 'analytics';
   }, [prerequisites]);
 
   // Determine next step (first incomplete step after current)
   const nextStep = useMemo<WorkflowStep | null>(() => {
-    const steps: WorkflowStep[] = [
-      'concept',
-      'characters',
-      'world',
-      'plots',
-      'outline',
-      'style',
-      'submission',
-      'chapters',
-    ];
+    const currentIndex = WORKFLOW_STEPS.indexOf(currentStep);
 
-    const currentIndex = steps.indexOf(currentStep);
-
-    for (let i = currentIndex + 1; i < steps.length; i++) {
-      const step = steps[i];
+    for (let i = currentIndex + 1; i < WORKFLOW_STEPS.length; i++) {
+      const step = WORKFLOW_STEPS[i];
       const check = prerequisites[step];
       if (!check.isComplete) {
         return step;
@@ -428,16 +410,24 @@ export function useWorkflowPrerequisites(
     return null; // All steps complete
   }, [currentStep, prerequisites]);
 
-  // Check if ready for generation (all required steps before submission complete)
+  // Check if ready for generation (all required steps before chapters complete)
   const isReadyForGeneration = useMemo(() => {
     return (
       prerequisites.concept.isComplete &&
       prerequisites.characters.isComplete &&
       prerequisites.world.isComplete &&
       prerequisites.plots.isComplete &&
-      prerequisites.outline.isComplete &&
-      prerequisites.style.isComplete
+      prerequisites.outline.isComplete
     );
+  }, [prerequisites]);
+
+  // Calculate completion percentage
+  const getCompletionPercentage = useMemo(() => {
+    return (): number => {
+      const requiredSteps = WORKFLOW_STEPS.filter(step => prerequisites[step].isRequired);
+      const completedCount = requiredSteps.filter(step => prerequisites[step].isComplete).length;
+      return Math.round((completedCount / requiredSteps.length) * 100);
+    };
   }, [prerequisites]);
 
   return {
@@ -448,5 +438,6 @@ export function useWorkflowPrerequisites(
     nextStep,
     isReadyForGeneration,
     getMissingItems,
+    getCompletionPercentage,
   };
 }

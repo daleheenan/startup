@@ -8,6 +8,8 @@ import PlotWizard from '../../../components/plot/PlotWizard';
 import { getToken } from '../../../lib/auth';
 import { colors } from '../../../lib/constants';
 import { useProjectNavigation } from '../../../hooks/useProjectProgress';
+import { createInitialPlotLayers, isKeyPlotLayer, toExtendedPlotLayer } from '../../../lib/plot-constants';
+import type { ExtendedPlotLayer } from '../../../../shared/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -28,6 +30,8 @@ interface PlotLayer {
   points: PlotPoint[];
   status: 'active' | 'resolved' | 'abandoned';
   resolution_chapter?: number;
+  deletable?: boolean;
+  editable?: boolean;
 }
 
 interface StoryStructure {
@@ -111,6 +115,10 @@ export default function PlotStructurePage() {
   const [generatingField, setGeneratingField] = useState<'name' | 'description' | null>(null);
   const [extractingFromConcept, setExtractingFromConcept] = useState(false);
   const [hasAttemptedExtraction, setHasAttemptedExtraction] = useState(false);
+  const [validatingCoherence, setValidatingCoherence] = useState(false);
+  const [coherenceWarnings, setCoherenceWarnings] = useState<string[]>([]);
+  const [coherenceSuggestions, setCoherenceSuggestions] = useState<string[]>([]);
+  const [isCoherent, setIsCoherent] = useState<boolean | null>(null);
 
   // Wizard mode state
   const [isWizardMode, setIsWizardMode] = useState(false);
@@ -152,9 +160,19 @@ export default function PlotStructurePage() {
         setProject(projectData);
         if (projectData.plot_structure) {
           // Ensure plot_layers is always an array to prevent undefined errors
+          // Mark layers with deletable/editable flags based on whether they're key layers
+          const plotLayers = (projectData.plot_structure.plot_layers || []).map((layer: PlotLayer) => {
+            const isKey = isKeyPlotLayer(layer.id);
+            return {
+              ...layer,
+              deletable: layer.deletable !== undefined ? layer.deletable : !isKey,
+              editable: layer.editable !== undefined ? layer.editable : true,
+            };
+          });
+
           const safeStructure = {
             ...projectData.plot_structure,
-            plot_layers: projectData.plot_structure.plot_layers || [],
+            plot_layers: plotLayers,
             act_structure: projectData.plot_structure.act_structure || {
               act_one_end: 5,
               act_two_midpoint: 12,
@@ -261,6 +279,26 @@ export default function PlotStructurePage() {
     }
   }, [loading, project, hasAttemptedExtraction, structure.plot_layers?.length, extractPlotsFromConcept]);
 
+  // Auto-populate initial plot layers when page loads with no plot layers
+  useEffect(() => {
+    const shouldPopulate = !loading &&
+      project &&
+      characters &&
+      (structure.plot_layers?.length || 0) === 0 &&
+      !extractingFromConcept;
+
+    if (shouldPopulate) {
+      // Create initial plot layers based on project data and characters
+      const initialLayers = createInitialPlotLayers(project, characters);
+
+      // Only save if we actually have layers to add
+      if (initialLayers.length > 0) {
+        const newStructure = { ...structure, plot_layers: initialLayers };
+        saveStructure(newStructure);
+      }
+    }
+  }, [loading, project, characters, structure.plot_layers?.length, extractingFromConcept]);
+
   const saveStructure = async (newStructure: StoryStructure) => {
     setSaving(true);
     try {
@@ -279,10 +317,45 @@ export default function PlotStructurePage() {
       }
 
       setStructure(newStructure);
+      // Clear previous coherence validation when structure changes
+      setIsCoherent(null);
+      setCoherenceWarnings([]);
+      setCoherenceSuggestions([]);
     } catch (err: any) {
       setError(err.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Validate plot coherence with story concept/DNA
+  const validatePlotCoherence = async () => {
+    setValidatingCoherence(true);
+    setError(null);
+
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE_URL}/api/projects/${projectId}/validate-plot-coherence`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to validate plot coherence');
+      }
+
+      const data = await res.json();
+      setIsCoherent(data.isCoherent);
+      setCoherenceWarnings(data.warnings || []);
+      setCoherenceSuggestions(data.suggestions || []);
+    } catch (err: any) {
+      console.error('Error validating plot coherence:', err);
+      setError(err.message);
+    } finally {
+      setValidatingCoherence(false);
     }
   };
 
@@ -353,6 +426,7 @@ export default function PlotStructurePage() {
 
   const handleSaveLayer = (generatePoints: boolean = false) => {
     const layerId = editingLayer?.id || `layer-${Date.now()}`;
+    const isKey = isKeyPlotLayer(layerId);
     const newLayer: PlotLayer = {
       id: layerId,
       name: layerForm.name,
@@ -361,6 +435,8 @@ export default function PlotStructurePage() {
       color: layerForm.color,
       points: editingLayer?.points || [],
       status: 'active',
+      deletable: editingLayer?.deletable !== undefined ? editingLayer.deletable : !isKey,
+      editable: editingLayer?.editable !== undefined ? editingLayer.editable : true,
     };
 
     const newLayers = editingLayer
@@ -429,6 +505,13 @@ export default function PlotStructurePage() {
   };
 
   const handleDeleteLayer = (layerId: string) => {
+    // Check if this is a key plot layer that cannot be deleted
+    const layer = structure.plot_layers?.find(l => l.id === layerId);
+    if (layer && layer.deletable === false) {
+      setError('This is a key plot layer and cannot be deleted. You can edit it instead.');
+      return;
+    }
+
     if (!confirm('Are you sure you want to delete this plot layer?')) return;
 
     const newLayers = (structure.plot_layers || []).filter(l => l.id !== layerId);
@@ -710,6 +793,76 @@ export default function PlotStructurePage() {
           </div>
         )}
 
+        {/* Plot Coherence Validation */}
+        {(structure.plot_layers?.length || 0) > 0 && (
+          <div style={{
+            background: isCoherent === true ? '#ECFDF5' : isCoherent === false ? '#FEF2F2' : '#F9FAFB',
+            border: `1px solid ${isCoherent === true ? '#A7F3D0' : isCoherent === false ? '#FECACA' : '#E5E7EB'}`,
+            borderRadius: '8px',
+            padding: '1rem',
+            marginBottom: '1.5rem',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ flex: 1 }}>
+                <h3 style={{
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: isCoherent === true ? '#047857' : isCoherent === false ? '#DC2626' : colors.text,
+                  marginBottom: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                }}>
+                  {isCoherent === true && '✓ '}
+                  {isCoherent === false && '⚠ '}
+                  Plot Coherence Check
+                </h3>
+                {isCoherent === null && (
+                  <p style={{ fontSize: '0.875rem', color: colors.textSecondary, margin: 0 }}>
+                    Validate that your plots align with your story concept and genre.
+                  </p>
+                )}
+                {coherenceWarnings.length > 0 && (
+                  <ul style={{ margin: '0.5rem 0', paddingLeft: '1.25rem', fontSize: '0.875rem', color: '#B45309' }}>
+                    {coherenceWarnings.map((warning, i) => (
+                      <li key={i} style={{ marginBottom: '0.25rem' }}>{warning}</li>
+                    ))}
+                  </ul>
+                )}
+                {coherenceSuggestions.length > 0 && (
+                  <ul style={{ margin: '0.5rem 0', paddingLeft: '1.25rem', fontSize: '0.875rem', color: '#4338CA' }}>
+                    {coherenceSuggestions.map((suggestion, i) => (
+                      <li key={i} style={{ marginBottom: '0.25rem' }}>{suggestion}</li>
+                    ))}
+                  </ul>
+                )}
+                {isCoherent === true && coherenceWarnings.length === 0 && (
+                  <p style={{ fontSize: '0.875rem', color: '#047857', margin: 0 }}>
+                    Your plots are coherent with your story concept. Ready to generate outline!
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={validatePlotCoherence}
+                disabled={validatingCoherence}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: validatingCoherence ? '#E5E7EB' : '#FFFFFF',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '6px',
+                  color: validatingCoherence ? '#9CA3AF' : colors.text,
+                  fontSize: '0.8125rem',
+                  fontWeight: 500,
+                  cursor: validatingCoherence ? 'not-allowed' : 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {validatingCoherence ? 'Checking...' : isCoherent !== null ? 'Re-check' : 'Validate Coherence'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Mode Toggle */}
         <div style={{
           ...cardStyle,
@@ -969,20 +1122,35 @@ export default function PlotStructurePage() {
                       >
                         Edit
                       </button>
-                      <button
-                        onClick={() => handleDeleteLayer(layer.id)}
-                        style={{
+                      {layer.deletable !== false && (
+                        <button
+                          onClick={() => handleDeleteLayer(layer.id)}
+                          style={{
+                            padding: '0.375rem 0.75rem',
+                            background: '#FEF2F2',
+                            border: '1px solid #FECACA',
+                            borderRadius: '6px',
+                            color: '#DC2626',
+                            fontSize: '0.75rem',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Delete
+                        </button>
+                      )}
+                      {layer.deletable === false && (
+                        <span style={{
                           padding: '0.375rem 0.75rem',
-                          background: '#FEF2F2',
-                          border: '1px solid #FECACA',
+                          background: '#F3F4F6',
+                          border: '1px solid #D1D5DB',
                           borderRadius: '6px',
-                          color: '#DC2626',
-                          fontSize: '0.75rem',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Delete
-                      </button>
+                          color: '#6B7280',
+                          fontSize: '0.625rem',
+                          fontWeight: 500,
+                        }}>
+                          Required Layer
+                        </span>
+                      )}
                     </div>
                   </div>
 

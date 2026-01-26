@@ -273,7 +273,7 @@ export default function WorldPage() {
         </header>
 
         {/* Project Navigation */}
-        <ProjectNavigation projectId={projectId} tabs={navigation.tabs} />
+        <ProjectNavigation projectId={projectId} project={navigation.project} />
 
         {/* Content Area */}
         <div style={{

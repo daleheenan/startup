@@ -3,82 +3,92 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { colors, borderRadius } from '@/app/lib/constants';
-import type { ProjectNavigationTab } from '@/shared/types';
-import { useWorkflowPrerequisites, type WorkflowStep } from '@/app/hooks/useWorkflowPrerequisites';
-
-interface ExtendedTab extends ProjectNavigationTab {
-  required?: boolean;
-  status?: 'required' | 'completed' | 'optional' | 'neutral';
-}
+import { PROJECT_NAV_TABS, TAB_STATUS_COLORS } from '@/app/lib/navigation-constants';
+import { useWorkflowPrerequisites, type WorkflowStep, type WorkflowProjectData } from '@/app/hooks/useWorkflowPrerequisites';
+import type { Outline, Chapter, TabStatus } from '@/shared/types';
 
 interface ProjectNavigationProps {
   projectId: string;
-  tabs: ExtendedTab[];
-  project?: any;
-  plotStructure?: any;
-  outline?: any;
-  proseStyle?: any;
-  isSubmitted?: boolean;
+  project?: WorkflowProjectData | null;
+  outline?: Outline | null;
+  chapters?: Chapter[] | null;
 }
 
-// Status indicator colors
-const STATUS_COLORS = {
-  required: '#DC2626', // Red - needs to be completed
-  completed: '#10B981', // Green - done
-  optional: '#94A3B8', // Gray - optional, not done
-  neutral: 'transparent', // No indicator
-};
-
+/**
+ * Project Navigation Component
+ *
+ * Displays the navigation tabs for a project with workflow status indicators.
+ * Tab order: Overview, Characters, World, Plot, Outline, Chapters, Analytics
+ * Note: Style has been moved to global Settings page.
+ *
+ * Status colors:
+ * - Green: Step completed
+ * - Red: Step required (not yet completed)
+ * - Gray/Locked: Prerequisites not met
+ */
 export default function ProjectNavigation({
   projectId,
-  tabs,
   project,
-  plotStructure,
   outline,
-  proseStyle,
-  isSubmitted,
+  chapters,
 }: ProjectNavigationProps) {
   const pathname = usePathname();
 
-  // Get workflow prerequisites (only if project data is provided)
+  // Get workflow prerequisites
   const prerequisiteCheck = useWorkflowPrerequisites(
     projectId,
     project || null,
     outline,
-    proseStyle
+    chapters
   );
 
-  // Only apply prerequisites if project data is available
   const shouldEnforcePrerequisites = Boolean(project);
-  const { canAccess, getBlockingReason } = prerequisiteCheck;
-
-  // Map tab IDs to prerequisite steps
-  const getPrerequisiteStep = (tabId: string): WorkflowStep | null => {
-    const mapping: Record<string, WorkflowStep> = {
-      overview: 'concept', // Overview is always accessible (concept has no prerequisite)
-      characters: 'characters',
-      world: 'world',
-      plot: 'plots',
-      outline: 'outline',
-      style: 'style',
-      chapters: 'chapters',
-      analytics: 'concept', // Analytics is always accessible (concept has no prerequisite)
-    };
-    return mapping[tabId] || null;
-  };
+  const { canAccess, getBlockingReason, prerequisites } = prerequisiteCheck;
 
   // Determine active tab based on current path
   const getActiveTabId = () => {
-    for (const tab of tabs) {
+    for (const tab of PROJECT_NAV_TABS) {
       const fullRoute = `/projects/${projectId}${tab.route}`;
-      if (pathname === fullRoute || pathname?.startsWith(fullRoute + '/')) {
+      // Handle both exact match and nested routes
+      if (pathname === fullRoute ||
+          (tab.route === '' && pathname === `/projects/${projectId}`) ||
+          (tab.route !== '' && pathname?.startsWith(fullRoute + '/'))) {
         return tab.id;
       }
+    }
+    // Default to overview if on the project page
+    if (pathname === `/projects/${projectId}`) {
+      return 'overview';
     }
     return null;
   };
 
   const activeTabId = getActiveTabId();
+
+  // Get tab status for visual indicator
+  const getTabStatus = (tabId: string, step: WorkflowStep): TabStatus => {
+    if (activeTabId === tabId) return 'active';
+
+    const prereqCheck = prerequisites[step];
+    if (!prereqCheck) return 'optional';
+
+    // Check if locked
+    if (shouldEnforcePrerequisites && !canAccess(step)) {
+      return 'locked';
+    }
+
+    // Check if completed
+    if (prereqCheck.isComplete) {
+      return 'completed';
+    }
+
+    // Check if required
+    if (prereqCheck.isRequired) {
+      return 'required';
+    }
+
+    return 'optional';
+  };
 
   return (
     <nav
@@ -99,62 +109,45 @@ export default function ProjectNavigation({
           minWidth: 'min-content',
         }}
       >
-        {tabs.map((tab) => {
+        {PROJECT_NAV_TABS.map((tab) => {
           const isActive = activeTabId === tab.id;
           const fullRoute = `/projects/${projectId}${tab.route}`;
-          const statusColor = tab.status ? STATUS_COLORS[tab.status] : 'transparent';
-          const showStatusIndicator = tab.status && tab.status !== 'neutral';
+          const status = getTabStatus(tab.id, tab.workflowStep);
+          const isLocked = status === 'locked';
 
-          // Check if tab is locked (only enforce if project data is available)
-          const prerequisiteStep = getPrerequisiteStep(tab.id);
-          const isLocked = shouldEnforcePrerequisites && prerequisiteStep && !canAccess(prerequisiteStep);
-          const blockingReason = isLocked && prerequisiteStep ? getBlockingReason(prerequisiteStep) : null;
+          // Get the underline color based on status
+          let borderColor = 'transparent';
+          if (isActive) {
+            borderColor = TAB_STATUS_COLORS.active;
+          } else if (status === 'completed') {
+            borderColor = TAB_STATUS_COLORS.completed;
+          } else if (status === 'required') {
+            borderColor = TAB_STATUS_COLORS.required;
+          } else if (status === 'locked') {
+            borderColor = TAB_STATUS_COLORS.locked;
+          }
 
           // Build tooltip text
           let tooltipText: string | undefined;
-          if (isLocked && blockingReason) {
-            tooltipText = blockingReason;
-          } else if (tab.status === 'required') {
+          if (isLocked) {
+            tooltipText = getBlockingReason(tab.workflowStep) || 'Complete previous steps first';
+          } else if (status === 'required') {
             tooltipText = 'Required - not yet completed';
-          } else if (tab.status === 'completed') {
+          } else if (status === 'completed') {
             tooltipText = 'Completed';
-          } else if (tab.status === 'optional') {
-            tooltipText = 'Optional';
           }
 
           const tabContent = (
             <>
-              {tab.icon && (
-                <span aria-hidden="true" style={{ fontSize: '1rem' }}>
-                  {tab.icon}
-                </span>
-              )}
+              <span aria-hidden="true" style={{ fontSize: '1rem' }}>
+                {tab.icon}
+              </span>
               {isLocked && (
                 <span aria-hidden="true" style={{ fontSize: '0.875rem' }}>
                   🔒
                 </span>
               )}
-              {tab.label}
-              {tab.badge !== undefined && tab.badge !== null && tab.badge !== '' && (
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    minWidth: '20px',
-                    height: '20px',
-                    padding: '0 0.375rem',
-                    background: isActive ? colors.brandText : colors.textTertiary,
-                    color: colors.surface,
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    borderRadius: borderRadius.full,
-                  }}
-                  aria-label={`${tab.badge} items`}
-                >
-                  {tab.badge}
-                </span>
-              )}
+              <span>{tab.label}</span>
             </>
           );
 
@@ -164,10 +157,8 @@ export default function ProjectNavigation({
             gap: '0.5rem',
             padding: '0.75rem 1rem',
             borderBottom: isActive
-              ? `2px solid ${colors.brandText}`
-              : showStatusIndicator
-                ? `2px solid ${statusColor}`
-                : '2px solid transparent',
+              ? `3px solid ${borderColor}`
+              : `2px solid ${borderColor}`,
             color: isActive ? colors.brandText : colors.textSecondary,
             textDecoration: 'none',
             fontSize: '0.875rem',
@@ -186,6 +177,8 @@ export default function ProjectNavigation({
                 style={tabStyle}
                 aria-disabled="true"
                 title={tooltipText}
+                role="tab"
+                aria-selected={false}
               >
                 {tabContent}
               </div>
@@ -199,6 +192,8 @@ export default function ProjectNavigation({
               style={tabStyle}
               aria-current={isActive ? 'page' : undefined}
               title={tooltipText}
+              role="tab"
+              aria-selected={isActive}
             >
               {tabContent}
             </Link>

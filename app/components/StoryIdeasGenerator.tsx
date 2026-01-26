@@ -120,7 +120,7 @@ export default function StoryIdeasGenerator({
       }
 
       // Mark as saved
-      setSavedIdsSet(prev => new Set([...prev, idea.storyIdea]));
+      setSavedIdsSet(prev => new Set([...Array.from(prev), idea.storyIdea]));
       // Refresh saved ideas list
       await fetchSavedIdeas();
     } catch (err: any) {

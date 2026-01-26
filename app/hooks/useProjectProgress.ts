@@ -147,105 +147,26 @@ export function useProjectProgress(project: ProjectData | null, books: BookData[
   return progressData;
 }
 
+/**
+ * Hook to provide project navigation data
+ * Updated to work with the new ProjectNavigation component that uses
+ * PROJECT_NAV_TABS from constants and useWorkflowPrerequisites for status
+ */
 export function useProjectNavigation(
   projectId: string,
   project: ProjectData | null,
-  outline?: any, // Optional outline data for completion check
-  plotStructure?: any, // Optional plot structure data for prerequisite checks
-  proseStyle?: any, // Optional prose style data for prerequisite checks
-  isSubmitted?: boolean // Optional submission status for prerequisite checks
+  outline?: any, // Optional outline data for workflow checks
+  chapters?: any[] // Optional chapters data for analytics check
 ): {
   projectId: string;
-  tabs: any[];
   project?: ProjectData | null;
-  plotStructure?: any;
   outline?: any;
-  proseStyle?: any;
-  isSubmitted?: boolean;
+  chapters?: any[];
 } {
-  const tabs = useMemo(() => {
-    const characterCount = project?.story_bible?.characters?.length || 0;
-    const worldCount = countWorldElements(project?.story_bible?.world);
-
-    // Determine completion status for required sections
-    const hasCharacters = characterCount > 0;
-    const hasWorld = worldCount > 0;
-    const hasOutline = outline && outline.structure?.acts?.length > 0;
-
-    return [
-      {
-        id: 'overview',
-        label: 'Overview',
-        route: '',
-        icon: '📋',
-        status: 'neutral' as const,
-      },
-      {
-        id: 'characters',
-        label: 'Characters',
-        route: '/characters',
-        icon: '👥',
-        badge: characterCount > 0 ? characterCount : undefined,
-        required: true,
-        status: hasCharacters ? 'completed' : 'required' as const,
-      },
-      {
-        id: 'world',
-        label: 'World',
-        route: '/world',
-        icon: '🌍',
-        badge: worldCount > 0 ? worldCount : undefined,
-        required: true,
-        status: hasWorld ? 'completed' : 'required' as const,
-      },
-      {
-        id: 'plot',
-        label: 'Plot',
-        route: '/plot',
-        icon: '📊',
-        required: true,
-        status: 'optional' as const,
-      },
-      {
-        id: 'outline',
-        label: 'Outline',
-        route: '/outline',
-        icon: '📝',
-        required: true,
-        status: hasOutline ? 'completed' : 'required' as const,
-      },
-      {
-        id: 'style',
-        label: 'Style',
-        route: '/prose-style',
-        icon: '✨',
-        required: true,
-        status: 'neutral' as const,
-      },
-      {
-        id: 'chapters',
-        label: 'Chapters',
-        route: '/progress',
-        icon: '📖',
-        status: 'neutral' as const,
-      },
-      {
-        id: 'analytics',
-        label: 'Analytics',
-        route: '/analytics',
-        icon: '📈',
-        status: 'neutral' as const,
-      },
-    ];
-  }, [project, outline]);
-
   return {
     projectId,
-    tabs,
     project,
-    plotStructure,
     outline,
-    proseStyle,
-    isSubmitted,
+    chapters,
   };
 }

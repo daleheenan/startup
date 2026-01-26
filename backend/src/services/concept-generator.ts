@@ -982,3 +982,204 @@ Return ONLY a JSON array matching the number of summaries provided:
   ...
 ]`;
 }
+
+/**
+ * Interface for story idea data used in expansion
+ */
+export interface StoryIdeaForExpansion {
+  id: string;
+  storyIdea: string;
+  characterConcepts: string[];
+  plotElements: string[];
+  uniqueTwists: string[];
+  genre: string;
+  subgenre?: string;
+  tone?: string;
+  themes: string[];
+}
+
+/**
+ * Options for expanding a story idea into full concepts
+ */
+export interface ExpandFromIdeaOptions {
+  idea: StoryIdeaForExpansion;
+  count: number;
+  preferences?: Record<string, any>;
+}
+
+/**
+ * Expand a saved story idea into full story concepts
+ * This takes a brief story idea (with character concepts, plot elements, unique twists)
+ * and generates detailed story concepts from it
+ */
+export async function expandFromIdea(options: ExpandFromIdeaOptions): Promise<StoryConcept[]> {
+  const { idea, count, preferences = {} } = options;
+
+  logger.info({
+    ideaId: idea.id,
+    count,
+    genre: idea.genre,
+  }, 'Expanding story idea into full concepts');
+
+  // Fetch exclusions to avoid duplicate titles/names
+  const exclusions = fetchExclusions();
+
+  const prompt = buildIdeaExpansionPrompt(idea, count, exclusions, preferences);
+
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-opus-4-5-20251101',
+      max_tokens: count > 5 ? 8000 : 5000,
+      temperature: 1.0, // High creativity for diverse concepts
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+    });
+
+    const responseText = message.content[0].type === 'text'
+      ? message.content[0].text
+      : '';
+
+    let concepts = parseConceptsResponse(responseText);
+
+    if (!concepts || concepts.length === 0) {
+      throw new Error('Failed to parse expanded concepts from Claude response');
+    }
+
+    // Validate and clean concepts against exclusions
+    concepts = validateAndCleanConcepts(concepts, exclusions);
+
+    logger.info({
+      ideaId: idea.id,
+      conceptsGenerated: concepts.length,
+    }, 'Successfully expanded story idea into concepts');
+
+    return concepts;
+  } catch (error: any) {
+    logger.error({ error, ideaId: idea.id }, 'Failed to expand story idea');
+    throw error;
+  }
+}
+
+/**
+ * Build prompt for expanding a story idea into full concepts
+ */
+function buildIdeaExpansionPrompt(
+  idea: StoryIdeaForExpansion,
+  count: number,
+  exclusions: ConceptExclusions,
+  preferences: Record<string, any>
+): string {
+  const uniqueSeed = Date.now();
+
+  // Build character concepts section
+  const characterSection = idea.characterConcepts.length > 0
+    ? `**Character Concepts:**\n${idea.characterConcepts.map((c, i) => `${i + 1}. ${c}`).join('\n')}`
+    : '';
+
+  // Build plot elements section
+  const plotSection = idea.plotElements.length > 0
+    ? `**Plot Elements:**\n${idea.plotElements.map((p, i) => `${i + 1}. ${p}`).join('\n')}`
+    : '';
+
+  // Build unique twists section
+  const twistsSection = idea.uniqueTwists.length > 0
+    ? `**Unique Twists:**\n${idea.uniqueTwists.map((t, i) => `${i + 1}. ${t}`).join('\n')}`
+    : '';
+
+  // Build themes section
+  const themesSection = idea.themes.length > 0
+    ? `**Themes:** ${idea.themes.join(', ')}`
+    : '';
+
+  // Build exclusion section
+  let exclusionSection = '';
+  if (exclusions.titles.length > 0 || exclusions.protagonistNames.length > 0) {
+    exclusionSection = `
+═══════════════════════════════════════════════════════════════════════════════
+⛔ CRITICAL: BANNED ELEMENTS - DO NOT USE THESE ⛔
+═══════════════════════════════════════════════════════════════════════════════
+
+**BANNED TITLES:**
+${exclusions.titles.slice(0, 25).join(' | ')}
+
+**BANNED CHARACTER NAMES:**
+${exclusions.protagonistNames.slice(0, 50).join(' | ')}
+
+**BANNED GENERIC TITLE WORDS:**
+${GENERIC_TITLE_WORDS.join(' | ')}
+═══════════════════════════════════════════════════════════════════════════════
+`;
+  }
+
+  return `You are a master storyteller and concept developer. Your task is to expand a story idea into ${count} COMPLETE and UNIQUE story concepts.
+
+[Generation ID: ${uniqueSeed}]
+
+**ORIGINAL STORY IDEA:**
+${idea.storyIdea}
+
+${characterSection}
+
+${plotSection}
+
+${twistsSection}
+
+**Genre:** ${idea.genre}
+${idea.subgenre ? `**Subgenre:** ${idea.subgenre}` : ''}
+${idea.tone ? `**Tone:** ${idea.tone}` : ''}
+${themesSection}
+${preferences.targetLength ? `**Target Length:** ${preferences.targetLength.toLocaleString()} words` : ''}
+
+${exclusionSection}
+
+**YOUR TASK:**
+Generate ${count} FULLY DEVELOPED story concepts based on this idea. Each concept should:
+1. Be a unique interpretation of the core story idea
+2. Have a completely ORIGINAL title (not generic)
+3. Include a compelling logline (25-40 words)
+4. Have a detailed synopsis (150-200 words) covering setup, conflict, and stakes
+5. Feature a unique protagonist with a NAME from a diverse cultural background
+6. Include a hook that makes readers want more
+
+**DIVERSITY REQUIREMENTS:**
+Across your ${count} concepts, vary:
+- Protagonist types and backgrounds
+- Narrative approaches and structures
+- The specific conflict focus
+- The balance of character concepts used
+- The emphasis on different plot elements and twists
+
+**IMPORTANT:**
+- Draw from the provided character concepts, plot elements, and unique twists
+- Each concept should emphasize DIFFERENT aspects of the idea
+- Combine the elements in creative, unexpected ways
+- Do NOT simply repeat the idea - EXPAND and DEVELOP it
+
+Return ONLY a JSON array of ${count} concepts in this exact format:
+[
+  {
+    "id": "concept-1",
+    "title": "Unique, compelling title",
+    "logline": "A one-sentence hook that captures the story's essence and stakes",
+    "synopsis": "A detailed three-paragraph synopsis covering the setup, central conflict, and stakes",
+    "hook": "What makes this story truly unique and compelling",
+    "protagonistHint": "UniqueName - their role, key trait, and motivation",
+    "conflictType": "internal/external/both"
+  },
+  ...
+]`;
+}
+
+// Export the conceptGenerator object with all functions
+export const conceptGenerator = {
+  generateConcepts,
+  refineConcepts,
+  generateConceptSummaries,
+  expandSummariesToConcepts,
+  expandSummaryToVariations,
+  expandFromIdea,
+};

@@ -104,7 +104,7 @@ export default function ProseStylePage() {
         </header>
 
         {/* Project Navigation */}
-        <ProjectNavigation projectId={projectId} tabs={navigation.tabs} />
+        <ProjectNavigation projectId={projectId} project={navigation.project} />
 
         {/* Main Content */}
         <div style={{ flex: 1, overflow: 'auto' }}>

@@ -191,7 +191,7 @@ export default function AnalyticsPage() {
         </header>
 
         {/* Project Navigation */}
-        <ProjectNavigation projectId={projectId} tabs={navigation.tabs} />
+        <ProjectNavigation projectId={projectId} project={navigation.project} />
 
         {/* Content Area */}
         <div style={{ flex: 1, overflow: 'auto' }}>
