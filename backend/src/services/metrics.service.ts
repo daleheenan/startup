@@ -54,16 +54,8 @@ class MetricsService {
    */
   trackChapterTokens(chapterId: string, inputTokens: number, outputTokens: number): void {
     try {
-      // Update chapter token counts
-      const updateChapterStmt = db.prepare(`
-        UPDATE chapters
-        SET input_tokens = input_tokens + ?,
-            output_tokens = output_tokens + ?
-        WHERE id = ?
-      `);
-      updateChapterStmt.run(inputTokens, outputTokens, chapterId);
-
-      // Get project ID for this chapter
+      // Get project ID for this chapter and update project metrics directly
+      // Note: chapters table doesn't have token columns - tokens are tracked at project level only
       const getProjectStmt = db.prepare<[string], { project_id: string }>(`
         SELECT b.project_id
         FROM chapters c
@@ -76,7 +68,7 @@ class MetricsService {
         this.updateProjectTokens(result.project_id, inputTokens, outputTokens);
       }
     } catch (error) {
-      logger.error({ error }, 'Error tracking chapter tokens');
+      logger.error({ error, chapterId }, 'Error tracking chapter tokens');
     }
   }
 

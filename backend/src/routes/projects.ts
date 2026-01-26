@@ -198,11 +198,14 @@ router.get('/:id/progress', (req, res) => {
     };
 
     logger.info({
+      projectId,
+      bookCount: books.length,
+      bookIds: books.map((b: any) => b.id),
       total: chapterStats.total,
       completed: chapterStats.completed,
       inProgress: chapterStats.inProgress,
       pending: chapterStats.pending,
-      sampleWordCounts: allChapters.slice(0, 5).map(ch => ({ num: ch.chapter_number, wc: ch.word_count, st: ch.status })),
+      sampleWordCounts: allChapters.slice(0, 5).map(ch => ({ num: ch.chapter_number, wc: ch.word_count, st: ch.status, bookId: ch.book_id })),
     }, 'Chapter stats calculation');
 
     // Calculate word count metrics

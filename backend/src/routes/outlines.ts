@@ -429,6 +429,20 @@ router.post('/:id/start-generation', (req, res) => {
 
     const structure: StoryStructure = JSON.parse(outline.structure as any);
 
+    // Delete any existing chapters and their jobs before creating new ones
+    // This prevents duplicate chapters if generation is restarted
+    const deleteJobsStmt = db.prepare(`
+      DELETE FROM jobs WHERE target_id IN (
+        SELECT id FROM chapters WHERE book_id = ?
+      )
+    `);
+    deleteJobsStmt.run(outline.book_id);
+
+    const deleteChaptersStmt = db.prepare(`
+      DELETE FROM chapters WHERE book_id = ?
+    `);
+    deleteChaptersStmt.run(outline.book_id);
+
     // Create chapter records for all chapters in the outline
     const now = new Date().toISOString();
     const chapterIds: string[] = [];
