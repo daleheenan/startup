@@ -44,3 +44,13 @@ exports/
 .claude/settings.local.json
 data/*.db-shm
 data/*.db-wal
+
+# Local development artifacts
+backups/
+dev-server.log
+**/test-output.txt
+
+# Compiled shared types (build artifacts)
+shared/*.js
+shared/*.d.ts
+shared/*.map
