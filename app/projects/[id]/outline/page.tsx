@@ -611,7 +611,12 @@ export default function OutlinePage() {
         </header>
 
         {/* Project Navigation */}
-        <ProjectNavigation projectId={projectId} project={navigation.project} outline={navigation.outline} />
+        <ProjectNavigation
+          projectId={projectId}
+          project={navigation.project}
+          outline={navigation.outline}
+          chapters={navigation.chapters}
+        />
 
         {/* Content Area */}
         <div style={{
