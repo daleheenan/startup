@@ -258,6 +258,8 @@ export default function PlotStructurePage() {
 
       const data = await res.json();
       if (data.plots && data.plots.length > 0) {
+        // Mark as populated since extraction added plots - prevents auto-populate from overwriting
+        setHasPopulatedInitialLayers(true);
         // Refresh the data to get the newly extracted plots
         await fetchData();
       }
@@ -282,14 +284,17 @@ export default function PlotStructurePage() {
   }, [loading, project, hasAttemptedExtraction, structure.plot_layers?.length, extractPlotsFromConcept]);
 
   // Auto-populate initial plot layers when page loads with no plot layers
+  // Only runs if extraction didn't already populate layers
   // Uses hasPopulatedInitialLayers flag to prevent infinite loop
   useEffect(() => {
+    // Wait for extraction to complete before deciding to auto-populate
     const shouldPopulate = !loading &&
       project &&
       characters &&
       characters.length > 0 &&
       (structure.plot_layers?.length || 0) === 0 &&
       !extractingFromConcept &&
+      hasAttemptedExtraction && // Only after extraction has been attempted
       !hasPopulatedInitialLayers;
 
     if (shouldPopulate) {
@@ -305,7 +310,7 @@ export default function PlotStructurePage() {
         saveStructure(newStructure);
       }
     }
-  }, [loading, project, characters, structure.plot_layers?.length, extractingFromConcept, hasPopulatedInitialLayers]);
+  }, [loading, project, characters, structure.plot_layers?.length, extractingFromConcept, hasAttemptedExtraction, hasPopulatedInitialLayers]);
 
   const saveStructure = async (newStructure: StoryStructure) => {
     setSaving(true);
