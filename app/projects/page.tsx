@@ -265,16 +265,22 @@ export default function ProjectsPage() {
                 </div>
               </div>
 
-              <div style={{
-                padding: '0.75rem 1rem',
-                background: '#F1F5F9',
-                borderRadius: '8px',
-              }}>
+              <Link
+                href="/admin/queue"
+                style={{
+                  padding: '0.75rem 1rem',
+                  background: '#F1F5F9',
+                  borderRadius: '8px',
+                  textDecoration: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+              >
                 <div style={{ fontSize: '0.75rem', color: '#475569' }}>Job Queue</div>
                 <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1A1A2E' }}>
                   PENDING: {queueStats.queue.pending}
                 </div>
-              </div>
+              </Link>
 
               <button
                 onClick={handleLogout}

@@ -368,7 +368,7 @@ export default function OutlinePage() {
 
     try {
       const token = getToken();
-      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/outline/acts/${actNumber}`, {
+      const response = await fetch(`${API_BASE_URL}/api/outlines/${outline.book_id}/acts/${actNumber}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -391,7 +391,7 @@ export default function OutlinePage() {
 
     try {
       const token = getToken();
-      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/outline/acts`, {
+      const response = await fetch(`${API_BASE_URL}/api/outlines/${outline.book_id}/acts`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -452,8 +452,8 @@ export default function OutlinePage() {
 
     try {
       const token = getToken();
-      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/outline/acts/${editingActNumber}`, {
-        method: 'PATCH',
+      const response = await fetch(`${API_BASE_URL}/api/outlines/${outline.book_id}/acts/${editingActNumber}`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,

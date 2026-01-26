@@ -205,13 +205,13 @@ router.get('/:id/progress', (req, res) => {
     // Step 4: Fetch queue statistics for this project
     const queueStmt = db.prepare(`
       SELECT
-        status,
+        j.status,
         COUNT(*) as count
       FROM jobs j
       INNER JOIN chapters c ON j.target_id = c.id
       INNER JOIN books b ON c.book_id = b.id
       WHERE b.project_id = ?
-      GROUP BY status
+      GROUP BY j.status
     `);
     const queueResults = queueStmt.all(projectId) as any[];
 

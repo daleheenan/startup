@@ -213,13 +213,25 @@ export default function ProgressPage() {
     const totalChapters = totalChaptersFromBooks > 0 ? totalChaptersFromBooks : progress.chapters.total;
     const completedChapters = totalChaptersFromBooks > 0 ? completedChaptersFromBooks : progress.chapters.completed;
 
+    // Check for pending jobs FIRST - if jobs are queued, generation is in progress
+    if (progress.queue.pending > 0 || progress.queue.running > 0) {
+      return 'generating';
+    }
+
+    // If no chapters at all and no pending jobs, generation hasn't started
     if (totalChapters === 0) return 'none';
+
+    // All chapters complete
     if (completedChapters === totalChapters && totalChapters > 0) return 'completed';
-    if (progress.queue.running > 0 || progress.chapters.inProgress > 0) return 'generating';
+
+    // Active work in progress
+    if (progress.chapters.inProgress > 0) return 'generating';
+
+    // Queue paused
     if (progress.queue.paused > 0) return 'paused';
 
     // If we have chapters with content but no active queue, consider it completed
-    if (completedChapters > 0 && progress.queue.running === 0 && progress.queue.pending === 0) {
+    if (completedChapters > 0) {
       return 'completed';
     }
 
