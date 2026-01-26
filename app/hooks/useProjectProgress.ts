@@ -243,15 +243,20 @@ export function useProjectNavigation(
       }
     };
 
-    // Only fetch if we need to
-    if (!providedOutline || !providedChapters) {
-      fetchNavigationData();
-    }
-  }, [projectId, providedOutline, providedChapters]);
+    // Always fetch navigation data to ensure we have the latest
+    // The hook will prefer provided data if it's not null
+    fetchNavigationData();
+  }, [projectId]);
 
-  // Use provided data if available, otherwise use fetched data
-  const outline = providedOutline !== undefined ? providedOutline : fetchedOutline;
-  const chapters = providedChapters !== undefined ? providedChapters : fetchedChapters;
+  // Use provided data if available and not null, otherwise use fetched data
+  // Note: null means "explicitly no data yet", undefined means "please fetch for me"
+  // We also use fetched data if provided data is null but fetched data exists (race condition fix)
+  const outline = (providedOutline !== undefined && providedOutline !== null)
+    ? providedOutline
+    : (fetchedOutline || providedOutline);
+  const chapters = (providedChapters !== undefined && providedChapters !== null)
+    ? providedChapters
+    : (fetchedChapters || providedChapters);
 
   return {
     projectId,

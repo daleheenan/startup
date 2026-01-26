@@ -321,6 +321,7 @@ export function runMigrations() {
       '019_user_settings.sql',           // DB version 26 - user genres, exclusions, recipes
       '019_time_period.sql',             // DB version 27 - time period support
       '015_fix_metrics_trigger.sql',     // DB version 28 - fix word_count ambiguity in trigger
+      '020_backfill_metrics.sql',        // DB version 29 - backfill metrics for existing data
     ];
 
     for (let i = 0; i < migrationFiles.length; i++) {

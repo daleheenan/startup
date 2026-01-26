@@ -200,18 +200,22 @@ export default function ProgressPage() {
     }
   };
 
+  // Calculate chapter stats from local books data (more accurate since it checks word_count)
+  const totalChaptersFromBooks = books.reduce((sum, book) => sum + (book.chapters?.length || 0), 0);
+  const completedChaptersFromBooks = books.reduce((sum, book) => {
+    return sum + (book.chapters?.filter(ch => ch.status === 'completed' || ch.word_count > 0).length || 0);
+  }, 0);
+  const currentWordCountFromBooks = books.reduce((sum, book) => {
+    return sum + (book.chapters?.reduce((chSum, ch) => chSum + (ch.word_count || 0), 0) || 0);
+  }, 0);
+
+  // Use books data if available, otherwise fall back to progress data
+  const effectiveTotalChapters = totalChaptersFromBooks > 0 ? totalChaptersFromBooks : (progress?.chapters.total || 0);
+  const effectiveCompletedChapters = totalChaptersFromBooks > 0 ? completedChaptersFromBooks : (progress?.chapters.completed || 0);
+  const effectiveWordCount = currentWordCountFromBooks > 0 ? currentWordCountFromBooks : (progress?.wordCount.current || 0);
+
   const getGenerationStatus = () => {
     if (!progress) return 'none';
-
-    // First check if we have chapters from the books data (more reliable)
-    const totalChaptersFromBooks = books.reduce((sum, book) => sum + (book.chapters?.length || 0), 0);
-    const completedChaptersFromBooks = books.reduce((sum, book) => {
-      return sum + (book.chapters?.filter(ch => ch.status === 'completed' || ch.word_count > 0).length || 0);
-    }, 0);
-
-    // Use books data if available, otherwise fall back to progress data
-    const totalChapters = totalChaptersFromBooks > 0 ? totalChaptersFromBooks : progress.chapters.total;
-    const completedChapters = totalChaptersFromBooks > 0 ? completedChaptersFromBooks : progress.chapters.completed;
 
     // Check for pending jobs FIRST - if jobs are queued, generation is in progress
     if (progress.queue.pending > 0 || progress.queue.running > 0) {
@@ -219,10 +223,10 @@ export default function ProgressPage() {
     }
 
     // If no chapters at all and no pending jobs, generation hasn't started
-    if (totalChapters === 0) return 'none';
+    if (effectiveTotalChapters === 0) return 'none';
 
     // All chapters complete
-    if (completedChapters === totalChapters && totalChapters > 0) return 'completed';
+    if (effectiveCompletedChapters === effectiveTotalChapters && effectiveTotalChapters > 0) return 'completed';
 
     // Active work in progress
     if (progress.chapters.inProgress > 0) return 'generating';
@@ -231,7 +235,7 @@ export default function ProgressPage() {
     if (progress.queue.paused > 0) return 'paused';
 
     // If we have chapters with content but no active queue, consider it completed
-    if (completedChapters > 0) {
+    if (effectiveCompletedChapters > 0) {
       return 'completed';
     }
 
@@ -240,6 +244,8 @@ export default function ProgressPage() {
 
   const getChapterStatus = (chapter: Chapter) => {
     if (chapter.status === 'completed') return 'completed';
+    // Consider chapters with content as readable (even if still being edited)
+    if ((chapter.status === 'editing' || chapter.status === 'processing') && chapter.word_count > 0) return 'completed';
     if (chapter.status === 'writing' || chapter.status === 'editing' || chapter.status === 'processing') return 'in-progress';
     return 'pending';
   };
@@ -632,9 +638,9 @@ export default function ProgressPage() {
                 {/* Status Banner */}
                 <GenerationStatusBanner
                   status={generationStatus}
-                  completedChapters={progress.chapters.completed}
-                  totalChapters={progress.chapters.total}
-                  currentWordCount={progress.wordCount.current}
+                  completedChapters={effectiveCompletedChapters}
+                  totalChapters={effectiveTotalChapters}
+                  currentWordCount={effectiveWordCount}
                   targetWordCount={progress.wordCount.target}
                   estimatedTimeRemaining={progress.timeEstimates.estimatedRemaining}
                   currentActivity={progress.currentActivity}
