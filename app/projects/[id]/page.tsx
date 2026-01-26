@@ -158,12 +158,80 @@ export default function ProjectDetailPage() {
               </div>
             </div>
 
+            {/* Quick Links - show when no story concept */}
+            {(!project.story_concept || (!project.story_concept.logline && !project.story_concept.synopsis)) && (
+              <div style={{ ...card, marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h2 style={{ fontSize: '1.125rem', color: '#1A1A2E', fontWeight: 600, margin: 0 }}>
+                      Story Resources
+                    </h2>
+                    <p style={{ fontSize: '0.875rem', color: colors.textSecondary, margin: '0.25rem 0 0 0' }}>
+                      Access your saved concepts and ideas
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <Link
+                      href="/saved-summaries"
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: colors.surface,
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: borderRadius.md,
+                        color: colors.brandStart,
+                        fontSize: '0.75rem',
+                        fontWeight: 500,
+                        textDecoration: 'none',
+                      }}
+                    >
+                      Saved Summaries
+                    </Link>
+                    <Link
+                      href="/saved-concepts"
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: colors.surface,
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: borderRadius.md,
+                        color: colors.brandStart,
+                        fontSize: '0.75rem',
+                        fontWeight: 500,
+                        textDecoration: 'none',
+                      }}
+                    >
+                      Saved Concepts
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Story Concept Section */}
             {project.story_concept && (project.story_concept.logline || project.story_concept.synopsis) && (
               <div style={{ ...card, marginBottom: '1rem' }}>
-                <h2 style={{ fontSize: '1.125rem', marginBottom: '1rem', color: '#1A1A2E', fontWeight: 600 }}>
-                  Story Concept
-                </h2>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h2 style={{ fontSize: '1.125rem', color: '#1A1A2E', fontWeight: 600, margin: 0 }}>
+                    Story Concept
+                  </h2>
+                  <Link
+                    href="/saved-summaries"
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: colors.surface,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: borderRadius.md,
+                      color: colors.brandStart,
+                      fontSize: '0.75rem',
+                      fontWeight: 500,
+                      textDecoration: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.375rem',
+                    }}
+                  >
+                    View Saved Summaries
+                  </Link>
+                </div>
                 <div style={{ display: 'grid', gap: '1rem', color: '#64748B', fontSize: '0.875rem' }}>
                   {project.story_concept.logline && (
                     <div>
