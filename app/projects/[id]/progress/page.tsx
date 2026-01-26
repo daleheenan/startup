@@ -203,10 +203,25 @@ export default function ProgressPage() {
   const getGenerationStatus = () => {
     if (!progress) return 'none';
 
-    if (progress.chapters.total === 0) return 'none';
-    if (progress.chapters.completed === progress.chapters.total && progress.chapters.total > 0) return 'completed';
+    // First check if we have chapters from the books data (more reliable)
+    const totalChaptersFromBooks = books.reduce((sum, book) => sum + (book.chapters?.length || 0), 0);
+    const completedChaptersFromBooks = books.reduce((sum, book) => {
+      return sum + (book.chapters?.filter(ch => ch.status === 'completed' || ch.word_count > 0).length || 0);
+    }, 0);
+
+    // Use books data if available, otherwise fall back to progress data
+    const totalChapters = totalChaptersFromBooks > 0 ? totalChaptersFromBooks : progress.chapters.total;
+    const completedChapters = totalChaptersFromBooks > 0 ? completedChaptersFromBooks : progress.chapters.completed;
+
+    if (totalChapters === 0) return 'none';
+    if (completedChapters === totalChapters && totalChapters > 0) return 'completed';
     if (progress.queue.running > 0 || progress.chapters.inProgress > 0) return 'generating';
     if (progress.queue.paused > 0) return 'paused';
+
+    // If we have chapters with content but no active queue, consider it completed
+    if (completedChapters > 0 && progress.queue.running === 0 && progress.queue.pending === 0) {
+      return 'completed';
+    }
 
     return 'none';
   };
