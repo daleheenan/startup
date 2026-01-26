@@ -2,6 +2,9 @@
   "name": "novelforge",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -14,6 +17,7 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.20",
+    "@tanstack/react-virtual": "^3.13.18",
     "next": "^14.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"

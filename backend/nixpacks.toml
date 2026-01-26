@@ -1,8 +1,11 @@
 # Nixpacks configuration for NovelForge backend
-# Required for better-sqlite3 native compilation
+# Required for better-sqlite3 native compilation and Node 20
+
+[variables]
+NODE_VERSION = "20"
 
 [phases.setup]
-nixPkgs = ["python3", "gcc", "gnumake"]
+nixPkgs = ["nodejs_20", "python3", "gcc", "gnumake"]
 
 [phases.install]
 cmds = ["npm install"]

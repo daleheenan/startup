@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Offline - NovelForge</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .container {
+      background: white;
+      border-radius: 16px;
+      padding: 3rem 2rem;
+      text-align: center;
+      max-width: 400px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    }
+
+    .icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 1.5rem;
+      background: #F8FAFC;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .icon svg {
+      width: 40px;
+      height: 40px;
+      color: #667eea;
+    }
+
+    h1 {
+      color: #1A1A2E;
+      font-size: 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    p {
+      color: #475569;
+      line-height: 1.6;
+      margin-bottom: 1.5rem;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 0.875rem 2rem;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 14px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .cached-chapters {
+      margin-top: 2rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid #E2E8F0;
+    }
+
+    .cached-chapters h2 {
+      font-size: 1rem;
+      color: #475569;
+      margin-bottom: 0.75rem;
+    }
+
+    #cached-list {
+      text-align: left;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .cached-item {
+      padding: 0.5rem;
+      border-radius: 4px;
+      background: #F8FAFC;
+      margin-bottom: 0.5rem;
+      font-size: 0.875rem;
+      color: #1A1A2E;
+    }
+
+    .no-cache {
+      color: #94A3B8;
+      font-style: italic;
+      font-size: 0.875rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414" />
+      </svg>
+    </div>
+
+    <h1>You're Offline</h1>
+    <p>It looks like you've lost your internet connection. Don't worry - any chapters you've viewed recently are still available.</p>
+
+    <button class="btn" onclick="window.location.reload()">
+      Try Again
+    </button>
+
+    <div class="cached-chapters">
+      <h2>Available Offline</h2>
+      <div id="cached-list">
+        <p class="no-cache">Checking cached content...</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Check for cached chapters
+    if ('caches' in window) {
+      caches.open('novelforge-chapters-v1').then(cache => {
+        cache.keys().then(keys => {
+          const list = document.getElementById('cached-list');
+          if (keys.length === 0) {
+            list.innerHTML = '<p class="no-cache">No chapters cached yet. View some chapters while online to access them offline.</p>';
+            return;
+          }
+
+          list.innerHTML = '';
+          keys.forEach(request => {
+            const url = new URL(request.url);
+            const item = document.createElement('div');
+            item.className = 'cached-item';
+            item.textContent = `Chapter from ${url.pathname}`;
+            item.onclick = () => window.location.href = url.pathname.replace('/api', '').replace('/content', '');
+            item.style.cursor = 'pointer';
+            list.appendChild(item);
+          });
+        });
+      });
+    }
+  </script>
+</body>
+</html>

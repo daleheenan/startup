@@ -1,0 +1,17 @@
+# Nixpacks configuration for NovelForge frontend
+# Requires Node 20 for dependency compatibility
+
+[variables]
+NODE_VERSION = "20"
+
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+cmds = ["npm ci"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm start"
