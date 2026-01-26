@@ -48,8 +48,13 @@ router.get('/', (req, res) => {
     const allMetrics = metricsService.getAllProjectMetrics();
 
     // Get outline and chapter counts for each project
+    // Note: outlines table links to books, not directly to projects
     const outlineStmt = db.prepare<[string], any>(`
-      SELECT id, total_chapters FROM outlines WHERE project_id = ? LIMIT 1
+      SELECT o.id, o.total_chapters
+      FROM outlines o
+      INNER JOIN books b ON o.book_id = b.id
+      WHERE b.project_id = ?
+      LIMIT 1
     `);
     const chapterCountStmt = db.prepare<[string], any>(`
       SELECT COUNT(*) as count FROM chapters c
