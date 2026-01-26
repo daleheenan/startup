@@ -206,19 +206,10 @@ export default function ProgressPage() {
     }
   };
 
-  // Calculate chapter stats from local books data (more accurate since it checks word_count)
-  const totalChaptersFromBooks = books.reduce((sum, book) => sum + (book.chapters?.length || 0), 0);
-  const completedChaptersFromBooks = books.reduce((sum, book) => {
-    return sum + (book.chapters?.filter(ch => ch.status === 'completed' || ch.word_count > 0).length || 0);
-  }, 0);
-  const currentWordCountFromBooks = books.reduce((sum, book) => {
-    return sum + (book.chapters?.reduce((chSum, ch) => chSum + (ch.word_count || 0), 0) || 0);
-  }, 0);
-
-  // Use books data if available, otherwise fall back to progress data
-  const effectiveTotalChapters = totalChaptersFromBooks > 0 ? totalChaptersFromBooks : (progress?.chapters.total || 0);
-  const effectiveCompletedChapters = totalChaptersFromBooks > 0 ? completedChaptersFromBooks : (progress?.chapters.completed || 0);
-  const effectiveWordCount = currentWordCountFromBooks > 0 ? currentWordCountFromBooks : (progress?.wordCount.current || 0);
+  // Use progress API data directly - backend now correctly counts chapters with word_count > 0 as completed
+  const effectiveTotalChapters = progress?.chapters.total || 0;
+  const effectiveCompletedChapters = progress?.chapters.completed || 0;
+  const effectiveWordCount = progress?.wordCount.current || 0;
 
   const getGenerationStatus = () => {
     if (!progress) return 'none';
