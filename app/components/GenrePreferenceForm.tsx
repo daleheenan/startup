@@ -54,6 +54,8 @@ export interface StoryPreferences {
   specificYear?: number;
   // Character Nationality Configuration
   nationalityConfig?: NationalityConfig;
+  // Generation mode for concept creation
+  generateMode?: 'full' | 'summaries' | 'quick20';
 }
 
 interface SourceProject {
@@ -629,6 +631,12 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
   const [presetDescription, setPresetDescription] = useState('');
   const [savingPreset, setSavingPreset] = useState(false);
 
+  // Tab navigation state for multi-step wizard
+  const [currentTab, setCurrentTab] = useState(1);
+
+  // Generation mode: 'full' = 5 detailed concepts, 'summaries' = 10 summaries, 'quick20' = 20 summaries
+  const [generateMode, setGenerateMode] = useState<'full' | 'summaries' | 'quick20'>('full');
+
   // Load presets and universe data on mount
   useEffect(() => {
     fetchPresets();
@@ -958,6 +966,7 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
       timePeriodType: timePeriod.type !== 'present' ? timePeriod.type : undefined,
       specificYear: timePeriod.type === 'custom' ? timePeriod.year : undefined,
       nationalityConfig: nationalityConfig.mode !== 'none' ? nationalityConfig : undefined,
+      generateMode,
     };
 
     onSubmit(preferences);
@@ -1079,8 +1088,105 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
     );
   };
 
+  // Tab definitions for the wizard
+  const tabs = [
+    { id: 1, label: 'Project', description: 'Structure & Length' },
+    { id: 2, label: 'Genres', description: 'Style & Subgenres' },
+    { id: 3, label: 'Tone & Themes', description: 'Mood & Messages' },
+    { id: 4, label: 'Story Ideas', description: 'Your Concepts' },
+    { id: 5, label: 'Presets', description: 'Optional' },
+  ];
+
+  // Check if current tab is valid to proceed
+  const canProceedFromTab = (tabId: number): boolean => {
+    switch (tabId) {
+      case 1: return true; // Project structure has defaults
+      case 2: return genres.length > 0; // Must have at least one genre
+      case 3: return tones.length > 0 && (themes.length > 0 || customTheme.trim() !== ''); // Must have tone and theme
+      case 4: return true; // Story ideas are optional
+      case 5: return true; // Presets are optional
+      default: return true;
+    }
+  };
+
+  const handleNextTab = () => {
+    if (currentTab < 5 && canProceedFromTab(currentTab)) {
+      setCurrentTab(currentTab + 1);
+    }
+  };
+
+  const handlePrevTab = () => {
+    if (currentTab > 1) {
+      setCurrentTab(currentTab - 1);
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit} style={{ width: '100%' }}>
+      {/* Tab Navigation */}
+      <div style={{
+        display: 'flex',
+        gap: '0.25rem',
+        marginBottom: '1.5rem',
+        borderBottom: '2px solid #E2E8F0',
+        paddingBottom: '0',
+      }}>
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setCurrentTab(tab.id)}
+            style={{
+              padding: '0.75rem 1rem',
+              background: currentTab === tab.id ? '#FFFFFF' : 'transparent',
+              border: 'none',
+              borderBottom: currentTab === tab.id ? '2px solid #667eea' : '2px solid transparent',
+              marginBottom: '-2px',
+              color: currentTab === tab.id ? '#667eea' : '#64748B',
+              fontWeight: currentTab === tab.id ? 600 : 400,
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              minWidth: '80px',
+              opacity: tab.id === 5 ? 0.7 : 1,
+            }}
+          >
+            <span style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.375rem',
+            }}>
+              <span style={{
+                width: '20px',
+                height: '20px',
+                borderRadius: '50%',
+                background: currentTab === tab.id
+                  ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                  : (tab.id < currentTab ? '#10B981' : '#E2E8F0'),
+                color: '#FFFFFF',
+                fontSize: '0.625rem',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                {tab.id < currentTab ? '✓' : tab.id}
+              </span>
+              {tab.label}
+            </span>
+            <span style={{ fontSize: '0.625rem', color: '#94A3B8', marginTop: '0.125rem' }}>
+              {tab.description}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* TAB 5: Book Style Presets (Optional) */}
+      {currentTab === 5 && (
+        <>
       {/* Book Style Presets */}
       <CollapsibleSection
         title="Book Style Presets"
@@ -1518,7 +1624,12 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
           </div>
         )}
       </CollapsibleSection>
+        </>
+      )}
 
+      {/* TAB 1: Project Structure, Target Length, Time Period */}
+      {currentTab === 1 && (
+        <>
       {/* Project Structure Selection */}
       <div style={{
         ...sectionStyle,
@@ -1761,6 +1872,82 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
         </div>
       </div>
 
+      {/* Target Length - Moved to Tab 1 */}
+      <div style={sectionStyle}>
+        <label style={labelStyle}>
+          Target Length (words) <span style={{ color: '#DC2626' }}>*</span>
+        </label>
+        <input
+          type="number"
+          value={targetLength}
+          onChange={(e) => setTargetLength(Number(e.target.value))}
+          min={40000}
+          max={150000}
+          step={1000}
+          style={inputStyle}
+          disabled={isLoading}
+        />
+        <div style={{ marginTop: '0.5rem', fontSize: '0.813rem', color: '#64748B' }}>
+          Typical novel: 70,000-100,000 words. Epic fantasy: 100,000-150,000 words.
+        </div>
+        {errors.targetLength && <div style={errorStyle}>{errors.targetLength}</div>}
+      </div>
+
+      {/* Time Period Setting - Moved to Tab 1 */}
+      <div style={sectionStyle}>
+        <label style={labelStyle}>
+          Story Time Period
+          <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Optional)</span>
+        </label>
+        <div style={{ marginBottom: '1rem' }}>
+          <TimePeriodSelector
+            value={timePeriod}
+            onChange={setTimePeriod}
+            disabled={isLoading}
+          />
+          <div style={{ marginTop: '1rem', fontSize: '0.813rem', color: '#64748B' }}>
+            Select when your story takes place. This helps establish historical context, technology level, and cultural setting.
+          </div>
+          {timePeriod.type !== 'custom' && (
+            <div style={{ marginTop: '1rem' }}>
+              <input
+                type="text"
+                value={timeframe}
+                onChange={(e) => setTimeframe(e.target.value)}
+                placeholder="Additional era details (e.g., 'Victorian London', 'Post-Apocalyptic wasteland')"
+                style={inputStyle}
+                disabled={isLoading}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Tab 1 Navigation */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+        <button
+          type="button"
+          onClick={handleNextTab}
+          style={{
+            padding: '0.75rem 1.5rem',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            border: 'none',
+            borderRadius: '8px',
+            color: '#FFFFFF',
+            fontSize: '0.875rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          Next: Genres →
+        </button>
+      </div>
+        </>
+      )}
+
+      {/* TAB 2: Genres */}
+      {currentTab === 2 && (
+        <>
       {/* Genre Preview */}
       <div style={{
         ...sectionStyle,
@@ -2168,6 +2355,50 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
         </div>
       )}
 
+      {/* Tab 2 Navigation */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem' }}>
+        <button
+          type="button"
+          onClick={handlePrevTab}
+          style={{
+            padding: '0.75rem 1.5rem',
+            background: '#F8FAFC',
+            border: '1px solid #E2E8F0',
+            borderRadius: '8px',
+            color: '#64748B',
+            fontSize: '0.875rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          ← Back
+        </button>
+        <button
+          type="button"
+          onClick={handleNextTab}
+          disabled={!canProceedFromTab(2)}
+          style={{
+            padding: '0.75rem 1.5rem',
+            background: canProceedFromTab(2)
+              ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+              : '#94A3B8',
+            border: 'none',
+            borderRadius: '8px',
+            color: '#FFFFFF',
+            fontSize: '0.875rem',
+            fontWeight: 600,
+            cursor: canProceedFromTab(2) ? 'pointer' : 'not-allowed',
+          }}
+        >
+          Next: Tone & Themes →
+        </button>
+      </div>
+        </>
+      )}
+
+      {/* TAB 3: Tone & Themes */}
+      {currentTab === 3 && (
+        <>
       {/* Tone Selection - Multi-select with descriptions */}
       <div style={sectionStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
@@ -2430,58 +2661,50 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
         {errors.themes && <div style={errorStyle}>{errors.themes}</div>}
       </div>
 
-      {/* Target Length */}
-      <div style={sectionStyle}>
-        <label style={labelStyle}>
-          Target Length (words) <span style={{ color: '#DC2626' }}>*</span>
-        </label>
-        <input
-          type="number"
-          value={targetLength}
-          onChange={(e) => setTargetLength(Number(e.target.value))}
-          min={40000}
-          max={150000}
-          step={1000}
-          style={inputStyle}
-          disabled={isLoading}
-        />
-        <div style={{ marginTop: '0.5rem', fontSize: '0.813rem', color: '#64748B' }}>
-          Typical novel: 70,000-100,000 words. Epic fantasy: 100,000-150,000 words.
-        </div>
-        {errors.targetLength && <div style={errorStyle}>{errors.targetLength}</div>}
+      {/* Tab 3 Navigation */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem' }}>
+        <button
+          type="button"
+          onClick={handlePrevTab}
+          style={{
+            padding: '0.75rem 1.5rem',
+            background: '#F8FAFC',
+            border: '1px solid #E2E8F0',
+            borderRadius: '8px',
+            color: '#64748B',
+            fontSize: '0.875rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          ← Back
+        </button>
+        <button
+          type="button"
+          onClick={handleNextTab}
+          disabled={!canProceedFromTab(3)}
+          style={{
+            padding: '0.75rem 1.5rem',
+            background: canProceedFromTab(3)
+              ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+              : '#94A3B8',
+            border: 'none',
+            borderRadius: '8px',
+            color: '#FFFFFF',
+            fontSize: '0.875rem',
+            fontWeight: 600,
+            cursor: canProceedFromTab(3) ? 'pointer' : 'not-allowed',
+          }}
+        >
+          Next: Story Ideas →
+        </button>
       </div>
+        </>
+      )}
 
-      {/* Time Period Setting (Phase 4) */}
-      <div style={sectionStyle}>
-        <label style={labelStyle}>
-          Story Time Period
-          <span style={{ fontWeight: 400, color: '#64748B', marginLeft: '0.5rem' }}>(Optional)</span>
-        </label>
-        <div style={{ marginBottom: '1rem' }}>
-          <TimePeriodSelector
-            value={timePeriod}
-            onChange={setTimePeriod}
-            disabled={isLoading}
-          />
-          <div style={{ marginTop: '1rem', fontSize: '0.813rem', color: '#64748B' }}>
-            Select when your story takes place. This helps establish historical context, technology level, and cultural setting.
-          </div>
-          {/* Legacy custom timeframe input for more specific descriptions */}
-          {timePeriod.type !== 'custom' && (
-            <div style={{ marginTop: '1rem' }}>
-              <input
-                type="text"
-                value={timeframe}
-                onChange={(e) => setTimeframe(e.target.value)}
-                placeholder="Additional era details (e.g., 'Victorian London', 'Post-Apocalyptic wasteland')"
-                style={inputStyle}
-                disabled={isLoading}
-              />
-            </div>
-          )}
-        </div>
-      </div>
-
+      {/* TAB 4: Story Ideas, Notes, Character Nationality, Generation Mode */}
+      {currentTab === 4 && (
+        <>
       {/* Custom Story Ideas */}
       <div style={sectionStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
@@ -2582,28 +2805,201 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
         </div>
       </div>
 
-      {/* Submit Button */}
-      <button
-        type="submit"
-        disabled={isLoading}
-        style={{
-          width: '100%',
-          padding: '1rem',
-          background: isLoading
-            ? '#94A3B8'
-            : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          border: 'none',
-          borderRadius: '8px',
-          color: '#FFFFFF',
-          fontSize: '1rem',
-          fontWeight: 600,
-          cursor: isLoading ? 'not-allowed' : 'pointer',
-          transition: 'all 0.2s',
-          boxShadow: isLoading ? 'none' : '0 4px 14px rgba(102, 126, 234, 0.4)',
-        }}
-      >
-        {isLoading ? 'Generating Concepts...' : 'Generate Story Concepts'}
-      </button>
+      {/* Generation Mode Selection */}
+      <div style={sectionStyle}>
+        <label style={labelStyle}>
+          Generation Mode
+        </label>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: '0.75rem',
+        }}>
+          <button
+            type="button"
+            onClick={() => setGenerateMode('full')}
+            disabled={isLoading}
+            style={{
+              padding: '1rem 0.75rem',
+              background: generateMode === 'full'
+                ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                : '#F8FAFC',
+              border: generateMode === 'full'
+                ? '2px solid #667eea'
+                : '1px solid #E2E8F0',
+              borderRadius: '8px',
+              color: generateMode === 'full' ? '#FFFFFF' : '#374151',
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              transition: 'all 0.2s',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>📚</div>
+            <div style={{ fontWeight: 600, marginBottom: '0.25rem', fontSize: '0.875rem' }}>5 Full Concepts</div>
+            <div style={{ fontSize: '0.7rem', opacity: 0.8, lineHeight: '1.3' }}>Detailed concepts ready to use</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => setGenerateMode('summaries')}
+            disabled={isLoading}
+            style={{
+              padding: '1rem 0.75rem',
+              background: generateMode === 'summaries'
+                ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                : '#F8FAFC',
+              border: generateMode === 'summaries'
+                ? '2px solid #667eea'
+                : '1px solid #E2E8F0',
+              borderRadius: '8px',
+              color: generateMode === 'summaries' ? '#FFFFFF' : '#374151',
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              transition: 'all 0.2s',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>📝</div>
+            <div style={{ fontWeight: 600, marginBottom: '0.25rem', fontSize: '0.875rem' }}>10 Quick Summaries</div>
+            <div style={{ fontSize: '0.7rem', opacity: 0.8, lineHeight: '1.3' }}>Browse ideas, save favorites</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => setGenerateMode('quick20')}
+            disabled={isLoading}
+            style={{
+              padding: '1rem 0.75rem',
+              background: generateMode === 'quick20'
+                ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                : '#F8FAFC',
+              border: generateMode === 'quick20'
+                ? '2px solid #667eea'
+                : '1px solid #E2E8F0',
+              borderRadius: '8px',
+              color: generateMode === 'quick20' ? '#FFFFFF' : '#374151',
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              transition: 'all 0.2s',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>⚡</div>
+            <div style={{ fontWeight: 600, marginBottom: '0.25rem', fontSize: '0.875rem' }}>20 Quick Summaries</div>
+            <div style={{ fontSize: '0.7rem', opacity: 0.8, lineHeight: '1.3' }}>Maximum variety to explore</div>
+          </button>
+        </div>
+      </div>
+
+      {/* Tab 4 Navigation and Submit */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem', gap: '1rem' }}>
+        <button
+          type="button"
+          onClick={handlePrevTab}
+          style={{
+            padding: '0.75rem 1.5rem',
+            background: '#F8FAFC',
+            border: '1px solid #E2E8F0',
+            borderRadius: '8px',
+            color: '#64748B',
+            fontSize: '0.875rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          ← Back
+        </button>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button
+            type="button"
+            onClick={() => setCurrentTab(5)}
+            style={{
+              padding: '0.75rem 1.5rem',
+              background: '#F8FAFC',
+              border: '1px solid #E2E8F0',
+              borderRadius: '8px',
+              color: '#64748B',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            Presets (Optional)
+          </button>
+          <button
+            type="submit"
+            disabled={isLoading}
+            style={{
+              padding: '0.75rem 1.5rem',
+              background: isLoading
+                ? '#94A3B8'
+                : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              border: 'none',
+              borderRadius: '8px',
+              color: '#FFFFFF',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              boxShadow: isLoading ? 'none' : '0 4px 14px rgba(102, 126, 234, 0.4)',
+            }}
+          >
+            {isLoading
+              ? 'Generating...'
+              : generateMode === 'quick20'
+              ? '⚡ Generate 20 Summaries'
+              : generateMode === 'summaries'
+              ? '📝 Generate 10 Summaries'
+              : '📚 Generate 5 Concepts'
+            }
+          </button>
+        </div>
+      </div>
+        </>
+      )}
+
+      {/* Tab 5 also needs navigation */}
+      {currentTab === 5 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem' }}>
+          <button
+            type="button"
+            onClick={handlePrevTab}
+            style={{
+              padding: '0.75rem 1.5rem',
+              background: '#F8FAFC',
+              border: '1px solid #E2E8F0',
+              borderRadius: '8px',
+              color: '#64748B',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            ← Back to Story Ideas
+          </button>
+          <button
+            type="submit"
+            disabled={isLoading}
+            style={{
+              padding: '0.75rem 1.5rem',
+              background: isLoading
+                ? '#94A3B8'
+                : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              border: 'none',
+              borderRadius: '8px',
+              color: '#FFFFFF',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              boxShadow: isLoading ? 'none' : '0 4px 14px rgba(102, 126, 234, 0.4)',
+            }}
+          >
+            {isLoading
+              ? 'Generating...'
+              : generateMode === 'quick20'
+              ? '⚡ Generate 20 Summaries'
+              : generateMode === 'summaries'
+              ? '📝 Generate 10 Summaries'
+              : '📚 Generate 5 Concepts'
+            }
+          </button>
+        </div>
+      )}
     </form>
   );
 }

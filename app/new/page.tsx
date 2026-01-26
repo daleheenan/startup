@@ -135,9 +135,12 @@ export default function NewProjectPage() {
         }
       }
 
-      if (generateMode === 'summaries' || generateMode === 'quick20') {
+      // Use generateMode from preferences if provided (Full Customization mode), otherwise use local state (Quick mode)
+      const effectiveGenerateMode = preferences.generateMode || generateMode;
+
+      if (effectiveGenerateMode === 'summaries' || effectiveGenerateMode === 'quick20') {
         // Two-stage workflow: Generate summaries first
-        setCurrentStep(generateMode === 'quick20' ? 'Generating 20 concept summaries...' : 'Generating concept summaries...');
+        setCurrentStep(effectiveGenerateMode === 'quick20' ? 'Generating 20 concept summaries...' : 'Generating concept summaries...');
 
         const response = await fetch(`${API_BASE_URL}/api/concepts/summaries`, {
           method: 'POST',
@@ -147,7 +150,7 @@ export default function NewProjectPage() {
           },
           body: JSON.stringify({
             preferences: enhancedPreferences,
-            count: generateMode === 'quick20' ? 20 : 10
+            count: effectiveGenerateMode === 'quick20' ? 20 : 10
           }),
         });
 

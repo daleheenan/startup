@@ -109,6 +109,8 @@ export default function PlotStructurePage() {
   const [generatingPacing, setGeneratingPacing] = useState(false);
   const [generatingNewLayer, setGeneratingNewLayer] = useState(false);
   const [generatingField, setGeneratingField] = useState<'name' | 'description' | null>(null);
+  const [extractingFromConcept, setExtractingFromConcept] = useState(false);
+  const [hasAttemptedExtraction, setHasAttemptedExtraction] = useState(false);
 
   // Wizard mode state
   const [isWizardMode, setIsWizardMode] = useState(false);
@@ -206,6 +208,58 @@ export default function PlotStructurePage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Auto-extract plots from story concept on first visit when no plots exist
+  const extractPlotsFromConcept = useCallback(async () => {
+    if (hasAttemptedExtraction || extractingFromConcept) return;
+
+    setHasAttemptedExtraction(true);
+    setExtractingFromConcept(true);
+    setError(null);
+
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE_URL}/api/projects/${projectId}/extract-plots-from-concept`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        // Don't show error if it's just "no concept" - user hasn't created one yet
+        if (data.error?.code !== 'NO_CONCEPT') {
+          console.warn('Plot extraction failed:', data.error?.message);
+        }
+        return;
+      }
+
+      const data = await res.json();
+      if (data.plots && data.plots.length > 0) {
+        // Refresh the data to get the newly extracted plots
+        await fetchData();
+      }
+    } catch (err: any) {
+      console.error('Error extracting plots from concept:', err);
+      // Don't set error for extraction - it's automatic and optional
+    } finally {
+      setExtractingFromConcept(false);
+    }
+  }, [projectId, hasAttemptedExtraction, extractingFromConcept, fetchData]);
+
+  // Trigger auto-extraction when page loads with no plots and we have a project
+  useEffect(() => {
+    if (
+      !loading &&
+      project &&
+      !hasAttemptedExtraction &&
+      (structure.plot_layers?.length || 0) === 0
+    ) {
+      extractPlotsFromConcept();
+    }
+  }, [loading, project, hasAttemptedExtraction, structure.plot_layers?.length, extractPlotsFromConcept]);
 
   const saveStructure = async (newStructure: StoryStructure) => {
     setSaving(true);
@@ -608,7 +662,7 @@ export default function PlotStructurePage() {
         projectNavigation={navigation}
       >
         <div style={{ padding: '2rem', textAlign: 'center', color: colors.textSecondary }}>
-          Loading plot structure...
+          {extractingFromConcept ? 'Extracting plots from story concept...' : 'Loading plot structure...'}
         </div>
       </PageLayout>
     );
@@ -636,6 +690,23 @@ export default function PlotStructurePage() {
             color: '#DC2626',
           }}>
             {error}
+          </div>
+        )}
+
+        {extractingFromConcept && (
+          <div style={{
+            background: '#EEF2FF',
+            border: '1px solid #C7D2FE',
+            borderRadius: '8px',
+            padding: '1rem',
+            marginBottom: '1.5rem',
+            color: '#4338CA',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+          }}>
+            <span style={{ animation: 'spin 1s linear infinite' }}>⟳</span>
+            Analyzing story concept to suggest plot threads...
           </div>
         )}
 
