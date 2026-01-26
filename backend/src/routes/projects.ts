@@ -63,13 +63,14 @@ router.get('/', (req, res) => {
     `);
 
     // Get generation status for each project (check if any jobs are running or pending)
+    // Note: jobs table uses target_id (chapter id), not chapter_id
     const generationStatusStmt = db.prepare<[string], any>(`
       SELECT
         SUM(CASE WHEN j.status IN ('pending', 'running') THEN 1 ELSE 0 END) as active_jobs,
         SUM(CASE WHEN j.status = 'completed' THEN 1 ELSE 0 END) as completed_jobs,
         SUM(CASE WHEN j.status = 'failed' THEN 1 ELSE 0 END) as failed_jobs
       FROM jobs j
-      INNER JOIN chapters c ON j.chapter_id = c.id
+      INNER JOIN chapters c ON j.target_id = c.id
       INNER JOIN books b ON c.book_id = b.id
       WHERE b.project_id = ?
     `);
