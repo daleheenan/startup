@@ -22,6 +22,17 @@ import type {
  *
  * BUG-008 FIX: Added comprehensive null safety checks
  */
+
+/**
+ * Safely join an array, returning a fallback if undefined/empty
+ */
+function safeJoin(arr: any[] | undefined | null, separator: string = ', ', fallback: string = 'None'): string {
+  if (!arr || !Array.isArray(arr) || arr.length === 0) {
+    return fallback;
+  }
+  return arr.join(separator);
+}
+
 export class ContextAssemblyService {
   /**
    * Assemble complete context for chapter generation
@@ -122,7 +133,7 @@ You are a bestselling ${genre} author specializing in ${subgenre}. Your mission 
 GENRE & STYLE:
 - Genre: ${genre} (${subgenre})
 - Tone: ${tone}
-- Themes: ${themes.join(', ')}
+- Themes: ${safeJoin(themes)}
 ${timeframe ? `- Time Period/Era: ${timeframe} - Ensure historical accuracy, appropriate technology level, and cultural context for this era` : ''}
 - Prose Style: ${proseStyle}
 
@@ -170,12 +181,12 @@ Current State:
     if (povCharacter.currentState) {
       prompt += `- Location: ${povCharacter.currentState.location}
 - Emotional State: ${povCharacter.currentState.emotionalState}
-- Goals: ${povCharacter.currentState.goals.join(', ')}
-- Conflicts: ${povCharacter.currentState.conflicts.join(', ')}
+- Goals: ${safeJoin(povCharacter.currentState.goals)}
+- Conflicts: ${safeJoin(povCharacter.currentState.conflicts)}
 `;
     } else {
-      prompt += `- Goals: ${povCharacter.goals.join(', ')}
-- Conflicts: ${povCharacter.conflicts.join(', ')}
+      prompt += `- Goals: ${safeJoin(povCharacter.goals)}
+- Conflicts: ${safeJoin(povCharacter.conflicts)}
 `;
     }
 
@@ -196,7 +207,7 @@ ${lastChapterSummary}
 
     sceneCards.forEach((scene, index) => {
       prompt += `Scene ${index + 1}: ${scene.location}
-- Characters: ${scene.characters.join(', ')}
+- Characters: ${safeJoin(scene.characters)}
 - Goal: ${scene.goal}
 - Conflict: ${scene.conflict}
 - Outcome: ${scene.outcome}
@@ -215,7 +226,7 @@ ${scene.notes ? `- Notes: ${scene.notes}` : ''}
       otherCharacters.forEach((char) => {
         prompt += `${char.name} (${char.role})
 ${char.physicalDescription || 'No physical description'}
-Personality: ${char.personalityTraits.join(', ')}
+Personality: ${safeJoin(char.personalityTraits)}
 Voice: "${char.voiceSample}"
 ${char.currentState ? `Current state: ${char.currentState.emotionalState} in ${char.currentState.location}` : ''}
 
