@@ -83,7 +83,7 @@ export default function StoryIdeasGenerator({
         const data = await response.json();
         setSavedIdeas(data.ideas || []);
         // Build set of saved idea texts for quick lookup
-        const savedTexts = new Set(data.ideas?.map((i: SavedIdea) => i.storyIdea) || []);
+        const savedTexts = new Set<string>(data.ideas?.map((i: SavedIdea) => i.storyIdea) || []);
         setSavedIdsSet(savedTexts);
       }
     } catch (err) {
