@@ -12,12 +12,22 @@ import { colors, gradients, borderRadius, shadows } from '../../lib/constants';
 import { card, statusBadge } from '../../lib/styles';
 import { useProjectNavigation } from '../../hooks/useProjectProgress';
 
+interface StoryConcept {
+  title: string;
+  logline: string | null;
+  synopsis: string | null;
+  hook: string | null;
+  protagonistHint: string | null;
+  conflictType: string | null;
+}
+
 interface Project {
   id: string;
   title: string;
   type: string;
   genre: string;
   status: string;
+  story_concept: StoryConcept | null;
   story_dna: any;
   story_bible: any;
   series_bible: any;
@@ -147,6 +157,57 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
             </div>
+
+            {/* Story Concept Section */}
+            {project.story_concept && (project.story_concept.logline || project.story_concept.synopsis) && (
+              <div style={{ ...card, marginBottom: '1rem' }}>
+                <h2 style={{ fontSize: '1.125rem', marginBottom: '1rem', color: '#1A1A2E', fontWeight: 600 }}>
+                  Story Concept
+                </h2>
+                <div style={{ display: 'grid', gap: '1rem', color: '#64748B', fontSize: '0.875rem' }}>
+                  {project.story_concept.logline && (
+                    <div>
+                      <strong style={{ color: '#374151', display: 'block', marginBottom: '0.25rem' }}>Logline</strong>
+                      <p style={{ margin: 0, fontStyle: 'italic', lineHeight: '1.5' }}>
+                        {project.story_concept.logline}
+                      </p>
+                    </div>
+                  )}
+                  {project.story_concept.synopsis && (
+                    <div>
+                      <strong style={{ color: '#374151', display: 'block', marginBottom: '0.25rem' }}>Synopsis</strong>
+                      <p style={{ margin: 0, lineHeight: '1.6' }}>
+                        {project.story_concept.synopsis}
+                      </p>
+                    </div>
+                  )}
+                  {project.story_concept.hook && (
+                    <div>
+                      <strong style={{ color: '#374151', display: 'block', marginBottom: '0.25rem' }}>Hook</strong>
+                      <p style={{ margin: 0, lineHeight: '1.5' }}>
+                        {project.story_concept.hook}
+                      </p>
+                    </div>
+                  )}
+                  {project.story_concept.protagonistHint && (
+                    <div>
+                      <strong style={{ color: '#374151', display: 'block', marginBottom: '0.25rem' }}>Protagonist</strong>
+                      <p style={{ margin: 0, lineHeight: '1.5' }}>
+                        {project.story_concept.protagonistHint}
+                      </p>
+                    </div>
+                  )}
+                  {project.story_concept.conflictType && (
+                    <div>
+                      <strong style={{ color: '#374151', display: 'block', marginBottom: '0.25rem' }}>Core Conflict</strong>
+                      <p style={{ margin: 0, lineHeight: '1.5' }}>
+                        {project.story_concept.conflictType}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Story DNA Section */}
             <div style={{ ...card, marginBottom: '1rem' }}>

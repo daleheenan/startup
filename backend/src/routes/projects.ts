@@ -360,6 +360,7 @@ router.get('/:id', (req, res) => {
       ...project,
       story_dna: safeJsonParse(project.story_dna as any, null),
       story_bible: safeJsonParse(project.story_bible as any, null),
+      story_concept: safeJsonParse((project as any).story_concept, null),
       metrics: metricsService.getFormattedMetrics(project.id),
     };
 
@@ -467,9 +468,22 @@ router.post('/', (req, res) => {
     const timePeriodType = preferences.timePeriodType || preferences.timePeriod?.type || null;
     const specificYear = preferences.specificYear || preferences.timePeriod?.year || null;
 
+    // Build story concept object for storage
+    const storyConcept = {
+      title: concept.title,
+      logline: concept.logline || null,
+      synopsis: concept.synopsis || null,
+      hook: (concept as any).hook || null,
+      protagonistHint: (concept as any).protagonistHint || null,
+      conflictType: (concept as any).conflictType || null,
+    };
+
+    // Get source concept ID if provided
+    const sourceConceptId = (concept as any).id || null;
+
     const stmt = db.prepare(`
-      INSERT INTO projects (id, title, type, genre, status, book_count, universe_id, time_period_type, specific_year, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO projects (id, title, type, genre, status, book_count, universe_id, time_period_type, specific_year, story_concept, source_concept_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -482,6 +496,8 @@ router.post('/', (req, res) => {
       universeId,
       timePeriodType,
       specificYear,
+      JSON.stringify(storyConcept),
+      sourceConceptId,
       now,
       now
     );
