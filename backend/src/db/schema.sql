@@ -4,11 +4,20 @@
 CREATE TABLE IF NOT EXISTS projects (
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
-    type TEXT NOT NULL CHECK(type IN ('standalone', 'trilogy')),
+    type TEXT NOT NULL CHECK(type IN ('standalone', 'trilogy', 'series')),
     genre TEXT NOT NULL,
     status TEXT NOT NULL CHECK(status IN ('setup', 'generating', 'completed')),
     story_dna TEXT,              -- JSON: Genre, tone, themes, prose style
     story_bible TEXT,            -- JSON: Characters, world, timeline
+    series_bible TEXT,           -- JSON: Aggregated trilogy/series data
+    plot_structure TEXT,         -- JSON: Plot layers and act structure
+    story_concept TEXT,          -- JSON: Original story concept from saved concepts
+    book_count INTEGER DEFAULT 1,
+    universe_id TEXT,            -- Link to shared universe
+    is_universe_root INTEGER DEFAULT 0,
+    source_concept_id TEXT,      -- Link to saved_concepts table
+    time_period_type TEXT DEFAULT 'present',  -- past, present, future, unknown, custom
+    specific_year INTEGER,       -- Specific year for custom time periods
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -92,3 +101,98 @@ CREATE TABLE IF NOT EXISTS outlines (
 );
 
 CREATE INDEX IF NOT EXISTS idx_outlines_book ON outlines(book_id);
+
+-- Saved Concepts table (story concepts saved for future use)
+CREATE TABLE IF NOT EXISTS saved_concepts (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    logline TEXT NOT NULL,
+    synopsis TEXT NOT NULL,
+    hook TEXT,
+    protagonist_hint TEXT,
+    conflict_type TEXT,
+    preferences TEXT NOT NULL,     -- JSON: The preferences used to generate this concept
+    notes TEXT,                    -- User's notes about the concept
+    status TEXT NOT NULL CHECK(status IN ('saved', 'used', 'archived')) DEFAULT 'saved',
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_saved_concepts_status ON saved_concepts(status);
+CREATE INDEX IF NOT EXISTS idx_saved_concepts_created ON saved_concepts(created_at);
+
+-- Saved Story Ideas table (generated story ideas saved for future use)
+CREATE TABLE IF NOT EXISTS saved_story_ideas (
+    id TEXT PRIMARY KEY,
+    story_idea TEXT NOT NULL,              -- The main story idea/premise
+    character_concepts TEXT NOT NULL,       -- JSON array of character concepts
+    plot_elements TEXT NOT NULL,            -- JSON array of plot elements
+    unique_twists TEXT NOT NULL,            -- JSON array of unique twists
+    genre TEXT NOT NULL,                    -- Genre the idea was generated for
+    subgenre TEXT,                          -- Subgenre if specified
+    tone TEXT,                              -- Tone setting
+    themes TEXT,                            -- JSON array of themes
+    notes TEXT,                             -- User's notes about the idea
+    status TEXT NOT NULL CHECK(status IN ('saved', 'used', 'archived')) DEFAULT 'saved',
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_saved_story_ideas_status ON saved_story_ideas(status);
+CREATE INDEX IF NOT EXISTS idx_saved_story_ideas_genre ON saved_story_ideas(genre);
+CREATE INDEX IF NOT EXISTS idx_saved_story_ideas_created ON saved_story_ideas(created_at);
+
+-- Project Metrics table (token usage and cost tracking)
+CREATE TABLE IF NOT EXISTS project_metrics (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    total_input_tokens INTEGER DEFAULT 0,
+    total_output_tokens INTEGER DEFAULT 0,
+    total_cost_usd REAL DEFAULT 0,
+    total_chapters INTEGER DEFAULT 0,
+    total_word_count INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_project_metrics_project ON project_metrics(project_id);
+
+-- Chapter Edits table (track edited versions of chapters)
+CREATE TABLE IF NOT EXISTS chapter_edits (
+    id TEXT PRIMARY KEY,
+    chapter_id TEXT NOT NULL,
+    edit_type TEXT NOT NULL CHECK(edit_type IN ('user', 'dev_edit', 'line_edit', 'proofread')),
+    content TEXT NOT NULL,
+    word_count INTEGER DEFAULT 0,
+    notes TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_chapter_edits_chapter ON chapter_edits(chapter_id);
+
+-- Migration Registry table (track applied migrations)
+CREATE TABLE IF NOT EXISTS migration_registry (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    migration_name TEXT NOT NULL UNIQUE,
+    applied_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Agent Lessons table (agent learning system)
+CREATE TABLE IF NOT EXISTS agent_lessons (
+    id TEXT PRIMARY KEY,
+    lesson_type TEXT NOT NULL CHECK(lesson_type IN ('success', 'error', 'user_feedback', 'quality_check', 'prompt_refinement')),
+    context TEXT NOT NULL,         -- JSON: What was happening when lesson was learned
+    lesson TEXT NOT NULL,          -- The actual lesson/insight
+    confidence REAL DEFAULT 0.5,   -- 0-1 confidence score
+    applies_to TEXT,               -- Genre, chapter type, or 'all'
+    times_applied INTEGER DEFAULT 0,
+    times_successful INTEGER DEFAULT 0,
+    is_active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_lessons_type ON agent_lessons(lesson_type);
+CREATE INDEX IF NOT EXISTS idx_agent_lessons_active ON agent_lessons(is_active);
