@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { getToken } from '../lib/auth';
+import PrimaryNavigationBar from '../components/shared/PrimaryNavigationBar';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -64,6 +65,15 @@ export default function SettingsPage() {
       countLabel: 'genres',
     },
     {
+      title: 'Prose Style',
+      description: 'Configure your default writing style preferences including sentence structure, vocabulary, and pacing.',
+      href: '/settings/prose-style',
+      icon: 'P',
+      iconBg: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+      count: null,
+      countLabel: '',
+    },
+    {
       title: 'Exclusions',
       description: 'Manage blacklisted names, words, themes, and tropes that should be avoided in your stories.',
       href: '/settings/exclusions',
@@ -94,39 +104,13 @@ export default function SettingsPage() {
 
   return (
     <div style={{
-      display: 'flex',
       minHeight: '100vh',
       background: '#F8FAFC',
+      display: 'flex',
+      flexDirection: 'column',
     }}>
-      {/* Left Sidebar */}
-      <aside style={{
-        width: '72px',
-        background: '#FFFFFF',
-        borderRight: '1px solid #E2E8F0',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        padding: '1.5rem 0',
-      }}>
-        <Link
-          href="/projects"
-          style={{
-            width: '40px',
-            height: '40px',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            borderRadius: '10px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#FFFFFF',
-            fontWeight: '700',
-            fontSize: '1.25rem',
-            textDecoration: 'none',
-          }}
-        >
-          N
-        </Link>
-      </aside>
+      {/* Primary Navigation Bar */}
+      <PrimaryNavigationBar activeSection="settings" />
 
       {/* Main Content */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -152,20 +136,6 @@ export default function SettingsPage() {
               Manage your preferences and customizations
             </p>
           </div>
-          <Link
-            href="/projects"
-            style={{
-              padding: '0.5rem 1rem',
-              color: '#64748B',
-              textDecoration: 'none',
-              fontSize: '0.875rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-            }}
-          >
-            Back to Projects
-          </Link>
         </header>
 
         {/* Content Area */}
@@ -313,6 +283,29 @@ export default function SettingsPage() {
                     lineHeight: 1.5,
                   }}>
                     Create niche genres like "Cozy Cat Mystery" or "Space Western Romance" to match your writing style.
+                  </p>
+                </div>
+                <div style={{
+                  padding: '1rem',
+                  background: '#F8FAFC',
+                  borderRadius: '8px',
+                }}>
+                  <h3 style={{
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    color: '#1A1A2E',
+                    margin: 0,
+                    marginBottom: '0.5rem',
+                  }}>
+                    Prose Style
+                  </h3>
+                  <p style={{
+                    fontSize: '0.75rem',
+                    color: '#64748B',
+                    margin: 0,
+                    lineHeight: 1.5,
+                  }}>
+                    Set your default writing style preferences including sentence structure, vocabulary, and pacing for all new projects.
                   </p>
                 </div>
                 <div style={{

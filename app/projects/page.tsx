@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { getToken, logout } from '../lib/auth';
+import PrimaryNavigationBar from '../components/shared/PrimaryNavigationBar';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -59,7 +60,6 @@ export default function ProjectsPage() {
   const [queueStats, setQueueStats] = useState<QueueStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeNav, setActiveNav] = useState('projects');
 
   useEffect(() => {
     fetchProjects();
@@ -129,13 +129,6 @@ export default function ProjectsPage() {
     }
   };
 
-  const navItems = [
-    { id: 'projects', icon: '📚', label: 'Projects', href: '/projects' },
-    { id: 'new', icon: '✨', label: 'New Novel', href: '/new' },
-    { id: 'story-ideas', icon: '💡', label: 'Story Ideas', href: '/story-ideas' },
-    { id: 'saved-concepts', icon: '📋', label: 'Story Concepts', href: '/saved-concepts' },
-    { id: 'settings', icon: '⚙️', label: 'Settings', href: '/settings' },
-  ];
 
   if (isLoading) {
     return (
@@ -169,106 +162,13 @@ export default function ProjectsPage() {
 
   return (
     <div style={{
-      display: 'flex',
       minHeight: '100vh',
       background: '#F8FAFC',
+      display: 'flex',
+      flexDirection: 'column',
     }}>
-      {/* Left Sidebar */}
-      <aside
-        role="navigation"
-        aria-label="Main navigation"
-        style={{
-          width: '72px',
-          background: '#FFFFFF',
-          borderRight: '1px solid #E2E8F0',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          padding: '1.5rem 0',
-        }}>
-        {/* Logo */}
-        <div
-          aria-label="NovelForge logo"
-          style={{
-            width: '40px',
-            height: '40px',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            borderRadius: '10px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: '2rem',
-            color: '#FFFFFF',
-            fontWeight: '700',
-            fontSize: '1.25rem',
-          }}>
-          N
-        </div>
-
-        {/* Nav Icons */}
-        <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {navItems.map((item) => (
-            <Link
-              key={item.id}
-              href={item.href}
-              onClick={() => setActiveNav(item.id)}
-              aria-label={item.label}
-              aria-current={activeNav === item.id ? 'page' : undefined}
-              style={{
-                width: '48px',
-                height: '48px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '12px',
-                fontSize: '1.25rem',
-                textDecoration: 'none',
-                background: activeNav === item.id ? '#F1F5F9' : 'transparent',
-                transition: 'all 0.2s',
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.outline = '2px solid #667eea';
-                e.currentTarget.style.outlineOffset = '2px';
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.outline = 'none';
-              }}
-              title={item.label}
-            >
-              <span aria-hidden="true">{item.icon}</span>
-            </Link>
-          ))}
-        </nav>
-
-        {/* Logout */}
-        <button
-          onClick={handleLogout}
-          aria-label="Logout from NovelForge"
-          style={{
-            width: '48px',
-            height: '48px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '12px',
-            fontSize: '1.25rem',
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-          }}
-          onFocus={(e) => {
-            e.currentTarget.style.outline = '2px solid #667eea';
-            e.currentTarget.style.outlineOffset = '2px';
-          }}
-          onBlur={(e) => {
-            e.currentTarget.style.outline = 'none';
-          }}
-          title="Logout"
-        >
-          <span aria-hidden="true">🚪</span>
-        </button>
-      </aside>
+      {/* Primary Navigation Bar */}
+      <PrimaryNavigationBar activeSection="projects" />
 
       {/* Main Content */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -363,6 +263,27 @@ export default function ProjectsPage() {
                   PENDING: {queueStats.queue.pending}
                 </div>
               </div>
+
+              <button
+                onClick={handleLogout}
+                aria-label="Logout from NovelForge"
+                style={{
+                  padding: '0.75rem 1rem',
+                  background: '#F1F5F9',
+                  borderRadius: '8px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.875rem',
+                  color: '#64748B',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <span aria-hidden="true">🚪</span>
+                Logout
+              </button>
             </div>
           )}
         </header>

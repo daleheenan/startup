@@ -8,6 +8,7 @@ import GenerationProgress from '../components/GenerationProgress';
 import { TimePeriodSelector, getTimeframeDescription } from '../components/TimePeriodSelector';
 import type { TimePeriod } from '../../shared/types';
 import { getToken } from '../lib/auth';
+import PrimaryNavigationBar from '../components/shared/PrimaryNavigationBar';
 
 // Lazy load GenrePreferenceForm - form with complex validation
 const GenrePreferenceForm = dynamic(() => import('../components/GenrePreferenceForm'), {
@@ -109,12 +110,13 @@ export default function NewProjectPage() {
   const [currentStep, setCurrentStep] = useState<string>('');
 
   // Quick mode state
-  const [quickGenre, setQuickGenre] = useState<string>('');
+  const [quickGenres, setQuickGenres] = useState<string[]>([]);
   const [quickPrompt, setQuickPrompt] = useState<string>('');
   const [quickTimePeriod, setQuickTimePeriod] = useState<TimePeriod>({ type: 'present' });
+  const [quickProjectType, setQuickProjectType] = useState<'standalone' | 'trilogy' | 'series'>('standalone');
 
-  // Generation mode: 'full' = 5 detailed concepts, 'summaries' = 10 short summaries, 'quick20' = 20 quick summaries
-  const [generateMode, setGenerateMode] = useState<'full' | 'summaries' | 'quick20'>('full');
+  // Generation mode: 'full' = 5 detailed concepts, 'summaries' = 10 short story ideas
+  const [generateMode, setGenerateMode] = useState<'full' | 'summaries'>('full');
 
   const handleSubmit = async (preferences: any) => {
     setIsGenerating(true);
@@ -138,9 +140,9 @@ export default function NewProjectPage() {
       // Use generateMode from preferences if provided (Full Customization mode), otherwise use local state (Quick mode)
       const effectiveGenerateMode = preferences.generateMode || generateMode;
 
-      if (effectiveGenerateMode === 'summaries' || effectiveGenerateMode === 'quick20') {
-        // Two-stage workflow: Generate summaries first
-        setCurrentStep(effectiveGenerateMode === 'quick20' ? 'Generating 20 concept summaries...' : 'Generating concept summaries...');
+      if (effectiveGenerateMode === 'summaries') {
+        // Two-stage workflow: Generate story ideas first
+        setCurrentStep('Generating story ideas...');
 
         const response = await fetch(`${API_BASE_URL}/api/concepts/summaries`, {
           method: 'POST',
@@ -150,7 +152,7 @@ export default function NewProjectPage() {
           },
           body: JSON.stringify({
             preferences: enhancedPreferences,
-            count: effectiveGenerateMode === 'quick20' ? 20 : 10
+            count: 10
           }),
         });
 
@@ -159,7 +161,7 @@ export default function NewProjectPage() {
           throw new Error(errorData.error?.message || 'Failed to generate summaries');
         }
 
-        setCurrentStep('Finalizing summaries...');
+        setCurrentStep('Finalizing story ideas...');
         const data = await response.json();
 
         sessionStorage.setItem('generatedSummaries', JSON.stringify(data.summaries));
@@ -213,8 +215,8 @@ export default function NewProjectPage() {
 
   // Handle quick mode submission
   const handleQuickSubmit = async () => {
-    if (!quickGenre) {
-      setError('Please select a genre');
+    if (quickGenres.length === 0) {
+      setError('Please select at least one genre');
       return;
     }
 
@@ -262,19 +264,30 @@ export default function NewProjectPage() {
       },
     };
 
-    const config = genreConfig[quickGenre] || genreConfig['fantasy'];
+    // Merge configs from all selected genres
+    const primaryGenre = quickGenres[0];
+    const config = genreConfig[primaryGenre] || genreConfig['fantasy'];
+
+    // If multiple genres selected, blend their themes and tones
+    let allThemes = [...config.themes];
+    let allTones = [...config.tones];
+    if (quickGenres.length > 1) {
+      const secondaryConfig = genreConfig[quickGenres[1]] || genreConfig['fantasy'];
+      allThemes = Array.from(new Set<string>([...config.themes, ...secondaryConfig.themes])).slice(0, 3);
+      allTones = Array.from(new Set<string>([...config.tones, ...secondaryConfig.tones])).slice(0, 2);
+    }
 
     const quickPreferences = {
-      genre: quickGenre,
-      genres: [quickGenre],
+      genre: quickGenres.join(' + '),
+      genres: quickGenres,
       subgenres: config.subgenres,
       modifiers: [],
-      tone: config.tones[0],
-      tones: config.tones,
-      themes: config.themes,
+      tone: allTones[0],
+      tones: allTones,
+      themes: allThemes,
       customIdeas: quickPrompt.trim() || undefined,
       targetLength: 80000,
-      projectType: 'standalone' as const,
+      projectType: quickProjectType,
       // Time period settings
       timeframe: quickTimePeriod.type !== 'present' ? getTimeframeDescription(quickTimePeriod) : undefined,
       timePeriod: quickTimePeriod.type !== 'present' ? quickTimePeriod : undefined,
@@ -285,62 +298,61 @@ export default function NewProjectPage() {
     await handleSubmit(quickPreferences);
   };
 
-  // Generate random inspiration
+  // Generate a 3-line book idea based on selected settings
   const handleInspireMe = () => {
     // If no genre selected, pick a random one
-    if (!quickGenre) {
+    if (quickGenres.length === 0) {
       const randomGenre = QUICK_GENRES[Math.floor(Math.random() * QUICK_GENRES.length)];
-      setQuickGenre(randomGenre.value);
+      setQuickGenres([randomGenre.value]);
     }
 
-    // Pick random prompt appropriate to the genre
-    const randomPrompt = INSPIRATION_PROMPTS[Math.floor(Math.random() * INSPIRATION_PROMPTS.length)];
+    // Build a 3-line book idea
+    const genre = QUICK_GENRES.find(g => g.value === quickGenres[0])?.label || 'Fiction';
+    const tone = INSPIRATION_TONES[Math.floor(Math.random() * INSPIRATION_TONES.length)];
+    const theme = INSPIRATION_THEMES[Math.floor(Math.random() * INSPIRATION_THEMES.length)];
+    const basePrompt = INSPIRATION_PROMPTS[Math.floor(Math.random() * INSPIRATION_PROMPTS.length)];
 
-    // Enhance prompt based on time period if selected
-    let enhancedPrompt = randomPrompt;
+    // Line 1: Core concept
+    let line1 = basePrompt;
+
+    // Line 2: Tone and stakes
+    const stakesOptions = [
+      'Everything they know is about to change forever',
+      'But the truth could destroy everything',
+      'Time is running out to save what matters most',
+      'The price of success might be too high to pay',
+      'Nothing will ever be the same again',
+      'The stakes have never been higher'
+    ];
+    const line2 = `${tone}, with ${theme.toLowerCase()} at its core. ${stakesOptions[Math.floor(Math.random() * stakesOptions.length)]}.`;
+
+    // Line 3: Hook/setting
+    let line3 = `A ${genre.toLowerCase()} story`;
     if (quickTimePeriod.type !== 'present') {
       const timePeriodDesc = getTimeframeDescription(quickTimePeriod);
-      enhancedPrompt = `${randomPrompt} (Set in: ${timePeriodDesc})`;
+      line3 += ` set in ${timePeriodDesc.toLowerCase()}`;
+    }
+    if (quickProjectType === 'trilogy') {
+      line3 += ' - perfect for a trilogy.';
+    } else if (quickProjectType === 'series') {
+      line3 += ' - with series potential.';
+    } else {
+      line3 += ' that will captivate readers.';
     }
 
+    const enhancedPrompt = `${line1}\n\n${line2}\n\n${line3}`;
     setQuickPrompt(enhancedPrompt);
   };
 
   return (
     <div style={{
-      display: 'flex',
       minHeight: '100vh',
       background: '#F8FAFC',
+      display: 'flex',
+      flexDirection: 'column',
     }}>
-      {/* Left Sidebar */}
-      <aside style={{
-        width: '72px',
-        background: '#FFFFFF',
-        borderRight: '1px solid #E2E8F0',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        padding: '1.5rem 0',
-      }}>
-        <Link
-          href="/projects"
-          style={{
-            width: '40px',
-            height: '40px',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            borderRadius: '10px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#FFFFFF',
-            fontWeight: '700',
-            fontSize: '1.25rem',
-            textDecoration: 'none',
-          }}
-        >
-          N
-        </Link>
-      </aside>
+      {/* Primary Navigation Bar */}
+      <PrimaryNavigationBar activeSection="new-novel" />
 
       {/* Main Content */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -365,33 +377,6 @@ export default function NewProjectPage() {
             <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
               Tell us about your story and we'll generate concepts
             </p>
-          </div>
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            <Link
-              href="/saved-summaries"
-              style={{
-                padding: '0.5rem 1rem',
-                color: '#667eea',
-                textDecoration: 'none',
-                fontSize: '0.875rem',
-              }}
-            >
-              Saved Summaries
-            </Link>
-            <Link
-              href="/projects"
-              style={{
-                padding: '0.5rem 1rem',
-                color: '#64748B',
-                textDecoration: 'none',
-                fontSize: '0.875rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-              }}
-            >
-              ← Back to Projects
-            </Link>
           </div>
         </header>
 
@@ -490,39 +475,160 @@ export default function NewProjectPage() {
                     fontWeight: 600,
                     fontSize: '0.875rem',
                   }}>
-                    Choose a Genre <span style={{ color: '#DC2626' }}>*</span>
+                    Choose Primary Genres <span style={{ color: '#DC2626' }}>*</span>
+                    <span style={{ color: '#64748B', fontWeight: 400, marginLeft: '0.5rem', fontSize: '0.813rem' }}>
+                      (Select 1-2)
+                    </span>
                   </label>
                   <div style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(4, 1fr)',
                     gap: '0.75rem',
                   }}>
-                    {QUICK_GENRES.map(genre => (
-                      <button
-                        key={genre.value}
-                        type="button"
-                        onClick={() => setQuickGenre(genre.value)}
-                        disabled={isGenerating}
-                        style={{
-                          padding: '1rem 0.75rem',
-                          background: quickGenre === genre.value
-                            ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                            : '#F8FAFC',
-                          border: quickGenre === genre.value
-                            ? '2px solid #667eea'
-                            : '1px solid #E2E8F0',
-                          borderRadius: '12px',
-                          color: quickGenre === genre.value ? '#FFFFFF' : '#374151',
-                          cursor: isGenerating ? 'not-allowed' : 'pointer',
-                          transition: 'all 0.2s',
-                          textAlign: 'center',
-                        }}
-                      >
-                        <div style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>{genre.emoji}</div>
-                        <div style={{ fontSize: '0.813rem', fontWeight: 500 }}>{genre.label}</div>
-                      </button>
-                    ))}
+                    {QUICK_GENRES.map(genre => {
+                      const isSelected = quickGenres.includes(genre.value);
+                      const canSelect = quickGenres.length < 2 || isSelected;
+                      return (
+                        <button
+                          key={genre.value}
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              setQuickGenres(quickGenres.filter(g => g !== genre.value));
+                            } else if (canSelect) {
+                              setQuickGenres([...quickGenres, genre.value]);
+                            }
+                          }}
+                          disabled={isGenerating || (!canSelect && !isSelected)}
+                          style={{
+                            padding: '1rem 0.75rem',
+                            background: isSelected
+                              ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                              : '#F8FAFC',
+                            border: isSelected
+                              ? '2px solid #667eea'
+                              : '1px solid #E2E8F0',
+                            borderRadius: '12px',
+                            color: isSelected ? '#FFFFFF' : '#374151',
+                            cursor: (isGenerating || (!canSelect && !isSelected)) ? 'not-allowed' : 'pointer',
+                            opacity: (!canSelect && !isSelected) ? 0.5 : 1,
+                            transition: 'all 0.2s',
+                            textAlign: 'center',
+                          }}
+                        >
+                          <div style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>{genre.emoji}</div>
+                          <div style={{ fontSize: '0.813rem', fontWeight: 500 }}>{genre.label}</div>
+                        </button>
+                      );
+                    })}
                   </div>
+                </div>
+
+                {/* Project Structure Selection */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '0.75rem',
+                    color: '#374151',
+                    fontWeight: 600,
+                    fontSize: '0.875rem',
+                  }}>
+                    Project Structure
+                  </label>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: '0.75rem',
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => setQuickProjectType('standalone')}
+                      disabled={isGenerating}
+                      style={{
+                        padding: '1rem 0.75rem',
+                        background: quickProjectType === 'standalone'
+                          ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                          : '#F8FAFC',
+                        border: quickProjectType === 'standalone'
+                          ? '2px solid #667eea'
+                          : '1px solid #E2E8F0',
+                        borderRadius: '8px',
+                        color: quickProjectType === 'standalone' ? '#FFFFFF' : '#374151',
+                        cursor: isGenerating ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <div style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>📖</div>
+                      <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>Standalone</div>
+                      <div style={{ fontSize: '0.7rem', opacity: 0.8, marginTop: '0.25rem' }}>Single book</div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQuickProjectType('trilogy')}
+                      disabled={isGenerating}
+                      style={{
+                        padding: '1rem 0.75rem',
+                        background: quickProjectType === 'trilogy'
+                          ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                          : '#F8FAFC',
+                        border: quickProjectType === 'trilogy'
+                          ? '2px solid #667eea'
+                          : '1px solid #E2E8F0',
+                        borderRadius: '8px',
+                        color: quickProjectType === 'trilogy' ? '#FFFFFF' : '#374151',
+                        cursor: isGenerating ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <div style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>📚</div>
+                      <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>Trilogy</div>
+                      <div style={{ fontSize: '0.7rem', opacity: 0.8, marginTop: '0.25rem' }}>3 books</div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQuickProjectType('series')}
+                      disabled={isGenerating}
+                      style={{
+                        padding: '1rem 0.75rem',
+                        background: quickProjectType === 'series'
+                          ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                          : '#F8FAFC',
+                        border: quickProjectType === 'series'
+                          ? '2px solid #667eea'
+                          : '1px solid #E2E8F0',
+                        borderRadius: '8px',
+                        color: quickProjectType === 'series' ? '#FFFFFF' : '#374151',
+                        cursor: isGenerating ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <div style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>📚📚</div>
+                      <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>Series</div>
+                      <div style={{ fontSize: '0.7rem', opacity: 0.8, marginTop: '0.25rem' }}>4+ books</div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Time Period Selection */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '0.75rem',
+                    color: '#374151',
+                    fontWeight: 600,
+                    fontSize: '0.875rem',
+                  }}>
+                    Time Period <span style={{ fontWeight: 400, color: '#64748B' }}>(optional)</span>
+                  </label>
+                  <TimePeriodSelector
+                    value={quickTimePeriod}
+                    onChange={setQuickTimePeriod}
+                    disabled={isGenerating}
+                    compact={true}
+                  />
                 </div>
 
                 {/* Idea Input */}
@@ -562,7 +668,7 @@ export default function NewProjectPage() {
                     value={quickPrompt}
                     onChange={(e) => setQuickPrompt(e.target.value)}
                     placeholder="e.g., 'A young wizard discovers a forbidden spell that could save or destroy the kingdom'"
-                    rows={3}
+                    rows={5}
                     style={{
                       width: '100%',
                       padding: '0.875rem 1rem',
@@ -577,27 +683,8 @@ export default function NewProjectPage() {
                     disabled={isGenerating}
                   />
                   <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#64748B' }}>
-                    Generates a description based on your selected genre and time period
+                    Click "Inspire Me" to generate a 3-line book idea based on your selections
                   </div>
-                </div>
-
-                {/* Time Period Selection */}
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{
-                    display: 'block',
-                    marginBottom: '0.75rem',
-                    color: '#374151',
-                    fontWeight: 600,
-                    fontSize: '0.875rem',
-                  }}>
-                    Time Period <span style={{ fontWeight: 400, color: '#64748B' }}>(optional)</span>
-                  </label>
-                  <TimePeriodSelector
-                    value={quickTimePeriod}
-                    onChange={setQuickTimePeriod}
-                    disabled={isGenerating}
-                    compact={true}
-                  />
                 </div>
 
                 {/* Generation Mode Selection */}
@@ -613,7 +700,7 @@ export default function NewProjectPage() {
                   </label>
                   <div style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gridTemplateColumns: 'repeat(2, 1fr)',
                     gap: '0.75rem',
                   }}>
                     <button
@@ -658,32 +745,9 @@ export default function NewProjectPage() {
                         textAlign: 'center',
                       }}
                     >
-                      <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>📝</div>
-                      <div style={{ fontWeight: 600, marginBottom: '0.25rem', fontSize: '0.875rem' }}>10 Quick Summaries</div>
-                      <div style={{ fontSize: '0.7rem', opacity: 0.8, lineHeight: '1.3' }}>Browse ideas, save favorites</div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setGenerateMode('quick20')}
-                      disabled={isGenerating}
-                      style={{
-                        padding: '1rem 0.75rem',
-                        background: generateMode === 'quick20'
-                          ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                          : '#F8FAFC',
-                        border: generateMode === 'quick20'
-                          ? '2px solid #667eea'
-                          : '1px solid #E2E8F0',
-                        borderRadius: '8px',
-                        color: generateMode === 'quick20' ? '#FFFFFF' : '#374151',
-                        cursor: isGenerating ? 'not-allowed' : 'pointer',
-                        transition: 'all 0.2s',
-                        textAlign: 'center',
-                      }}
-                    >
-                      <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>⚡</div>
-                      <div style={{ fontWeight: 600, marginBottom: '0.25rem', fontSize: '0.875rem' }}>20 Quick Summaries</div>
-                      <div style={{ fontSize: '0.7rem', opacity: 0.8, lineHeight: '1.3' }}>Maximum variety to explore</div>
+                      <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>💡</div>
+                      <div style={{ fontWeight: 600, marginBottom: '0.25rem', fontSize: '0.875rem' }}>10 Story Ideas</div>
+                      <div style={{ fontSize: '0.7rem', opacity: 0.8, lineHeight: '1.3' }}>Quick ideas to explore and save</div>
                     </button>
                   </div>
                 </div>
@@ -691,11 +755,11 @@ export default function NewProjectPage() {
                 {/* Action Button */}
                 <button
                   onClick={handleQuickSubmit}
-                  disabled={!quickGenre || isGenerating}
+                  disabled={quickGenres.length === 0 || isGenerating}
                   style={{
                     width: '100%',
                     padding: '1rem',
-                    background: (!quickGenre || isGenerating)
+                    background: (quickGenres.length === 0 || isGenerating)
                       ? '#94A3B8'
                       : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                     border: 'none',
@@ -703,17 +767,15 @@ export default function NewProjectPage() {
                     color: '#FFFFFF',
                     fontSize: '1rem',
                     fontWeight: 600,
-                    cursor: (!quickGenre || isGenerating) ? 'not-allowed' : 'pointer',
-                    boxShadow: (!quickGenre || isGenerating) ? 'none' : '0 4px 14px rgba(102, 126, 234, 0.4)',
+                    cursor: (quickGenres.length === 0 || isGenerating) ? 'not-allowed' : 'pointer',
+                    boxShadow: (quickGenres.length === 0 || isGenerating) ? 'none' : '0 4px 14px rgba(102, 126, 234, 0.4)',
                     transition: 'all 0.2s',
                   }}
                 >
                   {isGenerating
                     ? 'Generating...'
-                    : generateMode === 'quick20'
-                    ? '⚡ Generate 20 Summaries'
                     : generateMode === 'summaries'
-                    ? '📝 Generate 10 Summaries'
+                    ? '💡 Generate 10 Story Ideas'
                     : '⚡ Generate 5 Concepts'
                   }
                 </button>
