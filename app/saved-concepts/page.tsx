@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { getToken, logout } from '../lib/auth';
 import { colors, borderRadius, shadows } from '../lib/constants';
 import PrimaryNavigationBar from '../components/shared/PrimaryNavigationBar';
@@ -24,8 +24,42 @@ interface SavedConcept {
   updated_at: string;
 }
 
+// Wrapper component to handle Suspense for useSearchParams
 export default function SavedConceptsPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ minHeight: '100vh', background: colors.background }}>
+        <PrimaryNavigationBar activeSection="story-concepts" />
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: 'calc(100vh - 60px)',
+        }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{
+              display: 'inline-block',
+              width: '48px',
+              height: '48px',
+              border: `3px solid ${colors.border}`,
+              borderTopColor: colors.brandStart,
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite'
+            }} />
+            <p style={{ marginTop: '1rem', color: colors.textSecondary }}>Loading...</p>
+          </div>
+          <style jsx>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      </div>
+    }>
+      <SavedConceptsContent />
+    </Suspense>
+  );
+}
+
+function SavedConceptsContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [concepts, setConcepts] = useState<SavedConcept[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +70,11 @@ export default function SavedConceptsPage() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterGenre, setFilterGenre] = useState<string>('all');
   const [isCreatingProject, setIsCreatingProject] = useState(false);
+
+  // Check if we're coming from Story Ideas expansion with newly generated concepts
+  const newConceptIds = searchParams.get('new')?.split(',').filter(Boolean) || [];
+  const isFromIdea = searchParams.get('from') === 'idea';
+  const [showingNewOnly, setShowingNewOnly] = useState(isFromIdea && newConceptIds.length > 0);
 
   useEffect(() => {
     loadConcepts();
@@ -212,60 +251,6 @@ export default function SavedConceptsPage() {
 
       const project = await response.json();
 
-      // Build context for generation from concept data
-      const generationContext = {
-        title: concept.title,
-        synopsis: concept.synopsis,
-        genre: preferences.genre,
-        subgenre: preferences.subgenre,
-        tone: preferences.tone,
-        themes: preferences.themes,
-      };
-
-      // Pre-populate characters, world, and plots in parallel
-      // These are fire-and-forget - we don't wait for them to complete
-      // The user will see "Generating..." indicators on the project page
-      const generatePromises = [
-        // Generate characters
-        fetch(`${API_BASE_URL}/api/projects/${project.id}/characters`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({ context: generationContext }),
-        }).catch(err => console.error('Character generation started:', err)),
-
-        // Generate world elements
-        fetch(`${API_BASE_URL}/api/projects/${project.id}/world`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({ context: generationContext }),
-        }).catch(err => console.error('World generation started:', err)),
-
-        // Extract plots from concept
-        fetch(`${API_BASE_URL}/api/projects/${project.id}/extract-plots-from-concept`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            synopsis: concept.synopsis,
-            logline: concept.logline,
-            hook: concept.hook,
-            protagonistHint: concept.protagonist_hint,
-            conflictType: concept.conflict_type,
-          }),
-        }).catch(err => console.error('Plot extraction started:', err)),
-      ];
-
-      // Start generation in background (don't wait)
-      Promise.all(generatePromises).catch(() => {});
-
       // Mark concept as used
       await fetch(`${API_BASE_URL}/api/saved-concepts/${concept.id}`, {
         method: 'PATCH',
@@ -276,8 +261,8 @@ export default function SavedConceptsPage() {
         body: JSON.stringify({ status: 'used' }),
       });
 
-      // Redirect to project page
-      router.push(`/projects/${project.id}`);
+      // Redirect to project page with autoGenerate flag to trigger content generation
+      router.push(`/projects/${project.id}?autoGenerate=true`);
     } catch (err: any) {
       console.error('Error using concept:', err);
       setError(err.message);
@@ -286,12 +271,23 @@ export default function SavedConceptsPage() {
     }
   };
 
-  // Filter concepts
+  // Filter concepts - if showing new only, filter to just those IDs
   const filteredConcepts = concepts.filter(concept => {
+    // When showing new concepts only, filter by the new IDs
+    if (showingNewOnly && newConceptIds.length > 0) {
+      return newConceptIds.includes(concept.id);
+    }
     if (filterStatus !== 'all' && concept.status !== filterStatus) return false;
     if (filterGenre !== 'all' && concept.preferences?.genre !== filterGenre) return false;
     return true;
   });
+
+  // Helper to clear the "new" filter and show all concepts
+  const handleShowAllConcepts = () => {
+    setShowingNewOnly(false);
+    // Remove query params from URL
+    router.replace('/saved-concepts');
+  };
 
   if (isLoading) {
     return (
@@ -339,12 +335,33 @@ export default function SavedConceptsPage() {
               color: colors.text,
               margin: 0,
             }}>
-              Story Concepts
+              {showingNewOnly ? `${newConceptIds.length} New Concepts Generated` : 'Story Concepts'}
             </h1>
             <p style={{ fontSize: '0.9375rem', color: colors.textSecondary, margin: '0.25rem 0 0' }}>
-              Detailed story concepts ready to become your next book
+              {showingNewOnly
+                ? 'Choose a concept to save for later or select one to start your project'
+                : 'Detailed story concepts ready to become your next book'}
             </p>
           </div>
+
+          {/* Show "View All" button when filtering to new concepts */}
+          {showingNewOnly && (
+            <button
+              onClick={handleShowAllConcepts}
+              style={{
+                marginTop: '1rem',
+                padding: '0.5rem 1rem',
+                background: colors.surface,
+                border: `1px solid ${colors.border}`,
+                borderRadius: borderRadius.sm,
+                color: colors.text,
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+              }}
+            >
+              ← View All Saved Concepts
+            </button>
+          )}
 
           {/* Filters */}
           {concepts.length > 0 && (

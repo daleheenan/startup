@@ -75,9 +75,11 @@ export default function StoryIdeasPage() {
     setExpandingMode(mode);
     setExpandError(null);
     try {
-      await expandIdeaMutation.mutateAsync({ id: ideaId, mode });
-      // Redirect to saved concepts page to see the new concepts
-      router.push('/saved-concepts');
+      const result = await expandIdeaMutation.mutateAsync({ id: ideaId, mode });
+      // Redirect to saved concepts page with the newly generated concept IDs
+      // This allows the concepts page to highlight/filter just the new concepts
+      const conceptIds = result.concepts?.map((c: any) => c.id).join(',') || '';
+      router.push(`/saved-concepts?new=${conceptIds}&from=idea`);
     } catch (err: any) {
       console.error('Error expanding idea:', err);
       setExpandError(err.message || 'Failed to generate concepts');

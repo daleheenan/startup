@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import ExportButtons from '../../components/ExportButtons';
 import PageLayout from '../../components/shared/PageLayout';
@@ -38,32 +38,146 @@ interface Project {
 
 export default function ProjectDetailPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const projectId = params.id as string;
 
   const [project, setProject] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isGeneratingContent, setIsGeneratingContent] = useState(false);
+  const [generationStatus, setGenerationStatus] = useState<{
+    characters: 'pending' | 'generating' | 'done' | 'error';
+    world: 'pending' | 'generating' | 'done' | 'error';
+    plots: 'pending' | 'generating' | 'done' | 'error';
+  }>({ characters: 'pending', world: 'pending', plots: 'pending' });
 
   // IMPORTANT: All hooks must be called before any early returns
   const navigation = useProjectNavigation(projectId, project);
 
-  useEffect(() => {
-    if (projectId) {
-      fetchProject();
-    }
-  }, [projectId]);
+  // Check if we're coming from concept selection which triggers auto-generation
+  const autoGenerate = searchParams.get('autoGenerate') === 'true';
 
-  const fetchProject = async () => {
+  const fetchProject = useCallback(async () => {
     try {
       const data = await fetchJson<Project>(`/api/projects/${projectId}`);
       setProject(data);
+      return data;
     } catch (err: any) {
       console.error('Error fetching project:', err);
       setError(err.message || 'Failed to load project');
+      return null;
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [projectId]);
+
+  // Trigger auto-generation of characters, world, and plots when coming from concept selection
+  useEffect(() => {
+    if (!projectId) return;
+
+    const initializeProject = async () => {
+      const projectData = await fetchProject();
+      if (!projectData || !autoGenerate) return;
+
+      // Check if content already exists
+      const hasCharacters = projectData.story_bible?.characters?.length > 0;
+      const hasWorld = projectData.story_bible?.world?.length > 0;
+
+      if (hasCharacters && hasWorld) {
+        // Content already exists, no need to generate
+        return;
+      }
+
+      setIsGeneratingContent(true);
+
+      // Build generation context from project data
+      const generationContext = {
+        title: projectData.title,
+        synopsis: projectData.story_concept?.synopsis || '',
+        genre: projectData.genre,
+        subgenre: projectData.story_dna?.subgenre,
+        tone: projectData.story_dna?.tone,
+        themes: projectData.story_dna?.themes || [],
+      };
+
+      const token = localStorage.getItem('novelforge_token');
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+      // Generate content in sequence for better UX feedback
+      try {
+        // Generate characters first
+        if (!hasCharacters) {
+          setGenerationStatus(prev => ({ ...prev, characters: 'generating' }));
+          const charRes = await fetch(`${API_BASE_URL}/api/projects/${projectId}/characters`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ context: generationContext }),
+          });
+          if (charRes.ok) {
+            setGenerationStatus(prev => ({ ...prev, characters: 'done' }));
+          } else {
+            setGenerationStatus(prev => ({ ...prev, characters: 'error' }));
+          }
+        } else {
+          setGenerationStatus(prev => ({ ...prev, characters: 'done' }));
+        }
+
+        // Then generate world
+        if (!hasWorld) {
+          setGenerationStatus(prev => ({ ...prev, world: 'generating' }));
+          const worldRes = await fetch(`${API_BASE_URL}/api/projects/${projectId}/world`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ context: generationContext }),
+          });
+          if (worldRes.ok) {
+            setGenerationStatus(prev => ({ ...prev, world: 'done' }));
+          } else {
+            setGenerationStatus(prev => ({ ...prev, world: 'error' }));
+          }
+        } else {
+          setGenerationStatus(prev => ({ ...prev, world: 'done' }));
+        }
+
+        // Extract plots from concept
+        setGenerationStatus(prev => ({ ...prev, plots: 'generating' }));
+        const plotRes = await fetch(`${API_BASE_URL}/api/projects/${projectId}/extract-plots-from-concept`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            synopsis: projectData.story_concept?.synopsis,
+            logline: projectData.story_concept?.logline,
+            hook: projectData.story_concept?.hook,
+            protagonistHint: projectData.story_concept?.protagonistHint,
+            conflictType: projectData.story_concept?.conflictType,
+          }),
+        });
+        if (plotRes.ok) {
+          setGenerationStatus(prev => ({ ...prev, plots: 'done' }));
+        } else {
+          setGenerationStatus(prev => ({ ...prev, plots: 'error' }));
+        }
+
+        // Refresh project data to show updated counts
+        await fetchProject();
+      } catch (err) {
+        console.error('Error generating content:', err);
+      } finally {
+        setIsGeneratingContent(false);
+      }
+    };
+
+    initializeProject();
+  }, [projectId, autoGenerate, fetchProject]);
 
   if (isLoading) {
     return <LoadingState message="Loading project..." />;
@@ -141,6 +255,98 @@ export default function ProjectDetailPage() {
       projectNavigation={navigation}
     >
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+            {/* Generation Progress Indicator */}
+            {isGeneratingContent && (
+              <div style={{
+                ...card,
+                marginBottom: '1.5rem',
+                padding: '1.5rem',
+                background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
+                border: `2px solid ${colors.brandBorder}`,
+              }}>
+                <h2 style={{ fontSize: '1.25rem', color: colors.text, fontWeight: 700, margin: '0 0 1rem 0' }}>
+                  Setting Up Your Project...
+                </h2>
+                <p style={{ fontSize: '0.9375rem', color: colors.textSecondary, margin: '0 0 1.5rem 0' }}>
+                  We're automatically generating characters, world elements, and plot structure based on your concept.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.75rem',
+                      background: generationStatus.characters === 'done' ? colors.success
+                        : generationStatus.characters === 'generating' ? colors.brandStart
+                        : generationStatus.characters === 'error' ? colors.error
+                        : colors.border,
+                      color: generationStatus.characters === 'pending' ? colors.textSecondary : 'white',
+                    }}>
+                      {generationStatus.characters === 'done' ? '✓' : generationStatus.characters === 'generating' ? '...' : generationStatus.characters === 'error' ? '!' : '1'}
+                    </span>
+                    <span style={{
+                      color: generationStatus.characters === 'generating' ? colors.brandText : colors.text,
+                      fontWeight: generationStatus.characters === 'generating' ? 600 : 400,
+                    }}>
+                      {generationStatus.characters === 'generating' ? 'Generating characters...' : generationStatus.characters === 'done' ? 'Characters generated' : generationStatus.characters === 'error' ? 'Character generation failed' : 'Generate characters'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.75rem',
+                      background: generationStatus.world === 'done' ? colors.success
+                        : generationStatus.world === 'generating' ? colors.brandStart
+                        : generationStatus.world === 'error' ? colors.error
+                        : colors.border,
+                      color: generationStatus.world === 'pending' ? colors.textSecondary : 'white',
+                    }}>
+                      {generationStatus.world === 'done' ? '✓' : generationStatus.world === 'generating' ? '...' : generationStatus.world === 'error' ? '!' : '2'}
+                    </span>
+                    <span style={{
+                      color: generationStatus.world === 'generating' ? colors.brandText : colors.text,
+                      fontWeight: generationStatus.world === 'generating' ? 600 : 400,
+                    }}>
+                      {generationStatus.world === 'generating' ? 'Building world elements...' : generationStatus.world === 'done' ? 'World elements created' : generationStatus.world === 'error' ? 'World generation failed' : 'Build world'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.75rem',
+                      background: generationStatus.plots === 'done' ? colors.success
+                        : generationStatus.plots === 'generating' ? colors.brandStart
+                        : generationStatus.plots === 'error' ? colors.error
+                        : colors.border,
+                      color: generationStatus.plots === 'pending' ? colors.textSecondary : 'white',
+                    }}>
+                      {generationStatus.plots === 'done' ? '✓' : generationStatus.plots === 'generating' ? '...' : generationStatus.plots === 'error' ? '!' : '3'}
+                    </span>
+                    <span style={{
+                      color: generationStatus.plots === 'generating' ? colors.brandText : colors.text,
+                      fontWeight: generationStatus.plots === 'generating' ? 600 : 400,
+                    }}>
+                      {generationStatus.plots === 'generating' ? 'Extracting plot structure...' : generationStatus.plots === 'done' ? 'Plot structure extracted' : generationStatus.plots === 'error' ? 'Plot extraction failed' : 'Extract plots'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Story Concept Section - Prominent display */}
             {project.story_concept && (project.story_concept.logline || project.story_concept.synopsis) && (
               <div style={{
