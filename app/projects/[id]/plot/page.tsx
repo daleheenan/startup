@@ -783,18 +783,50 @@ export default function PlotStructurePage() {
 
         {extractingFromConcept && (
           <div style={{
-            background: '#EEF2FF',
-            border: '1px solid #C7D2FE',
-            borderRadius: '8px',
-            padding: '1rem',
+            background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
+            border: '2px solid #C7D2FE',
+            borderRadius: '12px',
+            padding: '1.5rem',
             marginBottom: '1.5rem',
-            color: '#4338CA',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
           }}>
-            <span style={{ animation: 'spin 1s linear infinite' }}>⟳</span>
-            Analyzing story concept to suggest plot threads...
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                border: '3px solid #E0E7FF',
+                borderTopColor: '#667eea',
+                animation: 'spin 1s linear infinite',
+              }} />
+              <div>
+                <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#4338CA', margin: 0 }}>
+                  Analyzing Story Concept
+                </h3>
+                <p style={{ fontSize: '0.875rem', color: '#6366F1', margin: '0.25rem 0 0 0' }}>
+                  Extracting plot threads and story structure from your concept...
+                </p>
+              </div>
+            </div>
+            <div style={{
+              background: '#E0E7FF',
+              borderRadius: '4px',
+              height: '6px',
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                background: 'linear-gradient(90deg, #667eea, #764ba2)',
+                height: '100%',
+                width: '100%',
+                animation: 'progressPulse 2s ease-in-out infinite',
+              }} />
+            </div>
+            <style jsx>{`
+              @keyframes spin { to { transform: rotate(360deg); } }
+              @keyframes progressPulse {
+                0%, 100% { transform: translateX(-100%); }
+                50% { transform: translateX(100%); }
+              }
+            `}</style>
           </div>
         )}
 
@@ -906,6 +938,7 @@ export default function PlotStructurePage() {
         {/* Wizard Mode */}
         {isWizardMode ? (
           <PlotWizard
+            key={`wizard-${structure.plot_layers?.length || 0}-${extractingFromConcept}`}
             projectId={projectId}
             project={project}
             characters={characters}

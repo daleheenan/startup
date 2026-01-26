@@ -47,23 +47,37 @@ export const WORKFLOW_REQUIREMENTS: Record<WorkflowStep, WorkflowRequirement> = 
     route: '/plot',
     icon: '📖'
   },
+  coherence: {
+    step: 'coherence',
+    requiredSteps: ['concept', 'characters', 'world', 'plots'],
+    label: 'Coherence',
+    route: '/coherence',
+    icon: '🔗'
+  },
+  originality: {
+    step: 'originality',
+    requiredSteps: ['concept', 'characters', 'world', 'plots', 'coherence'],
+    label: 'Originality',
+    route: '/originality',
+    icon: '✨'
+  },
   outline: {
     step: 'outline',
-    requiredSteps: ['concept', 'characters', 'world', 'plots'],
+    requiredSteps: ['concept', 'characters', 'world', 'plots', 'coherence', 'originality'],
     label: 'Outline',
     route: '/outline',
     icon: '📝'
   },
   chapters: {
     step: 'chapters',
-    requiredSteps: ['concept', 'characters', 'world', 'plots', 'outline'],
+    requiredSteps: ['concept', 'characters', 'world', 'plots', 'coherence', 'originality', 'outline'],
     label: 'Chapters',
     route: '/progress',
     icon: '📚'
   },
   analytics: {
     step: 'analytics',
-    requiredSteps: ['concept', 'characters', 'world', 'plots', 'outline', 'chapters'],
+    requiredSteps: ['concept', 'characters', 'world', 'plots', 'coherence', 'originality', 'outline', 'chapters'],
     label: 'Analytics',
     route: '/analytics',
     icon: '📊'
@@ -101,6 +115,14 @@ export function isStepComplete(
 
     case 'plots':
       // Has plot layers defined
+      return (project.plot_structure?.plot_layers?.length ?? 0) > 0;
+
+    case 'coherence':
+      // Coherence is optional - always complete if plots exist
+      return (project.plot_structure?.plot_layers?.length ?? 0) > 0;
+
+    case 'originality':
+      // Originality is optional - always complete if plots exist
       return (project.plot_structure?.plot_layers?.length ?? 0) > 0;
 
     case 'outline':
@@ -248,7 +270,7 @@ export function getTabStatus(
  * Get all workflow steps in order
  */
 export function getOrderedWorkflowSteps(): WorkflowStep[] {
-  return ['concept', 'characters', 'world', 'plots', 'outline', 'chapters', 'analytics'];
+  return ['concept', 'characters', 'world', 'plots', 'coherence', 'originality', 'outline', 'chapters', 'analytics'];
 }
 
 /**

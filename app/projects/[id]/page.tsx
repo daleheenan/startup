@@ -260,90 +260,184 @@ export default function ProjectDetailPage() {
               <div style={{
                 ...card,
                 marginBottom: '1.5rem',
-                padding: '1.5rem',
+                padding: '2rem',
                 background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
                 border: `2px solid ${colors.brandBorder}`,
               }}>
-                <h2 style={{ fontSize: '1.25rem', color: colors.text, fontWeight: 700, margin: '0 0 1rem 0' }}>
-                  Setting Up Your Project...
-                </h2>
-                <p style={{ fontSize: '0.9375rem', color: colors.textSecondary, margin: '0 0 1.5rem 0' }}>
-                  We're automatically generating characters, world elements, and plot structure based on your concept.
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+                  <div style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '50%',
+                    border: '3px solid #E0E7FF',
+                    borderTopColor: '#667eea',
+                    animation: 'spin 1s linear infinite',
+                  }} />
+                  <div>
+                    <h2 style={{ fontSize: '1.25rem', color: colors.text, fontWeight: 700, margin: 0 }}>
+                      Setting Up Your Project...
+                    </h2>
+                    <p style={{ fontSize: '0.875rem', color: colors.textSecondary, margin: '0.25rem 0 0 0' }}>
+                      This may take a minute or two. Please don't navigate away.
+                    </p>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <span style={{
-                      width: '24px',
-                      height: '24px',
+                      width: '32px',
+                      height: '32px',
                       borderRadius: '50%',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '0.75rem',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
                       background: generationStatus.characters === 'done' ? colors.success
                         : generationStatus.characters === 'generating' ? colors.brandStart
                         : generationStatus.characters === 'error' ? colors.error
                         : colors.border,
                       color: generationStatus.characters === 'pending' ? colors.textSecondary : 'white',
+                      transition: 'all 0.3s ease',
                     }}>
-                      {generationStatus.characters === 'done' ? '✓' : generationStatus.characters === 'generating' ? '...' : generationStatus.characters === 'error' ? '!' : '1'}
+                      {generationStatus.characters === 'done' ? '✓' : generationStatus.characters === 'generating' ? (
+                        <span style={{ animation: 'pulse 1s ease-in-out infinite' }}>•••</span>
+                      ) : generationStatus.characters === 'error' ? '!' : '1'}
                     </span>
-                    <span style={{
-                      color: generationStatus.characters === 'generating' ? colors.brandText : colors.text,
-                      fontWeight: generationStatus.characters === 'generating' ? 600 : 400,
-                    }}>
-                      {generationStatus.characters === 'generating' ? 'Generating characters...' : generationStatus.characters === 'done' ? 'Characters generated' : generationStatus.characters === 'error' ? 'Character generation failed' : 'Generate characters'}
-                    </span>
+                    <div style={{ flex: 1 }}>
+                      <span style={{
+                        color: generationStatus.characters === 'generating' ? colors.brandText : colors.text,
+                        fontWeight: generationStatus.characters === 'generating' ? 600 : 400,
+                        fontSize: '0.9375rem',
+                      }}>
+                        {generationStatus.characters === 'generating' ? 'Generating characters...' : generationStatus.characters === 'done' ? 'Characters generated' : generationStatus.characters === 'error' ? 'Character generation failed' : 'Generate characters'}
+                      </span>
+                      {generationStatus.characters === 'generating' && (
+                        <div style={{
+                          marginTop: '0.5rem',
+                          background: '#E0E7FF',
+                          borderRadius: '4px',
+                          height: '4px',
+                          overflow: 'hidden',
+                        }}>
+                          <div style={{
+                            background: 'linear-gradient(90deg, #667eea, #764ba2)',
+                            height: '100%',
+                            width: '100%',
+                            animation: 'progressPulse 2s ease-in-out infinite',
+                          }} />
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <span style={{
-                      width: '24px',
-                      height: '24px',
+                      width: '32px',
+                      height: '32px',
                       borderRadius: '50%',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '0.75rem',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
                       background: generationStatus.world === 'done' ? colors.success
                         : generationStatus.world === 'generating' ? colors.brandStart
                         : generationStatus.world === 'error' ? colors.error
                         : colors.border,
                       color: generationStatus.world === 'pending' ? colors.textSecondary : 'white',
+                      transition: 'all 0.3s ease',
                     }}>
-                      {generationStatus.world === 'done' ? '✓' : generationStatus.world === 'generating' ? '...' : generationStatus.world === 'error' ? '!' : '2'}
+                      {generationStatus.world === 'done' ? '✓' : generationStatus.world === 'generating' ? (
+                        <span style={{ animation: 'pulse 1s ease-in-out infinite' }}>•••</span>
+                      ) : generationStatus.world === 'error' ? '!' : '2'}
                     </span>
-                    <span style={{
-                      color: generationStatus.world === 'generating' ? colors.brandText : colors.text,
-                      fontWeight: generationStatus.world === 'generating' ? 600 : 400,
-                    }}>
-                      {generationStatus.world === 'generating' ? 'Building world elements...' : generationStatus.world === 'done' ? 'World elements created' : generationStatus.world === 'error' ? 'World generation failed' : 'Build world'}
-                    </span>
+                    <div style={{ flex: 1 }}>
+                      <span style={{
+                        color: generationStatus.world === 'generating' ? colors.brandText : colors.text,
+                        fontWeight: generationStatus.world === 'generating' ? 600 : 400,
+                        fontSize: '0.9375rem',
+                      }}>
+                        {generationStatus.world === 'generating' ? 'Building world elements...' : generationStatus.world === 'done' ? 'World elements created' : generationStatus.world === 'error' ? 'World generation failed' : 'Build world'}
+                      </span>
+                      {generationStatus.world === 'generating' && (
+                        <div style={{
+                          marginTop: '0.5rem',
+                          background: '#E0E7FF',
+                          borderRadius: '4px',
+                          height: '4px',
+                          overflow: 'hidden',
+                        }}>
+                          <div style={{
+                            background: 'linear-gradient(90deg, #667eea, #764ba2)',
+                            height: '100%',
+                            width: '100%',
+                            animation: 'progressPulse 2s ease-in-out infinite',
+                          }} />
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <span style={{
-                      width: '24px',
-                      height: '24px',
+                      width: '32px',
+                      height: '32px',
                       borderRadius: '50%',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '0.75rem',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
                       background: generationStatus.plots === 'done' ? colors.success
                         : generationStatus.plots === 'generating' ? colors.brandStart
                         : generationStatus.plots === 'error' ? colors.error
                         : colors.border,
                       color: generationStatus.plots === 'pending' ? colors.textSecondary : 'white',
+                      transition: 'all 0.3s ease',
                     }}>
-                      {generationStatus.plots === 'done' ? '✓' : generationStatus.plots === 'generating' ? '...' : generationStatus.plots === 'error' ? '!' : '3'}
+                      {generationStatus.plots === 'done' ? '✓' : generationStatus.plots === 'generating' ? (
+                        <span style={{ animation: 'pulse 1s ease-in-out infinite' }}>•••</span>
+                      ) : generationStatus.plots === 'error' ? '!' : '3'}
                     </span>
-                    <span style={{
-                      color: generationStatus.plots === 'generating' ? colors.brandText : colors.text,
-                      fontWeight: generationStatus.plots === 'generating' ? 600 : 400,
-                    }}>
-                      {generationStatus.plots === 'generating' ? 'Extracting plot structure...' : generationStatus.plots === 'done' ? 'Plot structure extracted' : generationStatus.plots === 'error' ? 'Plot extraction failed' : 'Extract plots'}
-                    </span>
+                    <div style={{ flex: 1 }}>
+                      <span style={{
+                        color: generationStatus.plots === 'generating' ? colors.brandText : colors.text,
+                        fontWeight: generationStatus.plots === 'generating' ? 600 : 400,
+                        fontSize: '0.9375rem',
+                      }}>
+                        {generationStatus.plots === 'generating' ? 'Extracting plot structure...' : generationStatus.plots === 'done' ? 'Plot structure extracted' : generationStatus.plots === 'error' ? 'Plot extraction failed' : 'Extract plots'}
+                      </span>
+                      {generationStatus.plots === 'generating' && (
+                        <div style={{
+                          marginTop: '0.5rem',
+                          background: '#E0E7FF',
+                          borderRadius: '4px',
+                          height: '4px',
+                          overflow: 'hidden',
+                        }}>
+                          <div style={{
+                            background: 'linear-gradient(90deg, #667eea, #764ba2)',
+                            height: '100%',
+                            width: '100%',
+                            animation: 'progressPulse 2s ease-in-out infinite',
+                          }} />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
+                <style jsx>{`
+                  @keyframes spin {
+                    to { transform: rotate(360deg); }
+                  }
+                  @keyframes pulse {
+                    0%, 100% { opacity: 0.4; }
+                    50% { opacity: 1; }
+                  }
+                  @keyframes progressPulse {
+                    0%, 100% { transform: translateX(-100%); }
+                    50% { transform: translateX(100%); }
+                  }
+                `}</style>
               </div>
             )}
 

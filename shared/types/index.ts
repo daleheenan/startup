@@ -909,6 +909,8 @@ export type WorkflowStep =
   | 'characters'   // Characters created
   | 'world'        // World elements defined
   | 'plots'        // Plot layers created
+  | 'coherence'    // Coherence check completed
+  | 'originality'  // Originality check completed
   | 'outline'      // Outline generated
   | 'chapters'     // Chapters exist (at least 1)
   | 'analytics';   // Chapters have content

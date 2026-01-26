@@ -689,18 +689,12 @@ function CharacterArcsStep({
   const [selectedCharId, setSelectedCharId] = useState<string | null>(null);
   const [arcDescription, setArcDescription] = useState('');
 
-  // Filter characters who can have arcs - include all major roles, not just protagonist/antagonist
+  // Include all characters for arc creation - any character can have an arc
+  // The old filter was too restrictive and excluded valid characters
   const mainCharacters = characters.filter(c => {
-    const role = c.role.toLowerCase();
-    // Include protagonist, antagonist, and any supporting characters
-    return role === 'protagonist' ||
-           role === 'antagonist' ||
-           role === 'mentor' ||
-           role === 'sidekick' ||
-           role === 'love_interest' ||
-           role.includes('main') ||
-           role.includes('supporting') ||
-           characters.length <= 7; // If we have few characters, include all of them
+    // Include all characters - any character can have a meaningful arc
+    // Only exclude if they already have an arc
+    return true;
   });
 
   const handleCreateArc = () => {

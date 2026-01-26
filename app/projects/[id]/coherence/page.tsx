@@ -1,0 +1,478 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import PageLayout from '../../../components/shared/PageLayout';
+import LoadingState from '../../../components/shared/LoadingState';
+import { getToken } from '../../../lib/auth';
+import { colors, gradients, borderRadius } from '../../../lib/constants';
+import { card } from '../../../lib/styles';
+import { useProjectNavigation } from '../../../hooks/useProjectProgress';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+interface CoherenceResult {
+  isCoherent: boolean;
+  warnings: string[];
+  suggestions: string[];
+  plotAnalysis: Array<{
+    plotName: string;
+    isCoherent: boolean;
+    reason: string;
+  }>;
+  checkedAt?: string;
+}
+
+interface PlotLayer {
+  id: string;
+  name: string;
+  description: string;
+  type: 'main' | 'subplot' | 'mystery' | 'romance' | 'character-arc';
+}
+
+export default function CoherencePage() {
+  const params = useParams();
+  const router = useRouter();
+  const projectId = params.id as string;
+
+  const [project, setProject] = useState<any>(null);
+  const [plotLayers, setPlotLayers] = useState<PlotLayer[]>([]);
+  const [coherenceResult, setCoherenceResult] = useState<CoherenceResult | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [checking, setChecking] = useState(false);
+  const [implementing, setImplementing] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const navigation = useProjectNavigation(projectId, project);
+
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const token = getToken();
+
+      // Fetch project and plot structure in parallel
+      const [projectRes, plotRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        }),
+        fetch(`${API_BASE_URL}/api/projects/${projectId}/plot-structure`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        }),
+      ]);
+
+      if (!projectRes.ok) throw new Error('Failed to load project');
+
+      const projectData = await projectRes.json();
+      setProject(projectData);
+
+      if (plotRes.ok) {
+        const plotData = await plotRes.json();
+        setPlotLayers(plotData.plot_layers || []);
+
+        // Check if coherence was previously run (stored in plot_structure)
+        if (plotData.coherence_result) {
+          setCoherenceResult(plotData.coherence_result);
+        }
+      }
+    } catch (err: any) {
+      console.error('Error fetching data:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId]);
+
+  // Auto-run coherence check on mount if we have plot layers and no results
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Auto-run coherence check when data loads
+  useEffect(() => {
+    if (!loading && plotLayers.length > 0 && !coherenceResult && !checking) {
+      runCoherenceCheck();
+    }
+  }, [loading, plotLayers.length, coherenceResult]);
+
+  const runCoherenceCheck = async () => {
+    if (plotLayers.length === 0) return;
+
+    try {
+      setChecking(true);
+      setError(null);
+      const token = getToken();
+
+      const res = await fetch(`${API_BASE_URL}/api/projects/${projectId}/validate-plot-coherence`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!res.ok) throw new Error('Failed to validate coherence');
+
+      const result = await res.json();
+      setCoherenceResult({
+        ...result,
+        checkedAt: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      console.error('Error checking coherence:', err);
+      setError(err.message);
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const implementSuggestion = async (suggestion: string) => {
+    try {
+      setImplementing(suggestion);
+      const token = getToken();
+
+      // Call AI to implement the suggestion
+      const res = await fetch(`${API_BASE_URL}/api/projects/${projectId}/implement-coherence-suggestion`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ suggestion }),
+      });
+
+      if (!res.ok) {
+        // If endpoint doesn't exist, show a message
+        const errorData = await res.json().catch(() => ({}));
+        if (res.status === 404) {
+          alert('This feature will be available soon. For now, please implement the suggestion manually on the Plot page.');
+        } else {
+          throw new Error(errorData.error?.message || 'Failed to implement suggestion');
+        }
+        return;
+      }
+
+      // Refresh data and re-run coherence check
+      await fetchData();
+      await runCoherenceCheck();
+    } catch (err: any) {
+      console.error('Error implementing suggestion:', err);
+      setError(err.message);
+    } finally {
+      setImplementing(null);
+    }
+  };
+
+  if (loading) {
+    return <LoadingState message="Loading coherence analysis..." />;
+  }
+
+  return (
+    <PageLayout
+      title="Plot Coherence"
+      subtitle="Validate that your plots align with your story concept"
+      backLink={`/projects/${projectId}`}
+      backText="← Back to Overview"
+      projectNavigation={navigation}
+    >
+      <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+        {error && (
+          <div style={{
+            padding: '1rem',
+            background: '#FEF2F2',
+            border: '1px solid #FECACA',
+            borderRadius: borderRadius.md,
+            color: '#DC2626',
+            marginBottom: '1.5rem',
+          }}>
+            {error}
+          </div>
+        )}
+
+        {/* No Plots Warning */}
+        {plotLayers.length === 0 && (
+          <div style={{
+            ...card,
+            padding: '2rem',
+            textAlign: 'center',
+            background: '#FEF3C7',
+            border: '1px solid #FDE68A',
+          }}>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📖</div>
+            <h2 style={{ fontSize: '1.25rem', color: '#92400E', marginBottom: '0.5rem' }}>
+              No Plot Layers Found
+            </h2>
+            <p style={{ color: '#B45309', marginBottom: '1.5rem' }}>
+              Create plot layers on the Plot page before running coherence checks.
+            </p>
+            <button
+              onClick={() => router.push(`/projects/${projectId}/plot`)}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: gradients.brand,
+                border: 'none',
+                borderRadius: borderRadius.md,
+                color: 'white',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Go to Plot Page
+            </button>
+          </div>
+        )}
+
+        {/* Coherence Status Card */}
+        {plotLayers.length > 0 && (
+          <div style={{
+            ...card,
+            marginBottom: '1.5rem',
+            padding: '1.5rem',
+            background: coherenceResult?.isCoherent
+              ? '#ECFDF5'
+              : coherenceResult?.isCoherent === false
+                ? '#FEF2F2'
+                : '#F9FAFB',
+            border: `2px solid ${
+              coherenceResult?.isCoherent
+                ? '#A7F3D0'
+                : coherenceResult?.isCoherent === false
+                  ? '#FECACA'
+                  : '#E5E7EB'
+            }`,
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ flex: 1 }}>
+                <h2 style={{
+                  fontSize: '1.5rem',
+                  fontWeight: 700,
+                  color: coherenceResult?.isCoherent
+                    ? '#047857'
+                    : coherenceResult?.isCoherent === false
+                      ? '#DC2626'
+                      : colors.text,
+                  marginBottom: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                }}>
+                  {coherenceResult?.isCoherent === true && '✓ '}
+                  {coherenceResult?.isCoherent === false && '⚠ '}
+                  {checking && (
+                    <span style={{
+                      display: 'inline-block',
+                      width: '20px',
+                      height: '20px',
+                      border: '2px solid #E5E7EB',
+                      borderTopColor: '#667eea',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite',
+                    }} />
+                  )}
+                  Coherence Status
+                </h2>
+
+                {!coherenceResult && !checking && (
+                  <p style={{ color: '#64748B', margin: 0 }}>
+                    Run a coherence check to validate your plot structure.
+                  </p>
+                )}
+
+                {coherenceResult?.isCoherent === true && (
+                  <p style={{ color: '#047857', margin: 0 }}>
+                    Your plots are coherent with your story concept. Great work!
+                  </p>
+                )}
+
+                {coherenceResult?.isCoherent === false && (
+                  <p style={{ color: '#DC2626', margin: 0 }}>
+                    Some coherence issues were detected. See recommendations below.
+                  </p>
+                )}
+
+                {coherenceResult?.checkedAt && (
+                  <p style={{ fontSize: '0.75rem', color: '#9CA3AF', marginTop: '0.5rem' }}>
+                    Last checked: {new Date(coherenceResult.checkedAt).toLocaleString()}
+                  </p>
+                )}
+              </div>
+
+              <button
+                onClick={runCoherenceCheck}
+                disabled={checking}
+                style={{
+                  padding: '0.75rem 1.25rem',
+                  background: checking ? '#E5E7EB' : gradients.brand,
+                  border: 'none',
+                  borderRadius: borderRadius.md,
+                  color: checking ? '#9CA3AF' : 'white',
+                  fontWeight: 600,
+                  cursor: checking ? 'wait' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                }}
+              >
+                {checking ? 'Checking...' : coherenceResult ? 'Re-check' : 'Run Check'}
+              </button>
+            </div>
+
+            <style jsx>{`
+              @keyframes spin { to { transform: rotate(360deg); } }
+            `}</style>
+          </div>
+        )}
+
+        {/* Plot Analysis Results */}
+        {coherenceResult?.plotAnalysis && coherenceResult.plotAnalysis.length > 0 && (
+          <div style={{ ...card, marginBottom: '1.5rem', padding: '1.5rem' }}>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: colors.text, marginBottom: '1rem' }}>
+              Plot Analysis
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {coherenceResult.plotAnalysis.map((analysis, index) => (
+                <div
+                  key={index}
+                  style={{
+                    padding: '1rem',
+                    background: analysis.isCoherent ? '#F0FDF4' : '#FEF2F2',
+                    border: `1px solid ${analysis.isCoherent ? '#BBF7D0' : '#FECACA'}`,
+                    borderRadius: borderRadius.md,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '1rem' }}>
+                      {analysis.isCoherent ? '✓' : '⚠'}
+                    </span>
+                    <strong style={{ color: analysis.isCoherent ? '#166534' : '#991B1B' }}>
+                      {analysis.plotName}
+                    </strong>
+                  </div>
+                  <p style={{
+                    margin: 0,
+                    fontSize: '0.875rem',
+                    color: analysis.isCoherent ? '#166534' : '#991B1B',
+                  }}>
+                    {analysis.reason}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Warnings */}
+        {coherenceResult?.warnings && coherenceResult.warnings.length > 0 && (
+          <div style={{ ...card, marginBottom: '1.5rem', padding: '1.5rem', background: '#FFFBEB', border: '1px solid #FDE68A' }}>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#92400E', marginBottom: '1rem' }}>
+              ⚠ Warnings
+            </h3>
+            <ul style={{ margin: 0, paddingLeft: '1.5rem' }}>
+              {coherenceResult.warnings.map((warning, index) => (
+                <li key={index} style={{ color: '#B45309', marginBottom: '0.5rem', fontSize: '0.9375rem' }}>
+                  {warning}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Suggestions with Implement Buttons */}
+        {coherenceResult?.suggestions && coherenceResult.suggestions.length > 0 && (
+          <div style={{ ...card, marginBottom: '1.5rem', padding: '1.5rem', background: '#EEF2FF', border: '1px solid #C7D2FE' }}>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#4338CA', marginBottom: '1rem' }}>
+              Recommendations
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {coherenceResult.suggestions.map((suggestion, index) => (
+                <div
+                  key={index}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '1rem',
+                    padding: '1rem',
+                    background: 'white',
+                    borderRadius: borderRadius.md,
+                    border: '1px solid #E0E7FF',
+                  }}
+                >
+                  <p style={{ margin: 0, color: '#374151', fontSize: '0.9375rem', flex: 1 }}>
+                    {suggestion}
+                  </p>
+                  <button
+                    onClick={() => implementSuggestion(suggestion)}
+                    disabled={implementing === suggestion}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: implementing === suggestion ? '#E5E7EB' : '#667eea',
+                      border: 'none',
+                      borderRadius: borderRadius.md,
+                      color: 'white',
+                      fontSize: '0.8125rem',
+                      fontWeight: 500,
+                      cursor: implementing === suggestion ? 'wait' : 'pointer',
+                      whiteSpace: 'nowrap',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.375rem',
+                    }}
+                  >
+                    {implementing === suggestion ? (
+                      <>
+                        <span style={{
+                          display: 'inline-block',
+                          width: '12px',
+                          height: '12px',
+                          border: '2px solid rgba(255,255,255,0.3)',
+                          borderTopColor: 'white',
+                          borderRadius: '50%',
+                          animation: 'spin 1s linear infinite',
+                        }} />
+                        Implementing...
+                      </>
+                    ) : (
+                      'Implement'
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Navigation */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem' }}>
+          <button
+            onClick={() => router.push(`/projects/${projectId}/plot`)}
+            style={{
+              padding: '0.75rem 1.5rem',
+              background: 'white',
+              border: `1px solid ${colors.border}`,
+              borderRadius: borderRadius.md,
+              color: colors.text,
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            ← Back to Plot
+          </button>
+          <button
+            onClick={() => router.push(`/projects/${projectId}/originality`)}
+            style={{
+              padding: '0.75rem 1.5rem',
+              background: gradients.brand,
+              border: 'none',
+              borderRadius: borderRadius.md,
+              color: 'white',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Continue to Originality →
+          </button>
+        </div>
+      </div>
+    </PageLayout>
+  );
+}

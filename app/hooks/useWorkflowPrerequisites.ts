@@ -19,6 +19,8 @@ export type WorkflowStep =
   | 'characters'
   | 'world'
   | 'plots'
+  | 'coherence'
+  | 'originality'
   | 'outline'
   | 'chapters'
   | 'analytics';
@@ -179,6 +181,14 @@ function getMissingItemsForStep(
       }
       break;
 
+    case 'coherence':
+      // Coherence check is optional - just requires plots to exist
+      break;
+
+    case 'originality':
+      // Originality check is optional - just requires concept to exist
+      break;
+
     case 'outline':
       if (!hasOutlineContent(outline)) {
         missing.push('Story outline with chapters');
@@ -212,6 +222,8 @@ const WORKFLOW_STEPS: WorkflowStep[] = [
   'characters',
   'world',
   'plots',
+  'coherence',
+  'originality',
   'outline',
   'chapters',
   'analytics',
@@ -225,6 +237,8 @@ const STEP_NAMES: Record<WorkflowStep, string> = {
   characters: 'Characters',
   world: 'World Building',
   plots: 'Plot Structure',
+  coherence: 'Coherence Check',
+  originality: 'Originality Check',
   outline: 'Outline',
   chapters: 'Chapters',
   analytics: 'Analytics',
@@ -273,10 +287,22 @@ export function useWorkflowPrerequisites(
         requiresPrevious: 'world',
         missingItems: [],
       },
+      coherence: {
+        isComplete: false,
+        isRequired: false,  // Coherence check is optional
+        requiresPrevious: 'plots',
+        missingItems: [],
+      },
+      originality: {
+        isComplete: false,
+        isRequired: false,  // Originality check is optional
+        requiresPrevious: 'coherence',
+        missingItems: [],
+      },
       outline: {
         isComplete: false,
         isRequired: true,
-        requiresPrevious: 'plots',
+        requiresPrevious: 'originality',
         missingItems: [],
       },
       chapters: {
@@ -318,6 +344,16 @@ export function useWorkflowPrerequisites(
     checks.plots.missingItems = getMissingItemsForStep('plots', project);
     const plotLayers = project.plot_structure?.plot_layers || [];
     checks.plots.isComplete = plotLayers.length > 0;
+
+    // Check coherence completion (optional - always accessible if plots exist)
+    checks.coherence.missingItems = getMissingItemsForStep('coherence', project);
+    // Coherence is considered "complete" if it's been viewed (always allow access)
+    checks.coherence.isComplete = checks.plots.isComplete;
+
+    // Check originality completion (optional - always accessible if coherence accessible)
+    checks.originality.missingItems = getMissingItemsForStep('originality', project);
+    // Originality is considered "complete" if it's been viewed (always allow access)
+    checks.originality.isComplete = checks.coherence.isComplete;
 
     // Check outline completion
     checks.outline.missingItems = getMissingItemsForStep('outline', project, outline);

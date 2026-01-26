@@ -94,6 +94,20 @@ export const PROJECT_NAV_TABS = [
     workflowStep: 'plots' as const,
   },
   {
+    id: 'coherence',
+    label: 'Coherence',
+    route: '/coherence',
+    icon: '🔗',
+    workflowStep: 'coherence' as const,
+  },
+  {
+    id: 'originality',
+    label: 'Originality',
+    route: '/originality',
+    icon: '✨',
+    workflowStep: 'originality' as const,
+  },
+  {
     id: 'outline',
     label: 'Outline',
     route: '/outline',
