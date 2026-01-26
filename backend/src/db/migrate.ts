@@ -293,7 +293,7 @@ export function runMigrations() {
       runMigration(4, 'Saved Concepts', cleanedMigration);
     }
 
-    // Migrations 005-020: Run from migration files
+    // Migrations 005-025: Run from migration files
     const migrationFiles = [
       '005_analytics_insights.sql',
       '006_chapter_edits.sql',
@@ -311,6 +311,11 @@ export function runMigrations() {
       '018_concept_summaries.sql',
       '019_enhanced_tracking_and_query_perf.sql',
       '020_author_management.sql',
+      '021_story_concept.sql',
+      '022_saved_story_ideas.sql',
+      '023_plagiarism_checks.sql',
+      '024_user_preferences.sql',
+      '025_concept_source_idea.sql',
     ];
 
     for (let i = 0; i < migrationFiles.length; i++) {
