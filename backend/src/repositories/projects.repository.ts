@@ -22,6 +22,7 @@ interface ProjectRow {
   type: ProjectType;
   genre: string;
   status: ProjectStatus;
+  story_concept: string | null;
   story_dna: string | null;
   story_bible: string | null;
   series_bible: string | null;
@@ -29,6 +30,7 @@ interface ProjectRow {
   universe_id: string | null;
   is_universe_root: number;
   plot_structure: string | null;
+  source_concept_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -39,6 +41,8 @@ interface ProjectRow {
 export interface ParsedProject extends Omit<Project, 'is_universe_root'> {
   is_universe_root: boolean;
   plot_structure?: any;
+  story_concept?: string | null;  // Story concept stored directly on project
+  source_concept_id?: string | null;  // Reference to saved concept used as source
 }
 
 /**
@@ -63,10 +67,12 @@ export class ProjectsRepository extends BaseRepository<ProjectRow> {
     return {
       ...row,
       is_universe_root: row.is_universe_root === 1,
+      story_concept: this.safeJsonParse(row.story_concept),
       story_dna: this.safeJsonParse(row.story_dna),
       story_bible: this.safeJsonParse(row.story_bible),
       series_bible: this.safeJsonParse(row.series_bible),
       plot_structure: this.safeJsonParse(row.plot_structure),
+      source_concept_id: row.source_concept_id,
     };
   }
 

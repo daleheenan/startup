@@ -4,18 +4,30 @@
 export type ProjectType = 'standalone' | 'trilogy' | 'series';
 export type ProjectStatus = 'setup' | 'generating' | 'completed';
 
+export interface StoryConcept {
+  title: string;
+  logline: string | null;
+  synopsis: string | null;
+  hook: string | null;
+  protagonistHint: string | null;
+  conflictType: string | null;
+}
+
 export interface Project {
   id: string;
   title: string;
   type: ProjectType;
   genre: string;
   status: ProjectStatus;
+  story_concept: StoryConcept | null;  // Original story concept from saved concepts
   story_dna: StoryDNA | null;
   story_bible: StoryBible | null;
   series_bible: SeriesBible | null;  // Sprint 8: Aggregated trilogy data
+  plot_structure: any | null;        // Plot layers and act structure
   book_count: number;                 // Sprint 8: Number of books in series
   universe_id: string | null;         // Link to shared universe
   is_universe_root: boolean;          // Is this the origin project for a universe?
+  source_concept_id: string | null;   // Link to original saved_concept
   created_at: string;
   updated_at: string;
 }

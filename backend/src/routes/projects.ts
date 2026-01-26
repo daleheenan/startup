@@ -1799,6 +1799,139 @@ router.put('/:id/plot-structure', (req, res) => {
 });
 
 /**
+ * POST /api/projects/:id/validate-plot-coherence
+ * Validate that plots are coherent with the story concept and DNA
+ * Returns warnings (not errors) for plots that seem unrelated
+ */
+router.post('/:id/validate-plot-coherence', async (req, res) => {
+  try {
+    const { id: projectId } = req.params;
+
+    // Get project with story concept/DNA
+    const projectStmt = db.prepare<[string], any>(`
+      SELECT title, genre, story_dna, story_bible, plot_structure FROM projects WHERE id = ?
+    `);
+    const project = projectStmt.get(projectId);
+
+    if (!project) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project not found' },
+      });
+    }
+
+    const storyDNA = safeJsonParse(project.story_dna, null);
+    const storyBible = safeJsonParse(project.story_bible, null);
+    const plotStructure = safeJsonParse(project.plot_structure, { plot_layers: [] });
+
+    if (!plotStructure.plot_layers || plotStructure.plot_layers.length === 0) {
+      return res.json({
+        isCoherent: false,
+        warnings: ['No plots defined. Your story needs at least a main plot to generate a quality outline.'],
+        suggestions: ['Visit the Plot page to define your main plot and subplots.'],
+      });
+    }
+
+    // Check for main plot
+    const hasMainPlot = plotStructure.plot_layers.some((l: any) => l.type === 'main');
+    const warnings: string[] = [];
+    const suggestions: string[] = [];
+
+    if (!hasMainPlot) {
+      warnings.push('No main plot (golden thread) defined. Every novel needs a central narrative arc.');
+      suggestions.push('Convert one of your subplots to main plot, or create a new main plot that ties everything together.');
+    }
+
+    // Build context for AI validation
+    const storyContext = `
+Title: ${project.title}
+Genre: ${project.genre}
+${storyDNA?.themes?.length > 0 ? `Themes: ${storyDNA.themes.join(', ')}` : ''}
+${storyDNA?.tone ? `Tone: ${storyDNA.tone}` : ''}
+${storyBible?.characters?.length > 0 ? `Main Characters: ${storyBible.characters.slice(0, 5).map((c: any) => c.name).join(', ')}` : ''}
+    `.trim();
+
+    const plotSummaries = plotStructure.plot_layers.map((p: any) =>
+      `- ${p.name} (${p.type}): ${p.description}`
+    ).join('\n');
+
+    // Use Claude to validate coherence
+    const { default: Anthropic } = await import('@anthropic-ai/sdk');
+    const anthropic = new Anthropic();
+
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1500,
+      temperature: 0.3,
+      messages: [{
+        role: 'user',
+        content: `You are a story coherence validator. Analyze whether these plots fit the story concept.
+
+**Story Context:**
+${storyContext}
+
+**Defined Plots:**
+${plotSummaries}
+
+Evaluate:
+1. Does each plot fit the genre (${project.genre})?
+2. Are plots thematically consistent with the story?
+3. Are there any plots that seem out of place or contradictory?
+4. Are character arcs connected to characters in the story?
+
+Return ONLY a JSON object:
+{
+  "isCoherent": true/false,
+  "plotAnalysis": [
+    {
+      "plotName": "Plot name",
+      "isCoherent": true/false,
+      "reason": "Brief explanation"
+    }
+  ],
+  "overallWarnings": ["Any warnings about the plot structure"],
+  "suggestions": ["Actionable suggestions for improvement"]
+}`,
+      }],
+    });
+
+    const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+
+    if (!jsonMatch) {
+      // If parsing fails, return basic validation
+      return res.json({
+        isCoherent: hasMainPlot,
+        warnings: warnings,
+        suggestions: suggestions,
+        plotAnalysis: [],
+      });
+    }
+
+    const analysis = JSON.parse(jsonMatch[0]);
+
+    // Merge AI analysis with basic checks
+    const finalWarnings = [...warnings, ...(analysis.overallWarnings || [])];
+    const finalSuggestions = [...suggestions, ...(analysis.suggestions || [])];
+
+    // Check for incoherent individual plots
+    const incoherentPlots = (analysis.plotAnalysis || []).filter((p: any) => !p.isCoherent);
+    incoherentPlots.forEach((p: any) => {
+      finalWarnings.push(`"${p.plotName}" may not fit: ${p.reason}`);
+    });
+
+    res.json({
+      isCoherent: hasMainPlot && (analysis.isCoherent ?? true) && incoherentPlots.length === 0,
+      warnings: finalWarnings,
+      suggestions: finalSuggestions,
+      plotAnalysis: analysis.plotAnalysis || [],
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error validating plot coherence');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
  * GET /api/projects/:id/plot-structure
  * Get plot structure for a project
  */
@@ -2183,7 +2316,7 @@ router.post('/:id/extract-plots-from-concept', async (req, res) => {
 
     // Get project and its story concept
     const projectStmt = db.prepare<[string], any>(`
-      SELECT id, title, genre, story_dna, story_bible, plot_structure FROM projects WHERE id = ?
+      SELECT id, title, genre, story_dna, story_bible, story_concept, plot_structure FROM projects WHERE id = ?
     `);
     const project = projectStmt.get(projectId);
 
@@ -2193,19 +2326,39 @@ router.post('/:id/extract-plots-from-concept', async (req, res) => {
       });
     }
 
-    // Get concept from saved_concepts or use story_dna
-    const conceptStmt = db.prepare<[string], any>(`
-      SELECT synopsis, logline FROM saved_concepts WHERE id IN (
-        SELECT id FROM saved_concepts WHERE title = ? ORDER BY created_at DESC LIMIT 1
-      )
-    `);
-    const concept = conceptStmt.get(project.title);
-
     const storyDNA = safeJsonParse(project.story_dna, null);
     const storyBible = safeJsonParse(project.story_bible, null);
+    const storyConcept = safeJsonParse(project.story_concept, null);
 
-    // Use synopsis from concept or logline from story DNA
-    const conceptDescription = concept?.synopsis || concept?.logline || storyDNA?.themes?.join('. ') || 'A compelling story';
+    // Build rich concept description from stored story_concept
+    let conceptDescription = '';
+
+    if (storyConcept) {
+      // Use the stored story concept (preferred source)
+      const parts: string[] = [];
+      if (storyConcept.synopsis) parts.push(storyConcept.synopsis);
+      if (storyConcept.logline && !storyConcept.synopsis?.includes(storyConcept.logline)) {
+        parts.push(`Logline: ${storyConcept.logline}`);
+      }
+      if (storyConcept.hook) parts.push(`Hook: ${storyConcept.hook}`);
+      if (storyConcept.protagonistHint) parts.push(`Protagonist: ${storyConcept.protagonistHint}`);
+      if (storyConcept.conflictType) parts.push(`Core Conflict: ${storyConcept.conflictType}`);
+      conceptDescription = parts.join('\n\n');
+    }
+
+    // Fallback: check saved_concepts table by title match
+    if (!conceptDescription) {
+      const conceptStmt = db.prepare<[string], any>(`
+        SELECT synopsis, logline FROM saved_concepts WHERE title = ? ORDER BY created_at DESC LIMIT 1
+      `);
+      const savedConcept = conceptStmt.get(project.title);
+      conceptDescription = savedConcept?.synopsis || savedConcept?.logline || '';
+    }
+
+    // Final fallback: use story DNA themes
+    if (!conceptDescription) {
+      conceptDescription = storyDNA?.themes?.join('. ') || '';
+    }
 
     if (!conceptDescription || conceptDescription === 'A compelling story') {
       return res.status(400).json({
