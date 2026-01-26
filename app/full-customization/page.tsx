@@ -74,66 +74,39 @@ export default function FullCustomizationPage() {
       }
 
       // Use generateMode from preferences if provided
+      // 'full' = 5 full concepts, 'summaries' = 10 full concepts
       const effectiveGenerateMode = preferences.generateMode || 'full';
+      const conceptCount = effectiveGenerateMode === 'summaries' ? 10 : 5;
 
-      if (effectiveGenerateMode === 'summaries') {
-        // Two-stage workflow: Generate story ideas first
-        setCurrentStep('Generating story ideas...');
+      // Generate full concepts (5 or 10 based on mode)
+      setCurrentStep(`Generating ${conceptCount} story concepts...`);
 
-        const response = await fetch(`${API_BASE_URL}/api/concepts/summaries`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            preferences: enhancedPreferences,
-            count: 10
-          }),
-        });
+      const response = await fetch(`${API_BASE_URL}/api/concepts/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          preferences: enhancedPreferences,
+          count: conceptCount
+        }),
+      });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error?.message || 'Failed to generate summaries');
-        }
-
-        setCurrentStep('Finalizing story ideas...');
-        const data = await response.json();
-
-        sessionStorage.setItem('generatedSummaries', JSON.stringify(data.summaries));
-        sessionStorage.setItem('summaryPreferences', JSON.stringify(preferences));
-
-        await new Promise(resolve => setTimeout(resolve, 0));
-
-        router.push('/summaries');
-      } else {
-        // Direct full concept generation (existing behavior)
-        setCurrentStep('Analyzing your genre preferences...');
-
-        const response = await fetch(`${API_BASE_URL}/api/concepts/generate`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({ preferences: enhancedPreferences }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error?.message || 'Failed to generate concepts');
-        }
-
-        setCurrentStep('Finalizing story concepts...');
-        const data = await response.json();
-
-        sessionStorage.setItem('generatedConcepts', JSON.stringify(data.concepts));
-        sessionStorage.setItem('preferences', JSON.stringify(preferences));
-
-        await new Promise(resolve => setTimeout(resolve, 0));
-
-        router.push('/concepts');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Failed to generate concepts');
       }
+
+      setCurrentStep('Finalizing story concepts...');
+      const data = await response.json();
+
+      sessionStorage.setItem('generatedConcepts', JSON.stringify(data.concepts));
+      sessionStorage.setItem('preferences', JSON.stringify(preferences));
+
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      router.push('/concepts');
     } catch (err: any) {
       console.error('Error generating concepts:', err);
       setError(err.message || 'An error occurred while generating concepts');

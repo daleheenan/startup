@@ -49,6 +49,12 @@ export interface StoryPreferences {
   timePeriodConstraints?: {
     prohibitions: string[];
   };
+  // Character nationality configuration
+  nationalityConfig?: {
+    mode: 'none' | 'single' | 'mixed' | 'custom';
+    nationality?: string;  // For 'single' mode
+    distribution?: { nationality: string; count: number }[];  // For 'mixed' mode
+  };
 }
 
 export interface StoryConcept {
@@ -177,25 +183,31 @@ function fetchExclusions(): ConceptExclusions {
 }
 
 /**
- * Generate 5 diverse story concepts based on user preferences
+ * Generate diverse story concepts based on user preferences
+ * @param preferences - Story preferences from the user
+ * @param count - Number of concepts to generate (default: 5, max: 10)
  */
 export async function generateConcepts(
-  preferences: StoryPreferences
+  preferences: StoryPreferences,
+  count: number = 5
 ): Promise<StoryConcept[]> {
   const { genre, subgenre, tone, themes, targetLength, additionalNotes } = preferences;
+  const conceptCount = Math.min(Math.max(count, 1), 10); // Clamp between 1-10
 
   // Fetch exclusions from database
   const exclusions = fetchExclusions();
 
-  // Build the prompt for concept generation with exclusions
-  const prompt = buildConceptPrompt(preferences, exclusions);
+  // Build the prompt for concept generation with exclusions and count
+  const prompt = buildConceptPrompt(preferences, exclusions, conceptCount);
 
-  logger.info('[ConceptGenerator] Calling Claude API...');
+  logger.info(`[ConceptGenerator] Calling Claude API to generate ${conceptCount} concepts...`);
 
   try {
+    // Increase max_tokens for more concepts
+    const maxTokens = conceptCount > 5 ? 8000 : 4000;
     const message = await anthropic.messages.create({
       model: 'claude-opus-4-5-20251101',
-      max_tokens: 4000,
+      max_tokens: maxTokens,
       temperature: 1.0, // High creativity for diverse concepts
       messages: [
         {
@@ -356,10 +368,48 @@ function buildTimeContext(preferences: StoryPreferences): { timeframeText: strin
 }
 
 /**
- * Build the prompt for concept generation
+ * Build nationality guidance for character naming based on user settings
  */
-function buildConceptPrompt(preferences: StoryPreferences, exclusions?: ConceptExclusions): string {
-  const { tone, tones, themes, customTheme, targetLength, additionalNotes, customIdeas, regenerationTimestamp } = preferences;
+function buildNationalityGuidance(nationalityConfig?: StoryPreferences['nationalityConfig']): string {
+  if (!nationalityConfig || nationalityConfig.mode === 'none') {
+    return '';  // Let AI decide naturally without forcing diversity
+  }
+
+  switch (nationalityConfig.mode) {
+    case 'single':
+      return `
+**CHARACTER NATIONALITY REQUIREMENT:**
+All main characters should be ${nationalityConfig.nationality}. Use names, cultural backgrounds, and references appropriate to ${nationalityConfig.nationality} culture. Do NOT include characters from other nationalities unless they serve as minor supporting characters.`;
+
+    case 'mixed':
+      if (nationalityConfig.distribution && nationalityConfig.distribution.length > 0) {
+        const distText = nationalityConfig.distribution
+          .map(d => `${d.count} ${d.nationality}`)
+          .join(', ');
+        return `
+**CHARACTER NATIONALITY REQUIREMENTS:**
+Distribute characters as follows: ${distText}. Use culturally appropriate names for each nationality specified. Ensure the nationality distribution matches exactly as requested.`;
+      }
+      return '';
+
+    case 'custom':
+      return `
+**CHARACTER NATIONALITY NOTE:**
+User will specify character nationalities individually. For now, use common English/American names as placeholders that the user can customize later.`;
+
+    default:
+      return '';
+  }
+}
+
+/**
+ * Build the prompt for concept generation
+ * @param preferences - Story preferences from the user
+ * @param exclusions - Elements to exclude from generation
+ * @param count - Number of concepts to generate (default: 5)
+ */
+function buildConceptPrompt(preferences: StoryPreferences, exclusions?: ConceptExclusions, count: number = 5): string {
+  const { tone, tones, themes, customTheme, targetLength, additionalNotes, customIdeas, regenerationTimestamp, nationalityConfig } = preferences;
 
   const genreText = formatGenre(preferences);
   const subgenreText = formatSubgenre(preferences);
@@ -367,6 +417,9 @@ function buildConceptPrompt(preferences: StoryPreferences, exclusions?: ConceptE
 
   // Build time context
   const { timeframeText, timeGuidance } = buildTimeContext(preferences);
+
+  // Build nationality guidance
+  const nationalityGuidance = buildNationalityGuidance(nationalityConfig);
 
   // Support multi-tone (use tones array if available, fall back to single tone)
   const toneText = tones && tones.length > 0 ? tones.join(' + ') : tone;
@@ -401,12 +454,12 @@ Before finalizing each concept, verify:
 ✗ Title is NOT in the banned list above
 ✗ Title does NOT contain banned generic words
 ✗ Protagonist name is NOT in the banned names list
-✗ Protagonist name is from a REAL cultural background (Korean, Nigerian, Brazilian, etc.)
+${!nationalityConfig || nationalityConfig.mode === 'none' ? '✗ Protagonist name is from a REAL cultural background' : ''}
 ═══════════════════════════════════════════════════════════════════════════════
 `;
   }
 
-  return `You are a master storyteller and concept developer. Your task is to generate 5 COMPLETELY UNIQUE and RADICALLY DIFFERENT story concepts.
+  return `You are a master storyteller and concept developer. Your task is to generate ${count} COMPLETELY UNIQUE and RADICALLY DIFFERENT story concepts.
 
 ${seedHint}
 
@@ -419,14 +472,15 @@ ${timeframeText ? `**Time Period/Era:** ${timeframeText}` : ''}
 ${additionalNotes ? `**Additional Notes:** ${additionalNotes}` : ''}
 ${customIdeas ? `**Custom Ideas to Incorporate:** ${customIdeas}` : ''}
 ${timeGuidance}
+${nationalityGuidance}
 ${exclusionSection}
 
 **CRITICAL UNIQUENESS REQUIREMENTS:**
 1. Each concept MUST have a completely ORIGINAL title - no generic titles like "The Shadow's Edge" or "The Last Guardian"
-2. Each protagonist MUST have a UNIQUE NAME - use unusual, memorable names from diverse cultural backgrounds
+2. Each protagonist MUST have a UNIQUE NAME${nationalityConfig?.mode === 'single' ? ` from ${nationalityConfig.nationality} background` : nationalityConfig?.mode === 'mixed' ? ' matching the specified nationality distribution' : ''}
 3. Each central conflict MUST be DISTINCTIVE - avoid clichéd "chosen one" or "save the world" plots unless given a truly unique twist
 4. Settings should be SPECIFIC and VIVID - not generic "kingdoms" or "cities"
-5. The 5 concepts must explore DIFFERENT subthemes, protagonist archetypes, and narrative structures
+5. The ${count} concepts must explore DIFFERENT subthemes, protagonist archetypes, and narrative structures
 ${timeframeText ? '6. All concepts MUST be appropriate for the specified time period - no anachronisms!' : ''}
 
 **For EACH concept, provide:**
@@ -437,14 +491,14 @@ ${timeframeText ? '6. All concepts MUST be appropriate for the specified time pe
 - **protagonistHint**: Protagonist with UNIQUE NAME, specific role, and distinctive trait
 - **conflictType**: The primary conflict type (internal, external, both)
 
-**DIVERSITY CHECKLIST - Across your 5 concepts, vary these elements:**
+**DIVERSITY CHECKLIST - Across your ${count} concepts, vary these elements:**
 - Protagonist age ranges (young adult, middle-aged, elderly)
 - Protagonist professions/roles (not all warriors/royalty/chosen ones)
 - Narrative POV styles (first person, third limited, unreliable narrator)
 - Story structures (linear, non-linear, frame narrative)
 - Relationship dynamics (solo journey, ensemble, mentor-student)
 
-Return ONLY a JSON array of 5 concepts in this exact format:
+Return ONLY a JSON array of ${count} concepts in this exact format:
 [
   {
     "id": "concept-1",

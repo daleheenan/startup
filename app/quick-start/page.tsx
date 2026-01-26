@@ -679,42 +679,73 @@ export default function QuickStartPage() {
                 </div>
               </div>
 
-              {/* Action Button */}
-              <button
-                onClick={handleQuickSubmit}
-                disabled={quickGenres.length === 0 || isGenerating}
-                style={{
-                  width: '100%',
-                  padding: '1rem',
-                  background: (quickGenres.length === 0 || isGenerating)
-                    ? '#94A3B8'
-                    : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: '#FFFFFF',
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                  cursor: (quickGenres.length === 0 || isGenerating) ? 'not-allowed' : 'pointer',
-                  boxShadow: (quickGenres.length === 0 || isGenerating) ? 'none' : '0 4px 14px rgba(102, 126, 234, 0.4)',
-                  transition: 'all 0.2s',
-                }}
-              >
-                {isGenerating
-                  ? 'Generating...'
-                  : generateMode === 'summaries'
-                  ? 'Generate 10 Story Ideas'
-                  : 'Generate 5 Concepts'
-                }
-              </button>
+              {/* Action Buttons - Two Separate Buttons */}
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button
+                  onClick={() => {
+                    setGenerateMode('full');
+                    handleQuickSubmit();
+                  }}
+                  disabled={quickGenres.length === 0 || isGenerating}
+                  style={{
+                    flex: 1,
+                    padding: '1rem',
+                    background: (quickGenres.length === 0 || isGenerating)
+                      ? '#94A3B8'
+                      : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    color: '#FFFFFF',
+                    fontSize: '0.9375rem',
+                    fontWeight: 600,
+                    cursor: (quickGenres.length === 0 || isGenerating) ? 'not-allowed' : 'pointer',
+                    boxShadow: (quickGenres.length === 0 || isGenerating) ? 'none' : '0 4px 14px rgba(102, 126, 234, 0.4)',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {isGenerating && generateMode === 'full'
+                    ? 'Generating...'
+                    : 'Generate 5 Full Concepts'
+                  }
+                </button>
+                <button
+                  onClick={() => {
+                    setGenerateMode('summaries');
+                    handleQuickSubmit();
+                  }}
+                  disabled={quickGenres.length === 0 || isGenerating}
+                  style={{
+                    flex: 1,
+                    padding: '1rem',
+                    background: (quickGenres.length === 0 || isGenerating)
+                      ? '#94A3B8'
+                      : '#F8FAFC',
+                    border: (quickGenres.length === 0 || isGenerating) ? 'none' : '2px solid #667eea',
+                    borderRadius: '8px',
+                    color: (quickGenres.length === 0 || isGenerating) ? '#FFFFFF' : '#667eea',
+                    fontSize: '0.9375rem',
+                    fontWeight: 600,
+                    cursor: (quickGenres.length === 0 || isGenerating) ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {isGenerating && generateMode === 'summaries'
+                    ? 'Generating...'
+                    : 'Open Story Ideas Generator'
+                  }
+                </button>
+              </div>
             </div>
 
             {/* Progress Indicator Modal */}
             <GenerationProgress
               isActive={isGenerating}
-              title="Generating Story Concepts"
-              subtitle="Creating unique story ideas based on your preferences"
+              title={generateMode === 'summaries' ? "Generating Story Ideas" : "Generating Story Concepts"}
+              subtitle={generateMode === 'summaries'
+                ? "Creating quick story ideas based on your preferences"
+                : "Creating detailed story concepts based on your preferences"}
               currentStep={currentStep}
-              estimatedTime={90}
+              estimatedTime={generateMode === 'summaries' ? 45 : 90}
               error={error}
               onCancel={handleCancel}
             />

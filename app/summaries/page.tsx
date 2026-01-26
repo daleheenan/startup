@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import GenerationProgress from '../components/GenerationProgress';
 import { getToken } from '../lib/auth';
+import PrimaryNavigationBar from '../components/shared/PrimaryNavigationBar';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -238,42 +239,14 @@ export default function SummariesPage() {
 
   return (
     <div style={{
-      display: 'flex',
       minHeight: '100vh',
       background: '#F8FAFC',
     }}>
-      {/* Left Sidebar */}
-      <aside style={{
-        width: '72px',
-        background: '#FFFFFF',
-        borderRight: '1px solid #E2E8F0',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        padding: '1.5rem 0',
-      }}>
-        <Link
-          href="/projects"
-          style={{
-            width: '40px',
-            height: '40px',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            borderRadius: '10px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#FFFFFF',
-            fontWeight: '700',
-            fontSize: '1.25rem',
-            textDecoration: 'none',
-          }}
-        >
-          N
-        </Link>
-      </aside>
+      {/* Primary Navigation Bar */}
+      <PrimaryNavigationBar activeSection="story-ideas" />
 
       {/* Main Content */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <main style={{ display: 'flex', flexDirection: 'column' }}>
         {/* Top Bar */}
         <header style={{
           padding: '1rem 2rem',
@@ -290,15 +263,15 @@ export default function SummariesPage() {
               color: '#1A1A2E',
               margin: 0,
             }}>
-              Concept Summaries
+              Story Ideas
             </h1>
             <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
-              Select summaries to expand into full concepts, or save for later
+              Select story ideas to expand into full concepts, or save for later
             </p>
           </div>
           <div style={{ display: 'flex', gap: '1rem' }}>
             <Link
-              href="/saved-summaries"
+              href="/story-ideas"
               style={{
                 padding: '0.5rem 1rem',
                 color: '#667eea',
@@ -309,7 +282,7 @@ export default function SummariesPage() {
                 gap: '0.5rem',
               }}
             >
-              View Saved Summaries
+              View Saved Story Ideas
             </Link>
             <Link
               href="/new"
@@ -335,6 +308,75 @@ export default function SummariesPage() {
           overflow: 'auto',
         }}>
           <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+            {/* User Selections Summary */}
+            {preferences && (
+              <div style={{
+                background: '#F0F9FF',
+                border: '1px solid #BAE6FD',
+                borderRadius: '12px',
+                padding: '1rem 1.5rem',
+                marginBottom: '1.5rem',
+              }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#0369A1', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Your Selections
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
+                  {preferences.genres && preferences.genres.length > 0 && (
+                    <span style={{
+                      padding: '0.375rem 0.75rem',
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      color: '#FFFFFF',
+                      fontSize: '0.8125rem',
+                      fontWeight: 500,
+                      borderRadius: '9999px',
+                    }}>
+                      {preferences.genres.join(' + ')}
+                    </span>
+                  )}
+                  {preferences.projectType && (
+                    <span style={{
+                      padding: '0.375rem 0.75rem',
+                      background: '#E2E8F0',
+                      color: '#475569',
+                      fontSize: '0.8125rem',
+                      fontWeight: 500,
+                      borderRadius: '9999px',
+                    }}>
+                      {preferences.projectType === 'standalone' ? 'Standalone' : preferences.projectType === 'trilogy' ? 'Trilogy' : 'Series'}
+                    </span>
+                  )}
+                  {preferences.timePeriod && preferences.timePeriod.type !== 'present' && (
+                    <span style={{
+                      padding: '0.375rem 0.75rem',
+                      background: '#FEF3C7',
+                      color: '#92400E',
+                      fontSize: '0.8125rem',
+                      fontWeight: 500,
+                      borderRadius: '9999px',
+                    }}>
+                      {preferences.timeframe || (preferences.timePeriod.type === 'past' ? 'Historical' : preferences.timePeriod.type === 'future' ? 'Future' : 'Custom Era')}
+                    </span>
+                  )}
+                  {preferences.customIdeas && (
+                    <span style={{
+                      padding: '0.375rem 0.75rem',
+                      background: '#ECFDF5',
+                      color: '#065F46',
+                      fontSize: '0.8125rem',
+                      fontWeight: 500,
+                      borderRadius: '9999px',
+                      maxWidth: '300px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      Idea: {preferences.customIdeas.substring(0, 50)}{preferences.customIdeas.length > 50 ? '...' : ''}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Error Message */}
             {error && (
               <div style={{
@@ -365,8 +407,8 @@ export default function SummariesPage() {
             }}>
               <span style={{ color: '#0369A1', fontSize: '0.875rem' }}>
                 {selectedSummaries.size === 0
-                  ? 'Click on summaries to select them for expansion'
-                  : `${selectedSummaries.size} summary${selectedSummaries.size > 1 ? 's' : ''} selected`
+                  ? 'Click on story ideas to select them for expansion'
+                  : `${selectedSummaries.size} story idea${selectedSummaries.size > 1 ? 's' : ''} selected`
                 }
               </span>
               {selectedSummaries.size > 0 && (
@@ -512,7 +554,7 @@ export default function SummariesPage() {
                   transition: 'all 0.2s',
                 }}
               >
-                {isGenerating ? 'Regenerating...' : 'Regenerate Summaries'}
+                {isGenerating ? 'Regenerating...' : 'Regenerate Story Ideas'}
               </button>
 
               <button
@@ -538,8 +580,8 @@ export default function SummariesPage() {
                 {isExpanding
                   ? 'Expanding...'
                   : selectedSummaries.size === 0
-                  ? 'Select Summaries to Expand'
-                  : `Expand ${selectedSummaries.size} Summary${selectedSummaries.size > 1 ? 's' : ''} to Full Concepts`
+                  ? 'Select Story Idea to Expand'
+                  : `Expand ${selectedSummaries.size} Story Idea${selectedSummaries.size > 1 ? 's' : ''} to Full Concepts`
                 }
               </button>
             </div>
@@ -550,8 +592,8 @@ export default function SummariesPage() {
       {/* Progress Modal */}
       <GenerationProgress
         isActive={isGenerating || isExpanding}
-        title={isExpanding ? 'Expanding Summaries' : 'Generating Summaries'}
-        subtitle={isExpanding ? 'Creating detailed concepts from your selections' : 'Creating fresh story summaries'}
+        title={isExpanding ? 'Expanding Story Ideas' : 'Generating Story Ideas'}
+        subtitle={isExpanding ? 'Creating detailed concepts from your selections' : 'Creating fresh story ideas'}
         currentStep={currentStep}
         estimatedTime={isExpanding ? 60 : 45}
         error={error}

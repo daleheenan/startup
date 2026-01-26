@@ -169,18 +169,18 @@ router.get('/saved', async (req, res) => {
 
     const ideas = rows.map(row => ({
       id: row.id,
-      storyIdea: row.story_idea,
-      characterConcepts: JSON.parse(row.character_concepts || '[]'),
-      plotElements: JSON.parse(row.plot_elements || '[]'),
-      uniqueTwists: JSON.parse(row.unique_twists || '[]'),
+      story_idea: row.story_idea,
+      character_concepts: JSON.parse(row.character_concepts || '[]'),
+      plot_elements: JSON.parse(row.plot_elements || '[]'),
+      unique_twists: JSON.parse(row.unique_twists || '[]'),
       genre: row.genre,
       subgenre: row.subgenre,
       tone: row.tone,
       themes: JSON.parse(row.themes || '[]'),
       notes: row.notes,
       status: row.status,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
     }));
 
     res.json({ success: true, ideas });
@@ -208,18 +208,18 @@ router.get('/saved/:id', async (req, res) => {
 
     const idea = {
       id: row.id,
-      storyIdea: row.story_idea,
-      characterConcepts: JSON.parse(row.character_concepts || '[]'),
-      plotElements: JSON.parse(row.plot_elements || '[]'),
-      uniqueTwists: JSON.parse(row.unique_twists || '[]'),
+      story_idea: row.story_idea,
+      character_concepts: JSON.parse(row.character_concepts || '[]'),
+      plot_elements: JSON.parse(row.plot_elements || '[]'),
+      unique_twists: JSON.parse(row.unique_twists || '[]'),
       genre: row.genre,
       subgenre: row.subgenre,
       tone: row.tone,
       themes: JSON.parse(row.themes || '[]'),
       notes: row.notes,
       status: row.status,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
     };
 
     res.json({ success: true, idea });

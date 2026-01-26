@@ -101,16 +101,21 @@ export const generateConceptsSchema = z.object({
     genres: z.array(z.string()).optional(),
     subgenre: z.string().optional(),
     subgenres: z.array(z.string()).optional(),
-    tone: z.string().min(1, 'Tone is required'),
+    tone: z.string().optional(),  // Made optional for multi-tone support
+    tones: z.array(z.string()).optional(),  // Support multi-tone array
     themes: z.array(z.string()).min(1, 'At least one theme is required'),
-    targetLength: z.string().min(1, 'Target length is required'),
-  }).refine(
+    targetLength: z.union([z.string(), z.number()]),  // Accept both string and number
+  }).passthrough().refine(  // passthrough() allows additional fields
     data => data.genre || (data.genres && data.genres.length > 0),
     { message: 'Genre or genres array is required' }
   ).refine(
     data => data.subgenre || (data.subgenres && data.subgenres.length > 0),
     { message: 'Subgenre or subgenres array is required' }
+  ).refine(
+    data => data.tone || (data.tones && data.tones.length > 0),
+    { message: 'At least one tone is required' }
   ),
+  count: z.number().int().min(1).max(10).optional().default(5),  // Support 5 or 10 full concepts
 });
 
 export const refineConceptsSchema = z.object({

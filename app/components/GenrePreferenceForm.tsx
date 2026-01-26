@@ -2702,10 +2702,23 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
         </>
       )}
 
-      {/* TAB 4: Story Ideas, Notes, Character Nationality, Generation Mode */}
+      {/* TAB 4: Character Nationality, Story Ideas, Notes, Generation Mode */}
       {currentTab === 4 && (
         <>
-      {/* Custom Story Ideas */}
+      {/* Character Nationality Settings - FIRST (before Story Ideas Generator) */}
+      <div style={sectionStyle}>
+        <NationalitySelector
+          value={nationalityConfig}
+          onChange={setNationalityConfig}
+          characterCount={5}
+          disabled={isLoading}
+        />
+        <div style={{ marginTop: '0.75rem', fontSize: '0.813rem', color: '#64748B' }}>
+          Configure character nationalities for culturally appropriate names and backgrounds.
+        </div>
+      </div>
+
+      {/* Custom Story Ideas - SECOND (after nationality settings) */}
       <div style={sectionStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
           <label style={{ ...labelStyle, marginBottom: 0 }}>
@@ -2793,27 +2806,14 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
         />
       </div>
 
-      {/* Character Nationality Settings */}
-      <div style={sectionStyle}>
-        <NationalitySelector
-          value={nationalityConfig}
-          onChange={setNationalityConfig}
-          characterCount={5}
-          disabled={isLoading}
-        />
-        <div style={{ marginTop: '0.75rem', fontSize: '0.813rem', color: '#64748B' }}>
-          Configure character nationalities for culturally appropriate names and backgrounds.
-        </div>
-      </div>
-
-      {/* Generation Mode Selection */}
+      {/* Generation Mode Selection - Only 5 and 10 Full Concepts */}
       <div style={sectionStyle}>
         <label style={labelStyle}>
           Generation Mode
         </label>
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
+          gridTemplateColumns: 'repeat(2, 1fr)',
           gap: '0.75rem',
         }}>
           <button
@@ -2858,32 +2858,9 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
               textAlign: 'center',
             }}
           >
-            <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>📝</div>
-            <div style={{ fontWeight: 600, marginBottom: '0.25rem', fontSize: '0.875rem' }}>10 Story Ideas</div>
-            <div style={{ fontSize: '0.7rem', opacity: 0.8, lineHeight: '1.3' }}>Browse ideas, save favorites</div>
-          </button>
-          <button
-            type="button"
-            onClick={() => setGenerateMode('quick20')}
-            disabled={isLoading}
-            style={{
-              padding: '1rem 0.75rem',
-              background: generateMode === 'quick20'
-                ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                : '#F8FAFC',
-              border: generateMode === 'quick20'
-                ? '2px solid #667eea'
-                : '1px solid #E2E8F0',
-              borderRadius: '8px',
-              color: generateMode === 'quick20' ? '#FFFFFF' : '#374151',
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              transition: 'all 0.2s',
-              textAlign: 'center',
-            }}
-          >
-            <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>⚡</div>
-            <div style={{ fontWeight: 600, marginBottom: '0.25rem', fontSize: '0.875rem' }}>20 Story Ideas</div>
-            <div style={{ fontSize: '0.7rem', opacity: 0.8, lineHeight: '1.3' }}>Maximum variety to explore</div>
+            <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>📚📚</div>
+            <div style={{ fontWeight: 600, marginBottom: '0.25rem', fontSize: '0.875rem' }}>10 Full Concepts</div>
+            <div style={{ fontSize: '0.7rem', opacity: 0.8, lineHeight: '1.3' }}>More variety to choose from</div>
           </button>
         </div>
       </div>
@@ -2942,11 +2919,9 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
           >
             {isLoading
               ? 'Generating...'
-              : generateMode === 'quick20'
-              ? '⚡ Generate 20 Story Ideas'
               : generateMode === 'summaries'
-              ? '📝 Generate 10 Story Ideas'
-              : '📚 Generate 5 Concepts'
+              ? '📚 Generate 10 Full Concepts'
+              : '📚 Generate 5 Full Concepts'
             }
           </button>
         </div>
@@ -2992,11 +2967,9 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
           >
             {isLoading
               ? 'Generating...'
-              : generateMode === 'quick20'
-              ? '⚡ Generate 20 Story Ideas'
               : generateMode === 'summaries'
-              ? '📝 Generate 10 Story Ideas'
-              : '📚 Generate 5 Concepts'
+              ? '📚 Generate 10 Full Concepts'
+              : '📚 Generate 5 Full Concepts'
             }
           </button>
         </div>

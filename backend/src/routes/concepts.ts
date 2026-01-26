@@ -9,7 +9,8 @@ const logger = createLogger('routes:concepts');
 
 /**
  * POST /api/concepts/generate
- * Generate 5 story concepts based on user preferences
+ * Generate story concepts based on user preferences
+ * Supports count parameter (default: 5, max: 10)
  */
 router.post('/generate', async (req, res) => {
   try {
@@ -19,7 +20,7 @@ router.post('/generate', async (req, res) => {
       return res.status(400).json({ error: validation.error });
     }
 
-    const { preferences } = validation.data;
+    const { preferences, count = 5 } = validation.data;
 
     // Normalize preferences: ensure genre is set from genres array if needed
     const normalizedPreferences = {
@@ -35,9 +36,10 @@ router.post('/generate', async (req, res) => {
       subgenre: preferences.subgenre || preferences.subgenres?.join(', '),
       tone: preferences.tone,
       themesCount: preferences.themes.length,
+      count,
     }, 'Generating concepts for preferences');
 
-    const concepts = await generateConcepts(normalizedPreferences as any);
+    const concepts = await generateConcepts(normalizedPreferences as any, count);
 
     res.json({ success: true, concepts });
   } catch (error) {
