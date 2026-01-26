@@ -12,11 +12,11 @@ MAINTENANCE RULES:
 
 ## Summary Statistics
 
-- **Total tasks completed**: 12
-- **Total lessons recorded**: 12
-- **Last updated**: 2026-01-25
+- **Total tasks completed**: 21
+- **Total lessons recorded**: 21
+- **Last updated**: 2026-01-26
 - **Proven lessons** (score >= 5): 0
-- **Top themes**: #typescript #testing #patterns #frontend #backend #database #migrations #third-party-integration #performance #caching #mocking #jest #logging #structured-logging #pino #fullstack #prompts #claude-api #deployment #railway #ci-cd
+- **Top themes**: #typescript #testing #patterns #frontend #backend #database #migrations #third-party-integration #performance #caching #mocking #jest #logging #structured-logging #pino #fullstack #prompts #claude-api #deployment #railway #ci-cd #ui-components #ux #react #accessibility #api-routes #express #rest-api #crud-operations #state-management #confirmation-dialogs #act-management #outline-routes #manual-testing #api-documentation #auto-population #default-values #constants #workflow #react-query #virtualization #optimization #inventory
 
 ---
 
@@ -29,6 +29,299 @@ MAINTENANCE RULES:
 ---
 
 ## Active Lessons (Most Recent First)
+
+### 2026-01-26 | Task: Sprint 15 Performance Optimization - React Query and Virtualization
+
+**Date**: 2026-01-26
+**Task**: Implementing React Query hooks and virtualized chapter list for performance optimization
+**Context**: Sprint 15 optimization tasks - reducing N+1 queries and improving UI performance with large datasets
+
+**What Worked Well**:
+- Inventoried existing implementation before starting - discovered Task 1 (books-with-chapters endpoint) and Task 2 (React Query setup) were ALREADY DONE
+- Verified Task 4 (useProgressStream optimization) was already optimized with useRef pattern and useCallback with empty deps
+- Only needed to implement Task 3 (VirtualizedChapterList) and create api-hooks.ts
+- Created api-hooks.ts with centralized query keys pattern for easy cache invalidation
+- Used queryKeys object with factory functions: queryKeys.project(id), queryKeys.projectWithBooks(id)
+- Created typed React Query hooks (useProjects, useProject, useBooksWithChapters, useChapters, useBooks)
+- Added mutation hooks (useCreateProject, useUpdateProject, useDeleteProject) with automatic cache invalidation
+- Built apiFetch helper that adds auth token and proper error handling
+- Made all query hooks enable/disable based on required parameters (enabled: !!id)
+- Created VirtualizedChapterList component using @tanstack/react-virtual
+- Used useVirtualizer with estimateSize for dynamic heights, overscan for buffer rendering
+- Implemented scroll position restoration with useRef to save/restore scroll on mount/unmount
+- Added keyboard navigation (Enter/Space to click) for accessibility
+- Used absolute positioning with translateY for virtual items (recommended pattern)
+- Measured items dynamically with virtualizer.measureElement ref callback
+- Added inline styles matching existing codebase patterns (no CSS modules)
+- Implemented hover/focus/selected states with proper visual feedback
+- Build succeeded on first attempt with no TypeScript errors
+
+**What Didn't Work**:
+- N/A - systematic inventory approach prevented duplicate work
+
+**Lesson**: Before implementing optimization tasks, ALWAYS inventory what already exists. For this Sprint 15 task, 75% of the work (Tasks 1, 2, 4) was already completed. When implementing React Query: (1) Create centralized query keys with factory functions for consistent cache invalidation, (2) Use enabled flag to prevent queries from running without required params, (3) Create helper functions (apiFetch) for auth and error handling, (4) Add mutation hooks that automatically invalidate related queries on success. When implementing virtualization: (1) Use @tanstack/react-virtual with useVirtualizer hook, (2) Use absolute positioning + translateY (not margin-top) for virtual items, (3) Measure items dynamically with ref callback if heights vary, (4) Implement scroll restoration with useRef for better UX, (5) Add keyboard navigation for accessibility (Enter/Space), (6) Use overscan prop to render buffer items outside viewport for smooth scrolling. Virtual lists dramatically improve performance for 100+ items by only rendering visible items.
+
+**Application Score**: 0
+
+**Tags**: #react-query #virtualization #optimization #performance #inventory #react-hooks #typescript #accessibility #keyboard-navigation #caching #infinite-scroll #n-plus-one-fix
+
+---
+
+### 2026-01-26 | Task: Implementing Plot Layer Auto-Population on Page Load
+
+**Date**: 2026-01-26
+**Task**: Auto-populate 4 key plot layers when user first visits plot page, with non-deletable but editable constraints
+**Context**: Plot structure setup - eliminate empty state, provide scaffolding with smart defaults based on project data
+
+**What Worked Well**:
+- Created centralized constants file (plot-constants.ts) for key layer IDs, default structures, and helper functions
+- Defined ExtendedPlotLayer type extending PlotLayer with deletable and editable boolean flags
+- Used KEY_PLOT_LAYER_IDs constant array to identify non-deletable layers (main-plot, character-arcs, subplots, specialized-threads)
+- Implemented createInitialPlotLayers() function that intelligently populates descriptions based on:
+  - Story concept logline for Main Plot description
+  - Character names for Character Arcs description
+  - Genre for Specialized Thread type (mystery/romance/subplot/character-arc)
+- Added useEffect hook that auto-populates layers only when: page loaded, project exists, characters loaded, no existing layers, not extracting
+- Updated fetchData to mark all loaded layers with deletable/editable flags using isKeyPlotLayer() helper
+- Updated handleDeleteLayer to check deletable flag and show error message for key layers
+- Updated handleSaveLayer to preserve deletable/editable flags when editing existing layers
+- Conditionally rendered Delete button only for deletable layers, showed "Required Layer" badge for non-deletable
+- Separated genre-to-thread-type mapping into dedicated GENRE_TO_THREAD_TYPE object
+- Used getSpecializedThreadType() to determine if genre indicates mystery, romance, or default subplot
+- Made all four key layers editable so users can customize names and descriptions
+
+**What Didn't Work**:
+- Initial implementation didn't preserve deletable/editable flags when loading from database - needed explicit mapping in fetchData
+- Had to be careful with useEffect dependencies to avoid infinite loops (excluded saveStructure itself, used specific dependencies)
+
+**Lesson**: When implementing auto-population with constraints (editable but not deletable), use a structured approach: (1) Create constants file with key IDs, default templates, and helper functions, (2) Extend base types with constraint flags (deletable, editable) rather than relying on ID checks everywhere, (3) Apply constraints consistently in both read path (fetchData marking) and write path (handleSaveLayer preserving), (4) Use helper functions (isKeyPlotLayer, createInitialPlotLayers) to centralize logic, (5) Provide contextual descriptions by extracting data from story concept, characters, genre rather than generic placeholders, (6) Show clear UI indicators (badges) for constrained items so users understand why actions are disabled, (7) Allow editing even for required items - constraint is on deletion, not modification, (8) Use genre mapping objects rather than long if-else chains for determining specialized thread types.
+
+**Application Score**: 0
+
+**Tags**: #react #auto-population #default-values #constants #ui-constraints #deletable-editable-flags #smart-defaults #genre-mapping #plot-structure #useEffect #helper-functions #type-extension
+
+---
+
+### 2026-01-25 | Task: Transform Chapters Page into Monitoring Dashboard (Phase 5F)
+
+**Date**: 2026-01-25
+**Task**: Redesign progress page as chapter generation monitoring dashboard with three distinct states
+**Context**: Phase 5F UX improvement - Transform progress page to show no-generation, in-progress, and completed states with chapter-level detail
+
+**What Worked Well**:
+- Created separate GenerationStatusBanner component for reusability and separation of concerns
+- Used conditional rendering based on generation status to show three distinct UI states
+- Fetched both progress data AND chapter list in parallel to provide detailed chapter status
+- State determination logic in getGenerationStatus() centralizes business logic (none/generating/paused/completed)
+- Chapter status mapping (completed/in-progress/pending) with visual badges for clear user feedback
+- Highlighted currently generating chapter with different background color (#EEF2FF)
+- Responsive stats grid using grid-template-columns: repeat(auto-fit, minmax(200px, 1fr))
+- Used CSS-in-JS with inline styles to match existing project patterns (no CSS modules)
+- Progress bar shows percentage and chapter count when space available (percentComplete > 10)
+- Export and Read buttons only shown when appropriate for each state
+- Maintained auto-refresh with 5-second polling interval for real-time updates
+
+**What Didn't Work**:
+- Initial implementation had TypeScript error with progressData possibly being null after JSON parsing
+- Fixed by adding null checks before using progressData after the else block
+
+**Lesson**: When building monitoring dashboards, create distinct UI states based on business logic, fetch detailed data beyond summary stats, and use visual indicators (colors, icons, badges) to make status immediately clear. Component separation (GenerationStatusBanner) keeps code maintainable.
+
+**Application Score**: 1
+
+**Tags**: #react #typescript #dashboard #monitoring #ux #state-management #conditional-rendering #polling #real-time-updates #component-design #inline-styles
+
+---
+
+### 2026-01-25 | Task: Implementing Outline Act Management API Endpoints (Phase 5D Backend)
+
+**Date**: 2026-01-25
+**Task**: Adding comprehensive API endpoints for act CRUD operations: regenerate, update, delete specific, and delete all
+**Context**: Phase 5D backend implementation - Adding granular act management without requiring full outline regeneration
+
+**What Worked Well**:
+- Read existing outlines.ts routes file first to understand patterns (database queries, error handling, response formats)
+- Read outline-generator.ts service to understand how regeneration works (uses full generateOutline then replaces specific act)
+- Leveraged existing `generateOutline()` service for regeneration - no need for new granular generation functions
+- Implemented 4 endpoints with consistent patterns: POST regenerate-act, DELETE acts, DELETE acts/:actNumber, PUT acts/:actNumber
+- Used existing helper function `safeJsonParse()` for handling JSON database fields
+- Proper chapter renumbering logic across all endpoints (sequential 1, 2, 3... spanning all acts)
+- Act renumbering after deletion (remaining acts become 1, 2, 3... after removal)
+- Cascade deletions: deleting acts also deletes associated chapter records from database
+- Used prepared statements for all database operations with proper parameterization
+- Full TypeScript typing with imported types (Outline, Book, Project, StoryStructure, Act)
+- Comprehensive error handling with specific status codes (400, 404, 500) and error codes (INVALID_INPUT, NOT_FOUND, INVALID_STATE, INTERNAL_ERROR)
+- Created extensive API documentation with curl examples, response schemas, integration notes, and manual testing procedures
+- Code compiled successfully on first build (npm run build passed)
+- Followed existing logging patterns with structured logs using logger service
+
+**What Didn't Work**:
+- Initial test file approach failed - complex database mocking in Jest with ESM modules proved difficult
+- Module mocking with jest.mock() and dynamic imports didn't work well for routes that use real database connections
+- Deleted test file and focused on comprehensive API documentation instead for manual testing
+
+**Lesson**: When implementing API endpoints that require extensive database interactions and service dependencies, prefer comprehensive API documentation with manual testing procedures over complex integration tests with deep mocking. For act management endpoints: (1) Leverage existing services like generateOutline() rather than building granular functions - replace only the needed act after full regeneration, (2) Implement consistent renumbering logic across all operations (chapters numbered sequentially 1-N, acts numbered 1-N after deletions), (3) Use cascade deletions (delete chapters when deleting acts) to maintain referential integrity, (4) Provide specific error codes (INVALID_INPUT vs NOT_FOUND vs INVALID_STATE) for better client-side error handling, (5) Create comprehensive API documentation with request/response schemas, curl examples, error codes, integration notes, and manual testing procedures when integration tests are too complex to maintain, (6) For routes with bookId parameters, structure URLs as `/api/resource/:bookId/operation` for REST consistency.
+
+**Application Score**: 0
+
+**Tags**: #api-routes #express #rest-api #crud-operations #act-management #outline-routes #database #typescript #error-handling #manual-testing #api-documentation #cascade-deletes #renumbering
+
+---
+
+### 2026-01-25 | Task: Adding Act Management UI to Outline Page (Phase 5D)
+
+**Date**: 2026-01-25
+**Task**: Adding CRUD operations UI for act management in story outline with bulk actions, individual act controls, edit mode, and confirmation dialogs
+**Context**: Phase 5D - Adding interactive act management to existing outline page with regenerate, delete, and edit capabilities
+
+**What Worked Well**:
+- Read existing page first to understand structure, state management patterns, and styling conventions
+- Examined existing ConfirmDialog and GenerationProgress components to match reusable pattern usage
+- Used inline SVG icons matching existing codebase patterns (no external icon library dependency)
+- Created comprehensive state management for: editing act, regenerating act, confirmation dialogs
+- Implemented edit mode with toggle between view/edit states using local state (editingActNumber, editedActData)
+- Used existing ConfirmDialog component for all destructive actions (delete act, delete all, regenerate all)
+- Added visual feedback during operations: regenerating badge, disabled buttons during generation, loading states
+- Positioned action buttons consistently: Edit, Regenerate, Delete in that order with appropriate colors
+- Used semantic colors: purple gradient for primary actions, red for destructive, gray for neutral
+- Created bulk actions section above acts list for "Regenerate All Acts" and "Delete All Acts"
+- Made confirmation messages contextual with specific details (act number, chapter count)
+- Reused existing GenerationProgress modal for regeneration feedback with step updates
+- Build succeeded on first attempt with no TypeScript compilation errors
+- Maintained accessibility with proper button titles/tooltips
+
+**What Didn't Work**:
+- N/A - Implementation was straightforward following established patterns
+
+**Lesson**: When adding CRUD operations to existing pages: (1) Read existing UI components (dialogs, modals) to reuse patterns, (2) Use local state for edit mode rather than complex state management (editingActNumber as nullable number), (3) Create consistent action button ordering (non-destructive → regenerate → destructive), (4) Always use confirmation dialogs for destructive actions with contextual messages (include item counts, explain consequences), (5) Provide visual feedback during operations (badges, disabled states, progress modals), (6) Group related actions together (bulk actions section separate from individual actions), (7) Use inline SVG for icons when no icon library exists to maintain zero dependencies, (8) Match existing color semantics (purple for primary, red for danger, gray for neutral), (9) Build after implementation to verify TypeScript types and JSX syntax.
+
+**Application Score**: 0
+
+**Tags**: #react #crud-operations #ui-components #state-management #confirmation-dialogs #inline-svg #bulk-actions #edit-mode #visual-feedback #typescript #outline-management
+
+---
+
+### 2026-01-25 | Task: Creating PlotWizard Component for Phase 5C
+
+**Date**: 2026-01-25
+**Task**: Creating multi-step wizard component for guided plot structure creation
+**Context**: Phase 5C of workflow improvements - transforming flat plot page into a guided wizard with 5 steps
+
+**What Worked Well**:
+- Read existing plot page and PlotLayersVisualization components first to understand patterns, types, and styling conventions
+- Examined requirements document (PHASE_5_WORKFLOW_AND_UX_IMPROVEMENTS.md) to understand exact wizard step specifications
+- Used inline styles matching existing codebase patterns (same as plot page uses) rather than CSS modules
+- Created self-contained component with all sub-step components in same file for easy maintenance
+- Implemented progressive disclosure with step indicator showing current position and completion status
+- Made specialized threads (Step 4) optional with explicit "Skip" button support
+- Used local state management (localPlots) before committing changes via onUpdate callback on completion
+- Added recommendations based on book word count (novella/novel/epic novel categories)
+- Created clear visual hierarchy with purple gradient for main plot (from concept), different colors for plot types
+- Handled character arc creation with smart filtering (don't show characters that already have arcs)
+- Added collapsible accordion sections for specialized threads (mystery, romance) to avoid overwhelming users
+- Built succeeded on first attempt with no TypeScript compilation errors
+
+**What Didn't Work**:
+- Initially had duplicate `onUpdate` prop declaration in MainPlotStep interface - caught and fixed immediately
+- Used `/mnt/c/` path for bash command initially (Windows WSL path) - corrected to Windows path `C:/`
+
+**Lesson**: When creating wizard/multi-step components: (1) Read existing similar pages first to match styling patterns (inline vs CSS modules), (2) Keep all step sub-components in same file for wizard-specific logic unless they'll be reused elsewhere, (3) Use local state for wizard-in-progress changes, only commit on final "Complete" action, (4) Add visual progress indicators (numbered circles, completion status) for user orientation, (5) Support "Skip" for optional steps explicitly in UI, (6) Use progressive disclosure (accordion/collapsible) for optional specialized sections to avoid overwhelming users on first view, (7) Add smart recommendations based on context (book length, existing data) to guide users toward best practices, (8) Build with `npm run build` after implementation to catch TypeScript errors before committing.
+
+**Application Score**: 0
+
+**Tags**: #react #wizard #multi-step #ui-components #plot-structure #ux #typescript #inline-styles #progressive-disclosure #recommendations
+
+---
+
+### 2026-01-25 | Task: Creating useWorkflowPrerequisites Hook for Phase 5B
+
+**Date**: 2026-01-25
+**Task**: Creating custom React hook to enforce workflow prerequisite chain for NovelForge project creation
+**Context**: Phase 5B of workflow enforcement: Concept → Characters → World → Plots → Outline → Style → Submit → Chapters
+
+**What Worked Well**:
+- Read existing hooks (useProjectProgress.ts, useProjects.ts) first to understand project patterns and conventions
+- Used proper TypeScript typing with exported types (WorkflowStep, PrerequisiteCheck, WorkflowProjectData, etc.)
+- Created comprehensive prerequisite checking with isComplete, isRequired, requiresPrevious, and missingItems for each step
+- Implemented helper functions that are memoized with useMemo for performance (canAccess, getBlockingReason, getMissingItems)
+- Made character role checking case-insensitive and flexible (checks for 'protagonist', 'main character', 'antagonist', 'villain')
+- Handled world data structure flexibility (both array and object with categories)
+- Provided currentStep and nextStep calculations for guiding user through workflow
+- Created isReadyForGeneration flag for enabling submission UI
+- Checked how shared types are imported by reading other components before fixing import path
+- Updated existing ProjectNavigation component that was using old hook signature to match new API
+- Fixed TypeScript compilation errors by importing WorkflowStep type and updating tab-to-step mapping
+- Build succeeded with proper type safety throughout
+
+**What Didn't Work**:
+- Initially used @/shared/types import path, but shared folder is excluded from tsconfig - needed relative path ../../shared/types
+- ProjectNavigation component was calling old hook signature (5 params) - had to update to new signature (4 params: projectId, project, outline, proseStyle)
+- Tab ID mapping returned string instead of WorkflowStep type - needed proper typing and null handling for unmapped tabs
+
+**Lesson**: When creating workflow enforcement hooks: (1) Read existing similar hooks first to match patterns and conventions, (2) Export all types used in hook interface for component consumption, (3) Use proper TypeScript union types for workflow steps to enable type-safe step navigation, (4) Make prerequisite checks flexible and tolerant (case-insensitive, multiple valid values), (5) Memoize all helper functions and computations for performance, (6) Check import paths by examining how other files import from shared - don't assume path aliases work everywhere, (7) When updating hook signatures, search for all usages and update them in the same commit to avoid breaking existing code, (8) Use null return types for functions that might not find a match (getPrerequisiteStep) and handle nulls properly in consuming code.
+
+**Application Score**: 0
+
+**Tags**: #react #hooks #typescript #workflow #prerequisites #type-safety #memoization #imports #refactoring
+
+---
+
+### 2026-01-25 | Task: Adding Missing /api/projects/:id/progress Endpoint
+
+**Date**: 2026-01-25
+**Task**: Implementing comprehensive project progress API endpoint for NovelForge
+**Context**: Frontend progress page was calling `/api/projects/:id/progress` but getting 404 errors. Needed to add endpoint with detailed progress metrics.
+
+**What Worked Well**:
+- Read frontend component first to understand exact response structure expected (ProgressData interface)
+- Examined existing similar endpoints (queue stats, project metrics) for patterns
+- Positioned new route BEFORE generic `/:id` route to avoid Express routing conflicts (more specific routes must come first)
+- Used efficient SQL queries with JOINs to fetch related data in single queries (chapters, jobs, books)
+- Calculated statistics in-memory rather than complex SQL to keep queries readable
+- Separated concerns into logical steps: project fetch, books, chapters, queue, activity, events, flags, rate limits
+- Created helper function for time formatting (formatTimeRemaining) following existing patterns
+- Made optional fields truly optional (currentActivity, rateLimitStatus) returning undefined when not applicable
+- Used proper TypeScript typing throughout with type assertions for database results
+- Build succeeded on first attempt with no compilation errors
+
+**What Didn't Work**:
+- N/A - Implementation was straightforward following established patterns
+
+**Lesson**: When implementing complex API endpoints that aggregate data from multiple tables: (1) Read the frontend component FIRST to understand exact response shape needed, (2) Use efficient JOINs to minimize database queries (fetch chapters with books in single query), (3) Position specific routes before generic parameterized routes to avoid routing conflicts (`/:id/progress` before `/:id`), (4) Calculate complex statistics in-memory after fetching data - keeps SQL queries simple and maintainable, (5) Make optional response fields properly optional (use undefined, not null) to match TypeScript interfaces, (6) Create small helper functions for repeated formatting logic (time, dates), (7) Use structured error logging with context for debugging, (8) Follow existing patterns for consistency (database query structure, error handling, response format).
+
+**Application Score**: 0
+
+**Tags**: #api-routes #express #rest-api #database #sql #joins #aggregation #typescript #routing #progress-tracking #backend
+
+---
+
+### 2026-01-25 | Task: Implementing Collapsible UI Sections with Accessibility
+
+**Date**: 2026-01-25
+**Task**: Creating reusable collapsible sections for form organization with proper UX and accessibility
+**Context**: Large complex form (GenrePreferenceForm) overwhelming users with too many options visible at once
+
+**What Worked Well**:
+- Creating a reusable CollapsibleSection component with consistent props interface (title, description, optional, count, defaultOpen)
+- Using localStorage to persist collapsed/expanded state per section with unique sectionId
+- Implementing proper keyboard accessibility (Enter/Space to toggle, tabIndex, ARIA attributes)
+- Using CSS animations for smooth expand/collapse transitions (slideDown animation)
+- Adding visual indicators: chevron rotation, optional badges, count badges, expand/collapse hint text
+- Making sections closed by default to reduce cognitive load on first visit
+- Wrapping existing sections without major refactoring - targeted edits to wrap content in CollapsibleSection tags
+- Running build after changes to verify no syntax errors before marking task complete
+
+**What Didn't Work**:
+- Initial edit created malformed JSX with `<div style={` followed by another `<div style={{` - needed to fix duplicate tag
+- Almost implemented tabbed interface before realizing existing Quick/Full mode toggle already serves that purpose
+
+**Lesson**: When improving form UX with collapsible sections: (1) Create a reusable component with proper accessibility (ARIA, keyboard support), (2) Persist state to localStorage so users don't re-open sections on every visit, (3) Use visual indicators (chevron icons, badges, counts) to communicate state, (4) Make optional sections collapsed by default to reduce overwhelming first-time users, (5) Add smooth animations for professional feel, (6) Verify existing patterns before adding redundant features (check for existing mode toggles), (7) Run build to catch JSX syntax errors before completing.
+
+**Application Score**: 0
+
+**Tags**: #ui-components #ux #react #accessibility #collapsible #forms #localStorage #animations #keyboard-navigation #aria
+
+---
 
 ### 2026-01-25 | Task: Fixing Railway Deployment Failures - Untracked Files and Zod Version
 
@@ -363,3 +656,37 @@ Specific patterns that broke Railway:
 ## Archived Lessons
 
 *No archived lessons yet.*
+
+### 2026-01-25 | Task: Implementing Character Nationality/Ethnicity System with Name Generation
+
+**Date**: 2026-01-25
+**Task**: Implementing nationality-based character generation with culturally appropriate names, distribution modes, and filtering
+**Context**: Full-stack feature with data file, services, components, and API integration for novel writing application
+
+**What Worked Well**:
+- Created comprehensive nationality names database with 10+ nationalities (British, American, Russian, German, French, Japanese, Chinese, Indian, Spanish, Italian)
+- Separated concerns: data file (nationality-names.ts) provides names, service (name-generator.ts) handles generation logic, character-generator uses both
+- Built flexible NationalitySelector component with 4 modes: none (AI decides), single (all same), mixed (distribution), custom (per-character)
+- Mixed mode validates total count matches expected character count before submission
+- Added nationality assignment helper function that shuffles distribution to avoid predictable ordering
+- Extended character generation prompts to guide AI toward specified nationalities while maintaining creative freedom
+- Name override pattern: let AI generate character with nationality field, then override name with culturally appropriate one from database
+- Added filtering UI to characters page with dynamic dropdowns based on unique nationalities/ethnicities
+- Displayed nationality badges on character cards for quick identification
+- Used TypeScript strict typing throughout with proper interfaces (NationalityConfig, NationalityDistribution)
+- Fallback to AI name generation for unsupported/fictional nationalities
+- Both frontend and backend compiled successfully on first full build attempt
+
+**What Didn't Work**:
+- Initial TypeScript errors from spreading ...characterData without explicit field mapping
+- Had to explicitly construct Character objects with all required fields to satisfy strict typing
+- File linter modified character-generator.ts during implementation, requiring re-reads
+
+**Lesson**: When implementing cultural/demographic features, use a layered approach: (1) Create curated data files for common cases with proper structure and validation, (2) Build service layer that tries data first, falls back to AI for edge cases, (3) Provide flexible UI modes (none/single/mixed/custom) to support different use cases, (4) Shuffle distributions to avoid stereotypical ordering, (5) Guide AI with constraints but don't force rigid adherence - let AI handle creative aspects while enforcing data constraints post-generation. For TypeScript strict mode, always explicitly map object fields rather than spreading, especially when constructing typed objects from any source.
+
+**Application Score**: 0
+
+**Tags**: #fullstack #data-driven #nationality #i18n #cultural-accuracy #character-generation #name-generation #typescript #ui-modes #filtering #distribution
+
+---
+

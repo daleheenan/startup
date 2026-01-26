@@ -12,11 +12,11 @@ MAINTENANCE RULES:
 
 ## Summary Statistics
 
-- **Total tasks completed**: 1
-- **Total lessons recorded**: 6
-- **Last updated**: 2026-01-25
+- **Total tasks completed**: 2
+- **Total lessons recorded**: 7
+- **Last updated**: 2026-01-26
 - **Proven lessons** (score >= 5): 0
-- **Top themes**: #architecture #patterns #database #api #typescript #repository-pattern #circuit-breaker
+- **Top themes**: #architecture #patterns #database #api #typescript #repository-pattern #circuit-breaker #navigation #ui-redesign #workflow #component-design
 
 ---
 
@@ -29,6 +29,39 @@ MAINTENANCE RULES:
 ---
 
 ## Active Lessons (Most Recent First)
+
+### 2026-01-26 | Task: NovelForge Navigation & UI Redesign Architecture
+
+**Date**: 2026-01-26
+**Task**: Designing comprehensive navigation redesign with workflow enforcement, story ideas feature, and settings reorganization
+**Context**: Large-scale UX improvement affecting navigation, project workflow, story creation flow, and settings organization
+
+**What Worked Well**:
+- Reading lessons from developer and code-reviewer agents first to understand implementation patterns and pain points
+- Systematic codebase exploration: navigation (ProjectNavigation.tsx), new project page, projects dashboard, types, database schema
+- Reading existing similar features (story-ideas routes, saved-concepts page) before designing new ones
+- Creating comprehensive technical design first (architecture, data model, API routes, components) before implementation tasks
+- Breaking implementation into phases with clear dependencies: Foundation → Navigation → Story Ideas → Project Updates → Settings
+- Sizing tasks at 1-3 hours each for realistic tracking and progress visibility
+- Including rollback procedures and feature flags in deployment strategy for risk mitigation
+- Documenting both "what to build" (technical design) and "how to build it" (implementation tasks) in separate documents
+- Providing code examples in technical design so developers have reference implementations
+- Identifying reusable existing components (ProseStyleForm, ConfirmDialog) to reduce implementation time
+- Designing additive changes (new pages, new components) before breaking changes (removing tabs) for safer rollout
+- Including accessibility, performance, and testing strategies in technical design, not as afterthoughts
+
+**What Didn't Work**:
+- Initial design considered creating new database tables for navigation preferences - realized existing user_settings pattern is sufficient
+- Almost designed story idea expansion as synchronous API - realized async job queue is more consistent with existing architecture
+- First draft had prose style defaults in new table - simplified to reuse prose_styles table with project_id = null
+
+**Lesson**: For large-scale UX redesigns affecting multiple pages and workflows: (1) Read existing codebase patterns extensively before designing (navigation, pages, routes, types), (2) Identify and reuse existing components to reduce implementation scope, (3) Design changes in phases: non-breaking additions first, breaking changes last with feature flags, (4) Break implementation into <3 hour tasks grouped by phase with clear dependencies, (5) Provide code examples in technical design docs, not just interfaces - developers implement faster with reference code, (6) Include rollback procedures and feature flags from the start for large changes, (7) Design for consistency - new features should match existing architectural patterns (async jobs, API structure, database conventions), (8) Consider the complete system: types → database → API → components → integration → testing in that order.
+
+**Application Score**: 0
+
+**Tags**: #architecture #navigation #ui-redesign #workflow #ux #component-design #phased-implementation #feature-flags #rollback-planning #code-examples #task-breakdown
+
+---
 
 ### 2026-01-25 | Task: Sprint 18 - Database & Architecture Improvements
 

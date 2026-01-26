@@ -1,15 +1,46 @@
 # NovelForge
 
-An AI-powered application that transforms story ideas into professionally crafted novels with minimal user intervention. NovelForge leverages Claude AI to generate complete novels with multi-pass editing, continuity tracking, and trilogy support.
+An AI-powered application that transforms story ideas into professionally crafted novels with minimal user intervention. NovelForge leverages Claude AI to generate complete novels with multi-pass editing, continuity tracking, trilogy support, and originality verification.
 
 ## Features
 
-- **Fire-and-forget generation**: Configure once, receive completed novel
-- **Agent-based editing**: Specialized AI agents for developmental, line, continuity, and copy editing
-- **Resilient queue system**: Automatic pause and resume on rate limits
-- **Precise session tracking**: Waits only until actual reset time, not arbitrary delays
-- **Zero marginal cost**: Leverages existing Claude Max subscription
-- **Trilogy support**: Multi-book continuity tracking and series bible generation
+### Story Development
+- **Concept Generation**: Generate 5 unique story concepts from genre preferences, save favorites for later
+- **Story Ideas Generator**: Batch generate creative story ideas with regeneratable sections
+- **Originality Checking**: AI-powered analysis to ensure your concepts are unique (see details below)
+- **Saved Concepts Library**: Store and manage story concepts with notes and status tracking
+
+### Character & World Building
+- **Character Generation**: Create protagonists and supporting cast with voice samples and arcs
+- **World Elements**: Generate locations, factions, magic systems, and social structures
+- **Author Styles Library**: 100+ predefined author styles across genres, plus custom styles
+- **Prose Style Control**: Configure voice, tone, and writing style per project
+
+### Writing & Generation
+- **Fire-and-Forget Generation**: Configure once, receive completed novel
+- **5-Agent Editing Ensemble**: Author, Developmental Editor, Line Editor, Continuity Editor, Copy Editor
+- **Scene Cards**: Detailed scene specifications with POV, goals, conflicts, and outcomes
+- **Regeneration & Variations**: Generate 3 variations of any text selection
+- **Real-Time Progress**: SSE-powered live progress tracking
+
+### Trilogy & Series Support
+- **Cross-Book Continuity**: Track characters, relationships, and world state across books
+- **Mystery Tracking**: Track questions raised and resolved across series
+- **Series Bible Generation**: Comprehensive character index, world evolution, and timeline
+- **Book Transitions**: Generate summaries for time gaps between books
+- **Universe/Shared Worlds**: Link multiple projects in shared universes
+
+### Analysis & Export
+- **Analytics Dashboard**: Pacing, dialogue percentage, tension arcs, genre benchmarking
+- **Prose Analysis**: Readability scores, sentence metrics, character screen time
+- **Export Formats**: DOCX (Word), PDF, Story Bible export
+- **Editing Flags**: Track and resolve editorial concerns
+
+### Customization
+- **Custom Genres**: Create your own genre categories
+- **Genre Exclusions**: Define words/phrases to avoid per genre
+- **Genre Recipes**: Pre-configured genre + subgenre + tone combinations
+- **Style Presets**: Save and reuse writing configurations
 
 ## System Architecture
 
@@ -68,15 +99,10 @@ Five specialized AI agents process each chapter in sequence:
    ANTHROPIC_API_KEY=your_api_key_here
    PORT=3001
    FRONTEND_URL=http://localhost:3000
+   JWT_SECRET=your_jwt_secret_here
    ```
 
-4. **Run database migrations**
-   ```bash
-   cd backend
-   npm run migrate
-   ```
-
-5. **Start the application**
+4. **Start the application**
    ```bash
    # Start backend (from backend directory)
    npm run dev
@@ -93,11 +119,12 @@ The backend server will start on port 3001 and the frontend on port 3000.
 
 1. Select genre, subgenre, tone, and themes
 2. Review 5 generated story concepts
-3. Select preferred concept (or mix elements)
-4. Review and edit generated characters
-5. Review and edit world elements
-6. Review and edit chapter outline with scene cards
-7. Click 'Generate Novel' and walk away
+3. **Check originality** of your chosen concept
+4. Select preferred concept (or mix elements)
+5. Review and edit generated characters
+6. Review and edit world elements
+7. Review and edit chapter outline with scene cards
+8. Click 'Generate Novel' and walk away
 
 ### Phase 2: Generation (Automated, ~2-3 days)
 
@@ -115,6 +142,45 @@ The backend server will start on port 3001 and the frontend on port 3000.
 - Review any flagged issues
 - Optionally regenerate specific chapters
 
+## Originality Checking
+
+NovelForge includes an AI-powered originality checker to help ensure your stories are unique.
+
+### How It Works
+
+When you click "Check Originality" on a saved concept, the system:
+
+1. **Analyzes your content** - Sends title, logline, synopsis, and other details to Claude AI
+2. **Compares against known works** - Claude identifies similarities to published novels, films, TV shows
+3. **Scores originality** - Returns scores across 5 dimensions (plot, character, setting, theme, premise)
+4. **Flags concerns** - Highlights potentially derivative elements with suggestions for differentiation
+
+### Originality Scores
+
+| Score | Meaning |
+|-------|---------|
+| 90-100 | Highly original, unique concept |
+| 75-89 | Original with familiar elements used creatively |
+| 60-74 | Moderately original, common elements with some unique angles |
+| 40-59 | Derivative, closely resembles existing works |
+| 0-39 | Highly derivative, needs significant differentiation |
+
+### What Gets Checked
+
+- **Saved Concepts**: Full story concepts with synopsis
+- **Concept Summaries**: Short-form story ideas
+- **Story Ideas**: Generated creative ideas
+- **Chapters**: Generated chapter content (excerpt analysis)
+
+### Important Limitations
+
+This is **not** traditional plagiarism detection (comparing text against a database). It uses Claude's training knowledge, which means:
+
+- Can identify similarities to well-known works but may miss obscure ones
+- Generous toward creative combinations of familiar elements
+- Focuses on derivative concepts, not genre conventions
+- A story can reference other works and still score highly with unique angles
+
 ## API Documentation
 
 ### Base URL
@@ -123,42 +189,61 @@ The backend server will start on port 3001 and the frontend on port 3000.
 http://localhost:3001/api
 ```
 
-### Projects
+### Core Endpoints
 
+#### Projects
 - `GET /projects` - List all projects
 - `GET /projects/:id` - Get project details
 - `POST /projects` - Create new project
 - `PUT /projects/:id` - Update project
 - `DELETE /projects/:id` - Delete project
 
-### Books
+#### Concepts & Ideas
+- `POST /concepts/generate` - Generate story concepts
+- `GET /saved-concepts` - List saved concepts
+- `POST /saved-concepts` - Save a concept
+- `GET /story-ideas` - List saved story ideas
+- `POST /story-ideas/generate` - Generate story ideas
 
-- `GET /books/project/:projectId` - Get all books for a project
-- `GET /books/:id` - Get specific book
-- `POST /books` - Create new book
-- `PUT /books/:id` - Update book
-- `DELETE /books/:id` - Delete book
+#### Originality Checking
+- `POST /plagiarism/check/concept/:id` - Check concept originality
+- `POST /plagiarism/check/summary/:id` - Check summary originality
+- `POST /plagiarism/check/story-idea/:id` - Check story idea originality
+- `POST /plagiarism/check/chapter/:id` - Check chapter originality
+- `POST /plagiarism/check/raw` - Check raw content before saving
+- `GET /plagiarism/results/:contentId` - Get check history
 
-### Generation
-
+#### Generation
 - `POST /generation/start/:bookId` - Start book generation
 - `POST /generation/regenerate/:chapterId` - Regenerate specific chapter
-- `GET /generation/progress/:bookId` - Get generation progress
+- `GET /progress/:bookId` - SSE stream for real-time progress
 
-### Trilogy Support
-
-- `POST /trilogy/books/:bookId/ending-state` - Generate ending state snapshot
+#### Trilogy Support
+- `POST /trilogy/books/:bookId/ending-state` - Generate ending state
 - `POST /trilogy/books/:bookId/summary` - Generate book summary
-- `GET /trilogy/books/:bookId/previous-state` - Get previous book's ending state
 - `POST /trilogy/projects/:projectId/series-bible` - Generate series bible
 - `POST /trilogy/transitions` - Create book transition summary
-- `POST /trilogy/projects/:projectId/convert-to-trilogy` - Convert standalone to trilogy
 
-### Export
-
-- `POST /export/:bookId/docx` - Export book as DOCX
-- `POST /export/:bookId/pdf` - Export book as PDF
+#### Export
+- `POST /export/:bookId/docx` - Export as DOCX
+- `POST /export/:bookId/pdf` - Export as PDF
 - `POST /export/:bookId/bible` - Export story bible
+
+#### Analytics
+- `GET /analytics/chapters/:chapterId` - Chapter analytics
+- `GET /analytics/books/:bookId` - Book analytics
+- `GET /analytics/books/:bookId/benchmark` - Genre benchmarking
+
+### Additional Endpoints
+
+- `/authors` - Author styles library
+- `/prose-styles` - Prose style management
+- `/genre-tropes` - Genre tropes browser
+- `/genre-conventions` - Genre convention validation
+- `/mysteries` - Mystery tracking
+- `/universes` - Shared universe management
+- `/user-settings` - User preferences and customization
+- `/queue` - Queue status and management
 
 ## Trilogy Support
 
@@ -186,32 +271,26 @@ The series bible aggregates data across all books:
 - Timeline of events across the entire series
 - Mystery tracking (questions raised and answered)
 
-## Testing
-
-Run the test suite:
-
-```bash
-cd backend
-npm test
-```
-
 ## Project Structure
 
 ```
 novelforge/
 ├── app/                        # Next.js frontend (App Router)
+│   ├── components/             # Reusable React components
+│   ├── projects/               # Project pages
+│   ├── saved-concepts/         # Saved concepts library
+│   ├── settings/               # User settings pages
+│   └── admin/                  # Admin features
 ├── backend/                    # Node.js API server
 │   ├── src/
-│   │   ├── agents/             # AI agent definitions
-│   │   ├── db/                 # Database schema and connection
+│   │   ├── db/                 # Database schema and migrations
 │   │   ├── queue/              # Job queue system
 │   │   ├── routes/             # API endpoints
 │   │   └── services/           # Business logic
 │   └── package.json
 ├── shared/                     # Shared TypeScript types
 ├── data/                       # SQLite database
-├── exports/                    # Generated manuscripts
-└── requirements/               # Planning documents
+└── exports/                    # Generated manuscripts
 ```
 
 ## Configuration
@@ -221,8 +300,11 @@ novelforge/
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `ANTHROPIC_API_KEY` | - | Claude API key (required) |
+| `ANTHROPIC_MODEL` | claude-opus-4-5-20251101 | Claude model to use |
 | `PORT` | 3001 | Backend server port |
 | `FRONTEND_URL` | http://localhost:3000 | Frontend URL for CORS |
+| `JWT_SECRET` | - | Secret for JWT tokens |
+| `DATABASE_PATH` | ./data/novelforge.db | SQLite database location |
 | `NODE_ENV` | development | Environment mode |
 
 ### Session Tracking
@@ -253,10 +335,10 @@ The system tracks Claude Max session usage to handle rate limits:
 - View job details: `GET /api/queue/jobs`
 - Resume queue: `POST /api/queue/resume`
 
-**TypeScript compilation errors**
-- Run `npm run build` in backend directory
-- Check for type mismatches in shared types
-- Ensure all dependencies installed
+**Originality check fails**
+- Ensure ANTHROPIC_API_KEY is configured
+- Check API health: `GET /api/health/claude`
+- Verify content has sufficient detail to analyze
 
 ## Performance
 
@@ -264,23 +346,18 @@ The system tracks Claude Max session usage to handle rate limits:
 |--------|--------|---------|
 | Chapter generation time | < 5 min | 2-4 min |
 | Resume after rate limit | < 1 min | 15-30 sec |
+| Originality check | < 30 sec | 10-20 sec |
 | Database size | < 100 MB | 20-50 MB |
 | Chapters per book | 30-50 | 40 |
 
-## Development Status
+## Testing
 
-NovelForge is developed across 8 sprints (88% complete):
+Run the test suite:
 
-| Sprint | Focus | Points | Status |
-|--------|-------|--------|--------|
-| Sprint 1 | Foundation & Infrastructure | 31 | Complete |
-| Sprint 2 | Idea Generation | 24 | Complete |
-| Sprint 3 | World & Characters | 31 | Complete |
-| Sprint 4 | Outline Generation | 31 | Complete |
-| Sprint 5 | Chapter Generation | 31 | Complete |
-| Sprint 6 | Editing Agents | 32 | Complete |
-| Sprint 7 | Export & Dashboard | 29 | In Progress |
-| Sprint 8 | Trilogy Support | 32 | Complete |
+```bash
+cd backend
+npm test
+```
 
 ## License
 
@@ -300,11 +377,11 @@ Contributions are welcome! Please:
 
 For issues or questions:
 - Open an issue on GitHub
-- Check the requirements folder for detailed documentation
-- Review the PROGRESS_TRACKER.md for development status
+- Check the USER_GUIDE.md for detailed usage instructions
+- Review DEPLOYMENT.md for production deployment
 
 ---
 
-**Version:** 2.0
+**Version:** 3.0
 **Last Updated:** January 2026
 **Built with:** Claude Opus 4.5, Node.js, Next.js, SQLite

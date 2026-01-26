@@ -1,6 +1,6 @@
 Design Principles & Requirements
 
-1. The "Fire-and-Forget" Dashboard (Right Panel)
+1. The  Dashboard (Right Panel)
 
 Session Lifecycle Widget: Unlike a static dashboard, this must prominently display the "Claude Max" session status, showing the precise time remaining until the next 5-hour reset.
 
