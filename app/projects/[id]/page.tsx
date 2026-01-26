@@ -54,8 +54,11 @@ export default function ProjectDetailPage() {
   // IMPORTANT: All hooks must be called before any early returns
   const navigation = useProjectNavigation(projectId, project);
 
-  // Check if we're coming from concept selection which triggers auto-generation
-  const autoGenerate = searchParams.get('autoGenerate') === 'true';
+  // Track if we've already attempted generation to prevent duplicate runs
+  const [hasAttemptedGeneration, setHasAttemptedGeneration] = useState(false);
+
+  // Check if we're coming from concept selection (forced auto-generation)
+  const forceAutoGenerate = searchParams.get('autoGenerate') === 'true';
 
   const fetchProject = useCallback(async () => {
     try {
@@ -71,20 +74,34 @@ export default function ProjectDetailPage() {
     }
   }, [projectId]);
 
-  // Trigger auto-generation of characters, world, and plots when coming from concept selection
+  // Trigger auto-generation when project has a story concept but missing content
+  // This now works regardless of whether ?autoGenerate=true is in the URL
   useEffect(() => {
-    if (!projectId) return;
+    if (!projectId || hasAttemptedGeneration) return;
 
     const initializeProject = async () => {
       const projectData = await fetchProject();
-      if (!projectData || !autoGenerate) return;
+      if (!projectData) return;
 
       // Check if content already exists
       const hasCharacters = projectData.story_bible?.characters?.length > 0;
       const hasWorld = projectData.story_bible?.world?.length > 0;
+      const hasStoryConcept = !!(projectData.story_concept?.synopsis || projectData.story_concept?.logline);
 
+      // Only auto-generate if:
+      // 1. Forced via URL param, OR
+      // 2. Has a story concept but missing characters or world
+      const shouldGenerate = forceAutoGenerate || (hasStoryConcept && (!hasCharacters || !hasWorld));
+
+      if (!shouldGenerate) {
+        return;
+      }
+
+      // Mark that we've attempted generation to prevent re-runs
+      setHasAttemptedGeneration(true);
+
+      // If both exist, no need to generate
       if (hasCharacters && hasWorld) {
-        // Content already exists, no need to generate
         return;
       }
 
@@ -119,6 +136,7 @@ export default function ProjectDetailPage() {
           if (charRes.ok) {
             setGenerationStatus(prev => ({ ...prev, characters: 'done' }));
           } else {
+            console.error('Character generation failed:', await charRes.text());
             setGenerationStatus(prev => ({ ...prev, characters: 'error' }));
           }
         } else {
@@ -139,6 +157,7 @@ export default function ProjectDetailPage() {
           if (worldRes.ok) {
             setGenerationStatus(prev => ({ ...prev, world: 'done' }));
           } else {
+            console.error('World generation failed:', await worldRes.text());
             setGenerationStatus(prev => ({ ...prev, world: 'error' }));
           }
         } else {
@@ -164,6 +183,7 @@ export default function ProjectDetailPage() {
         if (plotRes.ok) {
           setGenerationStatus(prev => ({ ...prev, plots: 'done' }));
         } else {
+          // Don't log error for plot extraction - it's optional
           setGenerationStatus(prev => ({ ...prev, plots: 'error' }));
         }
 
@@ -177,7 +197,7 @@ export default function ProjectDetailPage() {
     };
 
     initializeProject();
-  }, [projectId, autoGenerate, fetchProject]);
+  }, [projectId, forceAutoGenerate, fetchProject, hasAttemptedGeneration]);
 
   if (isLoading) {
     return <LoadingState message="Loading project..." />;

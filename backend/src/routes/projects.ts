@@ -34,7 +34,7 @@ function safeJsonParse(jsonString: string | null | undefined, fallback: any = nu
 
 /**
  * GET /api/projects
- * List all projects
+ * List all projects with progress statistics
  */
 router.get('/', (req, res) => {
   try {
@@ -47,13 +47,52 @@ router.get('/', (req, res) => {
     // Get all metrics at once
     const allMetrics = metricsService.getAllProjectMetrics();
 
+    // Get outline and chapter counts for each project
+    const outlineStmt = db.prepare<[string], any>(`
+      SELECT id, total_chapters FROM outlines WHERE project_id = ? LIMIT 1
+    `);
+    const chapterCountStmt = db.prepare<[string], any>(`
+      SELECT COUNT(*) as count FROM chapters c
+      INNER JOIN books b ON c.book_id = b.id
+      WHERE b.project_id = ? AND c.content IS NOT NULL AND c.content != ''
+    `);
+
     // Parse JSON fields and attach metrics (with safe parsing)
-    const parsedProjects = projects.map((p) => ({
-      ...p,
-      story_dna: safeJsonParse(p.story_dna as any, null),
-      story_bible: safeJsonParse(p.story_bible as any, null),
-      metrics: allMetrics.get(p.id) || null,
-    }));
+    const parsedProjects = projects.map((p) => {
+      const storyBible = safeJsonParse(p.story_bible as any, null);
+      const plotStructure = safeJsonParse(p.plot_structure as any, null);
+      const outline = outlineStmt.get(p.id);
+      const chapterCount = chapterCountStmt.get(p.id);
+
+      // Calculate world element count (can be array or object with categories)
+      let worldCount = 0;
+      if (storyBible?.world) {
+        if (Array.isArray(storyBible.world)) {
+          worldCount = storyBible.world.length;
+        } else {
+          // Object with categories (locations, factions, systems)
+          worldCount = (storyBible.world.locations?.length || 0) +
+                       (storyBible.world.factions?.length || 0) +
+                       (storyBible.world.systems?.length || 0);
+        }
+      }
+
+      return {
+        ...p,
+        story_dna: safeJsonParse(p.story_dna as any, null),
+        story_bible: storyBible,
+        metrics: allMetrics.get(p.id) || null,
+        // Progress stats for dashboard display
+        progress: {
+          characters: storyBible?.characters?.length || 0,
+          worldElements: worldCount,
+          plotLayers: plotStructure?.plot_layers?.length || 0,
+          hasOutline: !!outline && (outline.total_chapters > 0),
+          outlineChapters: outline?.total_chapters || 0,
+          chaptersWritten: chapterCount?.count || 0,
+        },
+      };
+    });
 
     res.json({ projects: parsedProjects });
   } catch (error: any) {
@@ -647,6 +686,35 @@ router.post('/:id/story-dna', async (req, res) => {
     res.json(storyDNA);
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack }, 'Error generating Story DNA');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * GET /api/projects/:id/characters
+ * Get characters for a project from story_bible
+ */
+router.get('/:id/characters', (req, res) => {
+  try {
+    const projectId = req.params.id;
+
+    const stmt = db.prepare<[string], Project>(`
+      SELECT story_bible FROM projects WHERE id = ?
+    `);
+    const project = stmt.get(projectId);
+
+    if (!project) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project not found' },
+      });
+    }
+
+    const storyBible = safeJsonParse(project.story_bible as any, { characters: [], world: [], timeline: [] });
+    const characters = storyBible.characters || [];
+
+    res.json({ characters });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error getting characters');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });

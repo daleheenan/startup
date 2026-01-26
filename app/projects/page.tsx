@@ -29,6 +29,15 @@ interface ProjectMetrics {
   };
 }
 
+interface ProjectProgress {
+  characters: number;
+  worldElements: number;
+  plotLayers: number;
+  hasOutline: boolean;
+  outlineChapters: number;
+  chaptersWritten: number;
+}
+
 interface Project {
   id: string;
   title: string;
@@ -38,6 +47,7 @@ interface Project {
   created_at: string;
   updated_at: string;
   metrics?: ProjectMetrics | null;
+  progress?: ProjectProgress | null;
 }
 
 interface QueueStats {
@@ -549,6 +559,88 @@ export default function ProjectsPage() {
                       {project.type}
                     </span>
                   </div>
+
+                  {/* Progress Stats */}
+                  {project.progress && (
+                    <div style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: '0.5rem',
+                      fontSize: '0.75rem',
+                      marginBottom: '0.75rem',
+                    }}>
+                      <span
+                        aria-label={`${project.progress.characters} characters`}
+                        style={{
+                          padding: '0.25rem 0.5rem',
+                          background: project.progress.characters > 0 ? '#ECFDF5' : '#FEF2F2',
+                          color: project.progress.characters > 0 ? '#047857' : '#991B1B',
+                          borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                        }}>
+                        <span aria-hidden="true">👥</span>
+                        {project.progress.characters}
+                      </span>
+                      <span
+                        aria-label={`${project.progress.worldElements} world elements`}
+                        style={{
+                          padding: '0.25rem 0.5rem',
+                          background: project.progress.worldElements > 0 ? '#ECFDF5' : '#FEF2F2',
+                          color: project.progress.worldElements > 0 ? '#047857' : '#991B1B',
+                          borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                        }}>
+                        <span aria-hidden="true">🌍</span>
+                        {project.progress.worldElements}
+                      </span>
+                      <span
+                        aria-label={`${project.progress.plotLayers} plot layers`}
+                        style={{
+                          padding: '0.25rem 0.5rem',
+                          background: project.progress.plotLayers > 0 ? '#ECFDF5' : '#FEF2F2',
+                          color: project.progress.plotLayers > 0 ? '#047857' : '#991B1B',
+                          borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                        }}>
+                        <span aria-hidden="true">📖</span>
+                        {project.progress.plotLayers}
+                      </span>
+                      <span
+                        aria-label={project.progress.hasOutline ? `Outline: ${project.progress.outlineChapters} chapters` : 'No outline'}
+                        style={{
+                          padding: '0.25rem 0.5rem',
+                          background: project.progress.hasOutline ? '#ECFDF5' : '#FEF2F2',
+                          color: project.progress.hasOutline ? '#047857' : '#991B1B',
+                          borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                        }}>
+                        <span aria-hidden="true">📝</span>
+                        {project.progress.hasOutline ? project.progress.outlineChapters : '—'}
+                      </span>
+                      <span
+                        aria-label={`${project.progress.chaptersWritten} chapters written`}
+                        style={{
+                          padding: '0.25rem 0.5rem',
+                          background: project.progress.chaptersWritten > 0 ? '#ECFDF5' : '#FEF2F2',
+                          color: project.progress.chaptersWritten > 0 ? '#047857' : '#991B1B',
+                          borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                        }}>
+                        <span aria-hidden="true">📚</span>
+                        {project.progress.chaptersWritten}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Metrics Display */}
                   {project.metrics && (project.metrics.content.chapters > 0 || project.metrics.cost.usd !== '$0.00') && (
