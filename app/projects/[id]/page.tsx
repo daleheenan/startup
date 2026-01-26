@@ -36,12 +36,30 @@ interface Project {
   updated_at: string;
 }
 
+interface Outline {
+  id: string;
+  book_id: string;
+  structure_type: string;
+  structure: any;
+  total_chapters: number;
+}
+
+interface Chapter {
+  id: string;
+  book_id: string;
+  number: number;
+  title: string;
+  content?: string;
+}
+
 export default function ProjectDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const projectId = params.id as string;
 
   const [project, setProject] = useState<Project | null>(null);
+  const [outline, setOutline] = useState<Outline | null>(null);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
@@ -52,7 +70,7 @@ export default function ProjectDetailPage() {
   }>({ characters: 'pending', world: 'pending', plots: 'pending' });
 
   // IMPORTANT: All hooks must be called before any early returns
-  const navigation = useProjectNavigation(projectId, project);
+  const navigation = useProjectNavigation(projectId, project, outline, chapters);
 
   // Track if we've already attempted generation to prevent duplicate runs
   const [hasAttemptedGeneration, setHasAttemptedGeneration] = useState(false);
@@ -64,6 +82,34 @@ export default function ProjectDetailPage() {
     try {
       const data = await fetchJson<Project>(`/api/projects/${projectId}`);
       setProject(data);
+
+      // Also fetch outline and chapters for navigation state
+      try {
+        // Get the first book for this project
+        const booksData = await fetchJson<any[]>(`/api/books/project/${projectId}`);
+        if (booksData && booksData.length > 0) {
+          const bookId = booksData[0].id;
+
+          // Fetch outline
+          try {
+            const outlineData = await fetchJson<Outline>(`/api/outlines/book/${bookId}`);
+            setOutline(outlineData);
+          } catch {
+            // No outline yet - that's OK
+          }
+
+          // Fetch chapters
+          try {
+            const chaptersData = await fetchJson<Chapter[]>(`/api/chapters/book/${bookId}`);
+            setChapters(chaptersData || []);
+          } catch {
+            // No chapters yet - that's OK
+          }
+        }
+      } catch {
+        // No books yet - that's OK
+      }
+
       return data;
     } catch (err: any) {
       console.error('Error fetching project:', err);

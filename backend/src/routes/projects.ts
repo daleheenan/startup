@@ -62,12 +62,25 @@ router.get('/', (req, res) => {
       WHERE b.project_id = ? AND c.content IS NOT NULL AND c.content != ''
     `);
 
+    // Get generation status for each project (check if any jobs are running or pending)
+    const generationStatusStmt = db.prepare<[string], any>(`
+      SELECT
+        SUM(CASE WHEN j.status IN ('pending', 'running') THEN 1 ELSE 0 END) as active_jobs,
+        SUM(CASE WHEN j.status = 'completed' THEN 1 ELSE 0 END) as completed_jobs,
+        SUM(CASE WHEN j.status = 'failed' THEN 1 ELSE 0 END) as failed_jobs
+      FROM jobs j
+      INNER JOIN chapters c ON j.chapter_id = c.id
+      INNER JOIN books b ON c.book_id = b.id
+      WHERE b.project_id = ?
+    `);
+
     // Parse JSON fields and attach metrics (with safe parsing)
     const parsedProjects = projects.map((p) => {
       const storyBible = safeJsonParse(p.story_bible as any, null);
       const plotStructure = safeJsonParse(p.plot_structure as any, null);
       const outline = outlineStmt.get(p.id);
       const chapterCount = chapterCountStmt.get(p.id);
+      const genStatus = generationStatusStmt.get(p.id);
 
       // Calculate world element count (can be array or object with categories)
       let worldCount = 0;
@@ -80,6 +93,16 @@ router.get('/', (req, res) => {
                        (storyBible.world.factions?.length || 0) +
                        (storyBible.world.systems?.length || 0);
         }
+      }
+
+      // Determine generation status
+      let generationStatus: 'idle' | 'generating' | 'completed' | 'failed' = 'idle';
+      if (genStatus?.active_jobs > 0) {
+        generationStatus = 'generating';
+      } else if (genStatus?.failed_jobs > 0 && genStatus?.completed_jobs === 0) {
+        generationStatus = 'failed';
+      } else if (genStatus?.completed_jobs > 0) {
+        generationStatus = 'completed';
       }
 
       return {
@@ -95,6 +118,7 @@ router.get('/', (req, res) => {
           hasOutline: !!outline && (outline.total_chapters > 0),
           outlineChapters: outline?.total_chapters || 0,
           chaptersWritten: chapterCount?.count || 0,
+          generationStatus,
         },
       };
     });

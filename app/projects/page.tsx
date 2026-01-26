@@ -36,6 +36,8 @@ interface ProjectProgress {
   hasOutline: boolean;
   outlineChapters: number;
   chaptersWritten: number;
+  generationStatus?: 'idle' | 'generating' | 'completed' | 'failed';
+  generationQueuePosition?: number;
 }
 
 interface Project {
@@ -516,8 +518,35 @@ export default function ProjectsPage() {
                       fontWeight: '600',
                       color: '#1A1A2E',
                       margin: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
                     }}>
                       {project.title}
+                      {/* Generation Status Indicator */}
+                      {project.progress?.generationStatus === 'generating' && (
+                        <span
+                          aria-label="Currently generating"
+                          style={{
+                            display: 'inline-block',
+                            width: '12px',
+                            height: '12px',
+                            borderRadius: '50%',
+                            background: '#F59E0B',
+                            animation: 'pulse 1.5s ease-in-out infinite',
+                          }}
+                          title="Currently generating chapters..."
+                        />
+                      )}
+                      {project.progress?.generationStatus === 'completed' && project.progress?.chaptersWritten > 0 && (
+                        <span
+                          aria-label="Generation complete"
+                          style={{ fontSize: '0.875rem' }}
+                          title={`${project.progress.chaptersWritten} chapters written`}
+                        >
+                          ✅
+                        </span>
+                      )}
                     </h3>
                     <span style={{
                       padding: '0.25rem 0.75rem',
@@ -724,6 +753,10 @@ export default function ProjectsPage() {
       <style jsx>{`
         @keyframes spin {
           to { transform: rotate(360deg); }
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(1.2); }
         }
       `}</style>
     </div>
