@@ -293,29 +293,33 @@ export function runMigrations() {
       runMigration(4, 'Saved Concepts', cleanedMigration);
     }
 
-    // Migrations 005-025: Run from migration files
+    // Migrations 005-028: Run from migration files
+    // Note: Version numbers in filenames don't directly map to DB versions
+    // The DB version is 5 + index in this array
     const migrationFiles = [
-      '005_analytics_insights.sql',
-      '006_chapter_edits.sql',
-      '007_regeneration_variations.sql',
-      '008_project_metrics.sql',
-      '009_genre_tropes.sql',
-      '010_prose_style_control.sql',
-      '011_book_style_presets.sql',
-      '012_mystery_tracking.sql',
-      '013_performance_indexes.sql',
-      '014_universe_support.sql',
-      '015_plot_structure.sql',
-      '016_timeframe_support.sql',
-      '017_migration_registry.sql',
-      '018_concept_summaries.sql',
-      '019_enhanced_tracking_and_query_perf.sql',
-      '020_author_management.sql',
-      '021_story_concept.sql',
-      '022_saved_story_ideas.sql',
-      '023_plagiarism_checks.sql',
-      '024_user_preferences.sql',
-      '025_concept_source_idea.sql',
+      '005_analytics_insights.sql',      // DB version 5
+      '006_chapter_edits.sql',           // DB version 6
+      '007_regeneration_variations.sql', // DB version 7
+      '008_project_metrics.sql',         // DB version 8
+      '009_genre_tropes.sql',            // DB version 9
+      '010_prose_style_control.sql',     // DB version 10
+      '011_book_style_presets.sql',      // DB version 11
+      '012_mystery_tracking.sql',        // DB version 12
+      '013_performance_indexes.sql',     // DB version 13
+      '014_universe_support.sql',        // DB version 14
+      '015_plot_structure.sql',          // DB version 15
+      '016_timeframe_support.sql',       // DB version 16
+      '017_migration_registry.sql',      // DB version 17
+      '018_concept_summaries.sql',       // DB version 18
+      '019_enhanced_tracking_and_query_perf.sql', // DB version 19
+      '020_author_management.sql',       // DB version 20
+      '021_story_concept.sql',           // DB version 21
+      '022_saved_story_ideas.sql',       // DB version 22
+      '023_plagiarism_checks.sql',       // DB version 23
+      '024_user_preferences.sql',        // DB version 24
+      '025_concept_source_idea.sql',     // DB version 25
+      '019_user_settings.sql',           // DB version 26 - user genres, exclusions, recipes
+      '019_time_period.sql',             // DB version 27 - time period support
     ];
 
     for (let i = 0; i < migrationFiles.length; i++) {
@@ -411,6 +415,14 @@ export function getMigrationStatus(): {
     '017_migration_registry.sql',
     '018_concept_summaries.sql',
     '019_enhanced_tracking_and_query_perf.sql',
+    '020_author_management.sql',
+    '021_story_concept.sql',
+    '022_saved_story_ideas.sql',
+    '023_plagiarism_checks.sql',
+    '024_user_preferences.sql',
+    '025_concept_source_idea.sql',
+    '019_user_settings.sql',
+    '019_time_period.sql',
   ];
 
   const pendingMigrations: string[] = [];
