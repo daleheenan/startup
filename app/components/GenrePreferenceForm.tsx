@@ -2766,6 +2766,7 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
             subgenre: subgenres.length > 0 ? subgenres[0] : undefined,
             tone: tones.length > 0 ? tones[0] : undefined,
             themes: themes,
+            timePeriod: timePeriod.type !== 'present' ? getTimeframeDescription(timePeriod) : 'Modern day',
           }}
           onSelectIdea={handleSelectGeneratedIdea}
           onClose={() => setShowStoryIdeasGenerator(false)}
@@ -2858,7 +2859,7 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
             }}
           >
             <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>📝</div>
-            <div style={{ fontWeight: 600, marginBottom: '0.25rem', fontSize: '0.875rem' }}>10 Quick Summaries</div>
+            <div style={{ fontWeight: 600, marginBottom: '0.25rem', fontSize: '0.875rem' }}>10 Story Ideas</div>
             <div style={{ fontSize: '0.7rem', opacity: 0.8, lineHeight: '1.3' }}>Browse ideas, save favorites</div>
           </button>
           <button
@@ -2881,7 +2882,7 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
             }}
           >
             <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>⚡</div>
-            <div style={{ fontWeight: 600, marginBottom: '0.25rem', fontSize: '0.875rem' }}>20 Quick Summaries</div>
+            <div style={{ fontWeight: 600, marginBottom: '0.25rem', fontSize: '0.875rem' }}>20 Story Ideas</div>
             <div style={{ fontSize: '0.7rem', opacity: 0.8, lineHeight: '1.3' }}>Maximum variety to explore</div>
           </button>
         </div>
@@ -2942,9 +2943,9 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
             {isLoading
               ? 'Generating...'
               : generateMode === 'quick20'
-              ? '⚡ Generate 20 Summaries'
+              ? '⚡ Generate 20 Story Ideas'
               : generateMode === 'summaries'
-              ? '📝 Generate 10 Summaries'
+              ? '📝 Generate 10 Story Ideas'
               : '📚 Generate 5 Concepts'
             }
           </button>
@@ -2992,9 +2993,9 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
             {isLoading
               ? 'Generating...'
               : generateMode === 'quick20'
-              ? '⚡ Generate 20 Summaries'
+              ? '⚡ Generate 20 Story Ideas'
               : generateMode === 'summaries'
-              ? '📝 Generate 10 Summaries'
+              ? '📝 Generate 10 Story Ideas'
               : '📚 Generate 5 Concepts'
             }
           </button>

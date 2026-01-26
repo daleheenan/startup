@@ -28,6 +28,7 @@ interface StoryIdeasGeneratorProps {
     subgenre?: string;
     tone?: string;
     themes?: string[];
+    timePeriod?: string;  // Time period for story ideas (e.g., "Modern day", "Medieval Era", "Year 2350")
   };
   onSelectIdea: (idea: GeneratedIdea) => void;
   onClose: () => void;
@@ -176,6 +177,7 @@ export default function StoryIdeasGenerator({
           subgenre: preferences.subgenre,
           tone: preferences.tone,
           themes: preferences.themes,
+          timePeriod: preferences.timePeriod,
           count: 5,
         }),
       });

@@ -412,7 +412,8 @@ export const generateStoryIdeasSchema = z.object({
   subgenre: z.string().optional(),
   tone: z.string().optional(),
   themes: z.array(z.string()).optional(),
-  count: z.number().int().min(1).max(10).optional().default(5),
+  timePeriod: z.string().optional(),
+  count: z.number().int().min(1).max(20).optional().default(5),
 });
 
 export const regenerateSectionSchema = z.object({

@@ -21,13 +21,14 @@ router.post('/generate', async (req, res) => {
       return res.status(400).json({ error: validation.error });
     }
 
-    const { genre, subgenre, tone, themes, count } = validation.data;
+    const { genre, subgenre, tone, themes, timePeriod, count } = validation.data;
 
     logger.info({
       genre,
       subgenre,
       tone,
       themesCount: themes?.length || 0,
+      timePeriod,
       count,
     }, 'Generating story ideas');
 
@@ -36,6 +37,7 @@ router.post('/generate', async (req, res) => {
       subgenre,
       tone,
       themes,
+      timePeriod,
       count,
     });
 

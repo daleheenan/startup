@@ -24,6 +24,7 @@ export interface GenerateIdeasParams {
   subgenre?: string;
   tone?: string;
   themes?: string[];
+  timePeriod?: string;
   count?: number;
 }
 
@@ -61,9 +62,9 @@ export class StoryIdeasGenerator {
       throw new Error('Claude API not configured. Set ANTHROPIC_API_KEY in .env file');
     }
 
-    const { genre, subgenre, tone, themes, count = 5 } = params;
+    const { genre, subgenre, tone, themes, timePeriod, count = 5 } = params;
 
-    const prompt = this.buildGeneratePrompt(genre, subgenre, tone, themes, count);
+    const prompt = this.buildGeneratePrompt(genre, subgenre, tone, themes, timePeriod, count);
 
     logger.info({
       genre,
@@ -160,12 +161,14 @@ export class StoryIdeasGenerator {
     subgenre: string | undefined,
     tone: string | undefined,
     themes: string[] | undefined,
+    timePeriod: string | undefined,
     count: number
   ): string {
     const uniqueSeed = Date.now();
     const genreText = subgenre ? `${genre} (${subgenre})` : genre;
     const toneText = tone || 'engaging';
     const themesText = themes?.length ? themes.join(', ') : 'universal themes';
+    const timePeriodText = timePeriod || 'any time period';
 
     return `You are a master storyteller with decades of experience crafting compelling narratives. Generate ${count} UNIQUE and CREATIVE story ideas.
 
@@ -174,6 +177,9 @@ export class StoryIdeasGenerator {
 **Genre:** ${genreText}
 **Tone:** ${toneText}
 **Themes:** ${themesText}
+**Time Period:** ${timePeriodText}
+
+CRITICAL: All story ideas MUST be set in the specified time period (${timePeriodText}). The setting, technology, culture, and social norms must accurately reflect this time period. Do NOT set stories in different time periods than specified.
 
 For EACH story idea, provide:
 1. **storyIdea**: A compelling 2-3 sentence premise that hooks the reader. Include the protagonist, their challenge, and what makes this story special.

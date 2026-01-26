@@ -131,7 +131,9 @@ export default function ProjectsPage() {
 
   const navItems = [
     { id: 'projects', icon: '📚', label: 'Projects', href: '/projects' },
-    { id: 'new', icon: '✨', label: 'New Project', href: '/new' },
+    { id: 'new', icon: '✨', label: 'New Novel', href: '/new' },
+    { id: 'story-ideas', icon: '💡', label: 'Story Ideas', href: '/story-ideas' },
+    { id: 'saved-concepts', icon: '📋', label: 'Story Concepts', href: '/saved-concepts' },
     { id: 'settings', icon: '⚙️', label: 'Settings', href: '/settings' },
   ];
 
@@ -462,7 +464,7 @@ export default function ProjectsPage() {
                 }}
               >
                 <span aria-hidden="true">+</span>
-                New Project
+                New Novel
               </Link>
             </div>
           </div>
