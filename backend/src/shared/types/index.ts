@@ -836,3 +836,65 @@ export interface ApplyVariationRequest {
 export interface RegenerateSceneRequest {
   sceneIndex: number;
 }
+
+// Plagiarism/Originality Checking Types
+
+export type PlagiarismCheckStatus = 'pending' | 'checking' | 'passed' | 'flagged' | 'requires_review' | 'error';
+
+export interface SimilarWork {
+  title: string;
+  author: string;
+  similarity: number; // 0-100 percentage
+  matchedElements: string[]; // What elements matched (plot, character, setting, etc.)
+  description: string; // Brief description of the similar work
+  publicationYear?: number;
+}
+
+export interface OriginalityScore {
+  overall: number; // 0-100 (100 = completely original)
+  plotOriginality: number;
+  characterOriginality: number;
+  settingOriginality: number;
+  themeOriginality: number;
+  premiseOriginality: number;
+}
+
+export interface PlagiarismFlag {
+  id: string;
+  type: 'plot_similarity' | 'character_similarity' | 'premise_similarity' | 'title_similarity' | 'trope_overuse';
+  severity: 'low' | 'medium' | 'high';
+  description: string;
+  similarTo: string; // What existing work it's similar to
+  suggestion: string; // How to differentiate
+  location?: string; // Where in the content this appears
+}
+
+export interface PlagiarismCheckResult {
+  id: string;
+  contentType: 'concept' | 'summary' | 'chapter' | 'story_idea';
+  contentId: string;
+  checkedAt: string;
+  status: PlagiarismCheckStatus;
+  originalityScore: OriginalityScore;
+  similarWorks: SimilarWork[];
+  flags: PlagiarismFlag[];
+  recommendations: string[];
+  analysisDetails: {
+    tropesIdentified: string[];
+    archetypesUsed: string[];
+    uniqueElements: string[];
+    concerningPatterns: string[];
+  };
+  usage?: {
+    input_tokens: number;
+    output_tokens: number;
+  };
+}
+
+export interface BatchPlagiarismResult {
+  totalChecked: number;
+  passedCount: number;
+  flaggedCount: number;
+  averageOriginalityScore: number;
+  results: PlagiarismCheckResult[];
+}

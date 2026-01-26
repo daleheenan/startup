@@ -10,6 +10,8 @@ import type {
   StoryDNA,
   Character,
   WorldElements,
+  PlotStructure,
+  PlotLayer,
 } from '../shared/types/index.js';
 import { getStructureTemplate } from './structure-templates.js';
 import { createLogger } from './logger.service.js';
@@ -34,6 +36,7 @@ export interface OutlineContext {
   world: WorldElements;
   structureType: StoryStructureType;
   targetWordCount: number;
+  plotStructure?: PlotStructure; // Plot layers to guide outline generation
 }
 
 /**
@@ -138,15 +141,82 @@ async function generateActBreakdown(
   }
 }
 
+/**
+ * Format plot structure for inclusion in prompts
+ */
+function formatPlotStructureForPrompt(plotStructure?: PlotStructure): string {
+  if (!plotStructure || !plotStructure.plot_layers || plotStructure.plot_layers.length === 0) {
+    return '';
+  }
+
+  const mainPlot = plotStructure.plot_layers.find(l => l.type === 'main');
+  const subplots = plotStructure.plot_layers.filter(l => l.type === 'subplot');
+  const characterArcs = plotStructure.plot_layers.filter(l => l.type === 'character-arc');
+  const mysteries = plotStructure.plot_layers.filter(l => l.type === 'mystery');
+  const romances = plotStructure.plot_layers.filter(l => l.type === 'romance');
+
+  let plotSection = '\n**PLOT STRUCTURE (CRITICAL - Must be integrated into outline):**\n';
+
+  if (mainPlot) {
+    plotSection += `\n**Main Plot (Golden Thread):** ${mainPlot.name}\n${mainPlot.description}\n`;
+    if (mainPlot.points && mainPlot.points.length > 0) {
+      plotSection += 'Key plot points:\n';
+      mainPlot.points.forEach(p => {
+        plotSection += `  - Chapter ${p.chapter_number}: ${p.description} (${p.phase}, impact: ${p.impact_level}/5)\n`;
+      });
+    }
+  }
+
+  if (subplots.length > 0) {
+    plotSection += '\n**Subplots:**\n';
+    subplots.forEach(sp => {
+      plotSection += `- ${sp.name}: ${sp.description}\n`;
+    });
+  }
+
+  if (characterArcs.length > 0) {
+    plotSection += '\n**Character Arcs:**\n';
+    characterArcs.forEach(ca => {
+      plotSection += `- ${ca.name}: ${ca.description}\n`;
+    });
+  }
+
+  if (mysteries.length > 0) {
+    plotSection += '\n**Mystery Threads:**\n';
+    mysteries.forEach(m => {
+      plotSection += `- ${m.name}: ${m.description}\n`;
+    });
+  }
+
+  if (romances.length > 0) {
+    plotSection += '\n**Romance Arcs:**\n';
+    romances.forEach(r => {
+      plotSection += `- ${r.name}: ${r.description}\n`;
+    });
+  }
+
+  if (plotStructure.act_structure) {
+    plotSection += `\n**Act Structure Markers:**
+- Act I ends at chapter ${plotStructure.act_structure.act_one_end}
+- Midpoint at chapter ${plotStructure.act_structure.act_two_midpoint}
+- Act II ends at chapter ${plotStructure.act_structure.act_two_end}
+- Climax at chapter ${plotStructure.act_structure.act_three_climax}\n`;
+  }
+
+  return plotSection;
+}
+
 function buildActBreakdownPrompt(
   context: OutlineContext,
   template: any,
   targetChapterCount: number
 ): string {
-  const { concept, storyDNA, characters, world } = context;
+  const { concept, storyDNA, characters, world, plotStructure } = context;
 
   const protagonist = characters.find((c) => c.role === 'protagonist');
   const antagonist = characters.find((c) => c.role === 'antagonist');
+  const plotSection = formatPlotStructureForPrompt(plotStructure);
+  const hasPlots = plotStructure && plotStructure.plot_layers && plotStructure.plot_layers.length > 0;
 
   return `You are a master story architect. Generate a detailed act breakdown for this novel using the ${template.name} structure.
 
@@ -158,7 +228,7 @@ Synopsis: ${concept.synopsis}
 **Genre:** ${storyDNA.genre} - ${storyDNA.subgenre}
 **Tone:** ${storyDNA.tone}
 **Themes:** ${storyDNA.themes.join(', ')}
-
+${plotSection}
 **Protagonist:** ${protagonist?.name} - ${protagonist?.role}
 ${protagonist?.voiceSample}
 
@@ -174,6 +244,7 @@ Generate a detailed act breakdown that:
 2. Describes how each beat will play out in THIS specific story
 3. Assigns chapter counts to each act (total must equal ${targetChapterCount})
 4. Ensures each act has appropriate pacing and word count
+${hasPlots ? '5. CRITICAL: Incorporates ALL plot threads (main plot, subplots, character arcs) defined above\n6. Ensures plot points occur at or near their designated chapters' : ''}
 
 Return ONLY a JSON array of acts in this format:
 [
@@ -193,7 +264,7 @@ Return ONLY a JSON array of acts in this format:
   }
 ]
 
-Make the descriptions SPECIFIC to this story, not generic beat descriptions.`;
+Make the descriptions SPECIFIC to this story, not generic beat descriptions.${hasPlots ? ' Reference specific plot threads by name where relevant.' : ''}`;
 }
 
 function parseActBreakdownResponse(responseText: string, template: any): Act[] {
@@ -257,17 +328,68 @@ async function generateChaptersForAct(
   }
 }
 
+/**
+ * Get plot points for a specific chapter range
+ */
+function getPlotPointsForChapterRange(
+  plotStructure: PlotStructure | undefined,
+  startChapter: number,
+  endChapter: number
+): string {
+  if (!plotStructure || !plotStructure.plot_layers) return '';
+
+  const relevantPoints: string[] = [];
+  for (const layer of plotStructure.plot_layers) {
+    if (!layer.points) continue;
+    for (const point of layer.points) {
+      if (point.chapter_number >= startChapter && point.chapter_number <= endChapter) {
+        relevantPoints.push(`- Chapter ${point.chapter_number} [${layer.name}]: ${point.description} (${point.phase})`);
+      }
+    }
+  }
+
+  if (relevantPoints.length === 0) return '';
+  return `\n**Plot Points to Include in This Act:**\n${relevantPoints.join('\n')}\n`;
+}
+
 function buildChapterOutlinePrompt(
   context: OutlineContext,
   act: Act,
   template: any
 ): string {
-  const { concept, storyDNA, characters } = context;
+  const { concept, storyDNA, characters, plotStructure } = context;
 
   const characterList = characters.map((c) => `- ${c.name} (${c.role})`).join('\n');
 
   // Get the starting chapter number based on previous acts
   const startingChapterNumber = 1; // Will be adjusted in parsing
+
+  // Get relevant plot threads for this act
+  const hasPlots = plotStructure && plotStructure.plot_layers && plotStructure.plot_layers.length > 0;
+  let plotContext = '';
+
+  if (hasPlots) {
+    // Extract main plot and subplots for context
+    const mainPlot = plotStructure!.plot_layers.find(l => l.type === 'main');
+    const activeSubplots = plotStructure!.plot_layers.filter(l => l.type !== 'main');
+
+    plotContext = '\n**Plot Threads to Weave Into Chapters:**\n';
+    if (mainPlot) {
+      plotContext += `Main Plot: ${mainPlot.name} - ${mainPlot.description}\n`;
+    }
+    if (activeSubplots.length > 0) {
+      plotContext += 'Active Subplots:\n';
+      activeSubplots.forEach(sp => {
+        plotContext += `- ${sp.name}: ${sp.description}\n`;
+      });
+    }
+
+    // Estimate chapter range for this act (rough calculation)
+    const actChapterCount = (act as any).chapterCount || 10;
+    const estimatedStartChapter = (act.number - 1) * actChapterCount + 1;
+    const estimatedEndChapter = act.number * actChapterCount;
+    plotContext += getPlotPointsForChapterRange(plotStructure, estimatedStartChapter, estimatedEndChapter);
+  }
 
   return `You are a master story architect. Generate chapter-by-chapter outlines for ${act.name}.
 
@@ -279,7 +401,7 @@ ${act.description}
 
 **Act Beats:**
 ${act.beats.map((b) => `- ${b.name}: ${b.description}`).join('\n')}
-
+${plotContext}
 **Characters:**
 ${characterList}
 
@@ -292,6 +414,7 @@ Generate ${(act as any).chapterCount || 10} chapters for this act. Each chapter 
 3. Specify POV character
 4. Have appropriate word count target (1800-2500 words)
 5. Map to the act's beats
+${hasPlots ? '6. CRITICAL: Advance the defined plot threads appropriately\n7. Include any specified plot points at their designated chapters' : ''}
 
 Return ONLY a JSON array of chapters:
 [
@@ -300,11 +423,11 @@ Return ONLY a JSON array of chapters:
     "summary": "2-3 sentence summary of what happens in this chapter",
     "povCharacter": "Character Name",
     "wordCountTarget": 2000,
-    "beatName": "Which beat this chapter corresponds to (if any)"
+    "beatName": "Which beat this chapter corresponds to (if any)"${hasPlots ? ',\n    "plotThreads": ["Names of plot threads advanced in this chapter"]' : ''}
   }
 ]
 
-Make each chapter summary SPECIFIC with concrete events, not vague descriptions.`;
+Make each chapter summary SPECIFIC with concrete events, not vague descriptions.${hasPlots ? ' Reference specific plot threads and ensure they progress logically.' : ''}`;
 }
 
 function parseChapterOutlineResponse(responseText: string, act: Act): ChapterOutline[] {

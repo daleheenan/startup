@@ -50,6 +50,7 @@ import universesRouter from './routes/universes.js';
 import userSettingsRouter from './routes/user-settings.js';
 import storyIdeasRouter from './routes/story-ideas.js';
 import authorsRouter from './routes/authors.js';
+import plagiarismRouter from './routes/plagiarism.js';
 
 // Run database migrations
 try {
@@ -152,6 +153,7 @@ app.use('/api/universes', apiLimiter, requireAuth, universesRouter);
 app.use('/api/user-settings', apiLimiter, requireAuth, userSettingsRouter);
 app.use('/api/story-ideas', apiLimiter, requireAuth, storyIdeasRouter);
 app.use('/api/authors', apiLimiter, requireAuth, authorsRouter);
+app.use('/api/plagiarism', apiLimiter, requireAuth, plagiarismRouter);
 
 // Sentry error handler - must be BEFORE custom error handlers
 app.use(sentryErrorHandler());

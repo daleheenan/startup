@@ -693,4 +693,104 @@ router.delete('/recipes/:id', (req, res) => {
   }
 });
 
+// ============================================================================
+// PROSE STYLE (DEFAULT)
+// ============================================================================
+
+/**
+ * GET /api/user-settings/prose-style
+ * Get the default prose style for the user
+ */
+router.get('/prose-style', (req, res) => {
+  try {
+    const cacheKey = `user-prose-style:${DEFAULT_USER_ID}`;
+
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
+    // Check if user has a prose style preference stored
+    const stmt = db.prepare(`
+      SELECT prose_style FROM user_preferences
+      WHERE user_id = ?
+    `);
+
+    const result = stmt.get(DEFAULT_USER_ID) as any;
+
+    let proseStyle = null;
+    if (result && result.prose_style) {
+      proseStyle = safeJsonParse(result.prose_style, null);
+    }
+
+    // If no preference exists, return default values
+    if (!proseStyle) {
+      proseStyle = {
+        name: 'Default Prose Style',
+        sentence_length_preference: 'varied',
+        sentence_complexity: 'moderate',
+        sentence_variety_score: 0.7,
+        target_reading_level: 'general',
+        flesch_kincaid_target: 70.0,
+        formality_level: 'moderate',
+        voice_tone: 'neutral',
+        narrative_distance: 'close',
+        vocabulary_complexity: 'moderate',
+        use_metaphors: true,
+        use_similes: true,
+        default_pacing: 'moderate',
+        scene_transition_style: 'smooth',
+        paragraph_length_preference: 'varied',
+      };
+    }
+
+    const response = { proseStyle };
+    cache.set(cacheKey, response, CACHE_TTL);
+
+    res.json(response);
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error fetching prose style');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * PUT /api/user-settings/prose-style
+ * Update the default prose style for the user
+ */
+router.put('/prose-style', (req, res) => {
+  try {
+    const proseStyle = req.body;
+
+    // Ensure user_preferences table exists and has the user
+    const checkStmt = db.prepare(`
+      SELECT user_id FROM user_preferences WHERE user_id = ?
+    `);
+    const existing = checkStmt.get(DEFAULT_USER_ID);
+
+    if (!existing) {
+      // Create user preferences row
+      db.prepare(`
+        INSERT INTO user_preferences (user_id, prose_style, created_at, updated_at)
+        VALUES (?, ?, datetime('now'), datetime('now'))
+      `).run(DEFAULT_USER_ID, JSON.stringify(proseStyle));
+    } else {
+      // Update existing row
+      db.prepare(`
+        UPDATE user_preferences
+        SET prose_style = ?, updated_at = datetime('now')
+        WHERE user_id = ?
+      `).run(JSON.stringify(proseStyle), DEFAULT_USER_ID);
+    }
+
+    // Invalidate cache
+    cache.invalidate(`user-prose-style:${DEFAULT_USER_ID}`);
+
+    res.json({ success: true, proseStyle });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error updating prose style');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
 export default router;

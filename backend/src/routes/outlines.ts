@@ -114,6 +114,7 @@ router.post('/generate', async (req, res) => {
     // Parse project data
     let storyDNA = safeJsonParse(project.story_dna as any, null);
     const storyBible = safeJsonParse(project.story_bible as any, null);
+    const plotStructure = safeJsonParse(project.plot_structure as any, null);
 
     // Auto-generate Story DNA if it doesn't exist
     if (!storyDNA) {
@@ -146,6 +147,21 @@ router.post('/generate', async (req, res) => {
       });
     }
 
+    // Check Plot Structure - require at least a main plot for quality novel generation
+    const hasMainPlot = plotStructure?.plot_layers?.some((layer: any) => layer.type === 'main');
+    if (!plotStructure || !plotStructure.plot_layers || plotStructure.plot_layers.length === 0) {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_STATE',
+          message: 'Project must have plot structure before generating outline. Please define your plots on the Plot page first. This ensures your novel has coherent, well-developed storylines.',
+        },
+      });
+    }
+
+    if (!hasMainPlot) {
+      logger.warn({ projectId }, 'No main plot defined - outline may lack narrative focus');
+    }
+
     // Build outline context
     const context: OutlineContext = {
       concept: {
@@ -158,6 +174,7 @@ router.post('/generate', async (req, res) => {
       world: storyBible.world || { locations: [], factions: [], systems: [] },
       structureType: structureType as StoryStructureType,
       targetWordCount: targetWordCount || 80000,
+      plotStructure, // Include plot structure for coherent outline generation
     };
 
     // Generate the outline
