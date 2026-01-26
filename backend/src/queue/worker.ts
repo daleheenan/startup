@@ -769,8 +769,11 @@ Output only valid JSON, no commentary:`;
     const maxAttempts = 3;
     const newAttempts = job.attempts + 1;
 
+    // Build detailed error message with stack trace and code
+    const errorDetails = this.formatErrorDetails(error);
+
     if (newAttempts < maxAttempts) {
-      logger.warn({ jobId: job.id, attempts: newAttempts, maxAttempts }, 'Job failed, retrying');
+      logger.warn({ jobId: job.id, attempts: newAttempts, maxAttempts, error: errorDetails }, 'Job failed, retrying');
 
       const stmt = db.prepare(`
         UPDATE jobs
@@ -778,9 +781,9 @@ Output only valid JSON, no commentary:`;
         WHERE id = ?
       `);
 
-      stmt.run(newAttempts, error.message, job.id);
+      stmt.run(newAttempts, errorDetails, job.id);
     } else {
-      logger.error({ jobId: job.id, attempts: maxAttempts }, 'Job failed after maximum attempts');
+      logger.error({ jobId: job.id, attempts: maxAttempts, error: errorDetails }, 'Job failed after maximum attempts');
 
       const stmt = db.prepare(`
         UPDATE jobs
@@ -788,8 +791,42 @@ Output only valid JSON, no commentary:`;
         WHERE id = ?
       `);
 
-      stmt.run(newAttempts, error.message, job.id);
+      stmt.run(newAttempts, errorDetails, job.id);
     }
+  }
+
+  /**
+   * Format error details for storage and display
+   */
+  private formatErrorDetails(error: any): string {
+    if (!error) return 'Unknown error';
+
+    const parts: string[] = [];
+
+    // Error code (e.g., SQLITE_ERROR)
+    if (error.code) {
+      parts.push(`[${error.code}]`);
+    }
+
+    // Main error message
+    if (error.message) {
+      parts.push(error.message);
+    } else if (typeof error === 'string') {
+      parts.push(error);
+    }
+
+    // SQL query that caused the error (for SQLite errors)
+    if (error.sql) {
+      parts.push(`\n\nSQL: ${error.sql}`);
+    }
+
+    // Stack trace (first 5 lines for brevity)
+    if (error.stack) {
+      const stackLines = error.stack.split('\n').slice(1, 6).join('\n');
+      parts.push(`\n\nStack:\n${stackLines}`);
+    }
+
+    return parts.join(' ') || 'Unknown error';
   }
 
   /**

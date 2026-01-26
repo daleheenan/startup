@@ -320,6 +320,7 @@ export function runMigrations() {
       '025_concept_source_idea.sql',     // DB version 25
       '019_user_settings.sql',           // DB version 26 - user genres, exclusions, recipes
       '019_time_period.sql',             // DB version 27 - time period support
+      '015_fix_metrics_trigger.sql',     // DB version 28 - fix word_count ambiguity in trigger
     ];
 
     for (let i = 0; i < migrationFiles.length; i++) {
