@@ -40,9 +40,6 @@ interface ProjectRow {
  */
 export interface ParsedProject extends Omit<Project, 'is_universe_root'> {
   is_universe_root: boolean;
-  plot_structure?: any;
-  story_concept?: string | null;  // Story concept stored directly on project
-  source_concept_id?: string | null;  // Reference to saved concept used as source
 }
 
 /**
@@ -64,15 +61,25 @@ export class ProjectsRepository extends BaseRepository<ProjectRow> {
   private parseProject(row: ProjectRow | null): ParsedProject | null {
     if (!row) return null;
 
+    // Destructure to separate JSON string fields from primitive fields
+    const {
+      story_concept: _story_concept,
+      story_dna: _story_dna,
+      story_bible: _story_bible,
+      series_bible: _series_bible,
+      plot_structure: _plot_structure,
+      is_universe_root: _is_universe_root,
+      ...rest
+    } = row;
+
     return {
-      ...row,
-      is_universe_root: row.is_universe_root === 1,
-      story_concept: this.safeJsonParse(row.story_concept),
-      story_dna: this.safeJsonParse(row.story_dna),
-      story_bible: this.safeJsonParse(row.story_bible),
-      series_bible: this.safeJsonParse(row.series_bible),
-      plot_structure: this.safeJsonParse(row.plot_structure),
-      source_concept_id: row.source_concept_id,
+      ...rest,
+      is_universe_root: _is_universe_root === 1,
+      story_concept: this.safeJsonParse(_story_concept),
+      story_dna: this.safeJsonParse(_story_dna),
+      story_bible: this.safeJsonParse(_story_bible),
+      series_bible: this.safeJsonParse(_series_bible),
+      plot_structure: this.safeJsonParse(_plot_structure),
     };
   }
 
