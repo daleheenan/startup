@@ -51,7 +51,9 @@ export default function QueueAdminPage() {
   });
   const [total, setTotal] = useState(0);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [selectedJobs, setSelectedJobs] = useState<Set<string>>(new Set());
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -100,6 +102,86 @@ export default function QueueAdminPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const deleteJobs = async (jobIds: string[]) => {
+    if (jobIds.length === 0) return;
+
+    if (!confirm(`Delete ${jobIds.length} job(s)? This cannot be undone.`)) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/queue/jobs?ids=${jobIds.join(',')}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        setSelectedJobs(new Set());
+        setSelectedJob(null);
+        await fetchData();
+      } else {
+        const error = await response.json();
+        alert(`Failed to delete jobs: ${error.error?.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error deleting jobs:', error);
+      alert('Failed to delete jobs');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const deleteJobsByStatus = async (status: string) => {
+    if (!confirm(`Delete ALL ${status} jobs? This cannot be undone.`)) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/queue/jobs?status=${status}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        alert(`Deleted ${result.deleted} jobs`);
+        setSelectedJobs(new Set());
+        await fetchData();
+      } else {
+        const error = await response.json();
+        alert(`Failed to delete jobs: ${error.error?.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error deleting jobs:', error);
+      alert('Failed to delete jobs');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const toggleJobSelection = (jobId: string) => {
+    const newSelected = new Set(selectedJobs);
+    if (newSelected.has(jobId)) {
+      newSelected.delete(jobId);
+    } else {
+      newSelected.add(jobId);
+    }
+    setSelectedJobs(newSelected);
+  };
+
+  const selectAllVisible = () => {
+    const newSelected = new Set(jobs.map(j => j.id));
+    setSelectedJobs(newSelected);
+  };
+
+  const clearSelection = () => {
+    setSelectedJobs(new Set());
   };
 
   const getStatusColor = (status: string) => {
@@ -313,6 +395,110 @@ export default function QueueAdminPage() {
           </div>
         </div>
 
+        {/* Bulk Actions */}
+        {(selectedJobs.size > 0 || queueStats) && (
+          <div style={{
+            background: '#FFFFFF',
+            border: '1px solid #E0E0E0',
+            borderRadius: '12px',
+            padding: '1rem 1.5rem',
+            marginBottom: '1.5rem',
+            display: 'flex',
+            gap: '1rem',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+          }}>
+            {selectedJobs.size > 0 ? (
+              <>
+                <span style={{ fontSize: '0.875rem', color: '#374151' }}>
+                  {selectedJobs.size} job(s) selected
+                </span>
+                <button
+                  onClick={() => deleteJobs(Array.from(selectedJobs))}
+                  disabled={deleting}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: deleting ? '#9CA3AF' : '#DC2626',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    cursor: deleting ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {deleting ? 'Deleting...' : 'Delete Selected'}
+                </button>
+                <button
+                  onClick={clearSelection}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: '#F3F4F6',
+                    color: '#374151',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Clear Selection
+                </button>
+              </>
+            ) : (
+              <>
+                <span style={{ fontSize: '0.875rem', color: '#757575' }}>Bulk Actions:</span>
+                <button
+                  onClick={selectAllVisible}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: '#F3F4F6',
+                    color: '#374151',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Select All Visible
+                </button>
+                {queueStats && queueStats.failed > 0 && (
+                  <button
+                    onClick={() => deleteJobsByStatus('failed')}
+                    disabled={deleting}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: deleting ? '#9CA3AF' : '#DC2626',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '0.875rem',
+                      cursor: deleting ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    Delete All Failed ({queueStats.failed})
+                  </button>
+                )}
+                {queueStats && queueStats.completed > 0 && (
+                  <button
+                    onClick={() => deleteJobsByStatus('completed')}
+                    disabled={deleting}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: deleting ? '#9CA3AF' : '#6B7280',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '0.875rem',
+                      cursor: deleting ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    Delete All Completed ({queueStats.completed})
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
         {/* Results Summary */}
         <div style={{
           marginBottom: '1rem',
@@ -340,6 +526,14 @@ export default function QueueAdminPage() {
                   background: '#F5F5F5',
                   borderBottom: '1px solid #E0E0E0',
                 }}>
+                  <th style={{ ...thStyle, width: '40px', textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={jobs.length > 0 && selectedJobs.size === jobs.length}
+                      onChange={(e) => e.target.checked ? selectAllVisible() : clearSelection()}
+                      style={{ cursor: 'pointer' }}
+                    />
+                  </th>
                   <th style={thStyle}>Status</th>
                   <th style={thStyle}>Type</th>
                   <th style={thStyle}>Project</th>
@@ -360,10 +554,19 @@ export default function QueueAdminPage() {
                       style={{
                         borderBottom: '1px solid #E0E0E0',
                         cursor: 'pointer',
-                        background: isRunning ? '#EFF6FF' : undefined,
+                        background: selectedJobs.has(job.id) ? '#F0F4FF' : (isRunning ? '#EFF6FF' : undefined),
                       }}
                       onClick={() => setSelectedJob(job)}
                     >
+                      <td style={{ ...tdStyle, textAlign: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedJobs.has(job.id)}
+                          onChange={() => toggleJobSelection(job.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      </td>
                       <td style={tdStyle}>
                         <span style={{
                           padding: '0.25rem 0.5rem',
@@ -425,7 +628,7 @@ export default function QueueAdminPage() {
 
                 {jobs.length === 0 && !loading && (
                   <tr>
-                    <td colSpan={7} style={{ padding: '3rem', textAlign: 'center', color: '#757575' }}>
+                    <td colSpan={8} style={{ padding: '3rem', textAlign: 'center', color: '#757575' }}>
                       No jobs found matching the selected filters
                     </td>
                   </tr>
@@ -553,6 +756,27 @@ export default function QueueAdminPage() {
                 </pre>
               </div>
             )}
+
+            {/* Delete Job Button */}
+            <div style={{ marginTop: '2rem', paddingTop: '1rem', borderTop: '1px solid #E0E0E0' }}>
+              <button
+                onClick={() => deleteJobs([selectedJob.id])}
+                disabled={deleting}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem 1rem',
+                  background: deleting ? '#9CA3AF' : '#DC2626',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: deleting ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {deleting ? 'Deleting...' : 'Delete This Job'}
+              </button>
+            </div>
           </div>
         )}
       </div>

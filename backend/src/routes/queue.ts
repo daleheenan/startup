@@ -121,6 +121,74 @@ router.get('/jobs', (req, res) => {
 });
 
 /**
+ * DELETE /api/queue/jobs/:id
+ * Delete a single job
+ */
+router.delete('/jobs/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const stmt = db.prepare(`DELETE FROM jobs WHERE id = ?`);
+    const result = stmt.run(id);
+
+    if (result.changes === 0) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Job not found' } });
+    }
+
+    logger.info({ jobId: id }, 'Job deleted');
+    res.json({ success: true, deleted: 1 });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error deleting job');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * DELETE /api/queue/jobs
+ * Delete multiple jobs by status or IDs
+ * Query params: status (pending|failed|completed|all), ids (comma-separated)
+ */
+router.delete('/jobs', (req, res) => {
+  try {
+    const { status, ids } = req.query;
+
+    if (ids) {
+      // Delete specific jobs by ID
+      const jobIds = (ids as string).split(',').map(id => id.trim());
+      const placeholders = jobIds.map(() => '?').join(',');
+      const stmt = db.prepare(`DELETE FROM jobs WHERE id IN (${placeholders})`);
+      const result = stmt.run(...jobIds);
+
+      logger.info({ count: result.changes, jobIds }, 'Jobs deleted by ID');
+      return res.json({ success: true, deleted: result.changes });
+    }
+
+    if (!status || status === 'all') {
+      return res.status(400).json({
+        error: { code: 'INVALID_INPUT', message: 'Must specify status or ids to delete jobs' }
+      });
+    }
+
+    // Delete jobs by status
+    const validStatuses = ['pending', 'failed', 'completed', 'paused'];
+    if (!validStatuses.includes(status as string)) {
+      return res.status(400).json({
+        error: { code: 'INVALID_INPUT', message: `Invalid status. Must be one of: ${validStatuses.join(', ')}` }
+      });
+    }
+
+    const stmt = db.prepare(`DELETE FROM jobs WHERE status = ?`);
+    const result = stmt.run(status);
+
+    logger.info({ count: result.changes, status }, 'Jobs deleted by status');
+    res.json({ success: true, deleted: result.changes });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error deleting jobs');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
  * POST /api/queue/test
  * Create a test job
  */

@@ -250,7 +250,7 @@ class MetricsService {
       const statsStmt = db.prepare<[string], { total_chapters: number; total_word_count: number }>(`
         SELECT
           COUNT(*) as total_chapters,
-          COALESCE(SUM(word_count), 0) as total_word_count
+          COALESCE(SUM(c.word_count), 0) as total_word_count
         FROM chapters c
         JOIN books b ON c.book_id = b.id
         WHERE b.project_id = ?

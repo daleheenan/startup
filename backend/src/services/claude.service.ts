@@ -32,6 +32,7 @@ export class ClaudeService {
 
     this.client = new Anthropic({
       apiKey,
+      timeout: 5 * 60 * 1000, // 5 minute timeout
     });
 
     this.model = process.env.ANTHROPIC_MODEL || 'claude-opus-4-5-20251101';
