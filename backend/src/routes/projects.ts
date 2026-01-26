@@ -188,10 +188,11 @@ router.get('/:id/progress', (req, res) => {
     const allChapters = chaptersStmt.all(projectId) as any[];
 
     // Calculate chapter statistics
+    // Count chapters with content (word_count > 0) as completed, not just status='completed'
     const chapterStats = {
       total: allChapters.length,
-      completed: allChapters.filter(ch => ch.status === 'completed').length,
-      inProgress: allChapters.filter(ch => ch.status === 'writing' || ch.status === 'editing').length,
+      completed: allChapters.filter(ch => ch.status === 'completed' || ch.word_count > 0).length,
+      inProgress: allChapters.filter(ch => (ch.status === 'writing' || ch.status === 'editing') && ch.word_count === 0).length,
       pending: allChapters.filter(ch => ch.status === 'pending').length,
     };
 
@@ -260,10 +261,25 @@ router.get('/:id/progress', (req, res) => {
       ORDER BY j.completed_at DESC
       LIMIT 10
     `);
+    // Format job types into user-friendly labels
+    const formatJobType = (jobType: string): string => {
+      const labels: Record<string, string> = {
+        'generate_chapter': 'Writing completed',
+        'dev_edit': 'Developmental edit completed',
+        'author_revision': 'Author revision completed',
+        'line_edit': 'Line edit completed',
+        'continuity_check': 'Continuity check completed',
+        'copy_edit': 'Copy edit completed',
+        'generate_summary': 'Summary generated',
+        'update_states': 'Character states updated',
+      };
+      return labels[jobType] || jobType.replace(/_/g, ' ');
+    };
+
     const recentEvents = (recentEventsStmt.all(projectId) as any[]).map((event: any) => ({
       timestamp: event.completed_at,
       type: event.type,
-      message: `${event.type} completed for Chapter ${event.chapter_number}`,
+      message: `${formatJobType(event.type)} for Chapter ${event.chapter_number}`,
     }));
 
     // Step 7: Calculate flag statistics
@@ -292,7 +308,7 @@ router.get('/:id/progress', (req, res) => {
       }
     }
 
-    // Step 8: Calculate time estimates
+    // Step 8: Calculate time estimates based on actual generate_chapter job times
     const completedJobsStmt = db.prepare(`
       SELECT
         j.started_at,
@@ -301,6 +317,7 @@ router.get('/:id/progress', (req, res) => {
       INNER JOIN chapters c ON j.target_id = c.id
       INNER JOIN books b ON c.book_id = b.id
       WHERE b.project_id = ?
+        AND j.type = 'generate_chapter'
         AND j.status = 'completed'
         AND j.started_at IS NOT NULL
         AND j.completed_at IS NOT NULL
@@ -319,7 +336,9 @@ router.get('/:id/progress', (req, res) => {
       averageChapterTime = totalTime / completedJobs.length;
     }
 
-    const estimatedRemaining = averageChapterTime * chapterStats.pending;
+    // Calculate remaining chapters: total chapters minus those with content
+    const remainingChapters = allChapters.length - chapterStats.completed;
+    const estimatedRemaining = averageChapterTime * remainingChapters;
 
     // Step 9: Get rate limit status
     const rateLimitStmt = db.prepare(`

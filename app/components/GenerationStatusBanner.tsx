@@ -2,6 +2,23 @@
 
 import React from 'react';
 
+/**
+ * Format job type into user-friendly text
+ */
+function formatJobType(jobType: string): string {
+  const jobTypeLabels: Record<string, string> = {
+    'generate_chapter': 'Writing chapter',
+    'dev_edit': 'Developmental editing',
+    'author_revision': 'Author revision',
+    'line_edit': 'Line editing',
+    'continuity_check': 'Checking continuity',
+    'copy_edit': 'Copy editing',
+    'generate_summary': 'Generating summary',
+    'update_states': 'Updating character states',
+  };
+  return jobTypeLabels[jobType] || jobType.replace(/_/g, ' ');
+}
+
 interface GenerationStatusBannerProps {
   status: string;
   completedChapters: number;
@@ -220,7 +237,7 @@ export default function GenerationStatusBanner({
               color: '#64748B',
               marginTop: '0.25rem',
             }}>
-              {currentActivity.jobType}
+              {formatJobType(currentActivity.jobType)}
             </div>
           </div>
         )}

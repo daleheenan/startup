@@ -96,6 +96,8 @@ export default function OutlinePage() {
   const [error, setError] = useState<string | null>(null);
   const [expandedChapter, setExpandedChapter] = useState<number | null>(null);
   const [generationStep, setGenerationStep] = useState<string>('');
+  const [chaptersExist, setChaptersExist] = useState(false);
+  const [hasQueuedJobs, setHasQueuedJobs] = useState(false);
 
   // Act management state
   const [editingActNumber, setEditingActNumber] = useState<number | null>(null);
@@ -182,8 +184,10 @@ export default function OutlinePage() {
       setTemplates(templatesData.templates);
 
       if (booksData.books.length > 0) {
+        const bookId = booksData.books[0].id;
+
         try {
-          const outlineRes = await fetch(`${API_BASE_URL}/api/outlines/book/${booksData.books[0].id}`, {
+          const outlineRes = await fetch(`${API_BASE_URL}/api/outlines/book/${bookId}`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -195,6 +199,40 @@ export default function OutlinePage() {
           }
         } catch (err) {
           // No outline yet
+        }
+
+        // Check if chapters already exist
+        try {
+          const chaptersRes = await fetch(`${API_BASE_URL}/api/chapters/book/${bookId}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          if (chaptersRes.ok) {
+            const chaptersData = await chaptersRes.json();
+            const chapters = chaptersData.chapters || chaptersData || [];
+            setChaptersExist(chapters.length > 0);
+          }
+        } catch (err) {
+          // No chapters yet
+        }
+
+        // Check if there are queued jobs for this project
+        try {
+          const progressRes = await fetch(`${API_BASE_URL}/api/projects/${projectId}/progress`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          if (progressRes.ok) {
+            const progressData = await progressRes.json();
+            const hasJobs = (progressData.queue?.pending || 0) + (progressData.queue?.running || 0) > 0;
+            setHasQueuedJobs(hasJobs);
+          }
+        } catch (err) {
+          // No progress data
         }
       }
     } catch (err: any) {
@@ -800,30 +838,48 @@ export default function OutlinePage() {
                     {outline.structure_type.replace(/_/g, ' ')} • {outline.structure.acts.length} acts • {outline.total_chapters} chapters planned
                   </p>
 
-                  <div>
-                    <button
-                      onClick={startGeneration}
-                      disabled={isGenerating}
-                      style={{
-                        padding: '0.75rem 1.5rem',
-                        background: isGenerating
-                          ? '#94A3B8'
-                          : 'linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%)',
-                        border: 'none',
-                        borderRadius: '8px',
-                        color: '#fff',
-                        fontSize: '1rem',
-                        fontWeight: 600,
-                        cursor: isGenerating ? 'not-allowed' : 'pointer',
-                        boxShadow: isGenerating ? 'none' : '0 4px 14px rgba(139, 92, 246, 0.4)',
-                      }}
-                    >
-                      Submit for Novel Generation
-                    </button>
-                    <p style={{ color: '#64748B', fontSize: '0.813rem', marginTop: '0.5rem', marginBottom: 0 }}>
-                      This will create {outline.total_chapters} chapters ({outline.target_word_count.toLocaleString()} words) and queue them for AI writing.
-                    </p>
-                  </div>
+                  {/* Show generation button only if no chapters exist and no jobs are queued */}
+                  {!chaptersExist && !hasQueuedJobs ? (
+                    <div>
+                      <button
+                        onClick={startGeneration}
+                        disabled={isGenerating}
+                        style={{
+                          padding: '0.75rem 1.5rem',
+                          background: isGenerating
+                            ? '#94A3B8'
+                            : 'linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%)',
+                          border: 'none',
+                          borderRadius: '8px',
+                          color: '#fff',
+                          fontSize: '1rem',
+                          fontWeight: 600,
+                          cursor: isGenerating ? 'not-allowed' : 'pointer',
+                          boxShadow: isGenerating ? 'none' : '0 4px 14px rgba(139, 92, 246, 0.4)',
+                        }}
+                      >
+                        Submit for Novel Generation
+                      </button>
+                      <p style={{ color: '#64748B', fontSize: '0.813rem', marginTop: '0.5rem', marginBottom: 0 }}>
+                        This will create {outline.total_chapters} chapters ({outline.target_word_count.toLocaleString()} words) and queue them for AI writing.
+                      </p>
+                    </div>
+                  ) : (
+                    <div style={{
+                      padding: '0.75rem 1rem',
+                      background: '#DCFCE7',
+                      border: '1px solid #10B981',
+                      borderRadius: '8px',
+                      color: '#15803D',
+                      fontSize: '0.875rem',
+                    }}>
+                      {hasQueuedJobs ? (
+                        <span>✓ Novel generation in progress - <a href={`/projects/${projectId}/progress`} style={{ color: '#15803D', fontWeight: 600 }}>View Progress</a></span>
+                      ) : (
+                        <span>✓ Chapters have been created - <a href={`/projects/${projectId}/progress`} style={{ color: '#15803D', fontWeight: 600 }}>View Chapters</a></span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Bulk Actions */}

@@ -206,7 +206,7 @@ class MetricsService {
       cost: {
         usd: formatCurrency(metrics.total_cost_usd, '$'),
         gbp: formatCurrency(metrics.total_cost_gbp, '£'),
-        display: `${formatCurrency(metrics.total_cost_usd, '$')} / ${formatCurrency(metrics.total_cost_gbp, '£')}`,
+        display: formatCurrency(metrics.total_cost_gbp, '£'),
       },
       content: {
         chapters: metrics.total_chapters,

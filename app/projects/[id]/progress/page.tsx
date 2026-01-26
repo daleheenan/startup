@@ -161,7 +161,13 @@ export default function ProgressPage() {
         };
       } else {
         progressData = await progressResponse.json();
-        if (progressData) {
+        // Always fetch full project data for navigation prerequisites
+        const projectRes = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, { headers });
+        if (projectRes.ok) {
+          const fullProjectData = await projectRes.json();
+          setProject(fullProjectData);
+        } else if (progressData) {
+          // Fallback to minimal data if full project fetch fails
           setProject({ id: progressData.project.id, title: progressData.project.title, status: progressData.project.status });
         }
       }
