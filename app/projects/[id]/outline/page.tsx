@@ -208,13 +208,46 @@ export default function OutlinePage() {
   const generateOutline = async () => {
     if (!book || !project) return;
 
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutDuration = 15 * 60 * 1000; // 15 minutes timeout
+    const timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
+
+    // Progress simulation for better UX
+    let progressInterval: ReturnType<typeof setInterval>;
+
     try {
       setIsGenerating(true);
       setError(null);
       setGenerationStep('Preparing story context...');
       const token = getToken();
 
-      setGenerationStep('Analyzing story structure requirements...');
+      // Start progress simulation (updates every 10 seconds)
+      let stepIndex = 0;
+      const progressSteps = [
+        'Analyzing story structure requirements...',
+        'Building act breakdown with AI...',
+        'Generating chapter outlines for Act 1...',
+        'Generating chapter outlines for Act 2...',
+        'Generating chapter outlines for Act 3...',
+        'Creating scene cards...',
+        'Finalizing outline structure...',
+        'This may take several minutes for long novels...',
+        'Still working... AI is generating detailed scene cards...',
+        'Almost there... Processing final chapters...',
+      ];
+
+      progressInterval = setInterval(() => {
+        if (stepIndex < progressSteps.length) {
+          setGenerationStep(progressSteps[stepIndex]);
+          stepIndex++;
+        } else {
+          // Loop back to indicate still working
+          setGenerationStep(`Still generating... (${Math.floor((Date.now() % 60000) / 1000)}s)`);
+        }
+      }, 10000);
+
+      setGenerationStep('Sending request to AI service...');
 
       const response = await fetch(`${API_BASE_URL}/api/outlines/generate`, {
         method: 'POST',
@@ -228,21 +261,33 @@ export default function OutlinePage() {
           structureType: selectedTemplate,
           targetWordCount,
           logline: project.title,
-          synopsis: '',
+          synopsis: project.story_dna?.synopsis || '',
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
+      clearInterval(progressInterval);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: { message: 'Failed to generate outline' } }));
-        throw new Error(errorData.error?.message || `Failed to generate outline (${response.status})`);
+        throw new Error(errorData.error?.message || `Failed to generate outline (HTTP ${response.status})`);
       }
 
       setGenerationStep('Processing outline structure...');
       const outlineData = await response.json();
       setOutline(outlineData);
+      setError(null);
     } catch (err: any) {
       console.error('Error generating outline:', err);
-      setError(err.message || 'An unexpected error occurred while generating the outline');
+      clearTimeout(timeoutId);
+      if (progressInterval!) clearInterval(progressInterval);
+
+      if (err.name === 'AbortError') {
+        setError('Outline generation timed out after 15 minutes. Please try with a shorter word count or fewer chapters.');
+      } else {
+        setError(err.message || 'An unexpected error occurred while generating the outline. Check the console for details.');
+      }
     } finally {
       setIsGenerating(false);
       setGenerationStep('');

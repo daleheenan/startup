@@ -25,6 +25,10 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+// Use Sonnet for faster generation with good quality
+// Opus 4.5 is too slow for outline generation (12+ minutes)
+const OUTLINE_MODEL = 'claude-sonnet-4-20250514';
+
 export interface OutlineContext {
   concept: {
     title: string;
@@ -102,7 +106,7 @@ async function generateActBreakdown(
     logger.info('[OutlineGenerator] Calling Claude API for act breakdown...');
 
     const message = await anthropic.messages.create({
-      model: 'claude-opus-4-5-20251101',
+      model: OUTLINE_MODEL,
       max_tokens: 4000,
       temperature: 0.8,
       system: 'You are a JSON API that generates story outlines. Always respond with valid JSON only, no markdown formatting, no explanations, no code blocks - just raw JSON.',
@@ -300,7 +304,7 @@ async function generateChaptersForAct(
 
   try {
     const message = await anthropic.messages.create({
-      model: 'claude-opus-4-5-20251101',
+      model: OUTLINE_MODEL,
       max_tokens: 6000,
       temperature: 0.8,
       system: 'You are a JSON API that generates story outlines. Always respond with valid JSON only, no markdown formatting, no explanations, no code blocks - just raw JSON.',
@@ -468,7 +472,7 @@ async function generateSceneCards(
 
   try {
     const message = await anthropic.messages.create({
-      model: 'claude-opus-4-5-20251101',
+      model: OUTLINE_MODEL,
       max_tokens: 3000,
       temperature: 0.7,
       system: 'You are a JSON API that generates story outlines. Always respond with valid JSON only, no markdown formatting, no explanations, no code blocks - just raw JSON.',

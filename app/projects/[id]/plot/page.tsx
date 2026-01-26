@@ -116,6 +116,7 @@ export default function PlotStructurePage() {
   const [generatingField, setGeneratingField] = useState<'name' | 'description' | null>(null);
   const [extractingFromConcept, setExtractingFromConcept] = useState(false);
   const [hasAttemptedExtraction, setHasAttemptedExtraction] = useState(false);
+  const [hasPopulatedInitialLayers, setHasPopulatedInitialLayers] = useState(false);
   const [validatingCoherence, setValidatingCoherence] = useState(false);
   const [coherenceWarnings, setCoherenceWarnings] = useState<string[]>([]);
   const [coherenceSuggestions, setCoherenceSuggestions] = useState<string[]>([]);
@@ -281,14 +282,20 @@ export default function PlotStructurePage() {
   }, [loading, project, hasAttemptedExtraction, structure.plot_layers?.length, extractPlotsFromConcept]);
 
   // Auto-populate initial plot layers when page loads with no plot layers
+  // Uses hasPopulatedInitialLayers flag to prevent infinite loop
   useEffect(() => {
     const shouldPopulate = !loading &&
       project &&
       characters &&
+      characters.length > 0 &&
       (structure.plot_layers?.length || 0) === 0 &&
-      !extractingFromConcept;
+      !extractingFromConcept &&
+      !hasPopulatedInitialLayers;
 
     if (shouldPopulate) {
+      // Set flag BEFORE async operation to prevent re-triggering
+      setHasPopulatedInitialLayers(true);
+
       // Create initial plot layers based on project data and characters
       const initialLayers = createInitialPlotLayers(project, characters);
 
@@ -298,7 +305,7 @@ export default function PlotStructurePage() {
         saveStructure(newStructure);
       }
     }
-  }, [loading, project, characters, structure.plot_layers?.length, extractingFromConcept]);
+  }, [loading, project, characters, structure.plot_layers?.length, extractingFromConcept, hasPopulatedInitialLayers]);
 
   const saveStructure = async (newStructure: StoryStructure) => {
     setSaving(true);
@@ -314,16 +321,20 @@ export default function PlotStructurePage() {
       });
 
       if (!res.ok) {
-        throw new Error('Failed to save plot structure');
+        const errorData = await res.json().catch(() => ({}));
+        const errorMessage = errorData.error?.message || `Failed to save plot structure (HTTP ${res.status})`;
+        throw new Error(errorMessage);
       }
 
       setStructure(newStructure);
+      setError(null); // Clear any previous errors on success
       // Clear previous coherence validation when structure changes
       setIsCoherent(null);
       setCoherenceWarnings([]);
       setCoherenceSuggestions([]);
     } catch (err: any) {
-      setError(err.message);
+      console.error('Plot structure save error:', err);
+      setError(`Save failed: ${err.message}. Please try again or refresh the page.`);
     } finally {
       setSaving(false);
     }
