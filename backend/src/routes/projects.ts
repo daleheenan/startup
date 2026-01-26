@@ -189,12 +189,21 @@ router.get('/:id/progress', (req, res) => {
 
     // Calculate chapter statistics
     // Count chapters with content (word_count > 0) as completed, not just status='completed'
+    // Use (ch.word_count || 0) to handle NULL values
     const chapterStats = {
       total: allChapters.length,
-      completed: allChapters.filter(ch => ch.status === 'completed' || ch.word_count > 0).length,
-      inProgress: allChapters.filter(ch => (ch.status === 'writing' || ch.status === 'editing') && ch.word_count === 0).length,
+      completed: allChapters.filter(ch => ch.status === 'completed' || (ch.word_count || 0) > 0).length,
+      inProgress: allChapters.filter(ch => (ch.status === 'writing' || ch.status === 'editing') && (ch.word_count || 0) === 0).length,
       pending: allChapters.filter(ch => ch.status === 'pending').length,
     };
+
+    logger.info({
+      total: chapterStats.total,
+      completed: chapterStats.completed,
+      inProgress: chapterStats.inProgress,
+      pending: chapterStats.pending,
+      sampleWordCounts: allChapters.slice(0, 5).map(ch => ({ num: ch.chapter_number, wc: ch.word_count, st: ch.status })),
+    }, 'Chapter stats calculation');
 
     // Calculate word count metrics
     const totalWordCount = allChapters.reduce((sum, ch) => sum + (ch.word_count || 0), 0);
