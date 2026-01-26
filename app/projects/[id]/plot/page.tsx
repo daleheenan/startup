@@ -149,9 +149,21 @@ export default function PlotStructurePage() {
         const projectData = await projectRes.json();
         setProject(projectData);
         if (projectData.plot_structure) {
-          setStructure(projectData.plot_structure);
+          // Ensure plot_layers is always an array to prevent undefined errors
+          const safeStructure = {
+            ...projectData.plot_structure,
+            plot_layers: projectData.plot_structure.plot_layers || [],
+            act_structure: projectData.plot_structure.act_structure || {
+              act_one_end: 5,
+              act_two_midpoint: 12,
+              act_two_end: 20,
+              act_three_climax: 23,
+            },
+            pacing_notes: projectData.plot_structure.pacing_notes || '',
+          };
+          setStructure(safeStructure);
           // If there are no plot layers, default to wizard mode
-          if (!projectData.plot_structure.plot_layers || projectData.plot_structure.plot_layers.length === 0) {
+          if (safeStructure.plot_layers.length === 0) {
             setIsWizardMode(true);
           }
         } else {
@@ -226,7 +238,7 @@ export default function PlotStructurePage() {
       name: '',
       description: '',
       type: 'subplot',
-      color: LAYER_COLORS[structure.plot_layers.length % LAYER_COLORS.length],
+      color: LAYER_COLORS[(structure.plot_layers?.length || 0) % LAYER_COLORS.length],
     });
     setShowLayerModal(true);
   };
@@ -272,7 +284,7 @@ export default function PlotStructurePage() {
   };
 
   const handleEditLayer = (layerId: string) => {
-    const layer = structure.plot_layers.find(l => l.id === layerId);
+    const layer = structure.plot_layers?.find(l => l.id === layerId);
     if (layer) {
       setEditingLayer(layer);
       setLayerForm({
@@ -298,8 +310,8 @@ export default function PlotStructurePage() {
     };
 
     const newLayers = editingLayer
-      ? structure.plot_layers.map(l => l.id === editingLayer.id ? newLayer : l)
-      : [...structure.plot_layers, newLayer];
+      ? (structure.plot_layers || []).map(l => l.id === editingLayer.id ? newLayer : l)
+      : [...(structure.plot_layers || []), newLayer];
 
     const newStructure = { ...structure, plot_layers: newLayers };
     saveStructure(newStructure);
@@ -365,7 +377,7 @@ export default function PlotStructurePage() {
   const handleDeleteLayer = (layerId: string) => {
     if (!confirm('Are you sure you want to delete this plot layer?')) return;
 
-    const newLayers = structure.plot_layers.filter(l => l.id !== layerId);
+    const newLayers = (structure.plot_layers || []).filter(l => l.id !== layerId);
     const newStructure = { ...structure, plot_layers: newLayers };
     saveStructure(newStructure);
   };
@@ -390,7 +402,7 @@ export default function PlotStructurePage() {
       impact_level: pointForm.impact_level,
     };
 
-    const newLayers = structure.plot_layers.map(layer => {
+    const newLayers = (structure.plot_layers || []).map(layer => {
       if (layer.id !== editingPoint.layerId) return layer;
 
       const newPoints = editingPoint.point
@@ -422,7 +434,7 @@ export default function PlotStructurePage() {
   };
 
   const handleGenerateLayerPoints = async (layerId: string) => {
-    const layer = structure.plot_layers.find(l => l.id === layerId);
+    const layer = structure.plot_layers?.find(l => l.id === layerId);
     if (!layer) return;
 
     setGeneratingLayerId(layerId);
@@ -454,7 +466,7 @@ export default function PlotStructurePage() {
       const data = await res.json();
 
       // Merge generated points with existing layer
-      const newLayers = structure.plot_layers.map(l => {
+      const newLayers = (structure.plot_layers || []).map(l => {
         if (l.id !== layerId) return l;
         return {
           ...l,
@@ -521,7 +533,7 @@ export default function PlotStructurePage() {
   const handleDeletePoint = (layerId: string, pointId: string) => {
     if (!confirm('Are you sure you want to delete this plot point?')) return;
 
-    const newLayers = structure.plot_layers.map(layer => {
+    const newLayers = (structure.plot_layers || []).map(layer => {
       if (layer.id !== layerId) return layer;
       return {
         ...layer,
@@ -776,7 +788,7 @@ export default function PlotStructurePage() {
             </button>
           </div>
 
-          {structure.plot_layers.length === 0 ? (
+          {(structure.plot_layers?.length || 0) === 0 ? (
             <div style={{
               textAlign: 'center',
               padding: '2rem',
@@ -807,7 +819,7 @@ export default function PlotStructurePage() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {structure.plot_layers.map(layer => (
+              {(structure.plot_layers || []).map(layer => (
                 <div
                   key={layer.id}
                   style={{
@@ -1007,10 +1019,10 @@ export default function PlotStructurePage() {
             </h2>
             <button
               onClick={handleGeneratePacingNotes}
-              disabled={generatingPacing || structure.plot_layers.length === 0}
+              disabled={generatingPacing || (structure.plot_layers?.length || 0) === 0}
               style={{
                 padding: '0.5rem 1rem',
-                background: generatingPacing || structure.plot_layers.length === 0
+                background: generatingPacing || (structure.plot_layers?.length || 0) === 0
                   ? '#94A3B8'
                   : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 border: 'none',
@@ -1018,13 +1030,13 @@ export default function PlotStructurePage() {
                 color: '#fff',
                 fontSize: '0.875rem',
                 fontWeight: 500,
-                cursor: generatingPacing || structure.plot_layers.length === 0 ? 'not-allowed' : 'pointer',
+                cursor: generatingPacing || (structure.plot_layers?.length || 0) === 0 ? 'not-allowed' : 'pointer',
               }}
             >
               {generatingPacing ? 'Generating...' : '✨ Generate Pacing Notes'}
             </button>
           </div>
-          {structure.plot_layers.length === 0 && (
+          {(structure.plot_layers?.length || 0) === 0 && (
             <p style={{ fontSize: '0.813rem', color: '#F59E0B', marginBottom: '0.5rem' }}>
               Add plot layers first to generate pacing notes.
             </p>
