@@ -42,13 +42,13 @@ export const PRIMARY_NAV_ITEMS: PrimaryNavigationItem[] = [
   {
     id: 'quick-start',
     label: 'Quick Start',
-    href: '/new?mode=quick',
+    href: '/quick-start',
     icon: '⚡',
   },
   {
     id: 'fully-customized',
-    label: 'Fully Customized',
-    href: '/new?mode=full',
+    label: 'Full Customization',
+    href: '/full-customization',
     icon: '🎨',
   },
   {
@@ -120,12 +120,9 @@ export const PROJECT_NAV_TABS = [
  * Determine active navigation section from pathname
  */
 export function getActiveSectionFromPath(pathname: string): NavigationSection | undefined {
-  if (pathname === '/new' || pathname.startsWith('/new?')) {
-    // Check for specific mode
-    if (pathname.includes('mode=quick')) return 'quick-start';
-    if (pathname.includes('mode=full')) return 'fully-customized';
-    return 'new-novel';
-  }
+  if (pathname === '/quick-start' || pathname.startsWith('/quick-start/')) return 'quick-start';
+  if (pathname === '/full-customization' || pathname.startsWith('/full-customization/')) return 'fully-customized';
+  if (pathname === '/new' || pathname.startsWith('/new/')) return 'new-novel';
   if (pathname === '/story-ideas' || pathname.startsWith('/story-ideas/')) return 'story-ideas';
   if (pathname === '/saved-concepts' || pathname.startsWith('/saved-concepts/')) return 'story-concepts';
   if (pathname === '/settings' || pathname.startsWith('/settings/')) return 'settings';
