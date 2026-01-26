@@ -13,7 +13,8 @@ async function fetchStoryIdeas(): Promise<SavedStoryIdea[]> {
     throw new Error('Failed to fetch story ideas');
   }
   const data = await response.json();
-  return Array.isArray(data) ? data : [];
+  // API returns { success: true, ideas: [...] }
+  return data.ideas || [];
 }
 
 /**
@@ -24,7 +25,9 @@ async function fetchStoryIdeaById(id: string): Promise<SavedStoryIdea> {
   if (!response.ok) {
     throw new Error('Failed to fetch story idea');
   }
-  return response.json();
+  const data = await response.json();
+  // API returns { success: true, idea: {...} }
+  return data.idea;
 }
 
 /**
