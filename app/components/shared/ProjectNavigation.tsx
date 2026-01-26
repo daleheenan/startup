@@ -5,13 +5,28 @@ import { usePathname } from 'next/navigation';
 import { colors, borderRadius } from '@/app/lib/constants';
 import { PROJECT_NAV_TABS, TAB_STATUS_COLORS } from '@/app/lib/navigation-constants';
 import { useWorkflowPrerequisites, type WorkflowStep, type WorkflowProjectData } from '@/app/hooks/useWorkflowPrerequisites';
-import type { Outline, Chapter, TabStatus } from '@/shared/types';
+import type { TabStatus } from '@/shared/types';
+
+// Flexible outline type that works with various page-specific interfaces
+interface OutlineData {
+  id?: string;
+  total_chapters?: number;
+  structure?: any;
+  [key: string]: any;
+}
+
+// Flexible chapter type
+interface ChapterData {
+  id?: string;
+  content?: string | null;
+  [key: string]: any;
+}
 
 interface ProjectNavigationProps {
   projectId: string;
   project?: WorkflowProjectData | null;
-  outline?: Outline | null;
-  chapters?: Chapter[] | null;
+  outline?: OutlineData | null;
+  chapters?: ChapterData[] | null;
 }
 
 /**

@@ -3,10 +3,25 @@
 import Link from 'next/link';
 import { colors, gradients, borderRadius } from '@/app/lib/constants';
 import { sidebar, header, pageTitle, pageSubtitle } from '@/app/lib/styles';
-import type { CreationProgressData, Outline, Chapter } from '@/shared/types';
+import type { CreationProgressData } from '@/shared/types';
 import type { WorkflowProjectData } from '@/app/hooks/useWorkflowPrerequisites';
 import CreationProgress from './CreationProgress';
 import ProjectNavigation from './ProjectNavigation';
+
+// Flexible outline type for navigation
+interface OutlineData {
+  id?: string;
+  total_chapters?: number;
+  structure?: any;
+  [key: string]: any;
+}
+
+// Flexible chapter type
+interface ChapterData {
+  id?: string;
+  content?: string | null;
+  [key: string]: any;
+}
 
 interface PageLayoutProps {
   title: string;
@@ -21,8 +36,8 @@ interface PageLayoutProps {
   projectNavigation?: {
     projectId: string;
     project?: WorkflowProjectData | null;
-    outline?: Outline | null;
-    chapters?: Chapter[] | null;
+    outline?: OutlineData | null;
+    chapters?: ChapterData[] | null;
   };
 }
 

@@ -1,7 +1,14 @@
 'use client';
 
 import { useMemo } from 'react';
-import type { Character, PlotStructure, StoryStructure, Chapter } from '../../shared/types';
+import type { Character, PlotStructure, StoryStructure } from '../../shared/types';
+
+// Flexible chapter type for the hook
+interface ChapterData {
+  id?: string;
+  content?: string | null;
+  [key: string]: any;
+}
 
 /**
  * Workflow Prerequisites Hook
@@ -56,11 +63,12 @@ export type WorldData = any[] | {
   systems?: any[];
 };
 
-// Outline data structure
+// Outline data structure - flexible to work with page-specific interfaces
 export interface OutlineData {
   id?: string;
   structure?: StoryStructure;
   total_chapters?: number;
+  [key: string]: any; // Allow additional properties from page-specific types
 }
 
 // Prerequisite check result
@@ -131,7 +139,7 @@ function getMissingItemsForStep(
   step: WorkflowStep,
   project: WorkflowProjectData | null,
   outline?: OutlineData | null,
-  chapters?: Chapter[] | null
+  chapters?: ChapterData[] | null
 ): string[] {
   const missing: string[] = [];
 
@@ -258,7 +266,7 @@ export function useWorkflowPrerequisites(
   projectId: string | null,
   project: WorkflowProjectData | null,
   outline?: OutlineData | null,
-  chapters?: Chapter[] | null
+  chapters?: ChapterData[] | null
 ): UseWorkflowPrerequisitesResult {
   const prerequisites = useMemo<PrerequisitesMap>(() => {
     // Define prerequisite chain
