@@ -405,6 +405,7 @@ router.get('/:id', (req, res) => {
       story_dna: safeJsonParse(project.story_dna as any, null),
       story_bible: safeJsonParse(project.story_bible as any, null),
       story_concept: safeJsonParse((project as any).story_concept, null),
+      plot_structure: safeJsonParse((project as any).plot_structure, null),
       metrics: metricsService.getFormattedMetrics(project.id),
     };
 
