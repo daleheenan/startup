@@ -39,7 +39,7 @@ BEGIN
     UPDATE project_metrics
     SET
         total_word_count = (
-            SELECT COALESCE(SUM(word_count), 0)
+            SELECT COALESCE(SUM(c.word_count), 0)
             FROM chapters c
             JOIN books b ON c.book_id = b.id
             WHERE b.project_id = (SELECT project_id FROM books WHERE id = NEW.book_id)
@@ -52,7 +52,7 @@ BEGIN
             AND c.content IS NOT NULL
         ),
         reading_time_minutes = (
-            SELECT CAST(COALESCE(SUM(word_count), 0) / 250.0 AS INTEGER)
+            SELECT CAST(COALESCE(SUM(c.word_count), 0) / 250.0 AS INTEGER)
             FROM chapters c
             JOIN books b ON c.book_id = b.id
             WHERE b.project_id = (SELECT project_id FROM books WHERE id = NEW.book_id)
