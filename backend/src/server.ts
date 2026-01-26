@@ -97,7 +97,8 @@ app.use(cors({
 }));
 
 // Request body parsing with size limits
-app.use(express.json({ limit: '1mb' }));
+// Increased to 10mb to handle large plot structures with many layers and points
+app.use(express.json({ limit: '10mb' }));
 
 // Request logging with correlation IDs
 app.use(requestLogger());

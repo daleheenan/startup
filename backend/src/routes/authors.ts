@@ -6,35 +6,13 @@
 
 import { Router } from 'express';
 import { randomUUID } from 'crypto';
-import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
 import db from '../db/connection.js';
 import { createLogger } from '../services/logger.service.js';
 import { lookupAuthor } from '../services/author-lookup.service.js';
+import { AUTHOR_STYLES } from '../services/author-styles.js';
 
 const router = Router();
 const logger = createLogger('routes:authors');
-
-// Load AUTHOR_STYLES at runtime from shared directory
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const sharedPath = join(__dirname, '../../../shared/author-styles.js');
-
-// We'll use dynamic import since we can't statically import from outside rootDir
-let AUTHOR_STYLES: any[] = [];
-
-// Initialize AUTHOR_STYLES from shared module
-(async () => {
-  try {
-    const module = await import(sharedPath);
-    AUTHOR_STYLES = module.AUTHOR_STYLES;
-  } catch (error) {
-    logger.error({ error }, 'Failed to load AUTHOR_STYLES from shared directory');
-    // Fallback to empty array if can't load
-    AUTHOR_STYLES = [];
-  }
-})();
 
 /**
  * Helper: Safely parse JSON with fallback
