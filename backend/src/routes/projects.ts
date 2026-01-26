@@ -334,11 +334,25 @@ router.get('/:id/progress', (req, res) => {
         return sum + (end - start);
       }, 0);
       averageChapterTime = totalTime / completedJobs.length;
+      logger.info({
+        completedJobsCount: completedJobs.length,
+        totalTimeMs: totalTime,
+        averageChapterTimeMs: averageChapterTime,
+        averageChapterTimeSec: Math.round(averageChapterTime / 1000),
+      }, 'Time estimate calculation');
     }
 
     // Calculate remaining chapters: total chapters minus those with content
     const remainingChapters = allChapters.length - chapterStats.completed;
     const estimatedRemaining = averageChapterTime * remainingChapters;
+
+    logger.info({
+      totalChapters: allChapters.length,
+      completedChapters: chapterStats.completed,
+      remainingChapters,
+      estimatedRemainingMs: estimatedRemaining,
+      estimatedRemainingMin: Math.round(estimatedRemaining / 60000),
+    }, 'Progress calculation');
 
     // Step 9: Get rate limit status
     const rateLimitStmt = db.prepare(`
