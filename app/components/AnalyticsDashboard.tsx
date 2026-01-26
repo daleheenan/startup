@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import type { BookAnalytics, ChapterAnalytics, GenreBenchmark } from '../../shared/types';
+import { getToken } from '../lib/auth';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 interface AnalyticsDashboardProps {
   bookId: string;
@@ -24,16 +27,21 @@ export default function AnalyticsDashboard({ bookId }: AnalyticsDashboardProps) 
   const loadAnalytics = async () => {
     try {
       setLoading(true);
+      const token = getToken();
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      };
 
       // Load book analytics
-      const bookResponse = await fetch(`/api/analytics/book/${bookId}`);
+      const bookResponse = await fetch(`${API_BASE_URL}/api/analytics/book/${bookId}`, { headers });
       if (bookResponse.ok) {
         const bookData = await bookResponse.json();
         setBookAnalytics(bookData.analytics);
       }
 
       // Load chapter analytics
-      const chaptersResponse = await fetch(`/api/analytics/book/${bookId}/chapters`);
+      const chaptersResponse = await fetch(`${API_BASE_URL}/api/analytics/book/${bookId}/chapters`, { headers });
       if (chaptersResponse.ok) {
         const chaptersData = await chaptersResponse.json();
         setChapterAnalytics(chaptersData.analytics || []);
@@ -48,8 +56,13 @@ export default function AnalyticsDashboard({ bookId }: AnalyticsDashboardProps) 
   const handleAnalyzeBook = async () => {
     setAnalyzing(true);
     try {
-      const response = await fetch(`/api/analytics/book/${bookId}/analyze`, {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/analytics/book/${bookId}/analyze`, {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
       });
 
       if (response.ok) {

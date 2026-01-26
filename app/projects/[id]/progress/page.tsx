@@ -231,8 +231,9 @@ export default function ProgressPage() {
     // Queue paused
     if (progress.queue.paused > 0) return 'paused';
 
-    // If we have chapters with content but no active queue, consider it completed
-    if (effectiveCompletedChapters > 0) {
+    // If we have chapters with content and no pending/running jobs, consider it completed
+    // This handles cases where data might be inconsistent (e.g., duplicate chapters)
+    if (effectiveCompletedChapters > 0 && progress.queue.pending === 0 && progress.queue.running === 0) {
       return 'completed';
     }
 
@@ -240,9 +241,9 @@ export default function ProgressPage() {
   };
 
   const getChapterStatus = (chapter: Chapter) => {
+    // Any chapter with content is considered completed/readable
+    if (chapter.word_count > 0) return 'completed';
     if (chapter.status === 'completed') return 'completed';
-    // Consider chapters with content as readable (even if still being edited)
-    if ((chapter.status === 'editing' || chapter.status === 'processing') && chapter.word_count > 0) return 'completed';
     if (chapter.status === 'writing' || chapter.status === 'editing' || chapter.status === 'processing') return 'in-progress';
     return 'pending';
   };
