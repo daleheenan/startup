@@ -62,6 +62,7 @@ async function deleteStoryIdea(id: string): Promise<void> {
 
 /**
  * Expand a story idea into full concepts
+ * Note: Uses extended timeout (120s) because Claude Opus concept generation can take 60-90 seconds
  */
 async function expandStoryIdea(
   id: string,
@@ -72,6 +73,7 @@ async function expandStoryIdea(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ mode, preferences }),
+    timeout: 120000, // 120 seconds for AI concept generation
   });
   if (!response.ok) {
     const error = await response.json();

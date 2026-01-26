@@ -92,7 +92,25 @@ export default function PlotLayersVisualization({
     const before = sortedPoints.filter(p => p.chapter_number < chapter).pop();
     const after = sortedPoints.find(p => p.chapter_number > chapter);
 
-    if (!before && !after) return 0;
+    // If no points at all, show a default curve based on layer type
+    if (!before && !after) {
+      // Generate a typical story arc curve based on the chapter position
+      const progress = chapter / totalChapters;
+      if (layer.type === 'main') {
+        // Main plot: builds tension, peaks at climax, resolves
+        if (progress < 0.25) return 1 + progress * 4; // Setup: 1 -> 2
+        if (progress < 0.5) return 2 + (progress - 0.25) * 6; // Rising: 2 -> 3.5
+        if (progress < 0.75) return 3.5 + (progress - 0.5) * 4; // Crisis: 3.5 -> 4.5
+        if (progress < 0.9) return 4.5 + (progress - 0.75) * 3.3; // Climax: 4.5 -> 5
+        return 5 - (progress - 0.9) * 25; // Resolution: 5 -> 2.5
+      } else {
+        // Subplots and arcs: gentler curve
+        if (progress < 0.3) return 1 + progress * 3.3; // 1 -> 2
+        if (progress < 0.7) return 2 + (progress - 0.3) * 2.5; // 2 -> 3
+        return 3 - (progress - 0.7) * 6.7; // 3 -> 1
+      }
+    }
+
     if (!before) return after!.impact_level * 0.5;
     if (!after) {
       // Layer resolved

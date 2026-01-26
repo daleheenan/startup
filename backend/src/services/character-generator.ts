@@ -167,7 +167,7 @@ function buildProtagonistPrompt(context: CharacterGenerationContext, assignedNat
 
   const nationalityGuidance = assignedNationality
     ? `\n\nIMPORTANT: The protagonist MUST be from ${assignedNationality}. Ensure their nationality field is set to "${assignedNationality}" and their background, ethnicity, and cultural details are consistent with this nationality.`
-    : '';
+    : `\n\nIMPORTANT NATIONALITY GUIDANCE: Choose a nationality that fits the story's setting naturally. Do NOT default to any particular ethnicity. For stories without a specific cultural setting, default to American or British. For stories set in specific regions, use nationalities from that region. DO NOT artificially force diversity by choosing African, Asian, or other ethnicities unless the story context calls for it.`;
 
   return `You are a master character creator. Based on this story, create a compelling, three-dimensional protagonist.${nationalityGuidance}
 
@@ -186,9 +186,9 @@ Create a protagonist who:
 5. Feels authentic and three-dimensional
 
 Provide:
-- **name**: Full name (first and last, culturally appropriate)
-- **ethnicity**: Cultural/ethnic background (e.g., East Asian, Mediterranean, West African, Nordic, etc.)
-- **nationality**: Country or region of origin (can be fictional for fantasy/sci-fi)
+- **name**: Full name (first and last, appropriate to the story setting - default to American/British names unless the story suggests otherwise)
+- **ethnicity**: Cultural/ethnic background (should match nationality naturally)
+- **nationality**: Country or region of origin (default to American or British unless story context suggests otherwise; can be fictional for fantasy/sci-fi)
 - **physicalDescription**: Brief physical description (2-3 sentences)
 - **personality**: 5-7 key personality traits
 - **voiceSample**: A 150-word sample in the character's voice (first-person internal monologue about their current situation)
@@ -238,7 +238,7 @@ The supporting cast MUST include characters from these specific nationalities in
 ${assignedNationalities.map((nat, i) => `${i + 1}. Character ${i + 1}: ${nat}`).join('\n')}
 
 Ensure each character's nationality field matches their assigned nationality, and their background, ethnicity, and cultural details are consistent.`
-    : '';
+    : `\n\nIMPORTANT NATIONALITY GUIDANCE: The supporting cast should have nationalities that fit the story's setting naturally. Match the protagonist's cultural context unless the story requires otherwise. Do NOT artificially force diversity by choosing African, Asian, or other ethnicities unless the story context calls for it. For stories without a specific cultural setting, default to American or British nationalities.`;
 
   return `You are a master character creator. Based on this story and protagonist, create a supporting cast of 4-6 characters who will populate this story world.${nationalityGuidance}
 
@@ -251,6 +251,7 @@ Themes: ${themes.join(', ')}
 
 **Protagonist:**
 Name: ${protagonist.name}
+Nationality: ${protagonist.nationality || 'Not specified'}
 Personality: ${protagonist.personality.join(', ')}
 Goals: ${protagonist.goals.join(', ')}
 Current State: ${protagonist.currentState}
@@ -263,10 +264,10 @@ Create 4-6 supporting characters with these roles:
 5. **Supporting Characters** (1-2): Other important characters (rival, family member, etc.)
 
 For EACH character, provide the same structure as the protagonist:
-- name (culturally appropriate)
+- name (appropriate to the story setting - should generally match protagonist's cultural context)
 - role (one of: antagonist, mentor, sidekick, love_interest, supporting)
-- ethnicity (cultural/ethnic background)
-- nationality (country or region, can be fictional)
+- ethnicity (cultural/ethnic background - should match nationality)
+- nationality (country or region - should fit story setting, can be fictional)
 - physicalDescription
 - personality (5-7 traits)
 - voiceSample (100-150 words in their voice)

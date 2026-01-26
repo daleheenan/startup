@@ -156,7 +156,7 @@ export default function WorldPage() {
   };
 
   const handleContinue = () => {
-    router.push(`/projects/${projectId}/outline`);
+    router.push(`/projects/${projectId}/plot`);
   };
 
   const getTypeIcon = (type: string) => {
@@ -398,7 +398,7 @@ export default function WorldPage() {
                         boxShadow: '0 4px 14px rgba(102, 126, 234, 0.3)',
                       }}
                     >
-                      Continue to Outline →
+                      Continue to Plot →
                     </button>
                     <Link
                       href={`/projects/${projectId}/characters`}

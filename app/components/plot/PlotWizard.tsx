@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { colors } from '../../lib/constants';
 
 // Types
@@ -81,6 +81,96 @@ export default function PlotWizard({
   const [localPlots, setLocalPlots] = useState<PlotLayer[]>(plotLayers);
   const [pacingNotes, setPacingNotes] = useState<string>('');
   const [isGeneratingPacing, setIsGeneratingPacing] = useState(false);
+  const [validatingCoherence, setValidatingCoherence] = useState(false);
+  const [isCoherent, setIsCoherent] = useState<boolean | null>(null);
+  const [coherenceWarnings, setCoherenceWarnings] = useState<string[]>([]);
+  const [coherenceSuggestions, setCoherenceSuggestions] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Sync local state when plotLayers prop changes (e.g., after auto-population)
+  useEffect(() => {
+    if (plotLayers.length > 0 && localPlots.length === 0) {
+      setLocalPlots(plotLayers);
+    } else if (plotLayers.length > localPlots.length) {
+      // If more plots were added externally, merge them
+      setLocalPlots(plotLayers);
+    }
+  }, [plotLayers]);
+
+  // Auto-save plot layers when they change
+  useEffect(() => {
+    // Skip if localPlots is empty or same as plotLayers
+    if (localPlots.length === 0) return;
+
+    // Compare to see if there's an actual change
+    const plotsChanged = JSON.stringify(localPlots) !== JSON.stringify(plotLayers);
+    if (!plotsChanged) return;
+
+    // Debounce the save to avoid too many API calls
+    const saveTimeout = setTimeout(async () => {
+      setIsSaving(true);
+      try {
+        const token = localStorage.getItem('novelforge_token');
+        const res = await fetch(`${API_BASE_URL}/api/projects/${projectId}/plot-structure`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            plot_structure: {
+              plot_layers: localPlots,
+              act_structure: {
+                act_one_end: 5,
+                act_two_midpoint: 12,
+                act_two_end: 20,
+                act_three_climax: 23,
+              },
+              pacing_notes: '',
+            }
+          }),
+        });
+        if (!res.ok) {
+          console.error('Failed to auto-save plot layers');
+        }
+      } catch (err) {
+        console.error('Error auto-saving plot layers:', err);
+      } finally {
+        setIsSaving(false);
+      }
+    }, 1000); // 1 second debounce
+
+    return () => clearTimeout(saveTimeout);
+  }, [localPlots, plotLayers, projectId]);
+
+  // Validate plot coherence with story concept/DNA
+  const validatePlotCoherence = async () => {
+    setValidatingCoherence(true);
+
+    try {
+      const token = localStorage.getItem('novelforge_token');
+      const res = await fetch(`${API_BASE_URL}/api/projects/${projectId}/validate-plot-coherence`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to validate plot coherence');
+      }
+
+      const data = await res.json();
+      setIsCoherent(data.isCoherent);
+      setCoherenceWarnings(data.warnings || []);
+      setCoherenceSuggestions(data.suggestions || []);
+    } catch (err: any) {
+      console.error('Error validating plot coherence:', err);
+    } finally {
+      setValidatingCoherence(false);
+    }
+  };
 
   // Get main plot (from concept or first main type)
   const mainPlot = localPlots.find(p => p.type === 'main' || p.isFromConcept);
@@ -310,6 +400,7 @@ export default function PlotWizard({
         {/* Step 3: Subplots */}
         {currentStep === 'subplots' && (
           <SubplotsStep
+            projectId={projectId}
             subplots={subplots}
             recommendations={getSubplotRecommendations(bookWordCount)}
             onAdd={(name, description) => handleAddPlot('subplot', name, description)}
@@ -333,11 +424,18 @@ export default function PlotWizard({
         {/* Step 5: Pacing & Review */}
         {currentStep === 'pacing' && (
           <PacingReviewStep
+            projectId={projectId}
             allPlots={localPlots}
             bookWordCount={bookWordCount}
             pacingNotes={pacingNotes}
             isGenerating={isGeneratingPacing}
             onGenerate={handleGeneratePacing}
+            onAddSubplot={(name, description) => handleAddPlot('subplot', name, description)}
+            validatingCoherence={validatingCoherence}
+            isCoherent={isCoherent}
+            coherenceWarnings={coherenceWarnings}
+            coherenceSuggestions={coherenceSuggestions}
+            onValidateCoherence={validatePlotCoherence}
           />
         )}
       </div>
@@ -591,11 +689,19 @@ function CharacterArcsStep({
   const [selectedCharId, setSelectedCharId] = useState<string | null>(null);
   const [arcDescription, setArcDescription] = useState('');
 
-  const mainCharacters = characters.filter(c =>
-    c.role.toLowerCase().includes('protagonist') ||
-    c.role.toLowerCase().includes('main') ||
-    c.role.toLowerCase().includes('antagonist')
-  );
+  // Filter characters who can have arcs - include all major roles, not just protagonist/antagonist
+  const mainCharacters = characters.filter(c => {
+    const role = c.role.toLowerCase();
+    // Include protagonist, antagonist, and any supporting characters
+    return role === 'protagonist' ||
+           role === 'antagonist' ||
+           role === 'mentor' ||
+           role === 'sidekick' ||
+           role === 'love_interest' ||
+           role.includes('main') ||
+           role.includes('supporting') ||
+           characters.length <= 7; // If we have few characters, include all of them
+  });
 
   const handleCreateArc = () => {
     const character = characters.find(c => c.id === selectedCharId);
@@ -773,13 +879,17 @@ function CharacterArcsStep({
   );
 }
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 function SubplotsStep({
+  projectId,
   subplots,
   recommendations,
   onAdd,
   onUpdate,
   onDelete,
 }: {
+  projectId: string;
   subplots: PlotLayer[];
   recommendations: { min: number; max: number; ideal: number; label: string };
   onAdd: (name: string, description: string) => void;
@@ -789,6 +899,55 @@ function SubplotsStep({
   const [showAddForm, setShowAddForm] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleGenerateSubplot = async () => {
+    setIsGenerating(true);
+    try {
+      const token = localStorage.getItem('novelforge_token');
+      // First generate the name
+      const nameRes = await fetch(`${API_BASE_URL}/api/projects/${projectId}/generate-plot-layer-field`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          field: 'name',
+          layerType: 'subplot',
+          existingValues: { name: '', description: '' },
+        }),
+      });
+
+      if (nameRes.ok) {
+        const nameData = await nameRes.json();
+        setName(nameData.value || '');
+
+        // Then generate the description based on the name
+        const descRes = await fetch(`${API_BASE_URL}/api/projects/${projectId}/generate-plot-layer-field`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            field: 'description',
+            layerType: 'subplot',
+            existingValues: { name: nameData.value || '', description: '' },
+          }),
+        });
+
+        if (descRes.ok) {
+          const descData = await descRes.json();
+          setDescription(descData.value || '');
+        }
+      }
+    } catch (err) {
+      console.error('Error generating subplot:', err);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const handleAdd = () => {
     onAdd(name, description);
@@ -916,9 +1075,48 @@ function SubplotsStep({
           borderRadius: '8px',
           border: '1px solid #E2E8F0',
         }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 600, color: colors.text, marginBottom: '1rem' }}>
-            New Subplot
-          </h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: colors.text, margin: 0 }}>
+              New Subplot
+            </h3>
+            <button
+              onClick={handleGenerateSubplot}
+              disabled={isGenerating}
+              style={{
+                padding: '0.5rem 1rem',
+                background: isGenerating ? '#94A3B8' : 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                border: 'none',
+                borderRadius: '6px',
+                color: '#FFFFFF',
+                fontSize: '0.75rem',
+                fontWeight: 500,
+                cursor: isGenerating ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.375rem',
+              }}
+            >
+              {isGenerating ? (
+                <>
+                  <span style={{
+                    display: 'inline-block',
+                    width: '12px',
+                    height: '12px',
+                    border: '2px solid rgba(255,255,255,0.3)',
+                    borderTopColor: '#fff',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite',
+                  }} />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <span>✨</span>
+                  Generate with AI
+                </>
+              )}
+            </button>
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div>
               <label style={{
@@ -1185,22 +1383,124 @@ function SpecializedThreadsStep({
 }
 
 function PacingReviewStep({
+  projectId,
   allPlots,
   bookWordCount,
   pacingNotes,
   isGenerating,
   onGenerate,
+  onAddSubplot,
+  validatingCoherence,
+  isCoherent,
+  coherenceWarnings,
+  coherenceSuggestions,
+  onValidateCoherence,
 }: {
+  projectId: string;
   allPlots: PlotLayer[];
   bookWordCount: number;
   pacingNotes: string;
   isGenerating: boolean;
   onGenerate: () => void;
+  onAddSubplot: (name: string, description: string) => void;
+  validatingCoherence: boolean;
+  isCoherent: boolean | null;
+  coherenceWarnings: string[];
+  coherenceSuggestions: string[];
+  onValidateCoherence: () => void;
 }) {
+  const [implementingRecommendation, setImplementingRecommendation] = useState<string | null>(null);
   const mainPlots = allPlots.filter(p => p.type === 'main');
   const subplots = allPlots.filter(p => p.type === 'subplot');
   const characterArcs = allPlots.filter(p => p.type === 'character-arc');
   const specializedThreads = allPlots.filter(p => p.type === 'mystery' || p.type === 'romance');
+
+  // Parse pacing notes to extract actionable recommendations
+  const getRecommendations = () => {
+    const recommendations: Array<{ type: string; message: string; action: string }> = [];
+    const subplotRec = getSubplotRecommendations(bookWordCount);
+
+    if (subplots.length < subplotRec.min) {
+      const needed = subplotRec.min - subplots.length;
+      recommendations.push({
+        type: 'subplot',
+        message: `Consider adding ${needed} more subplot(s) for a ${subplotRec.label}.`,
+        action: 'add_subplot',
+      });
+    }
+    if (subplots.length > subplotRec.max) {
+      recommendations.push({
+        type: 'subplot_warning',
+        message: `You have ${subplots.length - subplotRec.max} more subplot(s) than recommended. This may complicate pacing.`,
+        action: 'review',
+      });
+    }
+    if (characterArcs.length === 0 && allPlots.length > 0) {
+      recommendations.push({
+        type: 'character_arc',
+        message: 'Consider adding character arcs to deepen your story.',
+        action: 'add_character_arc',
+      });
+    }
+    if (mainPlots.length === 0) {
+      recommendations.push({
+        type: 'main_plot',
+        message: 'A main plot is essential. Add one to define your story\'s core conflict.',
+        action: 'add_main_plot',
+      });
+    }
+    return recommendations;
+  };
+
+  const handleImplementRecommendation = async (recommendation: { type: string; action: string }) => {
+    setImplementingRecommendation(recommendation.type);
+
+    try {
+      if (recommendation.action === 'add_subplot') {
+        // Generate a subplot using AI
+        const token = localStorage.getItem('novelforge_token');
+        const nameRes = await fetch(`${API_BASE_URL}/api/projects/${projectId}/generate-plot-layer-field`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            field: 'name',
+            layerType: 'subplot',
+            existingValues: { name: '', description: '' },
+          }),
+        });
+
+        if (nameRes.ok) {
+          const nameData = await nameRes.json();
+          const descRes = await fetch(`${API_BASE_URL}/api/projects/${projectId}/generate-plot-layer-field`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              field: 'description',
+              layerType: 'subplot',
+              existingValues: { name: nameData.value || '', description: '' },
+            }),
+          });
+
+          if (descRes.ok) {
+            const descData = await descRes.json();
+            onAddSubplot(nameData.value || 'New Subplot', descData.value || '');
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error implementing recommendation:', err);
+    } finally {
+      setImplementingRecommendation(null);
+    }
+  };
+
+  const recommendations = getRecommendations();
 
   return (
     <div>
@@ -1314,15 +1614,129 @@ function PacingReviewStep({
           </button>
         </div>
 
-        {pacingNotes ? (
-          <p style={{ fontSize: '0.875rem', color: '#78350F', margin: 0, lineHeight: 1.6 }}>
-            {pacingNotes}
-          </p>
+        {recommendations.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {recommendations.map((rec, idx) => (
+              <div
+                key={idx}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '0.75rem',
+                  background: 'rgba(255, 255, 255, 0.7)',
+                  borderRadius: '6px',
+                  gap: '1rem',
+                }}
+              >
+                <p style={{ fontSize: '0.875rem', color: '#78350F', margin: 0, flex: 1 }}>
+                  {rec.message}
+                </p>
+                {rec.action === 'add_subplot' && (
+                  <button
+                    onClick={() => handleImplementRecommendation(rec)}
+                    disabled={implementingRecommendation === rec.type}
+                    style={{
+                      padding: '0.375rem 0.75rem',
+                      background: implementingRecommendation === rec.type
+                        ? '#94A3B8'
+                        : 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                      border: 'none',
+                      borderRadius: '6px',
+                      color: '#FFFFFF',
+                      fontSize: '0.75rem',
+                      fontWeight: 500,
+                      cursor: implementingRecommendation === rec.type ? 'not-allowed' : 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {implementingRecommendation === rec.type ? 'Adding...' : 'Implement'}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
         ) : (
-          <p style={{ fontSize: '0.875rem', color: '#78350F', margin: 0, fontStyle: 'italic' }}>
-            Click "Generate Pacing Notes" to get AI-powered recommendations for your plot structure.
+          <p style={{ fontSize: '0.875rem', color: '#047857', margin: 0 }}>
+            ✓ Plot structure looks balanced for your book length. Good pacing potential!
           </p>
         )}
+
+        {pacingNotes && (
+          <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #FCD34D' }}>
+            <p style={{ fontSize: '0.875rem', color: '#78350F', margin: 0, lineHeight: 1.6 }}>
+              {pacingNotes}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Plot Coherence Validation */}
+      <div style={{
+        padding: '1.5rem',
+        background: isCoherent === true ? '#ECFDF5' : isCoherent === false ? '#FEF2F2' : '#F9FAFB',
+        border: `1px solid ${isCoherent === true ? '#A7F3D0' : isCoherent === false ? '#FECACA' : '#E5E7EB'}`,
+        borderRadius: '8px',
+        marginBottom: '2rem',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div style={{ flex: 1 }}>
+            <h3 style={{
+              fontSize: '1rem',
+              fontWeight: 600,
+              color: isCoherent === true ? '#047857' : isCoherent === false ? '#DC2626' : colors.text,
+              marginBottom: '0.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}>
+              {isCoherent === true && '✓ '}
+              {isCoherent === false && '⚠ '}
+              Plot Coherence Check
+            </h3>
+            {isCoherent === null && (
+              <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
+                Validate that your plots align with your story concept and genre.
+              </p>
+            )}
+            {coherenceWarnings.length > 0 && (
+              <ul style={{ margin: '0.5rem 0', paddingLeft: '1.25rem', fontSize: '0.875rem', color: '#B45309' }}>
+                {coherenceWarnings.map((warning, i) => (
+                  <li key={i} style={{ marginBottom: '0.25rem' }}>{warning}</li>
+                ))}
+              </ul>
+            )}
+            {coherenceSuggestions.length > 0 && (
+              <ul style={{ margin: '0.5rem 0', paddingLeft: '1.25rem', fontSize: '0.875rem', color: '#4338CA' }}>
+                {coherenceSuggestions.map((suggestion, i) => (
+                  <li key={i} style={{ marginBottom: '0.25rem' }}>{suggestion}</li>
+                ))}
+              </ul>
+            )}
+            {isCoherent === true && coherenceWarnings.length === 0 && (
+              <p style={{ fontSize: '0.875rem', color: '#047857', margin: 0 }}>
+                Your plots are coherent with your story concept. Ready to generate outline!
+              </p>
+            )}
+          </div>
+          <button
+            onClick={onValidateCoherence}
+            disabled={validatingCoherence || allPlots.length === 0}
+            style={{
+              padding: '0.5rem 1rem',
+              background: validatingCoherence || allPlots.length === 0 ? '#E5E7EB' : '#FFFFFF',
+              border: '1px solid #D1D5DB',
+              borderRadius: '6px',
+              color: validatingCoherence || allPlots.length === 0 ? '#9CA3AF' : colors.text,
+              fontSize: '0.813rem',
+              fontWeight: 500,
+              cursor: validatingCoherence || allPlots.length === 0 ? 'not-allowed' : 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {validatingCoherence ? 'Checking...' : isCoherent !== null ? 'Re-check' : 'Validate Coherence'}
+          </button>
+        </div>
       </div>
 
       {/* Warnings */}

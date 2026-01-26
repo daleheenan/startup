@@ -109,12 +109,10 @@ export const generateConceptsSchema = z.object({
     data => data.genre || (data.genres && data.genres.length > 0),
     { message: 'Genre or genres array is required' }
   ).refine(
-    data => data.subgenre || (data.subgenres && data.subgenres.length > 0),
-    { message: 'Subgenre or subgenres array is required' }
-  ).refine(
     data => data.tone || (data.tones && data.tones.length > 0),
     { message: 'At least one tone is required' }
   ),
+  // Note: Subgenre is now OPTIONAL - many genres work fine without subgenres
   count: z.number().int().min(1).max(10).optional().default(5),  // Support 5 or 10 full concepts
 });
 

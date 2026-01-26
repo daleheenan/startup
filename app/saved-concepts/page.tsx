@@ -35,6 +35,7 @@ export default function SavedConceptsPage() {
   const [editForm, setEditForm] = useState<Partial<SavedConcept>>({});
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterGenre, setFilterGenre] = useState<string>('all');
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
 
   useEffect(() => {
     loadConcepts();
@@ -167,13 +168,20 @@ export default function SavedConceptsPage() {
   };
 
   const handleUseConcept = async (concept: SavedConcept) => {
+    setIsCreatingProject(true);
+    setError(null);
     try {
       const token = getToken();
 
-      // Build preferences object, ensuring required fields are present
+      // Build preferences object, ensuring ALL required fields are present
+      // The createProjectSchema requires: genre, and optionally: subgenre, tone, themes, etc.
       const preferences = {
         ...concept.preferences,
-        genre: concept.preferences?.genre || 'General Fiction',  // Fallback if missing
+        genre: concept.preferences?.genre || 'General Fiction',
+        // Ensure other fields have reasonable defaults if missing
+        subgenre: concept.preferences?.subgenre || concept.preferences?.subgenres?.[0] || undefined,
+        tone: concept.preferences?.tone || concept.preferences?.tones?.[0] || undefined,
+        themes: concept.preferences?.themes || [],
       };
 
       // Create project from concept
@@ -204,6 +212,60 @@ export default function SavedConceptsPage() {
 
       const project = await response.json();
 
+      // Build context for generation from concept data
+      const generationContext = {
+        title: concept.title,
+        synopsis: concept.synopsis,
+        genre: preferences.genre,
+        subgenre: preferences.subgenre,
+        tone: preferences.tone,
+        themes: preferences.themes,
+      };
+
+      // Pre-populate characters, world, and plots in parallel
+      // These are fire-and-forget - we don't wait for them to complete
+      // The user will see "Generating..." indicators on the project page
+      const generatePromises = [
+        // Generate characters
+        fetch(`${API_BASE_URL}/api/projects/${project.id}/characters`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ context: generationContext }),
+        }).catch(err => console.error('Character generation started:', err)),
+
+        // Generate world elements
+        fetch(`${API_BASE_URL}/api/projects/${project.id}/world`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ context: generationContext }),
+        }).catch(err => console.error('World generation started:', err)),
+
+        // Extract plots from concept
+        fetch(`${API_BASE_URL}/api/projects/${project.id}/extract-plots-from-concept`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            synopsis: concept.synopsis,
+            logline: concept.logline,
+            hook: concept.hook,
+            protagonistHint: concept.protagonist_hint,
+            conflictType: concept.conflict_type,
+          }),
+        }).catch(err => console.error('Plot extraction started:', err)),
+      ];
+
+      // Start generation in background (don't wait)
+      Promise.all(generatePromises).catch(() => {});
+
       // Mark concept as used
       await fetch(`${API_BASE_URL}/api/saved-concepts/${concept.id}`, {
         method: 'PATCH',
@@ -219,6 +281,8 @@ export default function SavedConceptsPage() {
     } catch (err: any) {
       console.error('Error using concept:', err);
       setError(err.message);
+    } finally {
+      setIsCreatingProject(false);
     }
   };
 
@@ -590,19 +654,21 @@ export default function SavedConceptsPage() {
                         </button>
                         <button
                           onClick={() => handleUseConcept(concept)}
+                          disabled={isCreatingProject}
                           style={{
                             padding: '0.5rem 1rem',
-                            background: `linear-gradient(135deg, ${colors.brandStart} 0%, ${colors.brandEnd} 100%)`,
+                            background: isCreatingProject ? colors.textTertiary : `linear-gradient(135deg, ${colors.brandStart} 0%, ${colors.brandEnd} 100%)`,
                             border: 'none',
                             borderRadius: borderRadius.sm,
                             color: 'white',
                             fontSize: '0.875rem',
                             fontWeight: 600,
-                            cursor: 'pointer',
+                            cursor: isCreatingProject ? 'wait' : 'pointer',
                             whiteSpace: 'nowrap',
+                            opacity: isCreatingProject ? 0.7 : 1,
                           }}
                         >
-                          Use Concept
+                          {isCreatingProject ? 'Creating Project...' : 'Use Concept'}
                         </button>
                         <button
                           onClick={() => setShowOriginalityCheck(

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import PageLayout from '../../../components/shared/PageLayout';
 import PlotLayersVisualization from '../../../components/PlotLayersVisualization';
 import PlotWizard from '../../../components/plot/PlotWizard';
@@ -90,6 +90,7 @@ const LAYER_TYPES: Array<{ value: PlotLayer['type']; label: string }> = [
 
 export default function PlotStructurePage() {
   const params = useParams();
+  const router = useRouter();
   const projectId = params.id as string;
 
   const [structure, setStructure] = useState<StoryStructure>({
@@ -685,7 +686,6 @@ export default function PlotStructurePage() {
   const handleWizardUpdate = async (plots: PlotLayer[]) => {
     const newStructure = { ...structure, plot_layers: plots };
     await saveStructure(newStructure);
-    setIsWizardMode(false);
 
     // Show success message
     const successMsg = document.createElement('div');
@@ -701,9 +701,14 @@ export default function PlotStructurePage() {
       box-shadow: 0 4px 12px rgba(0,0,0,0.2);
       z-index: 9999;
     `;
-    successMsg.textContent = 'Plot structure saved successfully!';
+    successMsg.textContent = 'Plot structure saved! Redirecting to outline...';
     document.body.appendChild(successMsg);
-    setTimeout(() => successMsg.remove(), 3000);
+
+    // Navigate to Story Outline page after brief delay
+    setTimeout(() => {
+      successMsg.remove();
+      router.push(`/projects/${projectId}/outline`);
+    }, 1500);
   };
 
   const cardStyle = {
@@ -1287,6 +1292,42 @@ export default function PlotStructurePage() {
             rows={6}
             style={{ ...inputStyle, resize: 'vertical' }}
           />
+        </div>
+
+        {/* Continue to Outline button */}
+        <div style={{
+          ...cardStyle,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
+          border: '1px solid rgba(102, 126, 234, 0.3)',
+        }}>
+          <div>
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: colors.text, marginBottom: '0.25rem' }}>
+              Ready to proceed?
+            </h3>
+            <p style={{ fontSize: '0.813rem', color: colors.textSecondary, margin: 0 }}>
+              Continue to create your story outline based on these plot layers.
+            </p>
+          </div>
+          <button
+            onClick={() => router.push(`/projects/${projectId}/outline`)}
+            style={{
+              padding: '0.75rem 1.5rem',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              border: 'none',
+              borderRadius: '8px',
+              color: '#FFFFFF',
+              fontSize: '0.938rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              boxShadow: '0 4px 14px rgba(102, 126, 234, 0.4)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Continue to Outline →
+          </button>
         </div>
 
         {/* Saving indicator */}

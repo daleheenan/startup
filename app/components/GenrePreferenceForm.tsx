@@ -959,11 +959,11 @@ export default function GenrePreferenceForm({ onSubmit, isLoading }: GenrePrefer
       timeGapFromSource: useExistingUniverse && timeGapFromSource.trim() ? timeGapFromSource.trim() : undefined,
       // Author style reference
       authorStyleId: selectedAuthorStyle || undefined,
-      // Timeframe/Era - support both legacy string and new structured format
-      timeframe: timePeriod.type !== 'present' ? getTimeframeDescription(timePeriod) : (timeframe.trim() || undefined),
-      // Structured Time Period (Phase 4)
-      timePeriod: timePeriod.type !== 'present' ? timePeriod : undefined,
-      timePeriodType: timePeriod.type !== 'present' ? timePeriod.type : undefined,
+      // Timeframe/Era - ALWAYS send, including for 'present' (modern-day) setting
+      timeframe: getTimeframeDescription(timePeriod),
+      // Structured Time Period (Phase 4) - ALWAYS include to enforce time constraints
+      timePeriod: timePeriod,
+      timePeriodType: timePeriod.type,
       specificYear: timePeriod.type === 'custom' ? timePeriod.year : undefined,
       nationalityConfig: nationalityConfig.mode !== 'none' ? nationalityConfig : undefined,
       generateMode,

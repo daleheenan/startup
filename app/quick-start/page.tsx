@@ -275,10 +275,10 @@ export default function QuickStartPage() {
       customIdeas: quickPrompt.trim() || undefined,
       targetLength: 80000,
       projectType: quickProjectType,
-      // Time period settings
-      timeframe: quickTimePeriod.type !== 'present' ? getTimeframeDescription(quickTimePeriod) : undefined,
-      timePeriod: quickTimePeriod.type !== 'present' ? quickTimePeriod : undefined,
-      timePeriodType: quickTimePeriod.type !== 'present' ? quickTimePeriod.type : undefined,
+      // Time period settings - ALWAYS send, including 'present' for modern-day stories
+      timeframe: getTimeframeDescription(quickTimePeriod),
+      timePeriod: quickTimePeriod,
+      timePeriodType: quickTimePeriod.type,
       specificYear: quickTimePeriod.type === 'custom' ? quickTimePeriod.year : undefined,
     };
 
