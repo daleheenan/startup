@@ -23,7 +23,6 @@ export default function StoryIdeasPage() {
   const [expandedIdea, setExpandedIdea] = useState<string | null>(null);
   const [editingIdea, setEditingIdea] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<SavedStoryIdea>>({});
-  const [showExpansionModal, setShowExpansionModal] = useState<string | null>(null);
   const [filterGenre, setFilterGenre] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
 
@@ -69,13 +68,12 @@ export default function StoryIdeasPage() {
 
   const handleExpand = async (ideaId: string, mode: IdeaExpansionMode) => {
     try {
-      const result = await expandIdeaMutation.mutateAsync({ id: ideaId, mode });
+      await expandIdeaMutation.mutateAsync({ id: ideaId, mode });
       // Redirect to saved concepts page to see the new concepts
       router.push('/saved-concepts');
     } catch (err) {
       console.error('Error expanding idea:', err);
     }
-    setShowExpansionModal(null);
   };
 
   if (isLoading) {
@@ -456,7 +454,8 @@ export default function StoryIdeasPage() {
                           {expandedIdea === idea.id ? 'Show Less' : 'Show More'}
                         </button>
                         <button
-                          onClick={() => setShowExpansionModal(idea.id)}
+                          onClick={() => handleExpand(idea.id, 'concepts_5')}
+                          disabled={expandIdeaMutation.isPending}
                           style={{
                             padding: '0.5rem 1rem',
                             background: `linear-gradient(135deg, ${colors.brandStart} 0%, ${colors.brandEnd} 100%)`,
@@ -465,11 +464,30 @@ export default function StoryIdeasPage() {
                             color: 'white',
                             fontSize: '0.875rem',
                             fontWeight: 600,
-                            cursor: 'pointer',
+                            cursor: expandIdeaMutation.isPending ? 'wait' : 'pointer',
                             whiteSpace: 'nowrap',
+                            opacity: expandIdeaMutation.isPending ? 0.7 : 1,
                           }}
                         >
-                          Expand to Concepts
+                          {expandIdeaMutation.isPending ? 'Generating...' : 'Generate 5 Concepts'}
+                        </button>
+                        <button
+                          onClick={() => handleExpand(idea.id, 'concepts_10')}
+                          disabled={expandIdeaMutation.isPending}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            background: colors.surface,
+                            border: `2px solid ${colors.brandBorder}`,
+                            borderRadius: borderRadius.sm,
+                            color: colors.brandText,
+                            fontSize: '0.875rem',
+                            fontWeight: 600,
+                            cursor: expandIdeaMutation.isPending ? 'wait' : 'pointer',
+                            whiteSpace: 'nowrap',
+                            opacity: expandIdeaMutation.isPending ? 0.7 : 1,
+                          }}
+                        >
+                          {expandIdeaMutation.isPending ? 'Generating...' : 'Generate 10 Concepts'}
                         </button>
                         <button
                           onClick={() => handleStartEdit(idea)}
@@ -486,6 +504,26 @@ export default function StoryIdeasPage() {
                         >
                           Edit
                         </button>
+                        <select
+                          value={idea.status}
+                          onChange={(e) => updateIdeaMutation.mutate({
+                            id: idea.id,
+                            updates: { status: e.target.value as 'saved' | 'used' | 'archived' }
+                          })}
+                          style={{
+                            padding: '0.5rem 0.75rem',
+                            background: colors.surface,
+                            border: `1px solid ${colors.border}`,
+                            borderRadius: borderRadius.sm,
+                            color: colors.text,
+                            fontSize: '0.875rem',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <option value="saved">Saved</option>
+                          <option value="used">Used</option>
+                          <option value="archived">Archived</option>
+                        </select>
                         <button
                           onClick={() => handleDelete(idea.id)}
                           disabled={deleteIdeaMutation.isPending}
@@ -511,134 +549,6 @@ export default function StoryIdeasPage() {
           )}
         </div>
       </main>
-
-      {/* Expansion Modal */}
-      {showExpansionModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-          }}
-          onClick={() => setShowExpansionModal(null)}
-        >
-          <div
-            style={{
-              background: colors.surface,
-              borderRadius: borderRadius.lg,
-              padding: '2rem',
-              maxWidth: '480px',
-              width: '90%',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: colors.text, marginBottom: '0.5rem' }}>
-              Expand Story Idea
-            </h2>
-            <p style={{ fontSize: '0.9375rem', color: colors.textSecondary, marginBottom: '1.5rem' }}>
-              Generate detailed story concepts from this idea. Choose how many concepts to create.
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <button
-                onClick={() => handleExpand(showExpansionModal, 'concepts_5')}
-                disabled={expandIdeaMutation.isPending}
-                style={{
-                  padding: '1rem 1.5rem',
-                  background: `linear-gradient(135deg, ${colors.brandStart} 0%, ${colors.brandEnd} 100%)`,
-                  border: 'none',
-                  borderRadius: borderRadius.md,
-                  color: 'white',
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-              >
-                <div>Generate 5 Concepts</div>
-                <div style={{ fontSize: '0.875rem', fontWeight: 400, opacity: 0.9 }}>
-                  Faster generation, fewer options
-                </div>
-              </button>
-              <button
-                onClick={() => handleExpand(showExpansionModal, 'concepts_10')}
-                disabled={expandIdeaMutation.isPending}
-                style={{
-                  padding: '1rem 1.5rem',
-                  background: colors.surface,
-                  border: `2px solid ${colors.brandBorder}`,
-                  borderRadius: borderRadius.md,
-                  color: colors.brandText,
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-              >
-                <div>Generate 10 Concepts</div>
-                <div style={{ fontSize: '0.875rem', fontWeight: 400, color: colors.textSecondary }}>
-                  More variety to choose from
-                </div>
-              </button>
-            </div>
-
-            {expandIdeaMutation.isPending && (
-              <div style={{
-                marginTop: '1.5rem',
-                textAlign: 'center',
-                color: colors.textSecondary,
-              }}>
-                <div style={{
-                  display: 'inline-block',
-                  width: '24px',
-                  height: '24px',
-                  border: `2px solid ${colors.border}`,
-                  borderTopColor: colors.brandStart,
-                  borderRadius: '50%',
-                  animation: 'spin 1s linear infinite',
-                  marginBottom: '0.5rem',
-                }} />
-                <p style={{ margin: 0 }}>Generating concepts...</p>
-              </div>
-            )}
-
-            {expandIdeaMutation.isError && (
-              <div style={{
-                marginTop: '1rem',
-                padding: '0.75rem 1rem',
-                background: colors.errorLight,
-                border: `1px solid ${colors.errorBorder}`,
-                borderRadius: borderRadius.sm,
-                color: colors.error,
-                fontSize: '0.875rem',
-              }}>
-                Failed to generate concepts. Please try again.
-              </div>
-            )}
-
-            <button
-              onClick={() => setShowExpansionModal(null)}
-              style={{
-                width: '100%',
-                marginTop: '1rem',
-                padding: '0.75rem',
-                background: 'transparent',
-                border: 'none',
-                color: colors.textSecondary,
-                fontSize: '0.9375rem',
-                cursor: 'pointer',
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
 
       <style jsx>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>

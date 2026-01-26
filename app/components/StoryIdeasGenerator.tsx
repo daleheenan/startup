@@ -341,6 +341,7 @@ export default function StoryIdeasGenerator({
                 }}
               >
                 AI-powered creative story ideas for {preferences.genre}
+                {preferences.timePeriod && ` • ${preferences.timePeriod}`}
               </p>
             </div>
             <button

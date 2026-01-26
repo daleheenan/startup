@@ -182,36 +182,35 @@ export class StoryIdeasGenerator {
 CRITICAL: All story ideas MUST be set in the specified time period (${timePeriodText}). The setting, technology, culture, and social norms must accurately reflect this time period. Do NOT set stories in different time periods than specified.
 
 For EACH story idea, provide:
-1. **storyIdea**: A compelling 2-3 sentence premise that hooks the reader. Include the protagonist, their challenge, and what makes this story special.
-2. **characterConcepts**: 3-4 unique character concepts (protagonist and key supporting characters). Each should have a name, role, and one distinctive trait.
-3. **plotElements**: 3-4 major plot elements or events that drive the story forward.
-4. **uniqueTwists**: 2-3 unique twists or unexpected elements that make this story stand out.
+1. **storyIdea**: A BRIEF hook/premise in 3-4 lines maximum. Just enough to intrigue - NOT a full synopsis. Focus on the core conflict and what makes this story unique.
+2. **characterConcepts**: 2-3 character concepts. Each should have a name, role, and one distinctive trait. Use names appropriate to the story's setting (e.g., Western names for stories set in Western countries, period-appropriate names for historical settings).
+3. **plotElements**: 2-3 key plot elements that drive the story forward.
+4. **uniqueTwists**: 2 unique twists or unexpected elements that make this story stand out.
 
 **REQUIREMENTS:**
 - Each idea must be DRAMATICALLY different from the others
 - Avoid cliches and overused tropes
-- Characters should have unique, culturally diverse names
-- Plot elements should build tension and stakes
+- Keep the storyIdea BRIEF (3-4 lines max) - this is a seed idea, not a full concept
+- Character names should fit the story's setting naturally (don't force diversity)
+- Plot elements should hint at tension without revealing the full story
 - Twists should subvert reader expectations
 
 Return ONLY a JSON array in this exact format:
 [
   {
     "id": "idea-1",
-    "storyIdea": "A compelling premise...",
+    "storyIdea": "A retired contract killer takes a job as a kindergarten teacher to hide in plain sight. When she recognizes one of her students, her carefully constructed new life begins to unravel.",
     "characterConcepts": [
-      "Yuki Tanaka - A retired assassin turned kindergarten teacher who still receives mysterious contracts",
-      "Marcus Chen - The school principal who knows more about Yuki's past than he should",
-      "Little Maya - A five-year-old student who can see ghosts and accidentally reveals a conspiracy"
+      "Sarah Mitchell - The protagonist, a former assassin trying to escape her past",
+      "Principal Roberts - Knows more than he lets on about Sarah's background"
     ],
     "plotElements": [
-      "Yuki discovers one of her students is the child of her final target",
-      "A rival assassin arrives, forcing Yuki to confront her past",
-      "The school becomes the center of a supernatural event"
+      "Sarah's old handler tracks her down with one final job",
+      "A parent recognizes Sarah from her previous life"
     ],
     "uniqueTwists": [
-      "The ghosts Maya sees are not dead people but alternate versions from parallel timelines",
-      "Yuki's final target is still alive and is Maya's father"
+      "The child she was hired to protect years ago is now in her class",
+      "Her handler has been protecting her all along"
     ]
   }
 ]`;
@@ -231,17 +230,17 @@ Return ONLY a JSON array in this exact format:
     }> = {
       characters: {
         name: 'Character Concepts',
-        count: '3-4',
-        instructions: 'Create unique characters with distinctive names, roles, and traits. Use diverse cultural backgrounds.',
+        count: '2-3',
+        instructions: 'Create unique characters with distinctive names, roles, and traits. Use names appropriate to the story setting.',
       },
       plot: {
         name: 'Plot Elements',
-        count: '3-4',
+        count: '2-3',
         instructions: 'Design major events that build tension and drive the narrative forward.',
       },
       twists: {
         name: 'Unique Twists',
-        count: '2-3',
+        count: '2',
         instructions: 'Create unexpected elements that subvert reader expectations and make the story memorable.',
       },
     };

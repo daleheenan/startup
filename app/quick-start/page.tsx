@@ -105,7 +105,9 @@ export default function QuickStartPage() {
   // Generation mode: 'full' = 5 detailed concepts, 'summaries' = 10 short story ideas
   const [generateMode, setGenerateMode] = useState<'full' | 'summaries'>('full');
 
-  const handleSubmit = async (preferences: any) => {
+  const handleSubmit = async (preferences: any, mode?: 'full' | 'summaries') => {
+    const effectiveMode = mode || generateMode;
+    setGenerateMode(effectiveMode);  // Sync state for UI
     setIsGenerating(true);
     setError(null);
     setCurrentStep('Connecting to AI service...');
@@ -124,7 +126,7 @@ export default function QuickStartPage() {
         }
       }
 
-      if (generateMode === 'summaries') {
+      if (effectiveMode === 'summaries') {
         // Two-stage workflow: Generate story ideas first
         setCurrentStep('Generating story ideas...');
 
@@ -196,7 +198,10 @@ export default function QuickStartPage() {
   };
 
   // Handle quick mode submission
-  const handleQuickSubmit = async () => {
+  // Takes optional mode parameter to handle immediate mode changes (React state is async)
+  const handleQuickSubmit = async (modeOverride?: 'full' | 'summaries') => {
+    const effectiveMode = modeOverride || generateMode;
+
     if (quickGenres.length === 0) {
       setError('Please select at least one genre');
       return;
@@ -277,7 +282,7 @@ export default function QuickStartPage() {
       specificYear: quickTimePeriod.type === 'custom' ? quickTimePeriod.year : undefined,
     };
 
-    await handleSubmit(quickPreferences);
+    await handleSubmit(quickPreferences, effectiveMode);
   };
 
   // Generate a 3-line book idea based on selected settings
@@ -682,10 +687,7 @@ export default function QuickStartPage() {
               {/* Action Buttons - Two Separate Buttons */}
               <div style={{ display: 'flex', gap: '0.75rem' }}>
                 <button
-                  onClick={() => {
-                    setGenerateMode('full');
-                    handleQuickSubmit();
-                  }}
+                  onClick={() => handleQuickSubmit('full')}
                   disabled={quickGenres.length === 0 || isGenerating}
                   style={{
                     flex: 1,
@@ -709,10 +711,7 @@ export default function QuickStartPage() {
                   }
                 </button>
                 <button
-                  onClick={() => {
-                    setGenerateMode('summaries');
-                    handleQuickSubmit();
-                  }}
+                  onClick={() => handleQuickSubmit('summaries')}
                   disabled={quickGenres.length === 0 || isGenerating}
                   style={{
                     flex: 1,
@@ -731,7 +730,7 @@ export default function QuickStartPage() {
                 >
                   {isGenerating && generateMode === 'summaries'
                     ? 'Generating...'
-                    : 'Open Story Ideas Generator'
+                    : 'Generate 10 Story Ideas'
                   }
                 </button>
               </div>

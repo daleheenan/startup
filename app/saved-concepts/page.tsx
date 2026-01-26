@@ -140,6 +140,29 @@ export default function SavedConceptsPage() {
     setEditForm({});
   };
 
+  const handleChangeStatus = async (conceptId: string, newStatus: 'saved' | 'used' | 'archived') => {
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/saved-concepts/${conceptId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update status');
+      }
+
+      setConcepts(concepts.map(c => c.id === conceptId ? { ...c, status: newStatus } : c));
+    } catch (err: any) {
+      console.error('Error updating status:', err);
+      setError(err.message);
+    }
+  };
+
   const handleUseConcept = async (concept: SavedConcept) => {
     try {
       const token = getToken();
@@ -624,6 +647,23 @@ export default function SavedConceptsPage() {
                         >
                           Edit
                         </button>
+                        <select
+                          value={concept.status}
+                          onChange={(e) => handleChangeStatus(concept.id, e.target.value as 'saved' | 'used' | 'archived')}
+                          style={{
+                            padding: '0.5rem 0.75rem',
+                            background: colors.surface,
+                            border: `1px solid ${colors.border}`,
+                            borderRadius: borderRadius.sm,
+                            color: colors.text,
+                            fontSize: '0.875rem',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <option value="saved">Saved</option>
+                          <option value="used">Used</option>
+                          <option value="archived">Archived</option>
+                        </select>
                         <button
                           onClick={() => handleDelete(concept.id)}
                           style={{
