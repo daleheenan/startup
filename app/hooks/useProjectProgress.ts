@@ -203,7 +203,8 @@ export function useProjectNavigation(
         });
 
         if (!booksRes.ok) return;
-        const books = await booksRes.json();
+        const booksData = await booksRes.json();
+        const books = booksData.books || booksData || [];
 
         if (!books || books.length === 0) return;
         const bookId = books[0].id;
@@ -231,7 +232,7 @@ export function useProjectNavigation(
             });
             if (chaptersRes.ok) {
               const chaptersData = await chaptersRes.json();
-              setFetchedChapters(chaptersData || []);
+              setFetchedChapters(chaptersData.chapters || chaptersData || []);
             }
           } catch {
             // No chapters - that's OK
