@@ -213,7 +213,7 @@ export default function OutlinePage() {
     const timeoutDuration = 15 * 60 * 1000; // 15 minutes timeout
     const timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
 
-    // Progress simulation for better UX
+    // Progress polling interval
     let progressInterval: ReturnType<typeof setInterval>;
 
     try {
@@ -222,30 +222,28 @@ export default function OutlinePage() {
       setGenerationStep('Preparing story context...');
       const token = getToken();
 
-      // Start progress simulation (updates every 10 seconds)
-      let stepIndex = 0;
-      const progressSteps = [
-        'Analyzing story structure requirements...',
-        'Building act breakdown with AI...',
-        'Generating chapter outlines for Act 1...',
-        'Generating chapter outlines for Act 2...',
-        'Generating chapter outlines for Act 3...',
-        'Creating scene cards...',
-        'Finalizing outline structure...',
-        'This may take several minutes for long novels...',
-        'Still working... AI is generating detailed scene cards...',
-        'Almost there... Processing final chapters...',
-      ];
-
-      progressInterval = setInterval(() => {
-        if (stepIndex < progressSteps.length) {
-          setGenerationStep(progressSteps[stepIndex]);
-          stepIndex++;
-        } else {
-          // Loop back to indicate still working
-          setGenerationStep(`Still generating... (${Math.floor((Date.now() % 60000) / 1000)}s)`);
+      // Start polling for real progress from backend (every 3 seconds)
+      progressInterval = setInterval(async () => {
+        try {
+          const progressRes = await fetch(`${API_BASE_URL}/api/outlines/progress/${book.id}`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          if (progressRes.ok) {
+            const progressData = await progressRes.json();
+            if (progressData.inProgress && progressData.progress) {
+              const p = progressData.progress;
+              let message = p.message;
+              // Add percentage if available
+              if (p.percentComplete !== undefined) {
+                message = `${message} (${Math.round(p.percentComplete)}%)`;
+              }
+              setGenerationStep(message);
+            }
+          }
+        } catch (e) {
+          // Ignore polling errors - main request will handle failures
         }
-      }, 10000);
+      }, 3000);
 
       setGenerationStep('Sending request to AI service...');
 

@@ -717,13 +717,13 @@ export default function PlotStructurePage() {
       box-shadow: 0 4px 12px rgba(0,0,0,0.2);
       z-index: 9999;
     `;
-    successMsg.textContent = 'Plot structure saved! Redirecting to outline...';
+    successMsg.textContent = 'Plot structure saved! Redirecting to coherence check...';
     document.body.appendChild(successMsg);
 
-    // Navigate to Story Outline page after brief delay
+    // Navigate to Coherence page after brief delay
     setTimeout(() => {
       successMsg.remove();
-      router.push(`/projects/${projectId}/outline`);
+      router.push(`/projects/${projectId}/coherence`);
     }, 1500);
   };
 
@@ -1343,7 +1343,7 @@ export default function PlotStructurePage() {
           />
         </div>
 
-        {/* Continue to Outline button */}
+        {/* Continue to Coherence button */}
         <div style={{
           ...cardStyle,
           display: 'flex',
@@ -1357,11 +1357,11 @@ export default function PlotStructurePage() {
               Ready to proceed?
             </h3>
             <p style={{ fontSize: '0.813rem', color: colors.textSecondary, margin: 0 }}>
-              Continue to create your story outline based on these plot layers.
+              Continue to validate your plot structure for coherence.
             </p>
           </div>
           <button
-            onClick={() => router.push(`/projects/${projectId}/outline`)}
+            onClick={() => router.push(`/projects/${projectId}/coherence`)}
             style={{
               padding: '0.75rem 1.5rem',
               background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -1375,7 +1375,7 @@ export default function PlotStructurePage() {
               whiteSpace: 'nowrap',
             }}
           >
-            Continue to Outline →
+            Continue to Coherence →
           </button>
         </div>
 

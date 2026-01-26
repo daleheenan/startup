@@ -41,15 +41,44 @@ export interface OutlineContext {
   structureType: StoryStructureType;
   targetWordCount: number;
   plotStructure?: PlotStructure; // Plot layers to guide outline generation
+  // Progress tracking callback - receives current step info
+  onProgress?: (progress: OutlineProgress) => void;
+  // Incremental save callback - called after each act/chapter is generated
+  onIncrementalSave?: (partialOutline: StoryStructure) => Promise<void>;
+}
+
+export interface OutlineProgress {
+  phase: 'acts' | 'chapters' | 'scenes' | 'complete';
+  currentAct?: number;
+  totalActs?: number;
+  currentChapter?: number;
+  totalChapters?: number;
+  message: string;
+  percentComplete: number;
 }
 
 /**
  * Generate complete story outline with act breakdown and chapter-by-chapter structure
+ * Now supports progress tracking and incremental saving for better UX and failsafe recovery
  */
 export async function generateOutline(context: OutlineContext): Promise<StoryStructure> {
+  const { onProgress, onIncrementalSave } = context;
+
   logger.info(`[OutlineGenerator] Generating outline for: ${context.concept.title}`);
   logger.info(`[OutlineGenerator] Structure type: ${context.structureType}`);
   logger.info(`[OutlineGenerator] Target word count: ${context.targetWordCount}`);
+
+  // Helper to report progress
+  const reportProgress = (progress: OutlineProgress) => {
+    logger.info({ ...progress }, `[OutlineGenerator] Progress: ${progress.message}`);
+    if (onProgress) {
+      try {
+        onProgress(progress);
+      } catch (e) {
+        logger.error({ error: e }, '[OutlineGenerator] Error in progress callback');
+      }
+    }
+  };
 
   // Get the structure template
   const template = getStructureTemplate(context.structureType);
@@ -63,22 +92,86 @@ export async function generateOutline(context: OutlineContext): Promise<StoryStr
 
   logger.info(`[OutlineGenerator] Target chapters: ${targetChapterCount}`);
 
+  reportProgress({
+    phase: 'acts',
+    message: 'Generating act structure breakdown...',
+    percentComplete: 5,
+  });
+
   // Generate act-level breakdown with chapter assignments
   const acts = await generateActBreakdown(context, template, targetChapterCount);
+  const totalActs = acts.length;
+
+  reportProgress({
+    phase: 'acts',
+    totalActs,
+    message: `Act structure complete (${totalActs} acts)`,
+    percentComplete: 15,
+  });
 
   // Generate detailed chapter outlines for each act
+  let globalChapterCount = 0;
   for (let i = 0; i < acts.length; i++) {
-    logger.info(`[OutlineGenerator] Generating chapters for Act ${i + 1}...`);
+    const actNum = i + 1;
+    reportProgress({
+      phase: 'chapters',
+      currentAct: actNum,
+      totalActs,
+      message: `Generating chapters for Act ${actNum}...`,
+      percentComplete: 15 + (i / totalActs) * 25,
+    });
+
+    logger.info(`[OutlineGenerator] Generating chapters for Act ${actNum}...`);
     acts[i].chapters = await generateChaptersForAct(context, acts[i], template);
+    globalChapterCount += acts[i].chapters.length;
+
+    // Incremental save after each act's chapters are generated
+    if (onIncrementalSave) {
+      try {
+        await onIncrementalSave({ type: context.structureType, acts });
+      } catch (e) {
+        logger.error({ error: e }, '[OutlineGenerator] Error in incremental save after chapters');
+      }
+    }
   }
 
+  reportProgress({
+    phase: 'scenes',
+    totalChapters: globalChapterCount,
+    message: `All ${globalChapterCount} chapters outlined. Now generating scene cards...`,
+    percentComplete: 40,
+  });
+
   // Generate scene cards for each chapter
+  let chaptersProcessed = 0;
   for (const act of acts) {
     for (let i = 0; i < act.chapters.length; i++) {
+      chaptersProcessed++;
+      const chapterNum = act.chapters[i].number;
+
+      reportProgress({
+        phase: 'scenes',
+        currentAct: act.number,
+        totalActs,
+        currentChapter: chapterNum,
+        totalChapters: globalChapterCount,
+        message: `Generating scene cards for Chapter ${chapterNum} (${chaptersProcessed}/${globalChapterCount})...`,
+        percentComplete: 40 + (chaptersProcessed / globalChapterCount) * 55,
+      });
+
       logger.info(
-        `[OutlineGenerator] Generating scene cards for Chapter ${act.chapters[i].number}...`
+        `[OutlineGenerator] Generating scene cards for Chapter ${chapterNum}...`
       );
       act.chapters[i].scenes = await generateSceneCards(context, act.chapters[i], act);
+
+      // Incremental save after each chapter's scenes are generated
+      if (onIncrementalSave && chaptersProcessed % 3 === 0) {
+        try {
+          await onIncrementalSave({ type: context.structureType, acts });
+        } catch (e) {
+          logger.error({ error: e }, '[OutlineGenerator] Error in incremental save after scenes');
+        }
+      }
     }
   }
 
@@ -86,6 +179,23 @@ export async function generateOutline(context: OutlineContext): Promise<StoryStr
     type: context.structureType,
     acts,
   };
+
+  // Final save
+  if (onIncrementalSave) {
+    try {
+      await onIncrementalSave(storyStructure);
+    } catch (e) {
+      logger.error({ error: e }, '[OutlineGenerator] Error in final incremental save');
+    }
+  }
+
+  reportProgress({
+    phase: 'complete',
+    totalActs,
+    totalChapters: globalChapterCount,
+    message: 'Outline generation complete!',
+    percentComplete: 100,
+  });
 
   logger.info('[OutlineGenerator] Outline generation complete');
 

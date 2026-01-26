@@ -2,7 +2,7 @@ import { Router } from 'express';
 import db from '../db/connection.js';
 import { randomUUID } from 'crypto';
 import type { Outline, StoryStructure, Project, Book, StoryStructureType } from '../shared/types/index.js';
-import { generateOutline, type OutlineContext } from '../services/outline-generator.js';
+import { generateOutline, type OutlineContext, type OutlineProgress } from '../services/outline-generator.js';
 import { getAllStructureTemplates } from '../services/structure-templates.js';
 import { generateStoryDNA } from '../services/story-dna-generator.js';
 import { createLogger } from '../services/logger.service.js';
@@ -13,6 +13,24 @@ import {
   type GenerateOutlineInput,
   type UpdateOutlineInput,
 } from '../utils/schemas.js';
+
+// In-memory progress store for outline generation
+// Key: bookId, Value: progress info
+const outlineProgressStore = new Map<string, {
+  progress: OutlineProgress;
+  outlineId: string;
+  updatedAt: Date;
+}>();
+
+// Clean up old progress entries every 30 minutes
+setInterval(() => {
+  const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+  for (const [key, value] of outlineProgressStore.entries()) {
+    if (value.updatedAt < thirtyMinutesAgo) {
+      outlineProgressStore.delete(key);
+    }
+  }
+}, 30 * 60 * 1000);
 
 /**
  * Helper: Safely parse JSON with fallback
@@ -162,7 +180,11 @@ router.post('/generate', async (req, res) => {
       logger.warn({ projectId }, 'No main plot defined - outline may lack narrative focus');
     }
 
-    // Build outline context
+    // Create outline ID upfront for progress tracking
+    const outlineId = randomUUID();
+    const now = new Date().toISOString();
+
+    // Build outline context with progress tracking and incremental saving
     const context: OutlineContext = {
       concept: {
         title: book.title,
@@ -175,10 +197,62 @@ router.post('/generate', async (req, res) => {
       structureType: structureType as StoryStructureType,
       targetWordCount: targetWordCount || 80000,
       plotStructure, // Include plot structure for coherent outline generation
+
+      // Progress callback - store progress for polling
+      onProgress: (progress) => {
+        outlineProgressStore.set(bookId, {
+          progress,
+          outlineId,
+          updatedAt: new Date(),
+        });
+      },
+
+      // Incremental save - save partial outline to DB for failsafe recovery
+      onIncrementalSave: async (partialStructure) => {
+        try {
+          // Renumber chapters before saving
+          let chapterNum = 1;
+          for (const act of partialStructure.acts) {
+            for (const chapter of act.chapters || []) {
+              chapter.number = chapterNum++;
+            }
+          }
+
+          const totalChaps = partialStructure.acts.reduce(
+            (sum, act) => sum + (act.chapters?.length || 0),
+            0
+          );
+
+          // Upsert the outline
+          const upsertStmt = db.prepare(`
+            INSERT INTO outlines (id, book_id, structure_type, structure, total_chapters, target_word_count, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+              structure = excluded.structure,
+              total_chapters = excluded.total_chapters,
+              updated_at = excluded.updated_at
+          `);
+
+          upsertStmt.run(
+            outlineId,
+            bookId,
+            structureType,
+            JSON.stringify(partialStructure),
+            totalChaps,
+            targetWordCount || 80000,
+            now,
+            new Date().toISOString()
+          );
+
+          logger.info({ outlineId, chaptersGenerated: totalChaps }, 'Incremental outline save');
+        } catch (e) {
+          logger.error({ error: e }, 'Error in incremental outline save');
+        }
+      },
     };
 
     // Generate the outline
-    logger.info({ bookId, bookTitle: book.title }, 'Generating outline for book');
+    logger.info({ bookId, bookTitle: book.title, outlineId }, 'Generating outline for book');
     const structure = await generateOutline(context);
 
     // Calculate total chapters
@@ -195,16 +269,19 @@ router.post('/generate', async (req, res) => {
       }
     }
 
-    // Save outline to database
-    const outlineId = randomUUID();
-    const now = new Date().toISOString();
+    // Final save outline to database (using upsert since we may have incremental saves)
+    const finalNow = new Date().toISOString();
 
-    const insertStmt = db.prepare(`
+    const upsertStmt = db.prepare(`
       INSERT INTO outlines (id, book_id, structure_type, structure, total_chapters, target_word_count, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        structure = excluded.structure,
+        total_chapters = excluded.total_chapters,
+        updated_at = excluded.updated_at
     `);
 
-    insertStmt.run(
+    upsertStmt.run(
       outlineId,
       bookId,
       structureType,
@@ -212,8 +289,11 @@ router.post('/generate', async (req, res) => {
       totalChapters,
       targetWordCount || 80000,
       now,
-      now
+      finalNow
     );
+
+    // Clear progress from store
+    outlineProgressStore.delete(bookId);
 
     res.status(201).json({
       id: outlineId,
@@ -227,6 +307,56 @@ router.post('/generate', async (req, res) => {
     });
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack }, 'Error generating outline');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * GET /api/outlines/progress/:bookId
+ * Poll for outline generation progress
+ */
+router.get('/progress/:bookId', (req, res) => {
+  try {
+    const { bookId } = req.params;
+
+    const progressInfo = outlineProgressStore.get(bookId);
+
+    if (!progressInfo) {
+      // Check if there's an existing outline (generation might have completed)
+      const outlineStmt = db.prepare<[string], any>(`
+        SELECT id, total_chapters, updated_at FROM outlines WHERE book_id = ? ORDER BY created_at DESC LIMIT 1
+      `);
+      const existingOutline = outlineStmt.get(bookId);
+
+      if (existingOutline) {
+        return res.json({
+          inProgress: false,
+          complete: true,
+          outlineId: existingOutline.id,
+          progress: {
+            phase: 'complete',
+            message: 'Outline generation complete!',
+            percentComplete: 100,
+            totalChapters: existingOutline.total_chapters,
+          },
+        });
+      }
+
+      return res.json({
+        inProgress: false,
+        complete: false,
+        progress: null,
+      });
+    }
+
+    res.json({
+      inProgress: true,
+      complete: progressInfo.progress.phase === 'complete',
+      outlineId: progressInfo.outlineId,
+      progress: progressInfo.progress,
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error fetching outline progress');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });

@@ -129,21 +129,19 @@ export default function OriginalityPage() {
       });
 
       if (!res.ok) {
-        // Fallback: try checking the project's synopsis directly
-        const fallbackRes = await fetch(`${API_BASE_URL}/api/plagiarism/check-text`, {
+        // Fallback: try checking the project's synopsis directly using raw content endpoint
+        const fallbackRes = await fetch(`${API_BASE_URL}/api/plagiarism/check/raw`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            text: [
-              project.story_concept.logline,
-              project.story_concept.synopsis,
-              project.story_concept.hook,
-            ].filter(Boolean).join('\n\n'),
-            contentType: 'project',
-            contentId: projectId,
+            title: project.title,
+            logline: project.story_concept?.logline,
+            synopsis: project.story_concept?.synopsis,
+            hook: project.story_concept?.hook,
+            protagonistHint: project.story_concept?.protagonistHint,
           }),
         });
 
