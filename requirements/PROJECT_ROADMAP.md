@@ -314,6 +314,37 @@ Completed Manuscript → Submit to VEB (Background Job)
 
 ---
 
+#### Sprint 33: Specialist Agent Configuration (~20 points)
+
+**Goal**: Make specialist agents configurable to optimize cost and generation time
+
+**Background**: The current 14-step pipeline may be excessive for initial drafts. Adding configuration options allows users to choose between speed/cost and publication quality.
+
+| Task | Points | Description |
+|------|--------|-------------|
+| Project-level agent toggle | 5 | Enable/disable specialist agents per project |
+| Draft vs Publication mode | 5 | Preset configurations for different use cases |
+| Cost estimation display | 5 | Show estimated cost before generation |
+| Selective specialist runs | 5 | Run specialists only on specific chapters |
+
+**Configuration Options**:
+- **Draft Mode**: Core editing only (8 steps, ~$0.39/chapter)
+- **Publication Mode**: Core + all specialists (14 steps, ~$0.65/chapter)
+- **Custom**: User selects which specialists to run
+
+**UI Considerations**:
+- Toggle on project settings page
+- Cost estimate shown on generation confirmation
+- Option to run specialists as a separate "polish" pass after initial generation
+
+**Rationale**:
+- Current pipeline processes 14 agents per chapter regardless of need
+- Specialists add ~65% to generation cost
+- Some projects (drafts, experiments) don't need full specialist review
+- Running specialists post-generation allows for iterative quality improvement
+
+---
+
 ## Bug Backlog
 
 ### Remaining Issues
