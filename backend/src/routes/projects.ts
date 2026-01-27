@@ -2767,6 +2767,7 @@ router.put('/:id/world/:elementId', (req, res) => {
 /**
  * PUT /api/projects/:id/plot-structure
  * Update plot structure for multi-layered story tracking
+ * Automatically triggers background coherence and originality checks
  */
 router.put('/:id/plot-structure', (req, res) => {
   try {
@@ -2795,6 +2796,43 @@ router.put('/:id/plot-structure', (req, res) => {
     updateStmt.run(JSON.stringify(plot_structure), new Date().toISOString(), projectId);
 
     logger.info({ projectId, layerCount: plot_structure.plot_layers?.length || 0 }, 'Plot structure updated');
+
+    // Trigger background coherence check if plot layers exist
+    if (plot_structure.plot_layers && plot_structure.plot_layers.length > 0) {
+      // Check if there's already a pending/running coherence check for this project
+      const existingJob = db.prepare<[string], { id: string }>(`
+        SELECT id FROM jobs
+        WHERE target_id = ? AND type = 'coherence_check' AND status IN ('pending', 'running')
+        LIMIT 1
+      `).get(projectId);
+
+      if (!existingJob) {
+        const jobId = randomUUID();
+        db.prepare(`
+          INSERT INTO jobs (id, type, target_id, status, attempts)
+          VALUES (?, 'coherence_check', ?, 'pending', 0)
+        `).run(jobId, projectId);
+
+        logger.info({ projectId, jobId }, 'Queued background coherence check');
+      }
+
+      // Also trigger originality check (only if not already pending/running)
+      const existingOriginalityJob = db.prepare<[string], { id: string }>(`
+        SELECT id FROM jobs
+        WHERE target_id = ? AND type = 'originality_check' AND status IN ('pending', 'running')
+        LIMIT 1
+      `).get(projectId);
+
+      if (!existingOriginalityJob) {
+        const originalityJobId = randomUUID();
+        db.prepare(`
+          INSERT INTO jobs (id, type, target_id, status, attempts)
+          VALUES (?, 'originality_check', ?, 'pending', 0)
+        `).run(originalityJobId, projectId);
+
+        logger.info({ projectId, jobId: originalityJobId }, 'Queued background originality check');
+      }
+    }
 
     res.json({ success: true, plot_structure });
   } catch (error: any) {
@@ -2932,6 +2970,209 @@ Return ONLY a JSON object:
     });
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack }, 'Error validating plot coherence');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * GET /api/projects/:id/coherence-check
+ * Get the latest cached coherence check result for a project
+ * Returns cached result if available, or status if check is in progress
+ */
+router.get('/:id/coherence-check', (req, res) => {
+  try {
+    const { id: projectId } = req.params;
+
+    // Check for running/pending job first
+    const pendingJob = db.prepare<[string], { id: string; status: string; created_at: string }>(`
+      SELECT id, status, created_at FROM jobs
+      WHERE target_id = ? AND type = 'coherence_check' AND status IN ('pending', 'running')
+      ORDER BY created_at DESC
+      LIMIT 1
+    `).get(projectId);
+
+    if (pendingJob) {
+      return res.json({
+        status: pendingJob.status,
+        jobId: pendingJob.id,
+        startedAt: pendingJob.created_at,
+        message: pendingJob.status === 'running' ? 'Coherence check in progress...' : 'Coherence check queued...',
+      });
+    }
+
+    // Get the latest completed coherence check
+    const latestCheck = db.prepare<[string], any>(`
+      SELECT * FROM coherence_checks
+      WHERE project_id = ?
+      ORDER BY checked_at DESC
+      LIMIT 1
+    `).get(projectId);
+
+    if (!latestCheck) {
+      return res.json({
+        status: 'none',
+        message: 'No coherence check has been run for this project',
+      });
+    }
+
+    // Parse JSON fields
+    res.json({
+      status: latestCheck.status,
+      checkedAt: latestCheck.checked_at,
+      isCoherent: latestCheck.is_coherent === 1,
+      warnings: safeJsonParse(latestCheck.warnings, []),
+      suggestions: safeJsonParse(latestCheck.suggestions, []),
+      plotAnalysis: safeJsonParse(latestCheck.plot_analysis, []),
+      error: latestCheck.error,
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error fetching coherence check');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * POST /api/projects/:id/coherence-check
+ * Trigger a new coherence check (manual re-run)
+ */
+router.post('/:id/coherence-check', (req, res) => {
+  try {
+    const { id: projectId } = req.params;
+
+    // Check if there's already a pending/running job
+    const existingJob = db.prepare<[string], { id: string }>(`
+      SELECT id FROM jobs
+      WHERE target_id = ? AND type = 'coherence_check' AND status IN ('pending', 'running')
+      LIMIT 1
+    `).get(projectId);
+
+    if (existingJob) {
+      return res.json({
+        success: true,
+        jobId: existingJob.id,
+        message: 'Coherence check already in progress',
+      });
+    }
+
+    // Create new job
+    const jobId = randomUUID();
+    db.prepare(`
+      INSERT INTO jobs (id, type, target_id, status, attempts)
+      VALUES (?, 'coherence_check', ?, 'pending', 0)
+    `).run(jobId, projectId);
+
+    logger.info({ projectId, jobId }, 'Queued manual coherence check');
+
+    res.json({
+      success: true,
+      jobId,
+      message: 'Coherence check queued',
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error triggering coherence check');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * GET /api/projects/:id/originality-check
+ * Get the latest cached originality check result for a project
+ * Returns cached result if available, or status if check is in progress
+ */
+router.get('/:id/originality-check', (req, res) => {
+  try {
+    const { id: projectId } = req.params;
+
+    // Check for running/pending job first
+    const pendingJob = db.prepare<[string], { id: string; status: string; created_at: string }>(`
+      SELECT id, status, created_at FROM jobs
+      WHERE target_id = ? AND type = 'originality_check' AND status IN ('pending', 'running')
+      ORDER BY created_at DESC
+      LIMIT 1
+    `).get(projectId);
+
+    if (pendingJob) {
+      return res.json({
+        status: pendingJob.status,
+        jobId: pendingJob.id,
+        startedAt: pendingJob.created_at,
+        message: pendingJob.status === 'running' ? 'Originality check in progress...' : 'Originality check queued...',
+      });
+    }
+
+    // Get the latest completed originality check for this project
+    const latestCheck = db.prepare<[string], any>(`
+      SELECT * FROM plagiarism_checks
+      WHERE content_id = ? AND content_type = 'concept'
+      ORDER BY checked_at DESC
+      LIMIT 1
+    `).get(projectId);
+
+    if (!latestCheck) {
+      return res.json({
+        status: 'none',
+        message: 'No originality check has been run for this project',
+      });
+    }
+
+    // Parse JSON fields
+    res.json({
+      id: latestCheck.id,
+      contentType: latestCheck.content_type,
+      contentId: latestCheck.content_id,
+      checkedAt: latestCheck.checked_at,
+      status: latestCheck.status,
+      originalityScore: safeJsonParse(latestCheck.originality_score, {}),
+      similarWorks: safeJsonParse(latestCheck.similar_works, []),
+      flags: safeJsonParse(latestCheck.flags, []),
+      recommendations: safeJsonParse(latestCheck.recommendations, []),
+      analysisDetails: safeJsonParse(latestCheck.analysis_details, {}),
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error fetching originality check');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * POST /api/projects/:id/originality-check
+ * Trigger a new originality check (manual re-run)
+ */
+router.post('/:id/originality-check', (req, res) => {
+  try {
+    const { id: projectId } = req.params;
+
+    // Check if there's already a pending/running job
+    const existingJob = db.prepare<[string], { id: string }>(`
+      SELECT id FROM jobs
+      WHERE target_id = ? AND type = 'originality_check' AND status IN ('pending', 'running')
+      LIMIT 1
+    `).get(projectId);
+
+    if (existingJob) {
+      return res.json({
+        success: true,
+        jobId: existingJob.id,
+        message: 'Originality check already in progress',
+      });
+    }
+
+    // Create new job
+    const jobId = randomUUID();
+    db.prepare(`
+      INSERT INTO jobs (id, type, target_id, status, attempts)
+      VALUES (?, 'originality_check', ?, 'pending', 0)
+    `).run(jobId, projectId);
+
+    logger.info({ projectId, jobId }, 'Queued manual originality check');
+
+    res.json({
+      success: true,
+      jobId,
+      message: 'Originality check queued',
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error triggering originality check');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
@@ -3593,6 +3834,336 @@ Keep it practical and actionable. Format as clean markdown with headers and bull
     res.json({ pacingNotes });
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack }, 'Error generating pacing notes');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * POST /api/projects/:id/implement-originality-suggestion
+ * Use AI to implement an originality recommendation by improving the story concept
+ *
+ * This endpoint takes a recommendation string from the originality check and uses
+ * Claude to revise the story concept to address the concern.
+ */
+router.post('/:id/implement-originality-suggestion', async (req, res) => {
+  try {
+    const { id: projectId } = req.params;
+    const { recommendation } = req.body;
+
+    if (!recommendation || typeof recommendation !== 'string') {
+      return res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'recommendation is required and must be a string' },
+      });
+    }
+
+    // Get project with story concept
+    const projectStmt = db.prepare<[string], any>(`
+      SELECT id, title, genre, story_concept, story_dna, story_bible FROM projects WHERE id = ?
+    `);
+    const project = projectStmt.get(projectId);
+
+    if (!project) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project not found' },
+      });
+    }
+
+    const storyConcept = safeJsonParse(project.story_concept, null);
+    const storyDNA = safeJsonParse(project.story_dna, null);
+
+    if (!storyConcept) {
+      return res.status(400).json({
+        error: { code: 'NO_CONCEPT', message: 'Project has no story concept to improve' },
+      });
+    }
+
+    logger.info({ projectId, recommendation: recommendation.substring(0, 100) }, 'Implementing originality suggestion');
+
+    // Build context for AI
+    const conceptContext = `
+CURRENT STORY CONCEPT:
+Title: ${storyConcept.title || project.title}
+Logline: ${storyConcept.logline || 'Not set'}
+Synopsis: ${storyConcept.synopsis || 'Not set'}
+Hook: ${storyConcept.hook || 'Not set'}
+Protagonist Hint: ${storyConcept.protagonistHint || 'Not set'}
+
+${storyDNA ? `
+STORY DNA:
+Themes: ${storyDNA.themes?.join(', ') || 'Not set'}
+Tone: ${storyDNA.tone || 'Not set'}
+Genre: ${project.genre}
+` : ''}
+`.trim();
+
+    const { default: Anthropic } = await import('@anthropic-ai/sdk');
+    const anthropic = new Anthropic();
+
+    const prompt = `You are a creative writing consultant helping to improve story originality.
+
+${conceptContext}
+
+ORIGINALITY RECOMMENDATION TO IMPLEMENT:
+"${recommendation}"
+
+Your task is to revise the story concept to address this recommendation while:
+1. Maintaining the core essence and appeal of the original concept
+2. Making the changes feel natural and integrated, not forced
+3. Ensuring the result is more original and unique
+4. Keeping the same general genre and tone
+
+Respond with a JSON object containing the revised concept fields. Only include fields that need to change:
+{
+  "title": "revised title if needed, or omit",
+  "logline": "revised logline (1-2 sentences)",
+  "synopsis": "revised synopsis (2-3 paragraphs)",
+  "hook": "revised hook (what makes this unique)",
+  "protagonistHint": "revised protagonist description if needed"
+}
+
+Be creative but practical. The changes should directly address the originality concern while keeping the story compelling.
+
+Output ONLY valid JSON, no additional commentary:`;
+
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2000,
+      temperature: 0.8,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
+
+    // Parse the response
+    let revisedConcept: any;
+    try {
+      // Extract JSON from response (handle markdown code blocks)
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        revisedConcept = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error('No JSON found in response');
+      }
+    } catch (parseError) {
+      logger.error({ parseError, response: responseText.substring(0, 500) }, 'Failed to parse AI response');
+      return res.status(500).json({
+        error: { code: 'PARSE_ERROR', message: 'Failed to parse AI response' },
+      });
+    }
+
+    // Merge revised concept with existing concept (only update changed fields)
+    const updatedConcept = {
+      ...storyConcept,
+      ...revisedConcept,
+    };
+
+    // Update the project
+    const updateStmt = db.prepare(`
+      UPDATE projects SET story_concept = ?, updated_at = ? WHERE id = ?
+    `);
+    updateStmt.run(JSON.stringify(updatedConcept), new Date().toISOString(), projectId);
+
+    logger.info({
+      projectId,
+      fieldsUpdated: Object.keys(revisedConcept),
+      recommendation: recommendation.substring(0, 50),
+    }, 'Originality suggestion implemented');
+
+    res.json({
+      success: true,
+      updatedConcept,
+      fieldsUpdated: Object.keys(revisedConcept),
+      message: 'Story concept updated to address originality concern',
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error implementing originality suggestion');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * POST /api/projects/:id/implement-coherence-suggestion
+ * Use AI to implement a coherence recommendation by improving the plot structure
+ *
+ * This endpoint takes a suggestion string from the coherence check and uses
+ * Claude to revise the plot structure to address the alignment concern.
+ */
+router.post('/:id/implement-coherence-suggestion', async (req, res) => {
+  try {
+    const { id: projectId } = req.params;
+    const { suggestion } = req.body;
+
+    if (!suggestion || typeof suggestion !== 'string') {
+      return res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'suggestion is required and must be a string' },
+      });
+    }
+
+    // Get project with plot structure and story concept
+    const projectStmt = db.prepare<[string], any>(`
+      SELECT id, title, genre, story_concept, story_dna, story_bible, plot_structure FROM projects WHERE id = ?
+    `);
+    const project = projectStmt.get(projectId);
+
+    if (!project) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project not found' },
+      });
+    }
+
+    const plotStructure = safeJsonParse(project.plot_structure, { plot_layers: [] });
+    const storyConcept = safeJsonParse(project.story_concept, null);
+    const storyDNA = safeJsonParse(project.story_dna, null);
+
+    if (!plotStructure.plot_layers || plotStructure.plot_layers.length === 0) {
+      return res.status(400).json({
+        error: { code: 'NO_PLOTS', message: 'Project has no plot layers to improve' },
+      });
+    }
+
+    logger.info({ projectId, suggestion: suggestion.substring(0, 100) }, 'Implementing coherence suggestion');
+
+    // Build context for AI
+    const conceptContext = storyConcept ? `
+STORY CONCEPT:
+Title: ${storyConcept.title || project.title}
+Logline: ${storyConcept.logline || 'Not set'}
+Synopsis: ${storyConcept.synopsis || 'Not set'}
+Hook: ${storyConcept.hook || 'Not set'}
+` : `Title: ${project.title}\nGenre: ${project.genre}`;
+
+    const dnaContext = storyDNA ? `
+STORY DNA:
+Themes: ${storyDNA.themes?.join(', ') || 'Not set'}
+Tone: ${storyDNA.tone || 'Not set'}
+Central Conflict: ${storyDNA.centralConflict || 'Not set'}
+` : '';
+
+    const plotLayersContext = plotStructure.plot_layers.map((layer: any, index: number) => `
+Plot Layer ${index + 1}:
+- ID: ${layer.id}
+- Name: ${layer.name}
+- Type: ${layer.type}
+- Description: ${layer.description}
+`).join('\n');
+
+    const { default: Anthropic } = await import('@anthropic-ai/sdk');
+    const anthropic = new Anthropic();
+
+    const prompt = `You are a story structure consultant helping to improve plot coherence.
+
+${conceptContext}
+${dnaContext}
+
+CURRENT PLOT LAYERS:
+${plotLayersContext}
+
+COHERENCE SUGGESTION TO IMPLEMENT:
+"${suggestion}"
+
+Your task is to revise the plot layers to address this coherence suggestion while:
+1. Maintaining the core story elements and character arcs
+2. Ensuring all plots connect meaningfully to the main story concept
+3. Making changes that create better narrative cohesion
+4. Keeping the same plot layer IDs (these are immutable)
+
+Respond with a JSON object containing the revised plot_layers array:
+{
+  "plot_layers": [
+    {
+      "id": "existing-layer-id",
+      "name": "revised or original name",
+      "type": "main|subplot|mystery|romance|character-arc",
+      "description": "revised description that better aligns with the story concept"
+    }
+  ],
+  "explanation": "Brief explanation of what was changed and why"
+}
+
+Important:
+- Keep all existing layer IDs unchanged
+- You may modify names, types, or descriptions
+- Focus changes on the layers that need better alignment
+- The main plot should clearly connect to the story's central concept
+
+Output ONLY valid JSON, no additional commentary:`;
+
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 3000,
+      temperature: 0.7,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
+
+    // Parse the response
+    let revisedPlots: any;
+    try {
+      // Extract JSON from response (handle markdown code blocks)
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        revisedPlots = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error('No JSON found in response');
+      }
+    } catch (parseError) {
+      logger.error({ parseError, response: responseText.substring(0, 500) }, 'Failed to parse AI response');
+      return res.status(500).json({
+        error: { code: 'PARSE_ERROR', message: 'Failed to parse AI response' },
+      });
+    }
+
+    if (!revisedPlots.plot_layers || !Array.isArray(revisedPlots.plot_layers)) {
+      return res.status(500).json({
+        error: { code: 'INVALID_RESPONSE', message: 'AI response did not contain valid plot_layers' },
+      });
+    }
+
+    // Merge with existing structure (preserve act_structure and pacing_notes)
+    const updatedPlotStructure = {
+      ...plotStructure,
+      plot_layers: revisedPlots.plot_layers,
+    };
+
+    // Update the project
+    const updateStmt = db.prepare(`
+      UPDATE projects SET plot_structure = ?, updated_at = ? WHERE id = ?
+    `);
+    updateStmt.run(JSON.stringify(updatedPlotStructure), new Date().toISOString(), projectId);
+
+    // Trigger a new coherence check to validate the changes
+    const existingJob = db.prepare<[string], { id: string }>(`
+      SELECT id FROM jobs
+      WHERE target_id = ? AND type = 'coherence_check' AND status IN ('pending', 'running')
+      LIMIT 1
+    `).get(projectId);
+
+    let newCheckJobId: string | null = null;
+    if (!existingJob) {
+      newCheckJobId = randomUUID();
+      db.prepare(`
+        INSERT INTO jobs (id, type, target_id, status, attempts)
+        VALUES (?, 'coherence_check', ?, 'pending', 0)
+      `).run(newCheckJobId, projectId);
+      logger.info({ projectId, jobId: newCheckJobId }, 'Queued coherence re-check after suggestion implementation');
+    }
+
+    logger.info({
+      projectId,
+      layersUpdated: revisedPlots.plot_layers.length,
+      suggestion: suggestion.substring(0, 50),
+    }, 'Coherence suggestion implemented');
+
+    res.json({
+      success: true,
+      updatedPlotStructure,
+      explanation: revisedPlots.explanation || 'Plot structure updated to improve coherence',
+      coherenceCheckQueued: !!newCheckJobId,
+      message: 'Plot structure updated to address coherence concern',
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error implementing coherence suggestion');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
