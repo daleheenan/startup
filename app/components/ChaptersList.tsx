@@ -40,7 +40,7 @@ export default function ChaptersList({ projectId }: ChaptersListProps) {
       };
 
       // Get books for project
-      const booksRes = await fetch(`${API_BASE_URL}/api/projects/${projectId}/books`, { headers });
+      const booksRes = await fetch(`${API_BASE_URL}/api/books/project/${projectId}`, { headers });
       if (!booksRes.ok) {
         if (booksRes.status === 401) {
           logout();

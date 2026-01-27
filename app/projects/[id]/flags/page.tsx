@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { getToken, logout } from '../../../lib/auth';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 interface Flag {
   id: string;
@@ -37,14 +40,25 @@ export default function FlagsPage() {
 
   async function fetchFlags() {
     try {
+      const token = getToken();
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      };
+
       // First get project to find books
-      const projectRes = await fetch(`http://localhost:3001/api/projects/${projectId}`);
+      const projectRes = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, { headers });
+      if (projectRes.status === 401) {
+        logout();
+        window.location.href = '/login';
+        return;
+      }
       if (!projectRes.ok) throw new Error('Failed to fetch project');
 
       const project = await projectRes.json();
 
       // Get books for this project
-      const booksRes = await fetch(`http://localhost:3001/api/projects/${projectId}/books`);
+      const booksRes = await fetch(`${API_BASE_URL}/api/books/project/${projectId}`, { headers });
       if (!booksRes.ok) throw new Error('Failed to fetch books');
 
       const booksData = await booksRes.json();
@@ -54,7 +68,7 @@ export default function FlagsPage() {
       const allChapters: ChapterWithFlags[] = [];
 
       for (const book of books) {
-        const chaptersRes = await fetch(`http://localhost:3001/api/chapters/book/${book.id}`);
+        const chaptersRes = await fetch(`${API_BASE_URL}/api/chapters/book/${book.id}`, { headers });
         if (!chaptersRes.ok) continue;
 
         const chaptersData = await chaptersRes.json();
@@ -85,9 +99,15 @@ export default function FlagsPage() {
 
   async function resolveFlag(chapterId: string, flagId: string) {
     try {
+      const token = getToken();
       const res = await fetch(
-        `http://localhost:3001/api/editing/chapters/${chapterId}/flags/${flagId}/resolve`,
-        { method: 'POST' }
+        `${API_BASE_URL}/api/editing/chapters/${chapterId}/flags/${flagId}/resolve`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }
       );
 
       if (!res.ok) throw new Error('Failed to resolve flag');

@@ -177,7 +177,7 @@ export default function ProgressPage() {
       }
 
       // Fetch books and chapters
-      const booksRes = await fetch(`${API_BASE_URL}/api/projects/${projectId}/books`, { headers });
+      const booksRes = await fetch(`${API_BASE_URL}/api/books/project/${projectId}`, { headers });
       if (booksRes.ok) {
         const booksData = await booksRes.json();
         const fetchedBooks = booksData.books || [];
