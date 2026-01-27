@@ -1084,3 +1084,72 @@ export interface FollowUpRecommendations {
   inputTokens: number;
   outputTokens: number;
 }
+
+// ============================================
+// Book Cloning Types (Sprint B)
+// ============================================
+
+export interface BookClone {
+  id: string;
+  source_book_id: string;
+  cloned_book_id: string;
+  clone_number: number;
+  clone_reason: string | null;
+  created_at: string;
+}
+
+export interface ClonedBook extends Book {
+  is_clone: number;
+  clone_source_id: string | null;
+}
+
+export interface CloneBookOptions {
+  title?: string;
+  reason?: string;
+}
+
+export interface CloneBookResult {
+  success: boolean;
+  clonedBook: ClonedBook;
+  cloneRecord: BookClone;
+}
+
+export interface CloneHistory {
+  clonedFrom: (BookClone & { source_title: string }) | null;
+  clones: (BookClone & { clone_title: string })[];
+}
+
+// ============================================
+// Book Versioning Types (Sprint C)
+// ============================================
+
+export interface BookVersion {
+  id: string;
+  book_id: string;
+  version_number: number;
+  version_name: string | null;
+  plot_snapshot: string | null;  // JSON string of plot structure
+  outline_snapshot: string | null;  // JSON string of outline
+  is_active: number;  // SQLite boolean (0 or 1)
+  word_count: number;
+  chapter_count: number;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface BookVersionWithStats extends BookVersion {
+  actual_chapter_count: number;
+  actual_word_count: number;
+}
+
+export interface CreateVersionOptions {
+  name?: string;
+  autoCreated?: boolean;
+}
+
+export interface VersioningStatus {
+  required: boolean;
+  existingChapterCount: number;
+  existingWordCount: number;
+  activeVersion: BookVersion | null;
+}
