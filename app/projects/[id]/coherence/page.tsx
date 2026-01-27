@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import PageLayout from '../../../components/shared/PageLayout';
 import LoadingState from '../../../components/shared/LoadingState';
@@ -21,6 +21,8 @@ interface CoherenceResult {
     reason: string;
   }>;
   checkedAt?: string;
+  status?: string;
+  error?: string;
 }
 
 interface PlotLayer {
@@ -40,24 +42,45 @@ export default function CoherencePage() {
   const [coherenceResult, setCoherenceResult] = useState<CoherenceResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [checking, setChecking] = useState(false);
+  const [checkStatus, setCheckStatus] = useState<string | null>(null);
   const [implementing, setImplementing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   const navigation = useProjectNavigation(projectId, project);
+
+  // Fetch cached coherence check result
+  const fetchCachedResult = useCallback(async () => {
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE_URL}/api/projects/${projectId}/coherence-check`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      if (!res.ok) return null;
+
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      console.error('Error fetching cached coherence result:', err);
+      return null;
+    }
+  }, [projectId]);
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const token = getToken();
 
-      // Fetch project and plot structure in parallel
-      const [projectRes, plotRes] = await Promise.all([
+      // Fetch project, plot structure, and cached coherence result in parallel
+      const [projectRes, plotRes, cachedResult] = await Promise.all([
         fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
           headers: { 'Authorization': `Bearer ${token}` },
         }),
         fetch(`${API_BASE_URL}/api/projects/${projectId}/plot-structure`, {
           headers: { 'Authorization': `Bearer ${token}` },
         }),
+        fetchCachedResult(),
       ]);
 
       if (!projectRes.ok) throw new Error('Failed to load project');
@@ -68,11 +91,31 @@ export default function CoherencePage() {
       if (plotRes.ok) {
         const plotData = await plotRes.json();
         setPlotLayers(plotData.plot_layers || []);
+      }
 
-        // Check if coherence was previously run (stored in plot_structure)
-        if (plotData.coherence_result) {
-          setCoherenceResult(plotData.coherence_result);
+      // Handle cached result
+      if (cachedResult) {
+        if (cachedResult.status === 'pending' || cachedResult.status === 'running') {
+          // Check is in progress, start polling
+          setCheckStatus(cachedResult.status);
+          setChecking(true);
+          startPolling();
+        } else if (cachedResult.status === 'completed') {
+          // We have a completed result
+          setCoherenceResult({
+            isCoherent: cachedResult.isCoherent,
+            warnings: cachedResult.warnings || [],
+            suggestions: cachedResult.suggestions || [],
+            plotAnalysis: cachedResult.plotAnalysis || [],
+            checkedAt: cachedResult.checkedAt,
+            status: 'completed',
+          });
+          setCheckStatus(null);
+        } else if (cachedResult.status === 'failed') {
+          setError(cachedResult.error || 'Coherence check failed');
+          setCheckStatus(null);
         }
+        // If status is 'none', no check has been run yet - user can trigger manually
       }
     } catch (err: any) {
       console.error('Error fetching data:', err);
@@ -80,29 +123,71 @@ export default function CoherencePage() {
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, fetchCachedResult]);
 
-  // Auto-run coherence check on mount if we have plot layers and no results
+  // Poll for check completion
+  const startPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+    }
+
+    pollingRef.current = setInterval(async () => {
+      const result = await fetchCachedResult();
+      if (result) {
+        if (result.status === 'completed') {
+          setCoherenceResult({
+            isCoherent: result.isCoherent,
+            warnings: result.warnings || [],
+            suggestions: result.suggestions || [],
+            plotAnalysis: result.plotAnalysis || [],
+            checkedAt: result.checkedAt,
+            status: 'completed',
+          });
+          setChecking(false);
+          setCheckStatus(null);
+          if (pollingRef.current) {
+            clearInterval(pollingRef.current);
+            pollingRef.current = null;
+          }
+        } else if (result.status === 'failed') {
+          setError(result.error || 'Coherence check failed');
+          setChecking(false);
+          setCheckStatus(null);
+          if (pollingRef.current) {
+            clearInterval(pollingRef.current);
+            pollingRef.current = null;
+          }
+        } else {
+          setCheckStatus(result.status);
+        }
+      }
+    }, 2000); // Poll every 2 seconds
+  }, [fetchCachedResult]);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // Auto-run coherence check when data loads
-  useEffect(() => {
-    if (!loading && plotLayers.length > 0 && !coherenceResult && !checking) {
-      runCoherenceCheck();
-    }
-  }, [loading, plotLayers.length, coherenceResult]);
-
+  // Trigger a new coherence check (manual re-run)
   const runCoherenceCheck = async () => {
     if (plotLayers.length === 0) return;
 
     try {
       setChecking(true);
       setError(null);
+      setCoherenceResult(null);
       const token = getToken();
 
-      const res = await fetch(`${API_BASE_URL}/api/projects/${projectId}/validate-plot-coherence`, {
+      const res = await fetch(`${API_BASE_URL}/api/projects/${projectId}/coherence-check`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -110,17 +195,14 @@ export default function CoherencePage() {
         },
       });
 
-      if (!res.ok) throw new Error('Failed to validate coherence');
+      if (!res.ok) throw new Error('Failed to trigger coherence check');
 
       const result = await res.json();
-      setCoherenceResult({
-        ...result,
-        checkedAt: new Date().toISOString(),
-      });
+      setCheckStatus('pending');
+      startPolling();
     } catch (err: any) {
-      console.error('Error checking coherence:', err);
+      console.error('Error triggering coherence check:', err);
       setError(err.message);
-    } finally {
       setChecking(false);
     }
   };
@@ -271,9 +353,15 @@ export default function CoherencePage() {
                   Coherence Status
                 </h2>
 
+                {checking && (
+                  <p style={{ color: '#667eea', margin: 0 }}>
+                    {checkStatus === 'pending' ? 'Coherence check queued...' : 'Coherence check in progress...'}
+                  </p>
+                )}
+
                 {!coherenceResult && !checking && (
                   <p style={{ color: '#64748B', margin: 0 }}>
-                    Run a coherence check to validate your plot structure.
+                    No coherence check available. Click &quot;Run Check&quot; to validate your plot structure.
                   </p>
                 )}
 

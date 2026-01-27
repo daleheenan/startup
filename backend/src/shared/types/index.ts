@@ -212,7 +212,12 @@ export type JobType =
   | 'generate_follow_up'
   // Background validation checks (triggered when plot layers saved)
   | 'coherence_check'
-  | 'originality_check';
+  | 'originality_check'
+  // Sprint 39: Outline Editorial Board job types
+  | 'outline_structure_analyst'
+  | 'outline_character_arc'
+  | 'outline_market_fit'
+  | 'outline_editorial_finalize';
 
 export type JobStatus = 'pending' | 'running' | 'completed' | 'paused' | 'failed';
 

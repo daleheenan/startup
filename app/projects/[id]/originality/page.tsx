@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import PageLayout from '../../../components/shared/PageLayout';
 import LoadingState from '../../../components/shared/LoadingState';
@@ -65,29 +65,65 @@ export default function OriginalityPage() {
   const [originalityResult, setOriginalityResult] = useState<OriginalityResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [checking, setChecking] = useState(false);
+  const [checkStatus, setCheckStatus] = useState<string | null>(null);
   const [implementing, setImplementing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   const navigation = useProjectNavigation(projectId, project);
+
+  // Fetch cached originality check result
+  const fetchCachedResult = useCallback(async () => {
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE_URL}/api/projects/${projectId}/originality-check`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      if (!res.ok) return null;
+
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      console.error('Error fetching cached originality result:', err);
+      return null;
+    }
+  }, [projectId]);
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const token = getToken();
 
-      const projectRes = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
+      // Fetch project and cached originality result in parallel
+      const [projectRes, cachedResult] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        }),
+        fetchCachedResult(),
+      ]);
 
       if (!projectRes.ok) throw new Error('Failed to load project');
 
       const projectData = await projectRes.json();
       setProject(projectData);
 
-      // Check if there's a stored originality result
-      if (projectData.originality_result) {
-        setOriginalityResult(projectData.originality_result);
+      // Handle cached result
+      if (cachedResult) {
+        if (cachedResult.status === 'pending' || cachedResult.status === 'running') {
+          // Check is in progress, start polling
+          setCheckStatus(cachedResult.status);
+          setChecking(true);
+          startPolling();
+        } else if (cachedResult.status === 'none') {
+          // No check has been run - user can trigger manually
+          setOriginalityResult(null);
+        } else {
+          // We have a completed result (passed, flagged, requires_review, etc.)
+          setOriginalityResult(cachedResult);
+          setCheckStatus(null);
+        }
       }
     } catch (err: any) {
       console.error('Error fetching data:', err);
@@ -95,32 +131,65 @@ export default function OriginalityPage() {
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, fetchCachedResult]);
+
+  // Poll for check completion
+  const startPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+    }
+
+    pollingRef.current = setInterval(async () => {
+      const result = await fetchCachedResult();
+      if (result) {
+        if (result.status !== 'pending' && result.status !== 'running' && result.status !== 'none') {
+          // Check is complete
+          setOriginalityResult(result);
+          setChecking(false);
+          setCheckStatus(null);
+          if (pollingRef.current) {
+            clearInterval(pollingRef.current);
+            pollingRef.current = null;
+          }
+        } else if (result.status === 'none') {
+          // Something went wrong, check was not queued
+          setChecking(false);
+          setCheckStatus(null);
+          if (pollingRef.current) {
+            clearInterval(pollingRef.current);
+            pollingRef.current = null;
+          }
+        } else {
+          setCheckStatus(result.status);
+        }
+      }
+    }, 2000); // Poll every 2 seconds
+  }, [fetchCachedResult]);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // Auto-run originality check on mount if we have a concept and no results
-  useEffect(() => {
-    if (!loading && project?.story_concept && !originalityResult && !checking) {
-      runOriginalityCheck();
-    }
-  }, [loading, project?.story_concept, originalityResult]);
-
+  // Trigger a new originality check (manual re-run)
   const runOriginalityCheck = async () => {
     if (!project?.story_concept) return;
 
     try {
       setChecking(true);
       setError(null);
+      setOriginalityResult(null);
       const token = getToken();
 
-      // Check if project has a concept_id or use project itself
-      const conceptId = project.concept_id || projectId;
-      const endpoint = `/api/plagiarism/check/concept/${conceptId}`;
-
-      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+      const res = await fetch(`${API_BASE_URL}/api/projects/${projectId}/originality-check`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -128,38 +197,14 @@ export default function OriginalityPage() {
         },
       });
 
-      if (!res.ok) {
-        // Fallback: try checking the project's synopsis directly using raw content endpoint
-        const fallbackRes = await fetch(`${API_BASE_URL}/api/plagiarism/check/raw`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            title: project.title,
-            logline: project.story_concept?.logline,
-            synopsis: project.story_concept?.synopsis,
-            hook: project.story_concept?.hook,
-            protagonistHint: project.story_concept?.protagonistHint,
-          }),
-        });
-
-        if (!fallbackRes.ok) {
-          throw new Error('Failed to check originality');
-        }
-
-        const result = await fallbackRes.json();
-        setOriginalityResult(result);
-        return;
-      }
+      if (!res.ok) throw new Error('Failed to trigger originality check');
 
       const result = await res.json();
-      setOriginalityResult(result);
+      setCheckStatus('pending');
+      startPolling();
     } catch (err: any) {
-      console.error('Error checking originality:', err);
+      console.error('Error triggering originality check:', err);
       setError(err.message);
-    } finally {
       setChecking(false);
     }
   };
@@ -325,7 +370,33 @@ export default function OriginalityPage() {
                   <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: colors.text, marginBottom: '0.5rem' }}>
                     Originality Analysis
                   </h2>
-                  {originalityResult && getStatusBadge(originalityResult.status)}
+                  {checking && (
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '9999px',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      background: '#EEF2FF',
+                      color: '#4338CA',
+                    }}>
+                      {checkStatus === 'pending' ? 'Queued...' : 'Checking...'}
+                    </span>
+                  )}
+                  {!checking && originalityResult && getStatusBadge(originalityResult.status)}
+                  {!checking && !originalityResult && (
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '9999px',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      background: '#F3F4F6',
+                      color: '#6B7280',
+                    }}>
+                      Not checked yet
+                    </span>
+                  )}
                 </div>
                 <button
                   onClick={runOriginalityCheck}
