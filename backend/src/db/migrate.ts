@@ -332,6 +332,8 @@ export function runMigrations() {
       '033_book_versions.sql',           // DB version 37 - book version control
       '038_cleanup_duplicate_chapters.sql', // DB version 38 - cleanup duplicate chapters
       '039_fix_duplicate_cleanup.sql',   // DB version 39 - fix duplicate cleanup issues
+      '040_cover_image.sql',             // DB version 40 - cover image support
+      '041_chapter_generation_cost.sql', // DB version 41 - chapter generation cost tracking
     ];
 
     for (let i = 0; i < migrationFiles.length; i++) {
@@ -447,6 +449,8 @@ export function getMigrationStatus(): {
     '033_book_versions.sql',
     '038_cleanup_duplicate_chapters.sql',
     '039_fix_duplicate_cleanup.sql',
+    '040_cover_image.sql',
+    '041_chapter_generation_cost.sql',
   ];
 
   const pendingMigrations: string[] = [];

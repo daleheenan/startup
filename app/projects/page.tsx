@@ -21,6 +21,11 @@ interface ProjectMetrics {
     gbp: string;
     display: string;
   };
+  chapterCost?: {
+    usd: string;
+    gbp: string;
+    display: string;
+  };
   content: {
     chapters: number;
     words: number;
@@ -178,7 +183,11 @@ export default function ProjectsPage() {
           aValue = new Date(a.updated_at).getTime();
           bValue = new Date(b.updated_at).getTime();
           break;
-        case 'cost':
+        case 'chapterCost':
+          aValue = parseFloat((a.metrics as any)?.chapterCost?.usd?.replace(/[^0-9.-]/g, '') || '0');
+          bValue = parseFloat((b.metrics as any)?.chapterCost?.usd?.replace(/[^0-9.-]/g, '') || '0');
+          break;
+        case 'totalCost':
           aValue = parseFloat(a.metrics?.cost?.usd?.replace(/[^0-9.-]/g, '') || '0');
           bValue = parseFloat(b.metrics?.cost?.usd?.replace(/[^0-9.-]/g, '') || '0');
           break;

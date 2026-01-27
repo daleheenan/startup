@@ -42,9 +42,20 @@ export const createProjectSchema = z.object({
   }),
 });
 
+// Story concept schema for update
+const storyConceptSchema = z.object({
+  title: z.string().optional(),
+  logline: z.string().nullable().optional(),
+  synopsis: z.string().nullable().optional(),
+  hook: z.string().nullable().optional(),
+  protagonistHint: z.string().nullable().optional(),
+  conflictType: z.string().nullable().optional(),
+}).optional();
+
 export const updateProjectSchema = z.object({
   storyDNA: z.any().optional(), // Complex nested object, validate structure separately
   storyBible: z.any().optional(), // Complex nested object, validate structure separately
+  storyConcept: storyConceptSchema, // Story concept fields
   status: z.enum(['setup', 'planning', 'writing', 'editing', 'complete']).optional(),
   title: z.string().min(1, 'Title is required').max(500, 'Title too long').optional(),
   authorName: z.string().max(200, 'Author name too long').optional().nullable(),

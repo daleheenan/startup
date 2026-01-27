@@ -2,7 +2,7 @@
 
 import { colors, typography, spacing, transitions } from '@/app/lib/design-tokens';
 
-export type SortColumn = 'name' | 'updated_at' | 'cost' | 'type' | 'words' | 'chapters' | 'versions';
+export type SortColumn = 'name' | 'updated_at' | 'chapterCost' | 'totalCost' | 'type' | 'words' | 'chapters' | 'versions';
 export type SortDirection = 'asc' | 'desc';
 
 export interface SortConfig {

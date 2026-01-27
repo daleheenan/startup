@@ -19,6 +19,11 @@ interface ProjectMetrics {
     gbp: string;
     display: string;
   };
+  chapterCost?: {
+    usd: string;
+    gbp: string;
+    display: string;
+  };
   content: {
     chapters: number;
     words: number;
@@ -321,7 +326,7 @@ export default function ProjectsTable({
           style={{
             width: '100%',
             borderCollapse: 'collapse',
-            minWidth: '1000px',
+            minWidth: '1100px',
           }}
         >
           <thead>
@@ -339,8 +344,14 @@ export default function ProjectsTable({
                 onSort={onSort}
               />
               <SortableTableHeader
-                label="Cost"
-                column="cost"
+                label="Chapter Cost"
+                column="chapterCost"
+                currentSort={sortConfig}
+                onSort={onSort}
+              />
+              <SortableTableHeader
+                label="Total Cost"
+                column="totalCost"
                 currentSort={sortConfig}
                 onSort={onSort}
               />
@@ -441,7 +452,18 @@ export default function ProjectsTable({
                     {formatDate(project.updated_at)}
                   </td>
 
-                  {/* Cost */}
+                  {/* Chapter Cost */}
+                  <td
+                    style={{
+                      padding: `${spacing[4]}`,
+                      fontSize: typography.fontSize.sm,
+                      color: colors.text.secondary,
+                    }}
+                  >
+                    {project.metrics?.chapterCost?.display || '—'}
+                  </td>
+
+                  {/* Total Cost */}
                   <td
                     style={{
                       padding: `${spacing[4]}`,

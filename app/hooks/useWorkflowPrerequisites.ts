@@ -33,7 +33,8 @@ export type WorkflowStep =
   | 'chapters'
   | 'analytics'
   | 'editorial-report'
-  | 'follow-up';
+  | 'follow-up'
+  | 'series';
 
 // Project data structure expected by the hook
 export interface WorkflowProjectData {
@@ -244,6 +245,10 @@ function getMissingItemsForStep(
         missing.push('All chapters must be completed');
       }
       break;
+
+    case 'series':
+      // Series management is always accessible - no prerequisites
+      break;
   }
 
   return missing;
@@ -283,6 +288,7 @@ const STEP_NAMES: Record<WorkflowStep, string> = {
   analytics: 'Analytics',
   'editorial-report': 'Editorial Report',
   'follow-up': 'Follow-Up Ideas',
+  series: 'Series Management',
 };
 
 /**
@@ -376,6 +382,12 @@ export function useWorkflowPrerequisites(
         requiresPrevious: 'chapters',
         missingItems: [],
       },
+      series: {
+        isComplete: false,
+        isRequired: false, // Series management is optional (for multi-book projects)
+        requiresPrevious: null, // No prerequisites - always accessible
+        missingItems: [],
+      },
     };
 
     if (!project) {
@@ -441,6 +453,10 @@ export function useWorkflowPrerequisites(
     const allChaptersWritten = chapters && chapters.length > 0 &&
       chapters.every(ch => ch.content && ch.content.length > 0);
     checks['follow-up'].isComplete = allChaptersWritten || false;
+
+    // Series management is always accessible (no prerequisites)
+    checks.series.missingItems = getMissingItemsForStep('series', project, outline, chapters);
+    checks.series.isComplete = true; // Always accessible
 
     return checks;
   }, [project, outline, chapters]);

@@ -109,6 +109,25 @@ export default function ProjectDetailPage() {
   const [authorValue, setAuthorValue] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Editing state for Story Concept
+  const [editingConcept, setEditingConcept] = useState(false);
+  const [conceptValues, setConceptValues] = useState<StoryConcept>({
+    title: '',
+    logline: null,
+    synopsis: null,
+    hook: null,
+    protagonistHint: null,
+    conflictType: null,
+  });
+
+  // Editing state for Story DNA
+  const [editingDNA, setEditingDNA] = useState(false);
+  const [dnaValues, setDnaValues] = useState<any>({
+    tone: '',
+    themes: [],
+    proseStyle: { pointOfView: '' },
+  });
+
   // Clone dialog state
   const [showCloneDialog, setShowCloneDialog] = useState(false);
 
@@ -126,6 +145,26 @@ export default function ProjectDetailPage() {
     if (project) {
       setTitleValue(project.title || '');
       setAuthorValue(project.author_name || '');
+      // Initialize Story Concept values
+      if (project.story_concept) {
+        setConceptValues({
+          title: project.story_concept.title || '',
+          logline: project.story_concept.logline || null,
+          synopsis: project.story_concept.synopsis || null,
+          hook: project.story_concept.hook || null,
+          protagonistHint: project.story_concept.protagonistHint || null,
+          conflictType: project.story_concept.conflictType || null,
+        });
+      }
+      // Initialize Story DNA values
+      if (project.story_dna) {
+        setDnaValues({
+          tone: project.story_dna.tone || '',
+          themes: project.story_dna.themes || [],
+          proseStyle: project.story_dna.proseStyle || { pointOfView: '' },
+          subgenre: project.story_dna.subgenre || '',
+        });
+      }
     }
   }, [project]);
 
@@ -237,6 +276,72 @@ export default function ProjectDetailPage() {
     } catch (err) {
       console.error('Error saving:', err);
       alert('Failed to save changes');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Save Story Concept
+  const saveStoryConcept = async () => {
+    setSaving(true);
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ storyConcept: conceptValues }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save Story Concept');
+      }
+
+      // Update local state
+      setProject((prev: any) => ({
+        ...prev,
+        story_concept: conceptValues,
+      }));
+
+      setEditingConcept(false);
+    } catch (err) {
+      console.error('Error saving Story Concept:', err);
+      alert('Failed to save Story Concept');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Save Story DNA
+  const saveStoryDNA = async () => {
+    setSaving(true);
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ storyDNA: dnaValues }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save Story DNA');
+      }
+
+      // Update local state
+      setProject((prev: any) => ({
+        ...prev,
+        story_dna: dnaValues,
+      }));
+
+      setEditingDNA(false);
+    } catch (err) {
+      console.error('Error saving Story DNA:', err);
+      alert('Failed to save Story DNA');
     } finally {
       setSaving(false);
     }
@@ -500,7 +605,7 @@ export default function ProjectDetailPage() {
 
           {/* Job Statistics */}
           {jobStats && (jobStats.running > 0 || jobStats.pending > 0 || jobStats.completed > 0) ? (
-            <div>
+            <div role="status" aria-live="polite" aria-atomic="true">
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
@@ -1057,19 +1162,39 @@ export default function ProjectDetailPage() {
           </div>
         )}
 
-        {/* Story Concept Section - Prominent display */}
-        {project.story_concept && (project.story_concept.logline || project.story_concept.synopsis) && (
-          <div style={{
-            ...card,
-            marginBottom: '1.5rem',
-            padding: '1.5rem',
-            background: colors.brandLight,
-            border: `2px solid ${colors.brandBorder}`,
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <h2 style={{ fontSize: '1.5rem', color: colors.text, fontWeight: 700, margin: 0 }}>
-                Story Concept
-              </h2>
+        {/* Story Concept Section - Editable */}
+        <div style={{
+          ...card,
+          marginBottom: '1.5rem',
+          padding: '1.5rem',
+          background: colors.brandLight,
+          border: `2px solid ${colors.brandBorder}`,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+            <h2 style={{ fontSize: '1.5rem', color: colors.text, fontWeight: 700, margin: 0 }}>
+              Story Concept
+            </h2>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              {!editingConcept && (
+                <button
+                  onClick={() => setEditingConcept(true)}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: colors.surface,
+                    border: `1px solid ${colors.brandBorder}`,
+                    borderRadius: borderRadius.md,
+                    color: colors.brandText,
+                    fontSize: '0.75rem',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.375rem',
+                  }}
+                >
+                  Edit
+                </button>
+              )}
               <Link
                 href="/saved-summaries"
                 style={{
@@ -1089,9 +1214,205 @@ export default function ProjectDetailPage() {
                 View Saved Summaries
               </Link>
             </div>
+          </div>
 
+          {editingConcept ? (
+            <div style={{ display: 'grid', gap: '1rem' }}>
+              {/* Logline */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.75rem',
+                  color: colors.brandText,
+                  fontWeight: 600,
+                  marginBottom: '0.375rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}>
+                  Logline
+                </label>
+                <textarea
+                  value={conceptValues.logline || ''}
+                  onChange={(e) => setConceptValues(prev => ({ ...prev, logline: e.target.value || null }))}
+                  placeholder="A one-sentence summary of your story..."
+                  rows={2}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: `1px solid ${colors.brandBorder}`,
+                    borderRadius: borderRadius.md,
+                    fontSize: '0.9375rem',
+                    fontStyle: 'italic',
+                    resize: 'vertical',
+                  }}
+                />
+              </div>
+
+              {/* Synopsis */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.75rem',
+                  color: colors.brandText,
+                  fontWeight: 600,
+                  marginBottom: '0.375rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}>
+                  Synopsis
+                </label>
+                <textarea
+                  value={conceptValues.synopsis || ''}
+                  onChange={(e) => setConceptValues(prev => ({ ...prev, synopsis: e.target.value || null }))}
+                  placeholder="A brief synopsis of your story..."
+                  rows={4}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: `1px solid ${colors.brandBorder}`,
+                    borderRadius: borderRadius.md,
+                    fontSize: '0.9375rem',
+                    resize: 'vertical',
+                  }}
+                />
+              </div>
+
+              {/* Hook */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.75rem',
+                  color: colors.brandText,
+                  fontWeight: 600,
+                  marginBottom: '0.375rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}>
+                  Hook
+                </label>
+                <textarea
+                  value={conceptValues.hook || ''}
+                  onChange={(e) => setConceptValues(prev => ({ ...prev, hook: e.target.value || null }))}
+                  placeholder="What makes your story unique and compelling..."
+                  rows={2}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: `1px solid ${colors.brandBorder}`,
+                    borderRadius: borderRadius.md,
+                    fontSize: '0.9375rem',
+                    resize: 'vertical',
+                  }}
+                />
+              </div>
+
+              {/* Protagonist and Conflict */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.75rem',
+                    color: colors.brandText,
+                    fontWeight: 600,
+                    marginBottom: '0.375rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}>
+                    Protagonist
+                  </label>
+                  <input
+                    type="text"
+                    value={conceptValues.protagonistHint || ''}
+                    onChange={(e) => setConceptValues(prev => ({ ...prev, protagonistHint: e.target.value || null }))}
+                    placeholder="Main character description..."
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: `1px solid ${colors.brandBorder}`,
+                      borderRadius: borderRadius.md,
+                      fontSize: '0.9375rem',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.75rem',
+                    color: colors.brandText,
+                    fontWeight: 600,
+                    marginBottom: '0.375rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}>
+                    Core Conflict
+                  </label>
+                  <input
+                    type="text"
+                    value={conceptValues.conflictType || ''}
+                    onChange={(e) => setConceptValues(prev => ({ ...prev, conflictType: e.target.value || null }))}
+                    placeholder="Main conflict type..."
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: `1px solid ${colors.brandBorder}`,
+                      borderRadius: borderRadius.md,
+                      fontSize: '0.9375rem',
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Save/Cancel buttons */}
+              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <button
+                  onClick={() => {
+                    setEditingConcept(false);
+                    if (project?.story_concept) {
+                      setConceptValues({
+                        title: project.story_concept.title || '',
+                        logline: project.story_concept.logline || null,
+                        synopsis: project.story_concept.synopsis || null,
+                        hook: project.story_concept.hook || null,
+                        protagonistHint: project.story_concept.protagonistHint || null,
+                        conflictType: project.story_concept.conflictType || null,
+                      });
+                    }
+                  }}
+                  style={{
+                    padding: '0.625rem 1rem',
+                    background: colors.surface,
+                    color: colors.textSecondary,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: borderRadius.md,
+                    cursor: 'pointer',
+                    fontSize: '0.8125rem',
+                    fontWeight: 500,
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveStoryConcept}
+                  disabled={saving}
+                  style={{
+                    padding: '0.625rem 1rem',
+                    background: gradients.brand,
+                    color: colors.surface,
+                    border: 'none',
+                    borderRadius: borderRadius.md,
+                    cursor: saving ? 'not-allowed' : 'pointer',
+                    fontSize: '0.8125rem',
+                    fontWeight: 600,
+                    opacity: saving ? 0.7 : 1,
+                  }}
+                >
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+          ) : (
             <div style={{ display: 'grid', gap: '1.25rem' }}>
-              {project.story_concept.logline && (
+              {project.story_concept?.logline ? (
                 <div>
                   <strong style={{
                     color: colors.brandText,
@@ -1114,9 +1435,13 @@ export default function ProjectDetailPage() {
                     {project.story_concept.logline}
                   </p>
                 </div>
+              ) : (
+                <p style={{ color: colors.textSecondary, fontSize: '0.875rem', fontStyle: 'italic' }}>
+                  No logline set. Click Edit to add one.
+                </p>
               )}
 
-              {project.story_concept.synopsis && (
+              {project.story_concept?.synopsis && (
                 <div>
                   <strong style={{
                     color: colors.brandText,
@@ -1140,7 +1465,7 @@ export default function ProjectDetailPage() {
                 </div>
               )}
 
-              {project.story_concept.hook && (
+              {project.story_concept?.hook && (
                 <div style={{
                   padding: '1rem',
                   background: gradients.brand,
@@ -1169,7 +1494,7 @@ export default function ProjectDetailPage() {
                 </div>
               )}
 
-              {(project.story_concept.protagonistHint || project.story_concept.conflictType) && (
+              {(project.story_concept?.protagonistHint || project.story_concept?.conflictType) && (
                 <div style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
@@ -1221,73 +1546,223 @@ export default function ProjectDetailPage() {
                 </div>
               )}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
-        {/* Quick Links - show when no story concept */}
-        {(!project.story_concept || (!project.story_concept.logline && !project.story_concept.synopsis)) && (
-          <div style={{ ...card, marginBottom: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+
+        {/* Story DNA Section - Editable */}
+        <div style={{ ...card, marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h2 style={{ fontSize: '1.125rem', color: '#1A1A2E', fontWeight: 600, margin: 0 }}>
+              Story DNA
+            </h2>
+            {!editingDNA && project.story_dna && (
+              <button
+                onClick={() => setEditingDNA(true)}
+                style={{
+                  padding: '0.375rem 0.75rem',
+                  background: 'transparent',
+                  color: colors.brandText,
+                  border: `1px solid ${colors.brandBorder}`,
+                  borderRadius: borderRadius.sm,
+                  cursor: 'pointer',
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                }}
+              >
+                Edit
+              </button>
+            )}
+          </div>
+
+          {editingDNA ? (
+            <div style={{ display: 'grid', gap: '1rem' }}>
+              {/* Tone */}
               <div>
-                <h2 style={{ fontSize: '1.125rem', color: '#1A1A2E', fontWeight: 600, margin: 0 }}>
-                  Story Resources
-                </h2>
-                <p style={{ fontSize: '0.875rem', color: colors.textSecondary, margin: '0.25rem 0 0 0' }}>
-                  Access your saved concepts and ideas
-                </p>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.75rem',
+                  color: colors.textSecondary,
+                  fontWeight: 600,
+                  marginBottom: '0.375rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}>
+                  Tone
+                </label>
+                <input
+                  type="text"
+                  value={dnaValues.tone || ''}
+                  onChange={(e) => setDnaValues((prev: any) => ({ ...prev, tone: e.target.value }))}
+                  placeholder="e.g., Dark and suspenseful, Light-hearted, Epic..."
+                  style={{
+                    width: '100%',
+                    padding: '0.625rem 0.75rem',
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: borderRadius.md,
+                    fontSize: '0.9375rem',
+                  }}
+                />
               </div>
-              <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <Link
-                  href="/saved-summaries"
+
+              {/* Themes */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.75rem',
+                  color: colors.textSecondary,
+                  fontWeight: 600,
+                  marginBottom: '0.375rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}>
+                  Themes (comma-separated)
+                </label>
+                <input
+                  type="text"
+                  value={(dnaValues.themes || []).join(', ')}
+                  onChange={(e) => setDnaValues((prev: any) => ({
+                    ...prev,
+                    themes: e.target.value.split(',').map((t: string) => t.trim()).filter((t: string) => t),
+                  }))}
+                  placeholder="e.g., Redemption, Love, Betrayal, Power..."
                   style={{
-                    padding: '0.5rem 1rem',
-                    background: colors.surface,
+                    width: '100%',
+                    padding: '0.625rem 0.75rem',
                     border: `1px solid ${colors.border}`,
                     borderRadius: borderRadius.md,
-                    color: colors.brandStart,
-                    fontSize: '0.75rem',
-                    fontWeight: 500,
-                    textDecoration: 'none',
+                    fontSize: '0.9375rem',
                   }}
-                >
-                  Saved Summaries
-                </Link>
-                <Link
-                  href="/saved-concepts"
+                />
+              </div>
+
+              {/* Point of View */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.75rem',
+                  color: colors.textSecondary,
+                  fontWeight: 600,
+                  marginBottom: '0.375rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}>
+                  Point of View
+                </label>
+                <select
+                  value={dnaValues.proseStyle?.pointOfView || ''}
+                  onChange={(e) => setDnaValues((prev: any) => ({
+                    ...prev,
+                    proseStyle: { ...prev.proseStyle, pointOfView: e.target.value },
+                  }))}
                   style={{
-                    padding: '0.5rem 1rem',
-                    background: colors.surface,
+                    width: '100%',
+                    padding: '0.625rem 0.75rem',
                     border: `1px solid ${colors.border}`,
                     borderRadius: borderRadius.md,
-                    color: colors.brandStart,
-                    fontSize: '0.75rem',
-                    fontWeight: 500,
-                    textDecoration: 'none',
+                    fontSize: '0.9375rem',
+                    background: colors.surface,
                   }}
                 >
-                  Saved Concepts
-                </Link>
+                  <option value="">Select POV...</option>
+                  <option value="first-person">First Person</option>
+                  <option value="third-person-limited">Third Person Limited</option>
+                  <option value="third-person-omniscient">Third Person Omniscient</option>
+                  <option value="second-person">Second Person</option>
+                  <option value="multiple-pov">Multiple POV</option>
+                </select>
+              </div>
+
+              {/* Subgenre */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.75rem',
+                  color: colors.textSecondary,
+                  fontWeight: 600,
+                  marginBottom: '0.375rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}>
+                  Subgenre
+                </label>
+                <input
+                  type="text"
+                  value={dnaValues.subgenre || ''}
+                  onChange={(e) => setDnaValues((prev: any) => ({ ...prev, subgenre: e.target.value }))}
+                  placeholder="e.g., Psychological thriller, Cosy mystery..."
+                  style={{
+                    width: '100%',
+                    padding: '0.625rem 0.75rem',
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: borderRadius.md,
+                    fontSize: '0.9375rem',
+                  }}
+                />
+              </div>
+
+              {/* Save/Cancel buttons */}
+              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <button
+                  onClick={() => {
+                    setEditingDNA(false);
+                    if (project?.story_dna) {
+                      setDnaValues({
+                        tone: project.story_dna.tone || '',
+                        themes: project.story_dna.themes || [],
+                        proseStyle: project.story_dna.proseStyle || { pointOfView: '' },
+                        subgenre: project.story_dna.subgenre || '',
+                      });
+                    }
+                  }}
+                  style={{
+                    padding: '0.625rem 1rem',
+                    background: colors.surface,
+                    color: colors.textSecondary,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: borderRadius.md,
+                    cursor: 'pointer',
+                    fontSize: '0.8125rem',
+                    fontWeight: 500,
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveStoryDNA}
+                  disabled={saving}
+                  style={{
+                    padding: '0.625rem 1rem',
+                    background: gradients.brand,
+                    color: colors.surface,
+                    border: 'none',
+                    borderRadius: borderRadius.md,
+                    cursor: saving ? 'not-allowed' : 'pointer',
+                    fontSize: '0.8125rem',
+                    fontWeight: 600,
+                    opacity: saving ? 0.7 : 1,
+                  }}
+                >
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </button>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Story DNA Section */}
-        <div style={{ ...card, marginBottom: '1rem' }}>
-          <h2 style={{ fontSize: '1.125rem', marginBottom: '1rem', color: '#1A1A2E', fontWeight: 600 }}>
-            Story DNA
-          </h2>
-          {project.story_dna ? (
+          ) : project.story_dna ? (
             <div style={{ display: 'grid', gap: '0.75rem', color: '#64748B', fontSize: '0.875rem' }}>
               <div>
-                <strong style={{ color: '#374151' }}>Tone:</strong> {project.story_dna.tone}
+                <strong style={{ color: '#374151' }}>Tone:</strong> {project.story_dna.tone || <em style={{ color: colors.textSecondary }}>Not set</em>}
               </div>
               <div>
-                <strong style={{ color: '#374151' }}>Themes:</strong> {project.story_dna.themes?.join(', ')}
+                <strong style={{ color: '#374151' }}>Themes:</strong> {project.story_dna.themes?.length > 0 ? project.story_dna.themes.join(', ') : <em style={{ color: colors.textSecondary }}>Not set</em>}
               </div>
               <div>
-                <strong style={{ color: '#374151' }}>Point of View:</strong> {project.story_dna.proseStyle?.pointOfView}
+                <strong style={{ color: '#374151' }}>Point of View:</strong> {project.story_dna.proseStyle?.pointOfView || <em style={{ color: colors.textSecondary }}>Not set</em>}
               </div>
+              {project.story_dna.subgenre && (
+                <div>
+                  <strong style={{ color: '#374151' }}>Subgenre:</strong> {project.story_dna.subgenre}
+                </div>
+              )}
             </div>
           ) : (
             <p style={{ color: '#64748B', fontSize: '0.875rem' }}>Story DNA will be generated when you set up characters.</p>

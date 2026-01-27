@@ -20,6 +20,10 @@ export interface ProjectMetrics {
   total_output_tokens: number;
   total_cost_usd: number;
   total_cost_gbp: number;
+  chapter_input_tokens: number;
+  chapter_output_tokens: number;
+  chapter_cost_usd: number;
+  chapter_cost_gbp: number;
   total_chapters: number;
   total_word_count: number;
   reading_time_minutes: number;
@@ -35,7 +39,12 @@ export interface FormattedMetrics {
   cost: {
     usd: string;
     gbp: string;
-    display: string; // "$12.34 / £9.75"
+    display: string; // "£9.75"
+  };
+  chapterCost: {
+    usd: string;
+    gbp: string;
+    display: string; // "£7.50"
   };
   content: {
     chapters: number;
@@ -50,7 +59,7 @@ export interface FormattedMetrics {
 
 class MetricsService {
   /**
-   * Track token usage for a chapter
+   * Track token usage for a chapter (updates both total and chapter-specific costs)
    */
   trackChapterTokens(chapterId: string, inputTokens: number, outputTokens: number): void {
     try {
@@ -65,10 +74,38 @@ class MetricsService {
       const result = getProjectStmt.get(chapterId);
 
       if (result) {
+        // Update both total and chapter-specific token counts
         this.updateProjectTokens(result.project_id, inputTokens, outputTokens);
+        this.updateChapterTokens(result.project_id, inputTokens, outputTokens);
       }
     } catch (error) {
       logger.error({ error, chapterId }, 'Error tracking chapter tokens');
+    }
+  }
+
+  /**
+   * Update chapter-specific token counts and costs
+   */
+  updateChapterTokens(projectId: string, inputTokens: number, outputTokens: number): void {
+    try {
+      // Calculate chapter costs
+      const inputCostUSD = (inputTokens / 1_000_000) * PRICING.INPUT_PER_MILLION;
+      const outputCostUSD = (outputTokens / 1_000_000) * PRICING.OUTPUT_PER_MILLION;
+      const totalCostUSD = inputCostUSD + outputCostUSD;
+      const totalCostGBP = totalCostUSD * PRICING.USD_TO_GBP;
+
+      const updateStmt = db.prepare(`
+        UPDATE project_metrics
+        SET chapter_input_tokens = COALESCE(chapter_input_tokens, 0) + ?,
+            chapter_output_tokens = COALESCE(chapter_output_tokens, 0) + ?,
+            chapter_cost_usd = COALESCE(chapter_cost_usd, 0) + ?,
+            chapter_cost_gbp = COALESCE(chapter_cost_gbp, 0) + ?,
+            updated_at = datetime('now')
+        WHERE project_id = ?
+      `);
+      updateStmt.run(inputTokens, outputTokens, totalCostUSD, totalCostGBP, projectId);
+    } catch (error) {
+      logger.error({ error, projectId }, 'Error updating chapter tokens');
     }
   }
 
@@ -196,9 +233,14 @@ class MetricsService {
         display: `${formatTokenCount(metrics.total_input_tokens)} in / ${formatTokenCount(metrics.total_output_tokens)} out`,
       },
       cost: {
-        usd: formatCurrency(metrics.total_cost_usd, '$'),
-        gbp: formatCurrency(metrics.total_cost_gbp, '£'),
-        display: formatCurrency(metrics.total_cost_gbp, '£'),
+        usd: formatCurrency(metrics.total_cost_usd || 0, '$'),
+        gbp: formatCurrency(metrics.total_cost_gbp || 0, '£'),
+        display: formatCurrency(metrics.total_cost_gbp || 0, '£'),
+      },
+      chapterCost: {
+        usd: formatCurrency(metrics.chapter_cost_usd || 0, '$'),
+        gbp: formatCurrency(metrics.chapter_cost_gbp || 0, '£'),
+        display: formatCurrency(metrics.chapter_cost_gbp || 0, '£'),
       },
       content: {
         chapters: metrics.total_chapters,

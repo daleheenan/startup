@@ -46,6 +46,9 @@ export default function CoherencePage() {
   const [implementing, setImplementing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const [suggestionPage, setSuggestionPage] = useState(0);
+  const SUGGESTIONS_PER_PAGE = 5;
+  const [acknowledgedWarnings, setAcknowledgedWarnings] = useState<Set<number>>(new Set());
 
   const navigation = useProjectNavigation(projectId, project);
 
@@ -448,32 +451,107 @@ export default function CoherencePage() {
           </div>
         )}
 
-        {/* Warnings */}
+        {/* Warnings with Acknowledgement */}
         {coherenceResult?.warnings && coherenceResult.warnings.length > 0 && (
           <div style={{ ...card, marginBottom: '1.5rem', padding: '1.5rem', background: '#FFFBEB', border: '1px solid #FDE68A' }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#92400E', marginBottom: '1rem' }}>
-              ⚠ Warnings
-            </h3>
-            <ul style={{ margin: 0, paddingLeft: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#92400E', margin: 0 }}>
+                ⚠ Warnings ({coherenceResult.warnings.length})
+              </h3>
+              <span style={{ fontSize: '0.75rem', color: '#92400E' }}>
+                {acknowledgedWarnings.size} of {coherenceResult.warnings.length} acknowledged
+              </span>
+            </div>
+            <p style={{ fontSize: '0.75rem', color: '#B45309', marginBottom: '1rem', fontStyle: 'italic' }}>
+              Check each warning to acknowledge you&apos;ve addressed or considered it
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {coherenceResult.warnings.map((warning, index) => (
-                <li key={index} style={{ color: '#B45309', marginBottom: '0.5rem', fontSize: '0.9375rem' }}>
-                  {warning}
-                </li>
+                <label
+                  key={index}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '0.75rem',
+                    padding: '0.75rem',
+                    background: acknowledgedWarnings.has(index) ? '#FEF3C7' : 'white',
+                    borderRadius: borderRadius.md,
+                    border: `1px solid ${acknowledgedWarnings.has(index) ? '#F59E0B' : '#FDE68A'}`,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={acknowledgedWarnings.has(index)}
+                    onChange={(e) => {
+                      setAcknowledgedWarnings(prev => {
+                        const newSet = new Set(prev);
+                        if (e.target.checked) {
+                          newSet.add(index);
+                        } else {
+                          newSet.delete(index);
+                        }
+                        return newSet;
+                      });
+                    }}
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      marginTop: '2px',
+                      accentColor: '#F59E0B',
+                    }}
+                  />
+                  <span style={{
+                    color: acknowledgedWarnings.has(index) ? '#92400E' : '#B45309',
+                    fontSize: '0.9375rem',
+                    textDecoration: acknowledgedWarnings.has(index) ? 'line-through' : 'none',
+                    opacity: acknowledgedWarnings.has(index) ? 0.7 : 1,
+                  }}>
+                    {warning}
+                  </span>
+                </label>
               ))}
-            </ul>
+            </div>
+            {acknowledgedWarnings.size === coherenceResult.warnings.length && (
+              <div style={{
+                marginTop: '1rem',
+                padding: '0.75rem',
+                background: '#ECFDF5',
+                borderRadius: borderRadius.md,
+                border: '1px solid #A7F3D0',
+                color: '#047857',
+                fontSize: '0.875rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+              }}>
+                ✓ All warnings acknowledged
+              </div>
+            )}
           </div>
         )}
 
-        {/* Suggestions with Implement Buttons */}
+        {/* Suggestions with Implement Buttons - Paginated */}
         {coherenceResult?.suggestions && coherenceResult.suggestions.length > 0 && (
           <div style={{ ...card, marginBottom: '1.5rem', padding: '1.5rem', background: '#EEF2FF', border: '1px solid #C7D2FE' }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#4338CA', marginBottom: '1rem' }}>
-              Recommendations
-            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#4338CA', margin: 0 }}>
+                Recommendations ({coherenceResult.suggestions.length} total)
+              </h3>
+              <span style={{ fontSize: '0.875rem', color: '#6366F1' }}>
+                Showing {Math.min(suggestionPage * SUGGESTIONS_PER_PAGE + 1, coherenceResult.suggestions.length)}-{Math.min((suggestionPage + 1) * SUGGESTIONS_PER_PAGE, coherenceResult.suggestions.length)} of {coherenceResult.suggestions.length}
+              </span>
+            </div>
+            <p style={{ fontSize: '0.75rem', color: '#6B7280', marginBottom: '1rem', fontStyle: 'italic' }}>
+              Each &quot;Implement&quot; button applies only that specific recommendation
+            </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {coherenceResult.suggestions.map((suggestion, index) => (
+              {coherenceResult.suggestions
+                .slice(suggestionPage * SUGGESTIONS_PER_PAGE, (suggestionPage + 1) * SUGGESTIONS_PER_PAGE)
+                .map((suggestion, index) => (
                 <div
-                  key={index}
+                  key={suggestionPage * SUGGESTIONS_PER_PAGE + index}
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -486,6 +564,9 @@ export default function CoherencePage() {
                   }}
                 >
                   <p style={{ margin: 0, color: '#374151', fontSize: '0.9375rem', flex: 1 }}>
+                    <span style={{ fontWeight: 600, color: '#4F46E5', marginRight: '0.5rem' }}>
+                      #{suggestionPage * SUGGESTIONS_PER_PAGE + index + 1}
+                    </span>
                     {suggestion}
                   </p>
                   <button
@@ -526,6 +607,53 @@ export default function CoherencePage() {
                 </div>
               ))}
             </div>
+
+            {/* Pagination Controls */}
+            {coherenceResult.suggestions.length > SUGGESTIONS_PER_PAGE && (
+              <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: '1rem',
+                marginTop: '1rem',
+                paddingTop: '1rem',
+                borderTop: '1px solid #E0E7FF',
+              }}>
+                <button
+                  onClick={() => setSuggestionPage(p => Math.max(0, p - 1))}
+                  disabled={suggestionPage === 0}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: suggestionPage === 0 ? '#E5E7EB' : 'white',
+                    border: '1px solid #C7D2FE',
+                    borderRadius: borderRadius.md,
+                    color: suggestionPage === 0 ? '#9CA3AF' : '#4F46E5',
+                    fontWeight: 500,
+                    cursor: suggestionPage === 0 ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  ← Previous
+                </button>
+                <span style={{ fontSize: '0.875rem', color: '#4F46E5' }}>
+                  Page {suggestionPage + 1} of {Math.ceil(coherenceResult.suggestions.length / SUGGESTIONS_PER_PAGE)}
+                </span>
+                <button
+                  onClick={() => setSuggestionPage(p => Math.min(Math.ceil(coherenceResult.suggestions.length / SUGGESTIONS_PER_PAGE) - 1, p + 1))}
+                  disabled={(suggestionPage + 1) * SUGGESTIONS_PER_PAGE >= coherenceResult.suggestions.length}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: (suggestionPage + 1) * SUGGESTIONS_PER_PAGE >= coherenceResult.suggestions.length ? '#E5E7EB' : 'white',
+                    border: '1px solid #C7D2FE',
+                    borderRadius: borderRadius.md,
+                    color: (suggestionPage + 1) * SUGGESTIONS_PER_PAGE >= coherenceResult.suggestions.length ? '#9CA3AF' : '#4F46E5',
+                    fontWeight: 500,
+                    cursor: (suggestionPage + 1) * SUGGESTIONS_PER_PAGE >= coherenceResult.suggestions.length ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  Next →
+                </button>
+              </div>
+            )}
           </div>
         )}
 
