@@ -22,6 +22,36 @@ export interface Project {
 
 export class ExportService {
   /**
+   * Clean content of any markdown artifacts or structural markers
+   */
+  private cleanContent(content: string): string {
+    let cleaned = content;
+
+    // Remove markdown headings (# ## ### etc.)
+    cleaned = cleaned.replace(/^#{1,6}\s+.*$/gm, '');
+
+    // Remove markdown bold/italic markers
+    cleaned = cleaned.replace(/\*\*([^*]+)\*\*/g, '$1');
+    cleaned = cleaned.replace(/\*([^*]+)\*/g, '$1');
+    cleaned = cleaned.replace(/__([^_]+)__/g, '$1');
+    cleaned = cleaned.replace(/_([^_]+)_/g, '$1');
+
+    // Remove scene numbers/titles like "Scene 1:", "Scene One:", "Part 1:", etc.
+    cleaned = cleaned.replace(/^(Scene|Part|Section)\s+(\d+|One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten)[:\s].*$/gim, '');
+
+    // Remove any remaining markdown-style formatting
+    cleaned = cleaned.replace(/^[-*]\s+/gm, '');
+
+    // Clean up multiple blank lines to single blank line
+    cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+
+    // Trim leading/trailing whitespace
+    cleaned = cleaned.trim();
+
+    return cleaned;
+  }
+
+  /**
    * Generate DOCX file for a project
    * Sprint 16: Include edited versions when available
    */
@@ -134,8 +164,9 @@ export class ExportService {
       );
     }
 
-    // Chapter content - split into paragraphs
-    const contentParagraphs = chapter.content.split('\n\n');
+    // Chapter content - clean and split into paragraphs
+    const cleanedContent = this.cleanContent(chapter.content);
+    const contentParagraphs = cleanedContent.split('\n\n');
     for (const para of contentParagraphs) {
       const trimmed = para.trim();
       if (trimmed === '' ||  trimmed === '* * *') {
@@ -268,8 +299,9 @@ export class ExportService {
 
           doc.moveDown(1);
 
-          // Chapter content
-          const contentParagraphs = chapter.content.split('\n\n');
+          // Chapter content - clean and split
+          const cleanedContent = this.cleanContent(chapter.content);
+          const contentParagraphs = cleanedContent.split('\n\n');
           for (const para of contentParagraphs) {
             const trimmed = para.trim();
             if (trimmed === '' || trimmed === '* * *') {

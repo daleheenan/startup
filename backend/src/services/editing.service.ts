@@ -162,6 +162,14 @@ Your task is to polish the chapter at the sentence and paragraph level:
 6. **Sensory Details**: Add or enhance sensory descriptions (sight, sound, smell, touch, taste)
 7. **Redundancy**: Eliminate unnecessary repetition
 8. **Clichés**: Replace clichéd phrases with fresh language
+9. **Adjective/Adverb Overload**: Prune excessive modifiers - keep only what's essential
+10. **Dialogue Tags**: Reduce adverb-heavy dialogue tags (e.g., "she said angrily") - let dialogue speak for itself
+
+FORMATTING REQUIREMENT:
+- Output PURE PROSE only - like a professionally published novel
+- Remove any markdown formatting (#, ##, **, *, etc.) if present
+- Remove any scene numbers or structural headers
+- Scene breaks should be indicated by a blank line only
 
 Make direct edits to improve the prose. Mark sections that need author attention with [NEEDS AUTHOR: reason].`;
 
@@ -313,7 +321,7 @@ Output only valid JSON, no commentary:`;
       throw new Error('Chapter content not found');
     }
 
-    const systemPrompt = `You are a copy editor for fiction. Your focus is on grammar, punctuation, and style consistency.
+    const systemPrompt = `You are a copy editor for fiction. Your focus is on grammar, punctuation, style consistency, and professional formatting.
 
 Check and fix:
 1. **Grammar**: Subject-verb agreement, tense consistency, pronoun agreement
@@ -324,8 +332,14 @@ Check and fix:
    - Dialogue: "Quote," tag. OR "Quote."
    - Numbers: spell out one through nine, use numerals for 10+
    - Oxford comma: use it
-5. **Formatting**: Consistent paragraph breaks, scene breaks (use * * *)
+5. **Formatting**: Consistent paragraph breaks, use blank lines for scene breaks
 6. **Capitalization**: Proper nouns, beginning of sentences
+
+CRITICAL - Remove any non-prose elements:
+- Remove ALL markdown formatting (#, ##, **, *, _, etc.)
+- Remove scene numbers, scene titles, or structural headers (e.g., "Scene 1:", "Part One:")
+- The output should be pure prose like a professionally published novel
+- Scene transitions should be indicated by a blank line only, not text markers
 
 Make direct corrections. Do NOT change word choice, sentence structure, or prose style unless it's a clear grammatical error.`;
 

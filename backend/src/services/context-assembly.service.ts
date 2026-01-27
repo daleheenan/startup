@@ -149,7 +149,16 @@ WRITING PRINCIPLES:
 VOICE GUIDELINES:
 Your prose should match this style: ${proseStyle}
 
-You write with precision, clarity, and emotional depth. Every sentence serves the story.`;
+You write with precision, clarity, and emotional depth. Every sentence serves the story.
+
+FORMATTING REQUIREMENTS (CRITICAL):
+- Write PURE PROSE only - like a professionally published novel
+- NO markdown formatting (no #, ##, **, _, etc.)
+- NO scene numbers, scene titles, or scene headers in the output
+- NO "Scene 1:", "Part 1:", or similar structural markers
+- Use scene breaks with a single blank line between scenes, nothing more
+- Start paragraphs with standard indentation (the system handles this)
+- Write flowing narrative prose that reads like a published book`;
   }
 
   /**
@@ -249,7 +258,15 @@ CRITICAL REQUIREMENTS:
 7. Honor the ${storyDNA.genre} genre conventions and ${storyDNA.tone} tone
 8. Every line must serve character, plot, or theme
 
-Begin writing now. Output only the chapter prose - no meta-commentary, no explanations.`;
+FORMATTING (MANDATORY):
+- Write PURE PROSE only - exactly like a professionally published novel
+- DO NOT use any markdown: no #, ##, **, *, _, or other formatting symbols
+- DO NOT include scene numbers, scene titles, or scene headers in your output
+- DO NOT write "Scene 1:" or "Part One:" or any structural markers
+- Transition between scenes naturally with a blank line - no labels
+- Write flowing narrative that reads like a published book from a major publisher
+
+Begin writing now. Output ONLY the chapter prose - no meta-commentary, no explanations, no formatting.`;
 
     return prompt;
   }
