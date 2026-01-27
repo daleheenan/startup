@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import FlagsSummary from '../../../components/FlagsSummary';
 import GenerationStatusBanner from '../../../components/GenerationStatusBanner';
+import ExportButtons from '../../../components/ExportButtons';
 import { getToken, logout } from '../../../lib/auth';
 import ProjectNavigation from '../../../components/shared/ProjectNavigation';
 import { useProjectNavigation } from '../../../hooks/useProjectProgress';
@@ -480,6 +481,7 @@ export default function ProgressPage() {
                     display: 'flex',
                     gap: '1rem',
                     justifyContent: 'center',
+                    marginBottom: '1.5rem',
                   }}>
                     {books.length > 0 && books[0].chapters.length > 0 ? (
                       <Link
@@ -516,23 +518,8 @@ export default function ProgressPage() {
                         Loading chapters...
                       </span>
                     )}
-                    <Link
-                      href={`/projects/${projectId}#export`}
-                      style={{
-                        display: 'inline-block',
-                        padding: '0.75rem 1.5rem',
-                        background: '#FFFFFF',
-                        border: '1px solid #10B981',
-                        borderRadius: '8px',
-                        color: '#10B981',
-                        fontSize: '1rem',
-                        fontWeight: 600,
-                        textDecoration: 'none',
-                      }}
-                    >
-                      Export
-                    </Link>
                   </div>
+                  <ExportButtons projectId={projectId} />
                 </div>
 
                 {/* Chapter List for Completed */}
