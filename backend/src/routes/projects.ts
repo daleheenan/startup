@@ -4329,6 +4329,189 @@ Output ONLY valid JSON, no additional commentary:`;
 });
 
 /**
+ * POST /api/projects/:id/fix-coherence-warning
+ * Use AI to automatically fix a coherence warning by modifying the plot structure
+ *
+ * Warnings are different from suggestions - they indicate actual issues that need
+ * to be resolved. This endpoint uses Claude to identify and fix the root cause.
+ */
+router.post('/:id/fix-coherence-warning', async (req, res) => {
+  try {
+    const { id: projectId } = req.params;
+    const { warning } = req.body;
+
+    if (!warning) {
+      return res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'warning is required' },
+      });
+    }
+
+    // Get project data
+    const projectStmt = db.prepare<[string], any>(`SELECT * FROM projects WHERE id = ?`);
+    const project = projectStmt.get(projectId);
+
+    if (!project) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project not found' },
+      });
+    }
+
+    const storyConcept = typeof project.story_concept === 'string'
+      ? JSON.parse(project.story_concept || '{}')
+      : project.story_concept;
+    const storyDna = typeof project.story_dna === 'string'
+      ? JSON.parse(project.story_dna || '{}')
+      : project.story_dna;
+    const plotStructure = typeof project.plot_structure === 'string'
+      ? JSON.parse(project.plot_structure || '{}')
+      : project.plot_structure;
+
+    if (!plotStructure?.plot_layers || plotStructure.plot_layers.length === 0) {
+      return res.status(400).json({
+        error: { code: 'NO_PLOTS', message: 'No plot layers to fix' },
+      });
+    }
+
+    logger.info({ projectId, warning: warning.substring(0, 100) }, 'Fixing coherence warning with AI');
+
+    // Build context for AI
+    const conceptContext = storyConcept ? `
+**Story Concept:**
+- Logline: ${storyConcept.logline || 'Not set'}
+- Synopsis: ${storyConcept.synopsis || 'Not set'}
+- Hook: ${storyConcept.hook || 'Not set'}
+` : '';
+
+    const dnaContext = storyDna ? `
+**Story DNA:**
+- Genre: ${storyDna.genre || 'Not set'}
+- Tone: ${storyDna.tone || 'Not set'}
+- Themes: ${(storyDna.themes || []).join(', ') || 'None'}
+` : '';
+
+    const currentPlotsContext = `
+**Current Plot Layers:**
+${plotStructure.plot_layers.map((p: any, i: number) => `
+${i + 1}. ${p.name} (${p.type})
+   Description: ${p.description}
+   Key Events: ${(p.key_events || []).join(', ') || 'None'}
+   Character Arcs: ${(p.character_arcs || []).join(', ') || 'None'}
+`).join('\n')}`;
+
+    // Use Claude to fix the warning
+    const { default: Anthropic } = await import('@anthropic-ai/sdk');
+    const anthropic = new Anthropic();
+
+    const prompt = `You are a story structure consultant fixing a coherence warning.
+
+${conceptContext}
+${dnaContext}
+${currentPlotsContext}
+
+WARNING TO FIX:
+"${warning}"
+
+Your task is to revise the plot layers to FIX this warning. You should:
+1. Identify the root cause of the warning
+2. Make specific changes to address it
+3. Ensure the fix doesn't break other plot elements
+4. Keep changes minimal but effective
+
+Return a JSON object with:
+{
+  "fixed_plot_layers": [...], // The complete revised plot_layers array
+  "changes_made": ["Description of change 1", "Description of change 2"],
+  "explanation": "Brief explanation of the fix"
+}
+
+Return ONLY valid JSON, no markdown formatting.`;
+
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4096,
+      temperature: 0.3,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const content = response.content[0];
+    if (content.type !== 'text') {
+      throw new Error('Unexpected response type from AI');
+    }
+
+    // Parse the AI response
+    let fixResult;
+    try {
+      // Clean up response if wrapped in markdown
+      let jsonText = content.text.trim();
+      if (jsonText.startsWith('```json')) {
+        jsonText = jsonText.slice(7);
+      } else if (jsonText.startsWith('```')) {
+        jsonText = jsonText.slice(3);
+      }
+      if (jsonText.endsWith('```')) {
+        jsonText = jsonText.slice(0, -3);
+      }
+      fixResult = JSON.parse(jsonText.trim());
+    } catch (parseError) {
+      logger.error({ parseError, response: content.text.substring(0, 500) }, 'Failed to parse AI fix response');
+      throw new Error('Failed to parse AI fix response');
+    }
+
+    if (!fixResult.fixed_plot_layers || !Array.isArray(fixResult.fixed_plot_layers)) {
+      throw new Error('Invalid fix response: missing fixed_plot_layers array');
+    }
+
+    // Update the plot structure
+    const updatedPlotStructure = {
+      ...plotStructure,
+      plot_layers: fixResult.fixed_plot_layers,
+    };
+
+    const updateStmt = db.prepare(`
+      UPDATE projects
+      SET plot_structure = ?, updated_at = ?
+      WHERE id = ?
+    `);
+    updateStmt.run(JSON.stringify(updatedPlotStructure), new Date().toISOString(), projectId);
+
+    // Trigger a new coherence check to validate the fix
+    const existingJob = db.prepare<[string], { id: string }>(`
+      SELECT id FROM jobs
+      WHERE target_id = ? AND type = 'coherence_check' AND status IN ('pending', 'running')
+      LIMIT 1
+    `).get(projectId);
+
+    let newCheckJobId;
+    if (!existingJob) {
+      newCheckJobId = randomUUID();
+      db.prepare(`
+        INSERT INTO jobs (id, type, target_id, status, attempts)
+        VALUES (?, 'coherence_check', ?, 'pending', 0)
+      `).run(newCheckJobId, projectId);
+      logger.info({ projectId, jobId: newCheckJobId }, 'Queued coherence re-check after warning fix');
+    }
+
+    logger.info({
+      projectId,
+      warning: warning.substring(0, 100),
+      changesCount: fixResult.changes_made?.length || 0,
+    }, 'Coherence warning fixed');
+
+    res.json({
+      success: true,
+      updatedPlotStructure,
+      changesMade: fixResult.changes_made || [],
+      explanation: fixResult.explanation || 'Warning addressed',
+      coherenceCheckQueued: !!newCheckJobId,
+      message: 'Warning fixed and plot structure updated',
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error fixing coherence warning');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
  * POST /api/projects/:id/search-replace
  * Search and replace text across all content in a project
  * Searches: chapters (content, title, summary), story_bible (characters, world),

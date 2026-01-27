@@ -44,11 +44,12 @@ export default function CoherencePage() {
   const [checking, setChecking] = useState(false);
   const [checkStatus, setCheckStatus] = useState<string | null>(null);
   const [implementing, setImplementing] = useState<string | null>(null);
+  const [fixingWarning, setFixingWarning] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const [suggestionPage, setSuggestionPage] = useState(0);
   const SUGGESTIONS_PER_PAGE = 5;
-  const [acknowledgedWarnings, setAcknowledgedWarnings] = useState<Set<number>>(new Set());
+  const [fixedWarnings, setFixedWarnings] = useState<Set<number>>(new Set());
 
   const navigation = useProjectNavigation(projectId, project);
 
@@ -244,6 +245,46 @@ export default function CoherencePage() {
       setError(err.message);
     } finally {
       setImplementing(null);
+    }
+  };
+
+  // AI auto-fix for warnings
+  const fixWarningWithAI = async (warning: string, index: number) => {
+    try {
+      setFixingWarning(index);
+      const token = getToken();
+
+      // Call AI to fix the warning
+      const res = await fetch(`${API_BASE_URL}/api/projects/${projectId}/fix-coherence-warning`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ warning }),
+      });
+
+      if (!res.ok) {
+        // If endpoint doesn't exist, show a message
+        const errorData = await res.json().catch(() => ({}));
+        if (res.status === 404) {
+          alert('This feature will be available soon. For now, please address the warning manually on the Plot page.');
+        } else {
+          throw new Error(errorData.error?.message || 'Failed to fix warning');
+        }
+        return;
+      }
+
+      // Mark as fixed and refresh data
+      setFixedWarnings(prev => new Set(prev).add(index));
+      await fetchData();
+      // Optionally re-run coherence check after fix
+      await runCoherenceCheck();
+    } catch (err: any) {
+      console.error('Error fixing warning:', err);
+      setError(err.message);
+    } finally {
+      setFixingWarning(null);
     }
   };
 
@@ -451,7 +492,7 @@ export default function CoherencePage() {
           </div>
         )}
 
-        {/* Warnings with Acknowledgement */}
+        {/* Warnings with AI Auto-Fix */}
         {coherenceResult?.warnings && coherenceResult.warnings.length > 0 && (
           <div style={{ ...card, marginBottom: '1.5rem', padding: '1.5rem', background: '#FFFBEB', border: '1px solid #FDE68A' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -459,61 +500,93 @@ export default function CoherencePage() {
                 ⚠ Warnings ({coherenceResult.warnings.length})
               </h3>
               <span style={{ fontSize: '0.75rem', color: '#92400E' }}>
-                {acknowledgedWarnings.size} of {coherenceResult.warnings.length} acknowledged
+                {fixedWarnings.size} of {coherenceResult.warnings.length} fixed
               </span>
             </div>
             <p style={{ fontSize: '0.75rem', color: '#B45309', marginBottom: '1rem', fontStyle: 'italic' }}>
-              Check each warning to acknowledge you&apos;ve addressed or considered it
+              Click &quot;Fix with AI&quot; to automatically resolve each warning
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {coherenceResult.warnings.map((warning, index) => (
-                <label
+                <div
                   key={index}
                   style={{
                     display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '0.75rem',
-                    padding: '0.75rem',
-                    background: acknowledgedWarnings.has(index) ? '#FEF3C7' : 'white',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '1rem',
+                    padding: '1rem',
+                    background: fixedWarnings.has(index) ? '#ECFDF5' : 'white',
                     borderRadius: borderRadius.md,
-                    border: `1px solid ${acknowledgedWarnings.has(index) ? '#F59E0B' : '#FDE68A'}`,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
+                    border: `1px solid ${fixedWarnings.has(index) ? '#A7F3D0' : '#FDE68A'}`,
                   }}
                 >
-                  <input
-                    type="checkbox"
-                    checked={acknowledgedWarnings.has(index)}
-                    onChange={(e) => {
-                      setAcknowledgedWarnings(prev => {
-                        const newSet = new Set(prev);
-                        if (e.target.checked) {
-                          newSet.add(index);
-                        } else {
-                          newSet.delete(index);
-                        }
-                        return newSet;
-                      });
-                    }}
-                    style={{
-                      width: '18px',
-                      height: '18px',
-                      marginTop: '2px',
-                      accentColor: '#F59E0B',
-                    }}
-                  />
-                  <span style={{
-                    color: acknowledgedWarnings.has(index) ? '#92400E' : '#B45309',
-                    fontSize: '0.9375rem',
-                    textDecoration: acknowledgedWarnings.has(index) ? 'line-through' : 'none',
-                    opacity: acknowledgedWarnings.has(index) ? 0.7 : 1,
-                  }}>
-                    {warning}
-                  </span>
-                </label>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', flex: 1 }}>
+                    <span style={{ fontSize: '1.25rem' }}>
+                      {fixedWarnings.has(index) ? '✓' : '⚠'}
+                    </span>
+                    <span style={{
+                      color: fixedWarnings.has(index) ? '#047857' : '#B45309',
+                      fontSize: '0.9375rem',
+                      textDecoration: fixedWarnings.has(index) ? 'line-through' : 'none',
+                      opacity: fixedWarnings.has(index) ? 0.7 : 1,
+                    }}>
+                      {warning}
+                    </span>
+                  </div>
+                  {!fixedWarnings.has(index) && (
+                    <button
+                      onClick={() => fixWarningWithAI(warning, index)}
+                      disabled={fixingWarning === index}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: fixingWarning === index ? '#E5E7EB' : '#F59E0B',
+                        border: 'none',
+                        borderRadius: borderRadius.md,
+                        color: 'white',
+                        fontSize: '0.8125rem',
+                        fontWeight: 500,
+                        cursor: fixingWarning === index ? 'wait' : 'pointer',
+                        whiteSpace: 'nowrap',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.375rem',
+                      }}
+                    >
+                      {fixingWarning === index ? (
+                        <>
+                          <span style={{
+                            display: 'inline-block',
+                            width: '12px',
+                            height: '12px',
+                            border: '2px solid rgba(255,255,255,0.3)',
+                            borderTopColor: 'white',
+                            borderRadius: '50%',
+                            animation: 'spin 1s linear infinite',
+                          }} />
+                          Fixing...
+                        </>
+                      ) : (
+                        'Fix with AI'
+                      )}
+                    </button>
+                  )}
+                  {fixedWarnings.has(index) && (
+                    <span style={{
+                      padding: '0.5rem 1rem',
+                      background: '#D1FAE5',
+                      borderRadius: borderRadius.md,
+                      color: '#047857',
+                      fontSize: '0.8125rem',
+                      fontWeight: 500,
+                    }}>
+                      Fixed
+                    </span>
+                  )}
+                </div>
               ))}
             </div>
-            {acknowledgedWarnings.size === coherenceResult.warnings.length && (
+            {fixedWarnings.size === coherenceResult.warnings.length && (
               <div style={{
                 marginTop: '1rem',
                 padding: '0.75rem',
@@ -526,7 +599,7 @@ export default function CoherencePage() {
                 alignItems: 'center',
                 gap: '0.5rem',
               }}>
-                ✓ All warnings acknowledged
+                ✓ All warnings have been fixed
               </div>
             )}
           </div>
