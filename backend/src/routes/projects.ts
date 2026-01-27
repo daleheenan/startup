@@ -1358,6 +1358,222 @@ function escapeRegex(str: string): string {
 }
 
 /**
+ * Global text search/replace across ALL project fields
+ * Use this for fixing text issues like old character names that weren't propagated
+ *
+ * Searches and replaces in:
+ * - story_concept (title, logline, synopsis, hook, protagonistHint)
+ * - story_dna (themes, proseStyle)
+ * - story_bible (all character fields, world elements, timeline)
+ * - plot_structure (all text fields recursively)
+ * - chapters (content, summary, scene_cards)
+ * - books (title)
+ */
+function globalSearchReplace(
+  projectId: string,
+  searchText: string,
+  replaceText: string,
+  options: {
+    caseSensitive?: boolean;
+    wholeWord?: boolean;
+    includeChapterContent?: boolean;
+  } = {}
+): {
+  totalReplacements: number;
+  fieldsUpdated: string[];
+  preview?: Array<{ field: string; before: string; after: string }>;
+} {
+  const { caseSensitive = true, wholeWord = true, includeChapterContent = true } = options;
+  const stats = { totalReplacements: 0, fieldsUpdated: [] as string[] };
+
+  if (!searchText || searchText === replaceText) {
+    return stats;
+  }
+
+  // Build regex
+  const flags = caseSensitive ? 'g' : 'gi';
+  const pattern = wholeWord ? `\\b${escapeRegex(searchText)}\\b` : escapeRegex(searchText);
+  const regex = new RegExp(pattern, flags);
+
+  // Helper to replace in string and track
+  const replaceInString = (str: string | null | undefined, fieldName: string): string | null => {
+    if (!str || typeof str !== 'string') return str as any;
+    const matches = str.match(regex);
+    if (matches) {
+      stats.totalReplacements += matches.length;
+      if (!stats.fieldsUpdated.includes(fieldName)) {
+        stats.fieldsUpdated.push(fieldName);
+      }
+      return str.replace(regex, replaceText);
+    }
+    return str;
+  };
+
+  // Helper to recursively replace in object
+  const replaceInObject = (obj: any, fieldPrefix: string): boolean => {
+    if (!obj || typeof obj !== 'object') return false;
+    let changed = false;
+
+    if (Array.isArray(obj)) {
+      for (let i = 0; i < obj.length; i++) {
+        if (typeof obj[i] === 'string') {
+          const result = replaceInString(obj[i], `${fieldPrefix}[${i}]`);
+          if (result !== obj[i]) {
+            obj[i] = result;
+            changed = true;
+          }
+        } else if (typeof obj[i] === 'object') {
+          if (replaceInObject(obj[i], `${fieldPrefix}[${i}]`)) changed = true;
+        }
+      }
+    } else {
+      for (const key of Object.keys(obj)) {
+        if (typeof obj[key] === 'string') {
+          const result = replaceInString(obj[key], `${fieldPrefix}.${key}`);
+          if (result !== obj[key]) {
+            obj[key] = result;
+            changed = true;
+          }
+        } else if (typeof obj[key] === 'object') {
+          if (replaceInObject(obj[key], `${fieldPrefix}.${key}`)) changed = true;
+        }
+      }
+    }
+    return changed;
+  };
+
+  // Get project data
+  const projectStmt = db.prepare<[string], any>(`
+    SELECT story_concept, story_dna, story_bible, plot_structure, title
+    FROM projects WHERE id = ?
+  `);
+  const project = projectStmt.get(projectId);
+  if (!project) {
+    throw new Error(`Project not found: ${projectId}`);
+  }
+
+  let projectUpdated = false;
+
+  // 1. Update story_concept
+  if (project.story_concept) {
+    const concept = safeJsonParse(project.story_concept, null);
+    if (concept && replaceInObject(concept, 'story_concept')) {
+      const updateStmt = db.prepare(`UPDATE projects SET story_concept = ?, updated_at = ? WHERE id = ?`);
+      updateStmt.run(JSON.stringify(concept), new Date().toISOString(), projectId);
+      projectUpdated = true;
+    }
+  }
+
+  // 2. Update story_dna
+  if (project.story_dna) {
+    const dna = safeJsonParse(project.story_dna, null);
+    if (dna && replaceInObject(dna, 'story_dna')) {
+      const updateStmt = db.prepare(`UPDATE projects SET story_dna = ?, updated_at = ? WHERE id = ?`);
+      updateStmt.run(JSON.stringify(dna), new Date().toISOString(), projectId);
+      projectUpdated = true;
+    }
+  }
+
+  // 3. Update story_bible
+  if (project.story_bible) {
+    const bible = safeJsonParse(project.story_bible, null);
+    if (bible && replaceInObject(bible, 'story_bible')) {
+      const updateStmt = db.prepare(`UPDATE projects SET story_bible = ?, updated_at = ? WHERE id = ?`);
+      updateStmt.run(JSON.stringify(bible), new Date().toISOString(), projectId);
+      projectUpdated = true;
+    }
+  }
+
+  // 4. Update plot_structure
+  if (project.plot_structure) {
+    const plot = safeJsonParse(project.plot_structure, null);
+    if (plot && replaceInObject(plot, 'plot_structure')) {
+      const updateStmt = db.prepare(`UPDATE projects SET plot_structure = ?, updated_at = ? WHERE id = ?`);
+      updateStmt.run(JSON.stringify(plot), new Date().toISOString(), projectId);
+      projectUpdated = true;
+    }
+  }
+
+  // 5. Update project title
+  const newTitle = replaceInString(project.title, 'project.title');
+  if (newTitle !== project.title) {
+    const updateStmt = db.prepare(`UPDATE projects SET title = ?, updated_at = ? WHERE id = ?`);
+    updateStmt.run(newTitle, new Date().toISOString(), projectId);
+    projectUpdated = true;
+  }
+
+  // 6. Update books
+  const booksStmt = db.prepare<[string], { id: string; title: string }>(`
+    SELECT id, title FROM books WHERE project_id = ?
+  `);
+  const books = booksStmt.all(projectId);
+  for (const book of books) {
+    const newBookTitle = replaceInString(book.title, `book.${book.id}.title`);
+    if (newBookTitle !== book.title) {
+      const updateBookStmt = db.prepare(`UPDATE books SET title = ?, updated_at = ? WHERE id = ?`);
+      updateBookStmt.run(newBookTitle, new Date().toISOString(), book.id);
+    }
+  }
+
+  // 7. Update chapters
+  const chaptersStmt = db.prepare<[string], { id: string; scene_cards: string; content: string; summary: string }>(`
+    SELECT c.id, c.scene_cards, c.content, c.summary
+    FROM chapters c
+    JOIN books b ON c.book_id = b.id
+    WHERE b.project_id = ?
+  `);
+  const chapters = chaptersStmt.all(projectId);
+
+  for (const chapter of chapters) {
+    let chapterUpdated = false;
+    let sceneCards = safeJsonParse(chapter.scene_cards, []);
+    let content = chapter.content || '';
+    let summary = chapter.summary || '';
+
+    // Update scene cards
+    if (replaceInObject(sceneCards, `chapter.${chapter.id}.scene_cards`)) {
+      chapterUpdated = true;
+    }
+
+    // Update content (if enabled)
+    if (includeChapterContent && content) {
+      const newContent = replaceInString(content, `chapter.${chapter.id}.content`);
+      if (newContent !== content) {
+        content = newContent!;
+        chapterUpdated = true;
+      }
+    }
+
+    // Update summary
+    if (summary) {
+      const newSummary = replaceInString(summary, `chapter.${chapter.id}.summary`);
+      if (newSummary !== summary) {
+        summary = newSummary!;
+        chapterUpdated = true;
+      }
+    }
+
+    if (chapterUpdated) {
+      const updateChapterStmt = db.prepare(`
+        UPDATE chapters SET scene_cards = ?, content = ?, summary = ?, updated_at = ?
+        WHERE id = ?
+      `);
+      updateChapterStmt.run(JSON.stringify(sceneCards), content, summary, new Date().toISOString(), chapter.id);
+    }
+  }
+
+  logger.info({
+    projectId,
+    searchText,
+    replaceText,
+    totalReplacements: stats.totalReplacements,
+    fieldsUpdated: stats.fieldsUpdated.length,
+  }, 'Global search/replace completed');
+
+  return stats;
+}
+
+/**
  * Propagate world element name changes throughout the project
  * Updates: scene_cards locations, story_bible references, story_concept, plot_structure, chapter content
  */
@@ -1709,6 +1925,167 @@ router.post('/:id/characters/:characterId/propagate-name', (req, res) => {
     });
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack }, 'Error propagating character name');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * POST /api/projects/:id/search-replace
+ * Global text search and replace across ALL project fields
+ * Use for fixing text issues like old character names that weren't propagated
+ */
+router.post('/:id/search-replace', (req, res) => {
+  try {
+    const { id: projectId } = req.params;
+    const { searchText, replaceText, caseSensitive, wholeWord, includeChapterContent } = req.body;
+
+    if (!searchText) {
+      return res.status(400).json({
+        error: { code: 'INVALID_REQUEST', message: 'searchText is required' },
+      });
+    }
+
+    if (replaceText === undefined) {
+      return res.status(400).json({
+        error: { code: 'INVALID_REQUEST', message: 'replaceText is required' },
+      });
+    }
+
+    // Verify project exists
+    const projectStmt = db.prepare(`SELECT id FROM projects WHERE id = ?`);
+    const project = projectStmt.get(projectId);
+    if (!project) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project not found' },
+      });
+    }
+
+    const stats = globalSearchReplace(projectId, searchText, replaceText, {
+      caseSensitive: caseSensitive !== false, // Default true
+      wholeWord: wholeWord !== false, // Default true
+      includeChapterContent: includeChapterContent !== false, // Default true
+    });
+
+    logger.info({ projectId, searchText, replaceText, stats }, 'Global search/replace executed');
+
+    res.json({
+      success: true,
+      searchText,
+      replaceText,
+      totalReplacements: stats.totalReplacements,
+      fieldsUpdated: stats.fieldsUpdated,
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error in global search/replace');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * POST /api/projects/:id/search-replace/preview
+ * Preview what would be replaced without making changes
+ */
+router.post('/:id/search-replace/preview', (req, res) => {
+  try {
+    const { id: projectId } = req.params;
+    const { searchText, caseSensitive, wholeWord, includeChapterContent } = req.body;
+
+    if (!searchText) {
+      return res.status(400).json({
+        error: { code: 'INVALID_REQUEST', message: 'searchText is required' },
+      });
+    }
+
+    // Build regex
+    const flags = (caseSensitive !== false) ? 'g' : 'gi';
+    const pattern = (wholeWord !== false) ? `\\b${escapeRegex(searchText)}\\b` : escapeRegex(searchText);
+    const regex = new RegExp(pattern, flags);
+
+    const matches: Array<{ field: string; context: string; count: number }> = [];
+
+    // Helper to find matches in string
+    const findInString = (str: string | null | undefined, fieldName: string): void => {
+      if (!str || typeof str !== 'string') return;
+      const found = str.match(regex);
+      if (found) {
+        // Get context around first match
+        const idx = str.search(regex);
+        const start = Math.max(0, idx - 30);
+        const end = Math.min(str.length, idx + searchText.length + 30);
+        const context = (start > 0 ? '...' : '') + str.slice(start, end) + (end < str.length ? '...' : '');
+        matches.push({ field: fieldName, context, count: found.length });
+      }
+    };
+
+    // Helper to recursively search object
+    const searchInObject = (obj: any, fieldPrefix: string): void => {
+      if (!obj || typeof obj !== 'object') return;
+      if (Array.isArray(obj)) {
+        obj.forEach((item, i) => {
+          if (typeof item === 'string') findInString(item, `${fieldPrefix}[${i}]`);
+          else if (typeof item === 'object') searchInObject(item, `${fieldPrefix}[${i}]`);
+        });
+      } else {
+        Object.keys(obj).forEach(key => {
+          if (typeof obj[key] === 'string') findInString(obj[key], `${fieldPrefix}.${key}`);
+          else if (typeof obj[key] === 'object') searchInObject(obj[key], `${fieldPrefix}.${key}`);
+        });
+      }
+    };
+
+    // Get project data
+    const projectStmt = db.prepare<[string], any>(`
+      SELECT story_concept, story_dna, story_bible, plot_structure, title
+      FROM projects WHERE id = ?
+    `);
+    const project = projectStmt.get(projectId);
+    if (!project) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project not found' },
+      });
+    }
+
+    // Search in all fields
+    findInString(project.title, 'project.title');
+    if (project.story_concept) searchInObject(safeJsonParse(project.story_concept, null), 'story_concept');
+    if (project.story_dna) searchInObject(safeJsonParse(project.story_dna, null), 'story_dna');
+    if (project.story_bible) searchInObject(safeJsonParse(project.story_bible, null), 'story_bible');
+    if (project.plot_structure) searchInObject(safeJsonParse(project.plot_structure, null), 'plot_structure');
+
+    // Search in books
+    const booksStmt = db.prepare<[string], { id: string; title: string }>(`
+      SELECT id, title FROM books WHERE project_id = ?
+    `);
+    const books = booksStmt.all(projectId);
+    books.forEach(book => findInString(book.title, `book.${book.id}.title`));
+
+    // Search in chapters
+    if (includeChapterContent !== false) {
+      const chaptersStmt = db.prepare<[string], { id: string; chapter_number: number; scene_cards: string; content: string; summary: string }>(`
+        SELECT c.id, c.chapter_number, c.scene_cards, c.content, c.summary
+        FROM chapters c
+        JOIN books b ON c.book_id = b.id
+        WHERE b.project_id = ?
+      `);
+      const chapters = chaptersStmt.all(projectId);
+
+      chapters.forEach(chapter => {
+        if (chapter.scene_cards) searchInObject(safeJsonParse(chapter.scene_cards, []), `chapter${chapter.chapter_number}.scene_cards`);
+        findInString(chapter.content, `chapter${chapter.chapter_number}.content`);
+        findInString(chapter.summary, `chapter${chapter.chapter_number}.summary`);
+      });
+    }
+
+    const totalCount = matches.reduce((sum, m) => sum + m.count, 0);
+
+    res.json({
+      searchText,
+      totalMatches: totalCount,
+      fieldsWithMatches: matches.length,
+      matches: matches.slice(0, 50), // Limit preview to 50 matches
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error in search/replace preview');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
