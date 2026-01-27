@@ -93,22 +93,31 @@ export abstract class BaseRepository<T extends BaseEntity> {
    */
   findAll(options: FindOptions = {}): T[] {
     let sql = `SELECT ${options.columns?.join(', ') || '*'} FROM ${this.tableName}`;
+    const params: any[] = [];
 
     if (options.orderBy) {
+      // Validate ORDER BY to prevent SQL injection
+      this.validateOrderBy(options.orderBy);
       sql += ` ORDER BY ${options.orderBy}`;
     }
 
-    if (options.limit) {
-      sql += ` LIMIT ${options.limit}`;
+    if (options.limit !== undefined) {
+      // Validate and parameterise LIMIT
+      const safeLimit = this.validateNumber(options.limit, 'LIMIT');
+      sql += ` LIMIT ?`;
+      params.push(safeLimit);
     }
 
-    if (options.offset) {
-      sql += ` OFFSET ${options.offset}`;
+    if (options.offset !== undefined) {
+      // Validate and parameterise OFFSET
+      const safeOffset = this.validateNumber(options.offset, 'OFFSET');
+      sql += ` OFFSET ?`;
+      params.push(safeOffset);
     }
 
     const { result } = queryMonitor.wrapSync(sql, () => {
-      const stmt = this.db.prepare<[], T>(sql);
-      return stmt.all();
+      const stmt = this.db.prepare<any[], T>(sql);
+      return stmt.all(...params);
     });
 
     return result;
@@ -118,19 +127,28 @@ export abstract class BaseRepository<T extends BaseEntity> {
    * Find entities by a single column value
    */
   findBy(column: string, value: string | number, options: FindOptions = {}): T[] {
+    // Validate column name to prevent SQL injection
+    this.validateColumnName(column);
+
     let sql = `SELECT ${options.columns?.join(', ') || '*'} FROM ${this.tableName} WHERE ${column} = ?`;
+    const params: any[] = [value];
 
     if (options.orderBy) {
+      // Validate ORDER BY to prevent SQL injection
+      this.validateOrderBy(options.orderBy);
       sql += ` ORDER BY ${options.orderBy}`;
     }
 
-    if (options.limit) {
-      sql += ` LIMIT ${options.limit}`;
+    if (options.limit !== undefined) {
+      // Validate and parameterise LIMIT
+      const safeLimit = this.validateNumber(options.limit, 'LIMIT');
+      sql += ` LIMIT ?`;
+      params.push(safeLimit);
     }
 
     const { result } = queryMonitor.wrapSync(sql, () => {
-      const stmt = this.db.prepare<[typeof value], T>(sql);
-      return stmt.all(value);
+      const stmt = this.db.prepare<any[], T>(sql);
+      return stmt.all(...params);
     });
 
     return result;
@@ -140,6 +158,9 @@ export abstract class BaseRepository<T extends BaseEntity> {
    * Find first entity matching a column value
    */
   findOneBy(column: string, value: string | number): T | null {
+    // Validate column name to prevent SQL injection
+    this.validateColumnName(column);
+
     const sql = `SELECT * FROM ${this.tableName} WHERE ${column} = ? LIMIT 1`;
 
     const { result } = queryMonitor.wrapSync(sql, () => {
@@ -168,6 +189,9 @@ export abstract class BaseRepository<T extends BaseEntity> {
    * Count entities matching a condition
    */
   countBy(column: string, value: string | number): number {
+    // Validate column name to prevent SQL injection
+    this.validateColumnName(column);
+
     const sql = `SELECT COUNT(*) as count FROM ${this.tableName} WHERE ${column} = ?`;
 
     const { result } = queryMonitor.wrapSync(sql, () => {
@@ -279,6 +303,9 @@ export abstract class BaseRepository<T extends BaseEntity> {
    * Delete entities matching a condition
    */
   deleteBy(column: string, value: string | number): number {
+    // Validate column name to prevent SQL injection
+    this.validateColumnName(column);
+
     const sql = `DELETE FROM ${this.tableName} WHERE ${column} = ?`;
 
     const { result } = queryMonitor.wrapSync(sql, () => {
@@ -355,5 +382,37 @@ export abstract class BaseRepository<T extends BaseEntity> {
       pageSize,
       totalPages,
     };
+  }
+
+  /**
+   * Validate column name to prevent SQL injection
+   * Only allows alphanumeric characters and underscores
+   */
+  protected validateColumnName(column: string): void {
+    if (!/^[a-zA-Z0-9_]+$/.test(column)) {
+      throw new Error(`Invalid column name: ${column}`);
+    }
+  }
+
+  /**
+   * Validate ORDER BY clause to prevent SQL injection
+   * Allows column names, ASC/DESC, and commas for multiple columns
+   */
+  protected validateOrderBy(orderBy: string): void {
+    // Allow: column_name [ASC|DESC][, column_name [ASC|DESC]]*
+    if (!/^[a-zA-Z0-9_]+(?: (?:ASC|DESC))?(?: ?, ?[a-zA-Z0-9_]+(?: (?:ASC|DESC))?)*$/.test(orderBy)) {
+      throw new Error(`Invalid ORDER BY clause: ${orderBy}`);
+    }
+  }
+
+  /**
+   * Validate and coerce number for LIMIT/OFFSET
+   */
+  protected validateNumber(value: number, context: string): number {
+    const parsed = parseInt(String(value), 10);
+    if (isNaN(parsed) || parsed < 0) {
+      throw new Error(`Invalid ${context} value: ${value}`);
+    }
+    return parsed;
   }
 }

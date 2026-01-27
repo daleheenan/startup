@@ -715,11 +715,20 @@ router.delete('/:bookId/acts/:actNumber', (req, res) => {
 
     // Delete chapters belonging to this act
     if (chapterNumbersToDelete.length > 0) {
-      const placeholders = chapterNumbersToDelete.map(() => '?').join(',');
+      // Validate chapter numbers are integers to prevent SQL injection
+      const validatedNumbers = chapterNumbersToDelete.map(num => {
+        const parsed = parseInt(String(num), 10);
+        if (isNaN(parsed)) {
+          throw new Error('Invalid chapter number');
+        }
+        return parsed;
+      });
+
+      const placeholders = validatedNumbers.map(() => '?').join(',');
       const deleteChaptersStmt = db.prepare(`
         DELETE FROM chapters WHERE book_id = ? AND chapter_number IN (${placeholders})
       `);
-      deleteChaptersStmt.run(bookId, ...chapterNumbersToDelete);
+      deleteChaptersStmt.run(bookId, ...validatedNumbers);
     }
 
     // Remove the act

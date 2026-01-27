@@ -2,6 +2,7 @@ import express from 'express';
 import { EventEmitter } from 'events';
 import jwt from 'jsonwebtoken';
 import { createLogger } from '../services/logger.service.js';
+import { SSEConfig } from '../config/sse.config.js';
 
 const router = express.Router();
 const logger = createLogger('routes:progress');
@@ -10,17 +11,17 @@ const logger = createLogger('routes:progress');
 export const progressEmitter = new EventEmitter();
 
 // Set max listeners to avoid warnings (many concurrent clients)
-progressEmitter.setMaxListeners(100);
+progressEmitter.setMaxListeners(SSEConfig.MAX_LISTENERS);
 
 // Track active connections for monitoring
 const activeConnections = new Set<() => void>();
 
 // Monitor connection count periodically
 setInterval(() => {
-  if (activeConnections.size > 90) {
+  if (activeConnections.size > SSEConfig.HIGH_CONNECTION_WARNING_THRESHOLD) {
     logger.warn({ count: activeConnections.size }, 'High SSE connection count');
   }
-}, 300000); // Check every 5 minutes
+}, SSEConfig.CONNECTION_MONITOR_INTERVAL_MS);
 
 /**
  * GET /api/progress/stream
@@ -134,11 +135,11 @@ router.get('/stream', (req, res) => {
   // Cleanup on client disconnect
   req.on('close', cleanup);
 
-  // Forced cleanup after 1 hour (safety measure)
+  // Forced cleanup after configured timeout (safety measure)
   const forceCloseTimeout = setTimeout(() => {
-    logger.warn({ userId }, 'Forcing SSE connection close after 1 hour');
+    logger.warn({ userId }, 'Forcing SSE connection close after timeout');
     cleanup();
-  }, 3600000);
+  }, SSEConfig.CONNECTION_FORCE_CLOSE_TIMEOUT_MS);
 
   // Clear the force-close timeout if client disconnects normally
   req.on('close', () => {

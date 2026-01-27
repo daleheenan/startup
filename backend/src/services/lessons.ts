@@ -31,6 +31,7 @@ export const lessonsService = {
     if (genre) scopes.push(`genre:${genre}`);
     if (projectId) scopes.push(`project:${projectId}`);
 
+    // Create parameterised placeholders for safe IN clause
     const placeholders = scopes.map(() => '?').join(',');
 
     const stmt = db.prepare(`
@@ -40,6 +41,7 @@ export const lessonsService = {
       LIMIT 10
     `);
 
+    // Use parameterised query - scopes array is safe as it's constructed from controlled values
     const rows = stmt.all(agentType, ...scopes) as any[];
 
     return rows.map(row => ({

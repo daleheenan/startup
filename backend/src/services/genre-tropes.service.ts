@@ -133,7 +133,15 @@ class GenreTropesService {
         return [];
       }
 
-      const placeholders = genres.map(() => '?').join(',');
+      // Validate genres are strings to prevent SQL injection
+      const validatedGenres = genres.map(genre => {
+        if (typeof genre !== 'string' || genre.length === 0) {
+          throw new Error('Invalid genre value');
+        }
+        return genre;
+      });
+
+      const placeholders = validatedGenres.map(() => '?').join(',');
       const query = `
         SELECT * FROM genre_tropes
         WHERE genre IN (${placeholders})
@@ -141,7 +149,7 @@ class GenreTropesService {
       `;
 
       const stmt = db.prepare(query);
-      const rows = stmt.all(...genres) as any[];
+      const rows = stmt.all(...validatedGenres) as any[];
 
       return rows.map(this.parseTrope);
     } catch (error) {

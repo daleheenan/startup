@@ -246,7 +246,7 @@ export function useProjectNavigation(
     // Always fetch navigation data to ensure we have the latest
     // The hook will prefer provided data if it's not null
     fetchNavigationData();
-  }, [projectId]);
+  }, [projectId, providedOutline, providedChapters]);
 
   // Use provided data if available and not null, otherwise use fetched data
   // Note: null means "explicitly no data yet", undefined means "please fetch for me"

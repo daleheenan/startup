@@ -95,7 +95,7 @@ export default function PlotWizard({
       // If more plots were added externally, merge them
       setLocalPlots(plotLayers);
     }
-  }, [plotLayers]);
+  }, [plotLayers, localPlots]);
 
   // Auto-save plot layers when they change
   useEffect(() => {

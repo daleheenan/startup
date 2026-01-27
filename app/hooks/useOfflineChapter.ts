@@ -28,6 +28,7 @@ export function useOfflineChapter() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    let database: IDBDatabase | null = null;
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
     request.onerror = () => {
@@ -35,25 +36,25 @@ export function useOfflineChapter() {
     };
 
     request.onsuccess = (event) => {
-      const database = (event.target as IDBOpenDBRequest).result;
+      database = (event.target as IDBOpenDBRequest).result;
       setDb(database);
       setIsDbReady(true);
     };
 
     request.onupgradeneeded = (event) => {
-      const database = (event.target as IDBOpenDBRequest).result;
+      const localDb = (event.target as IDBOpenDBRequest).result;
 
       // Create chapters store with indexes
-      if (!database.objectStoreNames.contains(STORE_NAME)) {
-        const store = database.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      if (!localDb.objectStoreNames.contains(STORE_NAME)) {
+        const store = localDb.createObjectStore(STORE_NAME, { keyPath: 'id' });
         store.createIndex('bookId', 'bookId', { unique: false });
         store.createIndex('cachedAt', 'cachedAt', { unique: false });
       }
     };
 
     return () => {
-      if (db) {
-        db.close();
+      if (database) {
+        database.close();
       }
     };
   }, []);

@@ -411,7 +411,15 @@ export class ChaptersRepository extends BaseRepository<ChapterRow> {
   bulkUpdateStatus(ids: string[], status: ChapterStatus): number {
     if (ids.length === 0) return 0;
 
-    const placeholders = ids.map(() => '?').join(', ');
+    // Validate IDs are strings to prevent SQL injection
+    const validatedIds = ids.map(id => {
+      if (typeof id !== 'string' || id.length === 0) {
+        throw new Error('Invalid chapter ID');
+      }
+      return id;
+    });
+
+    const placeholders = validatedIds.map(() => '?').join(', ');
     const sql = `
       UPDATE chapters
       SET status = ?, updated_at = ?
@@ -419,7 +427,7 @@ export class ChaptersRepository extends BaseRepository<ChapterRow> {
     `;
 
     const now = new Date().toISOString();
-    const result = this.executeStatement(sql, [status, now, ...ids]);
+    const result = this.executeStatement(sql, [status, now, ...validatedIds]);
     return result.changes;
   }
 
