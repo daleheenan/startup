@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import ProjectNavigation from '../../../components/shared/ProjectNavigation';
-import { useProjectNavigation } from '../../../hooks/useProjectProgress';
+import { useProjectNavigation } from '@/app/hooks';
 import { fetchJson } from '../../../lib/fetch-utils';
 
 // Lazy load ProseStyleEditor - large editor component

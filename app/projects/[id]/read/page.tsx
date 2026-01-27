@@ -9,7 +9,7 @@ import ErrorMessage from '../../../components/shared/ErrorMessage';
 import BookVersionSelector from '../../../components/BookVersionSelector';
 import { fetchJson } from '../../../lib/fetch-utils';
 import { getToken } from '../../../lib/auth';
-import { useProjectNavigation } from '../../../hooks/useProjectProgress';
+import { useProjectNavigation } from '@/app/hooks';
 import { colors, borderRadius } from '../../../lib/constants';
 import { card } from '../../../lib/styles';
 

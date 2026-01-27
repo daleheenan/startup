@@ -12,7 +12,7 @@ import { fetchJson } from '../../lib/fetch-utils';
 import { getToken } from '../../lib/auth';
 import { colors, gradients, borderRadius, shadows } from '../../lib/constants';
 import { card, statusBadge } from '../../lib/styles';
-import { useProjectNavigation } from '../../hooks/useProjectProgress';
+import { useProjectNavigation } from '@/app/hooks';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 

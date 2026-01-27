@@ -7,7 +7,7 @@ import PlotLayersVisualization from '../../../components/PlotLayersVisualization
 import PlotWizard from '../../../components/plot/PlotWizard';
 import { getToken } from '../../../lib/auth';
 import { colors } from '../../../lib/constants';
-import { useProjectNavigation } from '../../../hooks/useProjectProgress';
+import { useProjectNavigation } from '@/app/hooks';
 import { createInitialPlotLayers, isKeyPlotLayer, toExtendedPlotLayer } from '../../../lib/plot-constants';
 import type { ExtendedPlotLayer } from '../../../../shared/types';
 

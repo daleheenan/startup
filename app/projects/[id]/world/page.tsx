@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getToken, logout } from '../../../lib/auth';
 import ProjectNavigation from '../../../components/shared/ProjectNavigation';
-import { useProjectNavigation } from '../../../hooks/useProjectProgress';
+import { useProjectNavigation } from '@/app/hooks';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 

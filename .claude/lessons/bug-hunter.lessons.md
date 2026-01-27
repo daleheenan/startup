@@ -12,11 +12,11 @@ MAINTENANCE RULES:
 
 ## Summary Statistics
 
-- **Total tasks completed**: 3
-- **Total lessons recorded**: 12
-- **Last updated**: 2026-01-25
+- **Total tasks completed**: 4
+- **Total lessons recorded**: 13
+- **Last updated**: 2026-01-27
 - **Proven lessons** (score >= 5): 0
-- **Top themes**: #react-hooks #sql-injection #dependencies #useCallback #security #patterns
+- **Top themes**: #sql-injection #security #patterns #validation #repositories #in-clause
 
 ---
 
@@ -30,6 +30,34 @@ MAINTENANCE RULES:
 
 ## Active Lessons (Most Recent First)
 
+### 2026-01-27 | Task: Comprehensive SQL Injection Security Audit (BUG-010)
+
+**Date**: 2026-01-27
+**Task**: Complete SQL injection audit across backend database layer
+**Context**: Better-sqlite3 database with BaseRepository pattern, 17 routes with db.prepare, 18 services
+
+**What Worked Well**:
+- Systematic three-layer audit: repositories → services → routes
+- Grepped for multiple SQL injection patterns: template literals, IN clauses, ORDER BY, LIMIT/OFFSET
+- Found 10 vulnerabilities across 3 severity levels
+- Traced data flow from user input (req.body/query) → service → repository → SQL
+- Distinguished "currently safe" from "safe pattern" vulnerabilities
+- Created comprehensive report with reproduction steps and fixes
+- Identified BaseRepository as systemic vulnerability source
+
+**What Didn't Work**:
+- Initial grep for `\`SELECT.*\${` missed IN clause construction patterns
+- Had to search separately for `IN (${`, `ORDER BY ${`, `LIMIT ${`, `OFFSET ${`
+- Dynamic SQL construction via string building (not template literals) requires different search patterns
+
+**Lesson**: SQL injection audit MUST check these layers in order: (1) **Routes** - Find where user input enters (req.body, req.query, req.params), (2) **Data flow** - Trace user input through service calls to repository/db.prepare, (3) **IN clause construction** - Pattern `ids.map(() => '?').join(',')` then `IN (${placeholders})` is CRITICAL vulnerability if ids from user, (4) **Repository abstraction** - BaseRepository methods with column/table/orderBy parameters are dangerous pattern even if currently safe, (5) **Dynamic query building** - LIMIT/OFFSET/ORDER BY string interpolation is vulnerable even with "trusted" values, (6) **Validation gaps** - No validation between route and SQL = vulnerability. Search patterns needed: `IN \(\${`, `ORDER BY \${`, `LIMIT \${`, `OFFSET \${`, `WHERE \${`, `db.prepare.*\${`. Found: Genre tropes API (user genres → IN clause), Queue deletion (user IDs → DELETE IN), BaseRepository (dynamic columns/ORDER BY/LIMIT/OFFSET), Lessons service (genre → scope → IN clause). Fix pattern: Validate/whitelist BEFORE building query, never trust "internal" data sources.
+
+**Application Score**: 1
+
+**Tags**: #sql-injection #security #repositories #in-clause #validation #patterns #audit #critical
+
+---
+
 ### 2026-01-25 | Task: React Hook & SQL Injection Audit (BUG-009, BUG-010)
 
 **Date**: 2026-01-25
@@ -42,7 +70,7 @@ MAINTENANCE RULES:
 - Checked for SQL template literals: `` `SELECT.*\${ ``
 - Found pattern-based vulnerabilities (dangerous even if not currently exploited)
 - Created comprehensive report documenting all findings with fixes
-- Prioritized by actual risk vs theoretical risk
+- Prioritised by actual risk vs theoretical risk
 
 **What Didn't Work**:
 - Some files too large to read fully (GenrePreferenceForm 31k tokens)
@@ -51,7 +79,7 @@ MAINTENANCE RULES:
 
 **Lesson**: React Hook + SQL injection audit requires TWO different mindsets: (1) For React hooks, look for ACTIVE bugs (useCallback in deps array, missing deps) - grep for `useCallback.*useEffect` patterns, (2) For SQL injection, look for PATTERNS even if currently safe (dynamic column names, ORDER BY from variables) - audit repositories not just routes, (3) Distinguish "currently safe" from "safe pattern" - `WHERE ${column} = ?` is dangerous pattern even with hardcoded column values, (4) useCallback + useEffect dependency is THE most common React anti-pattern - inline functions instead, (5) Document why pattern is dangerous, not just current state.
 
-**Application Score**: 1
+**Application Score**: 2
 
 **Tags**: #react-hooks #sql-injection #useCallback #dependencies #patterns #audit
 
@@ -65,15 +93,15 @@ MAINTENANCE RULES:
 
 **What Worked Well**:
 - Identified that useCallback is for child component props, not useEffect
-- Recognized pattern causes double renders (projectId changes → fetchData changes → useEffect runs)
+- Recognised pattern causes double renders (projectId changes → fetchData changes → useEffect runs)
 - Found 3 instances: plot/page, series/page, ChapterEditor
 - Explained WHY pattern is wrong, not just that it is
 
 **What Didn't Work**:
-- Pattern is so common that developers don't realize it's wrong
+- Pattern is so common that developers don't realise it's wrong
 - ESLint exhaustive-deps would catch this if enabled
 
-**Lesson**: The useCallback + useEffect pattern is THE most common React anti-pattern: (1) useCallback is for memoizing callbacks passed to CHILDREN, not for useEffect, (2) Pattern: `useCallback(fn, [id])` + `useEffect(() => fn(), [fn])` causes extra render, (3) Correct: `useEffect(() => { const fn = async () => {...}; fn(); }, [id])`, (4) Only depend on PRIMITIVE values (id, string, number), never on functions, (5) If you need to call function from multiple places, define it OUTSIDE component or use useRef for stable reference, (6) Enable ESLint exhaustive-deps to catch this automatically.
+**Lesson**: The useCallback + useEffect pattern is THE most common React anti-pattern: (1) useCallback is for memoising callbacks passed to CHILDREN, not for useEffect, (2) Pattern: `useCallback(fn, [id])` + `useEffect(() => fn(), [fn])` causes extra render, (3) Correct: `useEffect(() => { const fn = async () => {...}; fn(); }, [id])`, (4) Only depend on PRIMITIVE values (id, string, number), never on functions, (5) If you MUST memoize, use useRef for stable reference, (6) Enable ESLint exhaustive-deps to catch this automatically.
 
 **Application Score**: 1
 
@@ -88,7 +116,7 @@ MAINTENANCE RULES:
 **Context**: BaseRepository with string interpolation for column names and ORDER BY
 
 **What Worked Well**:
-- Found that routes are safe (all use parameterized queries)
+- Found that routes are safe (all use parameterised queries)
 - Identified repository layer has unsafe pattern even though currently not exploited
 - Explained difference between "currently safe" and "safe pattern"
 - Proposed whitelist-based fix for all repositories
@@ -97,9 +125,9 @@ MAINTENANCE RULES:
 - Initially focused on routes, almost missed repository pattern
 - Pattern is internal-only so developers might not see it as risk
 
-**Lesson**: SQL injection audit must check TWO layers: (1) Routes - verify all use `db.prepare('...?').run(value)` pattern, (2) Repositories - check for dynamic column/table/ORDER BY even if only called internally, (3) Pattern like `WHERE ${column} = ?` is ALWAYS dangerous even with hardcoded column values, (4) Future developer might pass user input without realizing danger, (5) Fix: Every repository MUST whitelist allowed columns in constructor, validate before interpolation, (6) Search patterns: grep for `ORDER BY \${`, `WHERE \${`, backtick SQL with variables, (7) Distinguish active vulnerability from dangerous pattern.
+**Lesson**: SQL injection audit must check TWO layers: (1) Routes - verify all use `db.prepare('...?').run(value)` pattern, (2) Repositories - check for dynamic column/table/ORDER BY even if only called internally, (3) Pattern like `WHERE ${column} = ?` is ALWAYS dangerous even with hardcoded column values, (4) Future developer might pass user input without realising danger, (5) Fix: Every repository MUST whitelist allowed columns in constructor, validate before interpolation, (6) Search patterns: grep for `ORDER BY \${`, `WHERE \${`, backtick SQL with variables, (7) Distinguish active vulnerability from dangerous pattern.
 
-**Application Score**: 1
+**Application Score**: 2
 
 **Tags**: #sql-injection #repositories #patterns #whitelisting #security
 
@@ -114,7 +142,7 @@ MAINTENANCE RULES:
 **What Worked Well**:
 - Systematic approach: Read lessons first, then scan codebase methodically
 - Created comprehensive bug report document before fixing
-- Prioritized by severity (Critical first, then High, Medium, Low)
+- Prioritised by severity (Critical first, then High, Medium, Low)
 - Used grep to find patterns (magic numbers, SQL concat, fetch calls)
 - Checked for SQL injection by searching for string concatenation in queries
 - Fixed multiple bugs in single pass to avoid context switching
@@ -123,7 +151,7 @@ MAINTENANCE RULES:
 - Initially missed that some bugs were already partially addressed
 - GenerationProgress useEffect cleanup looked suspicious but was actually correct
 
-**Lesson**: When bug hunting in full-stack apps, use this checklist: (1) SSE/WebSocket endpoints - check auth extraction and connection tracking, (2) Array growth - cap all event arrays, (3) Null safety - validate array[0] access and JSON.parse, (4) Fetch timeouts - add AbortController everywhere, (5) useEffect cleanup - verify intervals/timers cleared on unmount, (6) SQL queries - confirm all use parameterized queries. These 6 patterns account for 80% of production bugs.
+**Lesson**: When bug hunting in full-stack apps, use this checklist: (1) SSE/WebSocket endpoints - check auth extraction and connection tracking, (2) Array growth - cap all event arrays, (3) Null safety - validate array[0] access and JSON.parse, (4) Fetch timeouts - add AbortController everywhere, (5) useEffect cleanup - verify intervals/timers cleared on unmount, (6) SQL queries - confirm all use parameterised queries. These 6 patterns account for 80% of production bugs.
 
 **Application Score**: 2
 
@@ -138,7 +166,7 @@ MAINTENANCE RULES:
 **Context**: Server-Sent Events with JWT query parameter auth
 
 **What Worked Well**:
-- Recognized that jwt.verify() returns decoded payload but code wasn't using it
+- Recognised that jwt.verify() returns decoded payload but code wasn't using it
 - Added userId extraction and validation
 - Implemented connection tracking to monitor for leaks
 - Added forced cleanup after 1 hour as safety measure
@@ -238,7 +266,7 @@ MAINTENANCE RULES:
 **What Didn't Work**:
 - Initially thought code was bugged but it was actually correct
 
-**Lesson**: useEffect cleanup patterns: (1) Cleanup runs BOTH on unmount AND when dependencies change, (2) Inside if(isActive) block, return cleanup function - it will still run on unmount, (3) Store timers in const within effect, not state, (4) Always clearInterval/clearTimeout in cleanup, (5) For null safety, store in let and check: `if (timer) clearInterval(timer)`. Don't assume code is buggy without tracing React's cleanup behavior.
+**Lesson**: useEffect cleanup patterns: (1) Cleanup runs BOTH on unmount AND when dependencies change, (2) Inside if(isActive) block, return cleanup function - it will still run on unmount, (3) Store timers in const within effect, not state, (4) Always clearInterval/clearTimeout in cleanup, (5) For null safety, store in let and check: `if (timer) clearInterval(timer)`. Don't assume code is buggy without tracing React's cleanup behaviour.
 
 **Application Score**: 2
 
@@ -254,15 +282,15 @@ MAINTENANCE RULES:
 
 **What Worked Well**:
 - Grepped for template literals in SQL: `\`SELECT.*\$\{`
-- Confirmed all queries use parameterized pattern: `db.prepare('... WHERE id = ?').run(value)`
+- Confirmed all queries use parameterised pattern: `db.prepare('... WHERE id = ?').run(value)`
 - Found only template literals were in test files and console.log
 
 **What Didn't Work**:
 - N/A
 
-**Lesson**: SQL injection hunting: (1) Grep for backtick template literals with ${ in SQL strings, (2) Verify ALL db.prepare uses ? placeholders, (3) Check that values passed to .run/.get/.all match placeholder count, (4) Watch for dynamic ORDER BY or LIMIT - use whitelist, not user input, (5) Better-sqlite3 safely handles parameterized queries but can't protect against template literals. One missed concatenation = SQL injection.
+**Lesson**: SQL injection hunting: (1) Grep for backtick template literals with ${ in SQL strings, (2) Verify ALL db.prepare uses ? placeholders, (3) Check that values passed to .run/.get/.all match placeholder count, (4) Watch for dynamic ORDER BY or LIMIT - use whitelist, not user input, (5) Better-sqlite3 safely handles parameterised queries but can't protect against template literals. One missed concatenation = SQL injection.
 
-**Application Score**: 2
+**Application Score**: 3
 
 **Tags**: #sql-injection #security #database #grep
 
@@ -311,28 +339,6 @@ MAINTENANCE RULES:
 **Application Score**: 1
 
 **Tags**: #magic-numbers #constants #maintainability
-
----
-
-### 2026-01-25 | Task: Error Boundary Gap
-
-**Date**: 2026-01-25
-**Task**: Identifying missing error boundaries in React app
-**Context**: Next.js application without error boundaries
-
-**What Worked Well**:
-- Searched for ErrorBoundary components
-- Found none existed anywhere in app
-- Recognized this means any error = white screen crash
-
-**What Didn't Work**:
-- N/A (found the gap)
-
-**Lesson**: EVERY React app needs Error Boundaries at 3 levels: (1) App root - catches catastrophic failures, reload page button, (2) Page level - keeps other pages working, (3) Feature level - isolates component crashes. Create ErrorBoundary class component (not function), use componentDidCatch, provide fallback UI. Without these, React unmounts entire tree on error = worst UX possible.
-
-**Application Score**: 1
-
-**Tags**: #error-boundaries #react #ux #error-handling
 
 ---
 

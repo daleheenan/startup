@@ -1,8 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getToken } from '../lib/auth';
-import { API_BASE_URL } from '@/app/lib/constants';
+import { fetchJson } from '../lib/fetch-utils';
 
 // Types
 interface Project {
@@ -35,33 +34,11 @@ interface ProjectWithBooks extends Project {
 
 // API functions
 async function fetchProjects(): Promise<Project[]> {
-  const token = getToken();
-  const response = await fetch(`${API_BASE_URL}/api/projects`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch projects');
-  }
-
-  return response.json();
+  return fetchJson<Project[]>('/api/projects');
 }
 
 async function fetchProjectWithBooks(projectId: string): Promise<ProjectWithBooks> {
-  const token = getToken();
-  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}?include=books,chapters`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch project');
-  }
-
-  return response.json();
+  return fetchJson<ProjectWithBooks>(`/api/projects/${projectId}?include=books,chapters`);
 }
 
 // Hooks

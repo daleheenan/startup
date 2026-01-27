@@ -57,3 +57,12 @@ dev-server.log
 shared/*.js
 shared/*.d.ts
 shared/*.map
+
+# Auto-generated test summaries
+**/TEST_SUMMARY.md
+**/TEST_FIXES_SUMMARY.md
+**/VALIDATION_REPORT.md
+**/UTILITY_TESTS_SUMMARY.md
+
+# Windows artifacts
+nul

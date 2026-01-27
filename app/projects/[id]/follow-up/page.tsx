@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { getToken, logout } from '../../../lib/auth';
 import ProjectNavigation from '../../../components/shared/ProjectNavigation';
-import { useProjectNavigation } from '../../../hooks/useProjectProgress';
+import { useProjectNavigation } from '@/app/hooks';
 import type {
   FollowUpRecommendations,
   SequelIdea,

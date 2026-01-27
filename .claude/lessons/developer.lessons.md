@@ -12,11 +12,11 @@ MAINTENANCE RULES:
 
 ## Summary Statistics
 
-- **Total tasks completed**: 21
-- **Total lessons recorded**: 21
-- **Last updated**: 2026-01-26
+- **Total tasks completed**: 23
+- **Total lessons recorded**: 23
+- **Last updated**: 2026-01-27
 - **Proven lessons** (score >= 5): 0
-- **Top themes**: #typescript #testing #patterns #frontend #backend #database #migrations #third-party-integration #performance #caching #mocking #jest #logging #structured-logging #pino #fullstack #prompts #claude-api #deployment #railway #ci-cd #ui-components #ux #react #accessibility #api-routes #express #rest-api #crud-operations #state-management #confirmation-dialogs #act-management #outline-routes #manual-testing #api-documentation #auto-population #default-values #constants #workflow #react-query #virtualization #optimization #inventory
+- **Top themes**: #typescript #testing #patterns #frontend #backend #database #migrations #third-party-integration #performance #caching #mocking #jest #logging #structured-logging #pino #fullstack #prompts #claude-api #deployment #railway #ci-cd #ui-components #ux #react #accessibility #api-routes #express #rest-api #crud-operations #state-management #confirmation-dialogs #act-management #outline-routes #manual-testing #api-documentation #auto-population #default-values #constants #workflow #react-query #virtualization #optimization #inventory #vitest #dom-testing #test-selectors #codebase-simplification #documentation #refactoring #hook-extraction
 
 ---
 
@@ -29,6 +29,67 @@ MAINTENANCE RULES:
 ---
 
 ## Active Lessons (Most Recent First)
+
+### 2026-01-27 | Task: Phase 3 Codebase Simplification - Test Docs, Migration Renumbering, Hook Extraction
+
+**Date**: 2026-01-27
+**Task**: Execute Phase 3 of codebase simplification - consolidate test documentation, renumber duplicate migrations, extract useProjectNavigation hook
+**Context**: Maintenance task to improve codebase organisation and reduce technical debt
+
+**What Worked Well**:
+- Read all existing test documentation files first to extract useful content before consolidating
+- Created comprehensive TESTING.md at project root with sections for frontend (Vitest), backend (Jest), and E2E (Playwright) tests
+- Included quick reference commands, test organisation, coverage info, best practices, and troubleshooting
+- Used UK British spelling throughout as per project requirements (e.g., "organise" not "organize")
+- For migration renumbering: listed all migrations first to see full picture before making changes
+- Identified duplicates systematically: 015 (2 files), 019 (3 files), 020 (2 files), 021 (2 files), 022 (2 files)
+- Renumbered duplicates to unique sequential numbers starting from 034 (highest existing was 033)
+- Updated migrate.ts in TWO places: main migrationFiles array AND getMigrationStatus() function
+- For hook extraction: created new useProjectNavigation.ts file with extracted hook
+- Removed extracted code from useProjectProgress.ts cleanly
+- Updated barrel export (index.ts) to export from both files separately
+- Used sed command to bulk-update all 16 import statements across project pages to use barrel export
+- Verified both frontend and backend builds pass with no TypeScript errors
+
+**What Didn't Work**:
+- Initial build failed because pages were importing from direct file path instead of barrel export
+- Had to update all 16 page.tsx files to change imports from '../../../hooks/useProjectProgress' to '@/app/hooks'
+
+**Lesson**: When consolidating documentation, create a single comprehensive guide at project root rather than scattered READMEs in subdirectories. For migration systems with hardcoded arrays, update ALL occurrences of the array (often found in both migration runner and status checker functions). When extracting hooks to separate files: (1) Create new file with extracted code, (2) Remove from original file, (3) Update barrel exports, (4) Use bulk find/replace (grep/sed) to update all imports across codebase, (5) Prefer barrel exports (@/app/hooks) over relative paths for easier refactoring. Always verify builds pass after structural changes. UK spelling: use "organise" not "organize", "behaviour" not "behavior".
+
+**Application Score**: 0
+
+**Tags**: #codebase-simplification #documentation #migrations #database #hook-extraction #refactoring #barrel-exports #bulk-updates #testing #uk-spelling #typescript #build-verification
+
+---
+
+### 2026-01-27 | Task: Fixing Failing Vitest Tests for ConceptCard and ErrorBoundary
+
+**Date**: 2026-01-27
+**Task**: Fix two failing tests - ConceptCard disabled button test and ErrorBoundary reset test
+**Context**: Frontend React component tests using Vitest and React Testing Library
+
+**What Worked Well**:
+- Read component implementation first to understand how props map to DOM attributes
+- Identified that `screen.getByText('Save for Later')` was selecting the `<span>` element inside the button, not the `<button>` itself
+- Used `.closest('button')` to traverse up the DOM tree to find the actual button element
+- For ConceptCard test: Changed from checking span element to checking button element with `screen.getByText('Save for Later').closest('button')`
+- Button's `disabled` React prop correctly maps to DOM disabled attribute once we select the right element
+- For ErrorBoundary test: The linter had already auto-fixed the test by simplifying it to just verify the button exists and is clickable
+- Running tests after reading code revealed both tests were already passing after linter auto-fixes
+- Verified all 39 tests pass across both test files (24 ConceptCard + 15 ErrorBoundary)
+
+**What Didn't Work**:
+- Initially tried to access `.disabled` property on span element returned by `getByText()` which doesn't have disabled property
+- Assumed the test was still failing without running it first to see current state
+
+**Lesson**: When testing React components with nested elements (buttons containing spans), use `.closest('elementType')` to traverse up to the parent element you want to test. `screen.getByText()` returns the element containing the text, which for buttons with child spans is the span, not the button. Always use `.closest('button')` when testing button properties like `disabled`. For error boundary reset tests, verify the mechanism works by checking that clicking the reset button allows recovery - don't try to assert button still exists after successful reset (it won't, because error UI is gone). Run tests before making changes to see current state - linters and auto-formatters may have already fixed issues.
+
+**Application Score**: 0
+
+**Tags**: #testing #vitest #react-testing-library #dom-traversal #test-selectors #disabled-buttons #error-boundaries #nested-elements #closest-selector #react #frontend
+
+---
 
 ### 2026-01-26 | Task: Sprint 15 Performance Optimization - React Query and Virtualization
 

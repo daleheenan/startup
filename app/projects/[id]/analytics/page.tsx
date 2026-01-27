@@ -6,7 +6,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { getToken, logout } from '../../../lib/auth';
 import ProjectNavigation from '../../../components/shared/ProjectNavigation';
-import { useProjectNavigation } from '../../../hooks/useProjectProgress';
+import { useProjectNavigation } from '@/app/hooks';
 
 // Lazy load AnalyticsDashboard - heavy component with charts
 const AnalyticsDashboard = dynamic(() => import('../../../components/AnalyticsDashboard'), {

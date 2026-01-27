@@ -9,31 +9,13 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getToken } from './auth';
-import { API_BASE_URL } from '@/app/lib/constants';
+import { fetchJson } from './fetch-utils';
 
 /**
  * Helper: Make authenticated API request
  */
 async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const token = getToken();
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    ...(token && { Authorization: `Bearer ${token}` }),
-    ...options?.headers,
-  };
-
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: response.statusText }));
-    throw new Error(error.message || `API error: ${response.status}`);
-  }
-
-  return response.json();
+  return fetchJson<T>(endpoint, options);
 }
 
 /**

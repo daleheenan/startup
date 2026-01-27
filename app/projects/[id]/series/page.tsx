@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import PageLayout from '../../../components/shared/PageLayout';
 import { getToken } from '../../../lib/auth';
 import { colors, gradients } from '../../../lib/constants';
-import { useProjectNavigation } from '../../../hooks/useProjectProgress';
+import { useProjectNavigation } from '@/app/hooks';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 

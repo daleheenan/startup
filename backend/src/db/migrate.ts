@@ -293,7 +293,7 @@ export function runMigrations() {
       runMigration(4, 'Saved Concepts', cleanedMigration);
     }
 
-    // Migrations 005-028: Run from migration files
+    // Migrations 005-041: Run from migration files
     // Note: Version numbers in filenames don't directly map to DB versions
     // The DB version is 5 + index in this array
     const migrationFiles = [
@@ -318,10 +318,10 @@ export function runMigrations() {
       '023_plagiarism_checks.sql',       // DB version 23
       '024_user_preferences.sql',        // DB version 24
       '025_concept_source_idea.sql',     // DB version 25
-      '019_user_settings.sql',           // DB version 26 - user genres, exclusions, recipes
-      '019_time_period.sql',             // DB version 27 - time period support
-      '015_fix_metrics_trigger.sql',     // DB version 28 - fix word_count ambiguity in trigger
-      '020_backfill_metrics.sql',        // DB version 29 - backfill metrics for existing data
+      '035_user_settings.sql',           // DB version 26 - user genres, exclusions, recipes
+      '036_time_period.sql',             // DB version 27 - time period support
+      '034_fix_metrics_trigger.sql',     // DB version 28 - fix word_count ambiguity in trigger
+      '037_backfill_metrics.sql',        // DB version 29 - backfill metrics for existing data
       '026_author_name_field.sql',       // DB version 30 - author name for exports
       '027_editorial_reports.sql',       // DB version 31 - VEB (Virtual Editorial Board) tables
       '028_post_completion_features.sql', // DB version 32 - post-completion features
@@ -329,6 +329,9 @@ export function runMigrations() {
       '030_auto_veb_on_completion.sql',  // DB version 34 - auto-trigger VEB on book completion
       '031_outline_editorial_board.sql', // DB version 35 - Outline Editorial Board tables
       '032_book_cloning.sql',            // DB version 36 - book cloning support
+      '033_book_versions.sql',           // DB version 37 - book version control
+      '038_cleanup_duplicate_chapters.sql', // DB version 38 - cleanup duplicate chapters
+      '039_fix_duplicate_cleanup.sql',   // DB version 39 - fix duplicate cleanup issues
     ];
 
     for (let i = 0; i < migrationFiles.length; i++) {
@@ -430,10 +433,10 @@ export function getMigrationStatus(): {
     '023_plagiarism_checks.sql',
     '024_user_preferences.sql',
     '025_concept_source_idea.sql',
-    '019_user_settings.sql',
-    '019_time_period.sql',
-    '015_fix_metrics_trigger.sql',
-    '020_backfill_metrics.sql',
+    '035_user_settings.sql',
+    '036_time_period.sql',
+    '034_fix_metrics_trigger.sql',
+    '037_backfill_metrics.sql',
     '026_author_name_field.sql',
     '027_editorial_reports.sql',
     '028_post_completion_features.sql',
@@ -441,6 +444,9 @@ export function getMigrationStatus(): {
     '030_auto_veb_on_completion.sql',
     '031_outline_editorial_board.sql',
     '032_book_cloning.sql',
+    '033_book_versions.sql',
+    '038_cleanup_duplicate_chapters.sql',
+    '039_fix_duplicate_cleanup.sql',
   ];
 
   const pendingMigrations: string[] = [];

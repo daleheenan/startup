@@ -7,7 +7,7 @@ import PageLayout from '../../../components/shared/PageLayout';
 import LoadingState from '../../../components/shared/LoadingState';
 import { fetchJson } from '../../../lib/fetch-utils';
 import { getToken } from '../../../lib/auth';
-import { useProjectNavigation } from '../../../hooks/useProjectProgress';
+import { useProjectNavigation } from '@/app/hooks';
 import { colors, borderRadius, shadows } from '../../../lib/constants';
 import { card } from '../../../lib/styles';
 

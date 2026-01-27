@@ -1,23 +1,7 @@
 // API client for NovelForge backend
 
-import { getToken } from './auth';
+import { fetchWithAuth } from './fetch-utils';
 import { API_BASE_URL } from './constants';
-
-/**
- * Get headers with authentication token if available
- */
-function getHeaders(): HeadersInit {
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
-
-  const token = getToken();
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  return headers;
-}
 
 export interface QueueStats {
   queue: {
@@ -45,7 +29,7 @@ export interface HealthStatus {
  * Check if the backend server is healthy
  */
 export async function checkHealth(): Promise<HealthStatus> {
-  const response = await fetch(`${API_BASE_URL}/health`);
+  const response = await fetchWithAuth('/health', { skipAuth: true });
   if (!response.ok) {
     throw new Error('Backend server is not responding');
   }
@@ -56,9 +40,7 @@ export async function checkHealth(): Promise<HealthStatus> {
  * Get queue and session statistics
  */
 export async function getQueueStats(): Promise<QueueStats> {
-  const response = await fetch(`${API_BASE_URL}/api/queue/stats`, {
-    headers: getHeaders(),
-  });
+  const response = await fetchWithAuth('/api/queue/stats');
   if (!response.ok) {
     throw new Error('Failed to fetch queue stats');
   }
@@ -69,9 +51,8 @@ export async function getQueueStats(): Promise<QueueStats> {
  * Create a test job
  */
 export async function createTestJob(type: string, targetId: string): Promise<any> {
-  const response = await fetch(`${API_BASE_URL}/api/queue/test`, {
+  const response = await fetchWithAuth('/api/queue/test', {
     method: 'POST',
-    headers: getHeaders(),
     body: JSON.stringify({ type, targetId }),
   });
 

@@ -1,62 +1,50 @@
+// Note: This file is deprecated. All design tokens have been consolidated in design-tokens.ts
+// Please import from design-tokens.ts for all design system values.
+// This file remains for backward compatibility during migration.
+
+import { colors, shadows, borderRadius, spacing, typography } from './design-tokens';
+
 export const theme = {
   colors: {
-    // Light theme colors
-    background: '#FAFAFA',
-    surface: '#FFFFFF',
-    border: '#E0E0E0',
-    text: '#212121',
-    textSecondary: '#757575',
-    textTertiary: '#B0B0B0',
+    // Light theme colors - mapped to design-tokens
+    background: colors.background.secondary,
+    surface: colors.background.surface,
+    border: colors.border.default,
+    text: colors.text.primary,
+    textSecondary: colors.text.secondary,
+    textTertiary: colors.text.tertiary,
 
-    // Primary brand colors (purple-blue gradient)
-    primary: '#667eea',
-    primaryDark: '#764ba2',
-    primaryLight: '#E8EEFA',
+    // Primary brand colors
+    primary: colors.brand.primary,
+    primaryDark: colors.brand.primaryDark,
+    primaryLight: colors.brand.primaryLight,
 
     // Status colors
-    success: '#4CAF50',
-    warning: '#FF9800',
-    error: '#F44336',
-    info: '#2196F3',
+    success: colors.semantic.success,
+    warning: colors.semantic.warning,
+    error: colors.semantic.error,
+    info: colors.semantic.info,
 
     // Specific states
-    running: '#2196F3',
-    completed: '#4CAF50',
-    pending: '#FF9800',
-    failed: '#F44336',
-    paused: '#B0B0B0',
+    running: colors.status.running,
+    completed: colors.status.completed,
+    pending: colors.status.pending,
+    failed: colors.status.failed,
+    paused: colors.status.paused,
   },
 
   shadows: {
-    sm: '0 1px 3px rgba(0,0,0,0.08)',
-    md: '0 4px 6px rgba(0,0,0,0.1)',
-    lg: '0 10px 25px rgba(0,0,0,0.12)',
+    sm: shadows.sm,
+    md: shadows.md,
+    lg: shadows.lg,
   },
 
   borderRadius: {
-    sm: '8px',
-    md: '12px',
-    lg: '16px',
+    sm: borderRadius.sm,
+    md: borderRadius.md,
+    lg: borderRadius.lg,
   },
 
-  spacing: {
-    xs: '0.5rem',
-    sm: '0.75rem',
-    md: '1rem',
-    lg: '1.5rem',
-    xl: '2rem',
-  },
-
-  typography: {
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-    fontSize: {
-      xs: '0.75rem',
-      sm: '0.875rem',
-      base: '1rem',
-      lg: '1.125rem',
-      xl: '1.25rem',
-      '2xl': '1.5rem',
-      '3xl': '2rem',
-    },
-  },
+  spacing,
+  typography,
 };

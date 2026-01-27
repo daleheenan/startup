@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { getToken, logout } from '../../../lib/auth';
 import GenerationProgress from '../../../components/GenerationProgress';
 import ProjectNavigation from '../../../components/shared/ProjectNavigation';
-import { useProjectNavigation } from '../../../hooks/useProjectProgress';
+import { useProjectNavigation } from '@/app/hooks';
 import ConfirmDialog from '../../../components/shared/ConfirmDialog';
 import VersionPromptDialog from '../../../components/VersionPromptDialog';
 
