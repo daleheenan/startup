@@ -2,6 +2,22 @@
 
 This repository contains reusable AI agents, workflows, and commands for Claude Code.
 
+## Language & Spelling
+
+**IMPORTANT**: All output must use UK British spelling conventions. This includes:
+- Generated novel content, prose, and dialogue
+- Documentation and comments
+- Agent responses and reports
+
+Common conversions:
+- organize → organise (all -ize → -ise variants)
+- color → colour
+- behavior → behaviour
+- favor → favour
+- center → centre
+- defense → defence
+- modeling → modelling
+
 ## Purpose
 
 This is a template repository. Use the setup scripts to copy agents and commands to new projects.
