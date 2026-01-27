@@ -194,6 +194,12 @@ export type JobType =
   | 'continuity_check'
   | 'copy_edit'
   | 'proofread'
+  | 'sensitivity_review'
+  | 'research_review'
+  | 'beta_reader_review'
+  | 'opening_review'
+  | 'dialogue_review'
+  | 'hook_review'
   | 'generate_summary'
   | 'update_states';
 

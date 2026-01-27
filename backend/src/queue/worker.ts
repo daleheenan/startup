@@ -182,6 +182,18 @@ export class QueueWorker {
         return await this.copyEdit(job);
       case 'proofread':
         return await this.proofread(job);
+      case 'sensitivity_review':
+        return await this.sensitivityReview(job);
+      case 'research_review':
+        return await this.researchReview(job);
+      case 'beta_reader_review':
+        return await this.betaReaderReview(job);
+      case 'opening_review':
+        return await this.openingReview(job);
+      case 'dialogue_review':
+        return await this.dialogueReview(job);
+      case 'hook_review':
+        return await this.hookReview(job);
       case 'generate_summary':
         return await this.generateSummary(job);
       case 'update_states':
@@ -546,6 +558,254 @@ export class QueueWorker {
       checkpointManager.saveCheckpoint(job.id, 'completed', { chapterId });
     } catch (error) {
       logger.error({ error }, 'proofread: Error');
+      throw error;
+    }
+  }
+
+  /**
+   * Sensitivity review for a chapter
+   */
+  private async sensitivityReview(job: Job): Promise<void> {
+    logger.info({ chapterId: job.target_id }, 'sensitivity_review: Processing chapter');
+    const chapterId = job.target_id;
+
+    const { specialistAgentsService } = await import('../services/specialist-agents.service.js');
+    const { metricsService } = await import('../services/metrics.service.js');
+
+    checkpointManager.saveCheckpoint(job.id, 'started', { chapterId });
+
+    try {
+      const result = await specialistAgentsService.sensitivityReview(chapterId);
+
+      if (result.usage) {
+        metricsService.trackChapterTokens(chapterId, result.usage.input_tokens, result.usage.output_tokens);
+      }
+
+      // Apply edits if content was changed
+      if (result.editedContent !== result.originalContent) {
+        const updateStmt = db.prepare(`
+          UPDATE chapters SET content = ?, updated_at = ? WHERE id = ?
+        `);
+        updateStmt.run(result.editedContent, new Date().toISOString(), chapterId);
+      }
+
+      // Store flags
+      if (result.flags.length > 0) {
+        const chapterStmt = db.prepare(`SELECT flags FROM chapters WHERE id = ?`);
+        const chapter = chapterStmt.get(chapterId) as any;
+        const existingFlags = chapter?.flags ? JSON.parse(chapter.flags) : [];
+        const updateFlagsStmt = db.prepare(`UPDATE chapters SET flags = ? WHERE id = ?`);
+        updateFlagsStmt.run(JSON.stringify([...existingFlags, ...result.flags]), chapterId);
+      }
+
+      logger.info({ findingsCount: result.findings.length }, 'sensitivity_review: Complete');
+      checkpointManager.saveCheckpoint(job.id, 'completed', { chapterId });
+    } catch (error) {
+      logger.error({ error }, 'sensitivity_review: Error');
+      throw error;
+    }
+  }
+
+  /**
+   * Research review for a chapter
+   */
+  private async researchReview(job: Job): Promise<void> {
+    logger.info({ chapterId: job.target_id }, 'research_review: Processing chapter');
+    const chapterId = job.target_id;
+
+    const { specialistAgentsService } = await import('../services/specialist-agents.service.js');
+    const { metricsService } = await import('../services/metrics.service.js');
+
+    checkpointManager.saveCheckpoint(job.id, 'started', { chapterId });
+
+    try {
+      const result = await specialistAgentsService.researchReview(chapterId);
+
+      if (result.usage) {
+        metricsService.trackChapterTokens(chapterId, result.usage.input_tokens, result.usage.output_tokens);
+      }
+
+      if (result.editedContent !== result.originalContent) {
+        const updateStmt = db.prepare(`
+          UPDATE chapters SET content = ?, updated_at = ? WHERE id = ?
+        `);
+        updateStmt.run(result.editedContent, new Date().toISOString(), chapterId);
+      }
+
+      if (result.flags.length > 0) {
+        const chapterStmt = db.prepare(`SELECT flags FROM chapters WHERE id = ?`);
+        const chapter = chapterStmt.get(chapterId) as any;
+        const existingFlags = chapter?.flags ? JSON.parse(chapter.flags) : [];
+        const updateFlagsStmt = db.prepare(`UPDATE chapters SET flags = ? WHERE id = ?`);
+        updateFlagsStmt.run(JSON.stringify([...existingFlags, ...result.flags]), chapterId);
+      }
+
+      logger.info({ findingsCount: result.findings.length }, 'research_review: Complete');
+      checkpointManager.saveCheckpoint(job.id, 'completed', { chapterId });
+    } catch (error) {
+      logger.error({ error }, 'research_review: Error');
+      throw error;
+    }
+  }
+
+  /**
+   * Beta reader review for a chapter
+   */
+  private async betaReaderReview(job: Job): Promise<void> {
+    logger.info({ chapterId: job.target_id }, 'beta_reader_review: Processing chapter');
+    const chapterId = job.target_id;
+
+    const { specialistAgentsService } = await import('../services/specialist-agents.service.js');
+    const { metricsService } = await import('../services/metrics.service.js');
+
+    checkpointManager.saveCheckpoint(job.id, 'started', { chapterId });
+
+    try {
+      const result = await specialistAgentsService.betaReaderReview(chapterId);
+
+      if (result.usage) {
+        metricsService.trackChapterTokens(chapterId, result.usage.input_tokens, result.usage.output_tokens);
+      }
+
+      // Beta reader doesn't edit content, just flags issues
+      if (result.flags.length > 0) {
+        const chapterStmt = db.prepare(`SELECT flags FROM chapters WHERE id = ?`);
+        const chapter = chapterStmt.get(chapterId) as any;
+        const existingFlags = chapter?.flags ? JSON.parse(chapter.flags) : [];
+        const updateFlagsStmt = db.prepare(`UPDATE chapters SET flags = ? WHERE id = ?`);
+        updateFlagsStmt.run(JSON.stringify([...existingFlags, ...result.flags]), chapterId);
+      }
+
+      logger.info({ engagementScore: result.score, findingsCount: result.findings.length }, 'beta_reader_review: Complete');
+      checkpointManager.saveCheckpoint(job.id, 'completed', { chapterId });
+    } catch (error) {
+      logger.error({ error }, 'beta_reader_review: Error');
+      throw error;
+    }
+  }
+
+  /**
+   * Opening specialist review for chapter 1
+   */
+  private async openingReview(job: Job): Promise<void> {
+    logger.info({ chapterId: job.target_id }, 'opening_review: Processing chapter');
+    const chapterId = job.target_id;
+
+    const { specialistAgentsService } = await import('../services/specialist-agents.service.js');
+    const { metricsService } = await import('../services/metrics.service.js');
+
+    checkpointManager.saveCheckpoint(job.id, 'started', { chapterId });
+
+    try {
+      const result = await specialistAgentsService.openingReview(chapterId);
+
+      if (result.usage && result.usage.input_tokens > 0) {
+        metricsService.trackChapterTokens(chapterId, result.usage.input_tokens, result.usage.output_tokens);
+      }
+
+      if (result.editedContent !== result.originalContent) {
+        const updateStmt = db.prepare(`
+          UPDATE chapters SET content = ?, updated_at = ? WHERE id = ?
+        `);
+        updateStmt.run(result.editedContent, new Date().toISOString(), chapterId);
+      }
+
+      if (result.flags.length > 0) {
+        const chapterStmt = db.prepare(`SELECT flags FROM chapters WHERE id = ?`);
+        const chapter = chapterStmt.get(chapterId) as any;
+        const existingFlags = chapter?.flags ? JSON.parse(chapter.flags) : [];
+        const updateFlagsStmt = db.prepare(`UPDATE chapters SET flags = ? WHERE id = ?`);
+        updateFlagsStmt.run(JSON.stringify([...existingFlags, ...result.flags]), chapterId);
+      }
+
+      logger.info({ firstLineScore: result.score }, 'opening_review: Complete');
+      checkpointManager.saveCheckpoint(job.id, 'completed', { chapterId });
+    } catch (error) {
+      logger.error({ error }, 'opening_review: Error');
+      throw error;
+    }
+  }
+
+  /**
+   * Dialogue coach review for a chapter
+   */
+  private async dialogueReview(job: Job): Promise<void> {
+    logger.info({ chapterId: job.target_id }, 'dialogue_review: Processing chapter');
+    const chapterId = job.target_id;
+
+    const { specialistAgentsService } = await import('../services/specialist-agents.service.js');
+    const { metricsService } = await import('../services/metrics.service.js');
+
+    checkpointManager.saveCheckpoint(job.id, 'started', { chapterId });
+
+    try {
+      const result = await specialistAgentsService.dialogueReview(chapterId);
+
+      if (result.usage) {
+        metricsService.trackChapterTokens(chapterId, result.usage.input_tokens, result.usage.output_tokens);
+      }
+
+      if (result.editedContent !== result.originalContent) {
+        const updateStmt = db.prepare(`
+          UPDATE chapters SET content = ?, updated_at = ? WHERE id = ?
+        `);
+        updateStmt.run(result.editedContent, new Date().toISOString(), chapterId);
+      }
+
+      if (result.flags.length > 0) {
+        const chapterStmt = db.prepare(`SELECT flags FROM chapters WHERE id = ?`);
+        const chapter = chapterStmt.get(chapterId) as any;
+        const existingFlags = chapter?.flags ? JSON.parse(chapter.flags) : [];
+        const updateFlagsStmt = db.prepare(`UPDATE chapters SET flags = ? WHERE id = ?`);
+        updateFlagsStmt.run(JSON.stringify([...existingFlags, ...result.flags]), chapterId);
+      }
+
+      logger.info({ dialogueScore: result.score, findingsCount: result.findings.length }, 'dialogue_review: Complete');
+      checkpointManager.saveCheckpoint(job.id, 'completed', { chapterId });
+    } catch (error) {
+      logger.error({ error }, 'dialogue_review: Error');
+      throw error;
+    }
+  }
+
+  /**
+   * Chapter hook specialist review
+   */
+  private async hookReview(job: Job): Promise<void> {
+    logger.info({ chapterId: job.target_id }, 'hook_review: Processing chapter');
+    const chapterId = job.target_id;
+
+    const { specialistAgentsService } = await import('../services/specialist-agents.service.js');
+    const { metricsService } = await import('../services/metrics.service.js');
+
+    checkpointManager.saveCheckpoint(job.id, 'started', { chapterId });
+
+    try {
+      const result = await specialistAgentsService.hookReview(chapterId);
+
+      if (result.usage) {
+        metricsService.trackChapterTokens(chapterId, result.usage.input_tokens, result.usage.output_tokens);
+      }
+
+      if (result.editedContent !== result.originalContent) {
+        const updateStmt = db.prepare(`
+          UPDATE chapters SET content = ?, updated_at = ? WHERE id = ?
+        `);
+        updateStmt.run(result.editedContent, new Date().toISOString(), chapterId);
+      }
+
+      if (result.flags.length > 0) {
+        const chapterStmt = db.prepare(`SELECT flags FROM chapters WHERE id = ?`);
+        const chapter = chapterStmt.get(chapterId) as any;
+        const existingFlags = chapter?.flags ? JSON.parse(chapter.flags) : [];
+        const updateFlagsStmt = db.prepare(`UPDATE chapters SET flags = ? WHERE id = ?`);
+        updateFlagsStmt.run(JSON.stringify([...existingFlags, ...result.flags]), chapterId);
+      }
+
+      logger.info({ hookScore: result.score }, 'hook_review: Complete');
+      checkpointManager.saveCheckpoint(job.id, 'completed', { chapterId });
+    } catch (error) {
+      logger.error({ error }, 'hook_review: Error');
       throw error;
     }
   }

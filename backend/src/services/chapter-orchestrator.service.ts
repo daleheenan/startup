@@ -43,7 +43,9 @@ export class ChapterOrchestratorService {
     // Queue jobs for each chapter
     for (const chapter of chapters) {
       this.queueChapterWorkflow(chapter.id);
-      jobsCreated += 8; // generate_chapter, dev_edit, line_edit, continuity_check, copy_edit, proofread, generate_summary, update_states
+      jobsCreated += 14; // Core: generate, dev_edit, line_edit, continuity, copy_edit, proofread
+                         // Specialists: sensitivity, research, beta_reader, opening, dialogue, hook
+                         // Finalization: summary, states
       // Note: +1 additional job (author_revision) may be created dynamically if dev editor requires it
     }
 
@@ -58,15 +60,21 @@ export class ChapterOrchestratorService {
   /**
    * Queue the complete workflow for a single chapter
    *
-   * Pipeline:
+   * Pipeline (14 steps):
    * 1. generate_chapter - Author Agent writes initial draft
    * 2. dev_edit - Developmental Editor reviews (may queue author_revision)
    * 3. line_edit - Line Editor polishes prose
    * 4. continuity_check - Continuity Editor checks consistency
    * 5. copy_edit - Copy Editor fixes grammar/style
    * 6. proofread - Proofreader final quality check
-   * 7. generate_summary - Create summary for next chapter
-   * 8. update_states - Update character states
+   * 7. sensitivity_review - Sensitivity Reader checks representation
+   * 8. research_review - Researcher validates facts/history
+   * 9. beta_reader_review - Beta Reader simulates reader engagement
+   * 10. opening_review - Opening Specialist (chapter 1 only)
+   * 11. dialogue_review - Dialogue Coach ensures natural dialogue
+   * 12. hook_review - Hook Specialist ensures chapter ending momentum
+   * 13. generate_summary - Create summary for next chapter
+   * 14. update_states - Update character states
    */
   queueChapterWorkflow(chapterId: string): {
     generateJobId: string;
@@ -75,10 +83,17 @@ export class ChapterOrchestratorService {
     continuityJobId: string;
     copyEditJobId: string;
     proofreadJobId: string;
+    sensitivityJobId: string;
+    researchJobId: string;
+    betaReaderJobId: string;
+    openingJobId: string;
+    dialogueJobId: string;
+    hookJobId: string;
     summaryJobId: string;
     statesJobId: string;
   } {
     // Create jobs in sequence (worker processes them in order)
+    // Core editing pipeline
     const generateJobId = QueueWorker.createJob('generate_chapter', chapterId);
     const devEditJobId = QueueWorker.createJob('dev_edit', chapterId);
     // Note: author_revision job may be created dynamically by dev_edit if needed
@@ -86,6 +101,16 @@ export class ChapterOrchestratorService {
     const continuityJobId = QueueWorker.createJob('continuity_check', chapterId);
     const copyEditJobId = QueueWorker.createJob('copy_edit', chapterId);
     const proofreadJobId = QueueWorker.createJob('proofread', chapterId);
+
+    // Specialist agents (publication quality)
+    const sensitivityJobId = QueueWorker.createJob('sensitivity_review', chapterId);
+    const researchJobId = QueueWorker.createJob('research_review', chapterId);
+    const betaReaderJobId = QueueWorker.createJob('beta_reader_review', chapterId);
+    const openingJobId = QueueWorker.createJob('opening_review', chapterId);
+    const dialogueJobId = QueueWorker.createJob('dialogue_review', chapterId);
+    const hookJobId = QueueWorker.createJob('hook_review', chapterId);
+
+    // Finalization
     const summaryJobId = QueueWorker.createJob('generate_summary', chapterId);
     const statesJobId = QueueWorker.createJob('update_states', chapterId);
 
@@ -96,6 +121,12 @@ export class ChapterOrchestratorService {
     logger.info(`  - Continuity: ${continuityJobId}`);
     logger.info(`  - Copy Edit: ${copyEditJobId}`);
     logger.info(`  - Proofread: ${proofreadJobId}`);
+    logger.info(`  - Sensitivity: ${sensitivityJobId}`);
+    logger.info(`  - Research: ${researchJobId}`);
+    logger.info(`  - Beta Reader: ${betaReaderJobId}`);
+    logger.info(`  - Opening: ${openingJobId}`);
+    logger.info(`  - Dialogue: ${dialogueJobId}`);
+    logger.info(`  - Hook: ${hookJobId}`);
     logger.info(`  - Summary: ${summaryJobId}`);
     logger.info(`  - States: ${statesJobId}`);
 
@@ -106,6 +137,12 @@ export class ChapterOrchestratorService {
       continuityJobId,
       copyEditJobId,
       proofreadJobId,
+      sensitivityJobId,
+      researchJobId,
+      betaReaderJobId,
+      openingJobId,
+      dialogueJobId,
+      hookJobId,
       summaryJobId,
       statesJobId,
     };
