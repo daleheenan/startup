@@ -80,8 +80,9 @@ export default function ReadBookPage() {
       const projectData = await fetchJson<Project>(`/api/projects/${projectId}`);
       setProject(projectData);
 
-      // Fetch books
-      const booksData = await fetchJson<Book[]>(`/api/books/project/${projectId}`);
+      // Fetch books - API returns { books: [...] }
+      const booksResponse = await fetchJson<{ books: Book[] }>(`/api/books/project/${projectId}`);
+      const booksData = booksResponse.books || [];
       setBooks(booksData);
 
       if (booksData.length > 0) {

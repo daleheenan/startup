@@ -54,6 +54,8 @@ export default function VersionHistoryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isActivating, setIsActivating] = useState<string | null>(null);
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [legacyChapterCount, setLegacyChapterCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const navigation = useProjectNavigation(projectId, project, null, []);
@@ -95,6 +97,25 @@ export default function VersionHistoryPage() {
 
       const data = await response.json();
       setVersions(data.versions || []);
+
+      // If no versions, check for legacy chapters
+      if (!data.versions || data.versions.length === 0) {
+        try {
+          const chaptersRes = await fetch(`${API_BASE_URL}/api/chapters/book/${bookId}?allVersions=true`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          if (chaptersRes.ok) {
+            const chaptersData = await chaptersRes.json();
+            const chapters = chaptersData.chapters || [];
+            // Count chapters without version_id (legacy)
+            setLegacyChapterCount(chapters.length);
+          }
+        } catch {
+          // Ignore errors checking legacy chapters
+        }
+      } else {
+        setLegacyChapterCount(0);
+      }
     } catch (err: any) {
       console.error('Error fetching versions:', err);
       setVersions([]);
@@ -195,6 +216,40 @@ export default function VersionHistoryPage() {
       await fetchVersionsForBook(selectedBookId);
     } catch (err: any) {
       alert(err.message);
+    }
+  };
+
+  const handleMigrateChapters = async () => {
+    if (!selectedBookId || isMigrating) return;
+
+    setIsMigrating(true);
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/books/${selectedBookId}/migrate-chapters`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error?.message || 'Failed to migrate chapters');
+      }
+
+      const result = await response.json();
+      if (result.migrated) {
+        alert(`Successfully migrated ${legacyChapterCount} chapters to Version 1`);
+      } else {
+        alert(result.message || 'No chapters to migrate');
+      }
+
+      await fetchVersionsForBook(selectedBookId);
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setIsMigrating(false);
     }
   };
 
@@ -307,24 +362,52 @@ export default function VersionHistoryPage() {
             <h3 style={{ fontSize: '1.125rem', color: colors.text, marginBottom: '0.5rem' }}>
               No Versions Yet
             </h3>
-            <p style={{ color: colors.textSecondary, fontSize: '0.9375rem', marginBottom: '1.5rem' }}>
-              Versions are created automatically when you regenerate chapters after making plot changes.
-            </p>
-            <button
-              onClick={handleCreateVersion}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                border: 'none',
-                borderRadius: borderRadius.md,
-                color: '#FFFFFF',
-                fontSize: '0.9375rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              Create Version 1
-            </button>
+            {legacyChapterCount > 0 ? (
+              <>
+                <p style={{ color: colors.textSecondary, fontSize: '0.9375rem', marginBottom: '1.5rem' }}>
+                  You have <strong>{legacyChapterCount} chapters</strong> that were created before versioning was added.
+                  Migrate them to Version 1 to enable version management.
+                </p>
+                <button
+                  onClick={handleMigrateChapters}
+                  disabled={isMigrating}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    border: 'none',
+                    borderRadius: borderRadius.md,
+                    color: '#FFFFFF',
+                    fontSize: '0.9375rem',
+                    fontWeight: 600,
+                    cursor: isMigrating ? 'not-allowed' : 'pointer',
+                    opacity: isMigrating ? 0.7 : 1,
+                  }}
+                >
+                  {isMigrating ? 'Migrating...' : `Migrate ${legacyChapterCount} Chapters to Version 1`}
+                </button>
+              </>
+            ) : (
+              <>
+                <p style={{ color: colors.textSecondary, fontSize: '0.9375rem', marginBottom: '1.5rem' }}>
+                  Versions are created automatically when you regenerate chapters after making plot changes.
+                </p>
+                <button
+                  onClick={handleCreateVersion}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    border: 'none',
+                    borderRadius: borderRadius.md,
+                    color: '#FFFFFF',
+                    fontSize: '0.9375rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Create Version 1
+                </button>
+              </>
+            )}
           </div>
         )}
 

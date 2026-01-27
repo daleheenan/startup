@@ -764,6 +764,140 @@ router.delete('/:id', (req, res) => {
 });
 
 /**
+ * POST /api/projects/:id/cover-image
+ * Upload a cover image for the project
+ * Accepts base64 encoded image data
+ */
+router.post('/:id/cover-image', (req, res) => {
+  try {
+    const projectId = req.params.id;
+    const { image, imageType } = req.body;
+
+    if (!image || !imageType) {
+      return res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'Image and imageType are required' },
+      });
+    }
+
+    // Validate image type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(imageType)) {
+      return res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'Invalid image type. Allowed: jpeg, png, gif, webp' },
+      });
+    }
+
+    // Validate base64 format (should start with data:image or be raw base64)
+    const base64Pattern = /^[A-Za-z0-9+/=]+$/;
+    const dataUrlPattern = /^data:image\/(jpeg|png|gif|webp);base64,/;
+
+    let imageData = image;
+    if (dataUrlPattern.test(image)) {
+      // Extract base64 from data URL
+      imageData = image.split(',')[1];
+    } else if (!base64Pattern.test(image)) {
+      return res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'Invalid image format. Expected base64 encoded data.' },
+      });
+    }
+
+    // Check image size (limit to ~5MB encoded, which is ~3.75MB actual)
+    if (imageData.length > 5 * 1024 * 1024) {
+      return res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'Image too large. Maximum size is 5MB.' },
+      });
+    }
+
+    // Update the project
+    const stmt = db.prepare(`
+      UPDATE projects
+      SET cover_image = ?, cover_image_type = ?, updated_at = ?
+      WHERE id = ?
+    `);
+
+    const result = stmt.run(imageData, imageType, new Date().toISOString(), projectId);
+
+    if (result.changes === 0) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project not found' },
+      });
+    }
+
+    res.json({ success: true, message: 'Cover image uploaded successfully' });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error uploading cover image');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * DELETE /api/projects/:id/cover-image
+ * Remove the cover image from a project
+ */
+router.delete('/:id/cover-image', (req, res) => {
+  try {
+    const projectId = req.params.id;
+
+    const stmt = db.prepare(`
+      UPDATE projects
+      SET cover_image = NULL, cover_image_type = NULL, updated_at = ?
+      WHERE id = ?
+    `);
+
+    const result = stmt.run(new Date().toISOString(), projectId);
+
+    if (result.changes === 0) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project not found' },
+      });
+    }
+
+    res.json({ success: true, message: 'Cover image removed successfully' });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error removing cover image');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * GET /api/projects/:id/cover-image
+ * Get the cover image for a project
+ * Returns the image as a data URL
+ */
+router.get('/:id/cover-image', (req, res) => {
+  try {
+    const projectId = req.params.id;
+
+    const stmt = db.prepare<[string], { cover_image: string | null; cover_image_type: string | null }>(`
+      SELECT cover_image, cover_image_type FROM projects WHERE id = ?
+    `);
+
+    const project = stmt.get(projectId);
+
+    if (!project) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project not found' },
+      });
+    }
+
+    if (!project.cover_image) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'No cover image set' },
+      });
+    }
+
+    res.json({
+      image: project.cover_image,
+      imageType: project.cover_image_type,
+      dataUrl: `data:${project.cover_image_type};base64,${project.cover_image}`,
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error fetching cover image');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
  * POST /api/projects/:id/story-dna
  * Generate Story DNA for a project
  */
@@ -4185,6 +4319,282 @@ Output ONLY valid JSON, no additional commentary:`;
     });
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack }, 'Error implementing coherence suggestion');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * POST /api/projects/:id/search-replace
+ * Search and replace text across all content in a project
+ * Searches: chapters (content, title, summary), story_bible (characters, world),
+ * story_dna, plot_structure, story_concept
+ */
+router.post('/:id/search-replace', (req, res) => {
+  try {
+    const projectId = req.params.id;
+    const { searchText, replaceText, caseSensitive = true, preview = false } = req.body;
+
+    if (!searchText) {
+      return res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'searchText is required' },
+      });
+    }
+
+    if (replaceText === undefined) {
+      return res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'replaceText is required' },
+      });
+    }
+
+    logger.info({ projectId, searchText, replaceText, caseSensitive, preview }, 'Search and replace request');
+
+    // Get project
+    const projectStmt = db.prepare<[string], any>(`SELECT * FROM projects WHERE id = ?`);
+    const project = projectStmt.get(projectId);
+
+    if (!project) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project not found' },
+      });
+    }
+
+    // Create regex for search
+    const flags = caseSensitive ? 'g' : 'gi';
+    const searchRegex = new RegExp(searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
+
+    // Track all replacements
+    const replacements: Array<{
+      location: string;
+      field: string;
+      originalText: string;
+      count: number;
+    }> = [];
+
+    // Helper to count and optionally replace
+    const processText = (text: string | null, location: string, field: string): string | null => {
+      if (!text) return text;
+      const matches = text.match(searchRegex);
+      if (matches && matches.length > 0) {
+        // Find context around each match for preview
+        const contextMatches = [];
+        let match;
+        const contextRegex = new RegExp(searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
+        while ((match = contextRegex.exec(text)) !== null) {
+          const start = Math.max(0, match.index - 30);
+          const end = Math.min(text.length, match.index + searchText.length + 30);
+          const context = text.substring(start, end);
+          contextMatches.push(context);
+          if (contextMatches.length >= 3) break; // Limit preview contexts
+        }
+
+        replacements.push({
+          location,
+          field,
+          originalText: contextMatches.join(' ... '),
+          count: matches.length,
+        });
+
+        if (!preview) {
+          return text.replace(searchRegex, replaceText);
+        }
+      }
+      return text;
+    };
+
+    // Helper to process JSON fields
+    const processJson = (jsonStr: string | null, location: string, fieldName: string): string | null => {
+      if (!jsonStr) return jsonStr;
+      try {
+        const obj = JSON.parse(jsonStr);
+        const processObject = (o: any, path: string): any => {
+          if (typeof o === 'string') {
+            const processed = processText(o, location, `${fieldName}.${path}`);
+            return processed;
+          }
+          if (Array.isArray(o)) {
+            return o.map((item, i) => processObject(item, `${path}[${i}]`));
+          }
+          if (typeof o === 'object' && o !== null) {
+            const result: any = {};
+            for (const [key, value] of Object.entries(o)) {
+              result[key] = processObject(value, path ? `${path}.${key}` : key);
+            }
+            return result;
+          }
+          return o;
+        };
+        const processed = processObject(obj, '');
+        return JSON.stringify(processed);
+      } catch {
+        // If JSON parsing fails, try as plain text
+        return processText(jsonStr, location, fieldName);
+      }
+    };
+
+    // Process project fields
+    const updatedProject: any = {};
+
+    // story_bible (characters, world, etc.)
+    if (project.story_bible) {
+      const processed = processJson(project.story_bible, 'Project', 'story_bible');
+      if (!preview && processed !== project.story_bible) {
+        updatedProject.story_bible = processed;
+      }
+    }
+
+    // story_dna
+    if (project.story_dna) {
+      const processed = processJson(project.story_dna, 'Project', 'story_dna');
+      if (!preview && processed !== project.story_dna) {
+        updatedProject.story_dna = processed;
+      }
+    }
+
+    // plot_structure
+    if (project.plot_structure) {
+      const processed = processJson(project.plot_structure, 'Project', 'plot_structure');
+      if (!preview && processed !== project.plot_structure) {
+        updatedProject.plot_structure = processed;
+      }
+    }
+
+    // story_concept
+    if (project.story_concept) {
+      const processed = processJson(project.story_concept, 'Project', 'story_concept');
+      if (!preview && processed !== project.story_concept) {
+        updatedProject.story_concept = processed;
+      }
+    }
+
+    // series_bible
+    if (project.series_bible) {
+      const processed = processJson(project.series_bible, 'Project', 'series_bible');
+      if (!preview && processed !== project.series_bible) {
+        updatedProject.series_bible = processed;
+      }
+    }
+
+    // title
+    if (project.title) {
+      const processed = processText(project.title, 'Project', 'title');
+      if (!preview && processed !== project.title) {
+        updatedProject.title = processed;
+      }
+    }
+
+    // Update project if changes were made
+    if (!preview && Object.keys(updatedProject).length > 0) {
+      const updates = Object.keys(updatedProject).map(k => `${k} = ?`).join(', ');
+      const values = [...Object.values(updatedProject), new Date().toISOString(), projectId];
+      const stmt = db.prepare(`UPDATE projects SET ${updates}, updated_at = ? WHERE id = ?`);
+      stmt.run(...values);
+    }
+
+    // Get all books for this project
+    const booksStmt = db.prepare<[string], any>(`SELECT id, title FROM books WHERE project_id = ?`);
+    const books = booksStmt.all(projectId);
+
+    // Process chapters
+    const chaptersStmt = db.prepare<[string], any>(`
+      SELECT c.id, c.title, c.content, c.summary, c.scene_cards, b.title as book_title
+      FROM chapters c
+      JOIN books b ON c.book_id = b.id
+      WHERE b.project_id = ?
+    `);
+    const chapters = chaptersStmt.all(projectId);
+
+    for (const chapter of chapters) {
+      const chapterUpdates: any = {};
+      const location = `Chapter: ${chapter.title || 'Untitled'} (${chapter.book_title})`;
+
+      // content
+      if (chapter.content) {
+        const processed = processText(chapter.content, location, 'content');
+        if (!preview && processed !== chapter.content) {
+          chapterUpdates.content = processed;
+        }
+      }
+
+      // title
+      if (chapter.title) {
+        const processed = processText(chapter.title, location, 'title');
+        if (!preview && processed !== chapter.title) {
+          chapterUpdates.title = processed;
+        }
+      }
+
+      // summary
+      if (chapter.summary) {
+        const processed = processText(chapter.summary, location, 'summary');
+        if (!preview && processed !== chapter.summary) {
+          chapterUpdates.summary = processed;
+        }
+      }
+
+      // scene_cards (JSON)
+      if (chapter.scene_cards) {
+        const processed = processJson(chapter.scene_cards, location, 'scene_cards');
+        if (!preview && processed !== chapter.scene_cards) {
+          chapterUpdates.scene_cards = processed;
+        }
+      }
+
+      // Update chapter if changes were made
+      if (!preview && Object.keys(chapterUpdates).length > 0) {
+        const updates = Object.keys(chapterUpdates).map(k => `${k} = ?`).join(', ');
+        const values = [...Object.values(chapterUpdates), new Date().toISOString(), chapter.id];
+        const stmt = db.prepare(`UPDATE chapters SET ${updates}, updated_at = ? WHERE id = ?`);
+        stmt.run(...values);
+      }
+    }
+
+    // Process outlines
+    const outlinesStmt = db.prepare<[string], any>(`
+      SELECT o.id, o.structure, b.title as book_title
+      FROM outlines o
+      JOIN books b ON o.book_id = b.id
+      WHERE b.project_id = ?
+    `);
+    const outlines = outlinesStmt.all(projectId);
+
+    for (const outline of outlines) {
+      if (outline.structure) {
+        const location = `Outline: ${outline.book_title}`;
+        const processed = processJson(outline.structure, location, 'structure');
+        if (!preview && processed !== outline.structure) {
+          const stmt = db.prepare(`UPDATE outlines SET structure = ?, updated_at = ? WHERE id = ?`);
+          stmt.run(processed, new Date().toISOString(), outline.id);
+        }
+      }
+    }
+
+    // Calculate total replacements
+    const totalReplacements = replacements.reduce((sum, r) => sum + r.count, 0);
+
+    logger.info({
+      projectId,
+      searchText,
+      replaceText,
+      preview,
+      totalReplacements,
+      locations: replacements.length,
+    }, 'Search and replace completed');
+
+    res.json({
+      success: true,
+      preview,
+      searchText,
+      replaceText,
+      caseSensitive,
+      totalReplacements,
+      locations: replacements.length,
+      replacements: replacements.slice(0, 50), // Limit response size
+      message: preview
+        ? `Found ${totalReplacements} occurrences in ${replacements.length} locations`
+        : `Replaced ${totalReplacements} occurrences in ${replacements.length} locations`,
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error in search and replace');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });

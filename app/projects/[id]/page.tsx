@@ -5,6 +5,8 @@ import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ExportButtons from '../../components/ExportButtons';
 import CloneBookDialog from '../../components/CloneBookDialog';
+import CoverImageUpload from '../../components/CoverImageUpload';
+import SearchReplace from '../../components/SearchReplace';
 import PageLayout from '../../components/shared/PageLayout';
 import LoadingState from '../../components/shared/LoadingState';
 import ErrorMessage from '../../components/shared/ErrorMessage';
@@ -134,9 +136,10 @@ export default function ProjectDetailPage() {
 
       // Also fetch outline and chapters for navigation state
       try {
-        // Get the first book for this project
-        const booksData = await fetchJson<any[]>(`/api/books/project/${projectId}`);
-        if (booksData && booksData.length > 0) {
+        // Get the first book for this project - API returns { books: [...] }
+        const booksResponse = await fetchJson<{ books: any[] }>(`/api/books/project/${projectId}`);
+        const booksData = booksResponse?.books || [];
+        if (booksData.length > 0) {
           const bookId = booksData[0].id;
           setCurrentBookId(bookId);
 
@@ -636,7 +639,12 @@ export default function ProjectDetailPage() {
           <h2 style={{ fontSize: '1.125rem', color: colors.text, fontWeight: 700, margin: '0 0 1rem 0' }}>
             Book Details
           </h2>
-          <div style={{ display: 'grid', gap: '1rem' }}>
+          <div style={{ display: 'flex', gap: '2rem' }}>
+            {/* Cover Image Upload */}
+            <CoverImageUpload projectId={projectId} />
+
+            {/* Text Fields */}
+            <div style={{ flex: 1, display: 'grid', gap: '1rem' }}>
             {/* Title Field */}
             <div>
               <label style={{
@@ -845,6 +853,7 @@ export default function ProjectDetailPage() {
                 </p>
               </div>
             )}
+            </div>
           </div>
         </div>
 
@@ -1323,6 +1332,131 @@ export default function ProjectDetailPage() {
         {/* Export Section - show when book has generated content */}
         {chapters.length > 0 && chapters.some(ch => ch.content) && (
           <ExportButtons projectId={project.id} hasContent={true} />
+        )}
+
+        {/* Post-Generation Tools - show when book has chapters */}
+        {chapters.length > 0 && (
+          <div style={{ ...card, marginTop: '1rem', padding: '1.5rem' }}>
+            <h2 style={{ fontSize: '1.125rem', marginBottom: '1rem', color: colors.text, fontWeight: 600 }}>
+              Analysis & Management Tools
+            </h2>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '1rem',
+            }}>
+              <Link
+                href={`/projects/${project.id}/versions`}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  padding: '1rem',
+                  background: colors.surface,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: borderRadius.md,
+                  textDecoration: 'none',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <span style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>📚</span>
+                <span style={{ fontSize: '0.9375rem', fontWeight: 600, color: colors.text }}>
+                  Version History
+                </span>
+                <span style={{ fontSize: '0.8125rem', color: colors.textSecondary, marginTop: '0.25rem' }}>
+                  Manage chapter versions
+                </span>
+              </Link>
+              <Link
+                href={`/projects/${project.id}/originality`}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  padding: '1rem',
+                  background: colors.surface,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: borderRadius.md,
+                  textDecoration: 'none',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <span style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>🔍</span>
+                <span style={{ fontSize: '0.9375rem', fontWeight: 600, color: colors.text }}>
+                  Originality Check
+                </span>
+                <span style={{ fontSize: '0.8125rem', color: colors.textSecondary, marginTop: '0.25rem' }}>
+                  Check for plagiarism issues
+                </span>
+              </Link>
+              <Link
+                href={`/projects/${project.id}/coherence`}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  padding: '1rem',
+                  background: colors.surface,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: borderRadius.md,
+                  textDecoration: 'none',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <span style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>🎯</span>
+                <span style={{ fontSize: '0.9375rem', fontWeight: 600, color: colors.text }}>
+                  Coherence Check
+                </span>
+                <span style={{ fontSize: '0.8125rem', color: colors.textSecondary, marginTop: '0.25rem' }}>
+                  Verify story consistency
+                </span>
+              </Link>
+              <Link
+                href={`/projects/${project.id}/analytics`}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  padding: '1rem',
+                  background: colors.surface,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: borderRadius.md,
+                  textDecoration: 'none',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <span style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>📊</span>
+                <span style={{ fontSize: '0.9375rem', fontWeight: 600, color: colors.text }}>
+                  Analytics
+                </span>
+                <span style={{ fontSize: '0.8125rem', color: colors.textSecondary, marginTop: '0.25rem' }}>
+                  View usage metrics & costs
+                </span>
+              </Link>
+              <Link
+                href={`/projects/${project.id}/editorial-report`}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  padding: '1rem',
+                  background: colors.surface,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: borderRadius.md,
+                  textDecoration: 'none',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <span style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>📝</span>
+                <span style={{ fontSize: '0.9375rem', fontWeight: 600, color: colors.text }}>
+                  Editorial Report
+                </span>
+                <span style={{ fontSize: '0.8125rem', color: colors.textSecondary, marginTop: '0.25rem' }}>
+                  Review editorial feedback
+                </span>
+              </Link>
+            </div>
+
+            {/* Search & Replace Tool */}
+            <div style={{ marginTop: '1.5rem' }}>
+              <SearchReplace projectId={project.id} />
+            </div>
+          </div>
         )}
 
         {/* Next Steps */}
