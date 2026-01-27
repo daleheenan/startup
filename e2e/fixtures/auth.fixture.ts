@@ -1,4 +1,4 @@
-import { test as base, expect } from '@playwright/test';
+import { test as base, expect, Page } from '@playwright/test';
 import { login, logout, getAuthToken } from '../helpers/auth';
 
 /**
@@ -19,11 +19,11 @@ import { login, logout, getAuthToken } from '../helpers/auth';
  */
 
 type AuthFixtures = {
-  authenticatedPage: typeof base extends { _brand: infer Page } ? Page : any;
+  authenticatedPage: Page;
 };
 
 export const test = base.extend<AuthFixtures>({
-  authenticatedPage: async ({ page }, use) => {
+  authenticatedPage: async ({ page }: { page: Page }, use) => {
     // Login before test
     await login(page);
 

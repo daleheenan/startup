@@ -15,27 +15,19 @@ async function globalSetup(config: FullConfig) {
 
   // Example: Setup authentication state
   // This creates a logged-in session that tests can reuse
-  /*
-  const { baseURL } = config.projects[0].use;
-  const browser = await chromium.launch();
-  const context = await browser.newContext();
-  const page = await context.newPage();
-
-  // Login
-  await page.goto(`${baseURL}/login`);
-  await page.fill('#password', process.env.TEST_PASSWORD || 'testpassword123');
-  await page.click('button[type="submit"]');
-
-  // Wait for successful login
-  await page.waitForURL('**/projects');
-
-  // Save authentication state
-  await context.storageState({ path: 'e2e/fixtures/auth.json' });
-
-  await browser.close();
-
-  console.log('✅ Authentication state saved');
-  */
+  // Uncomment the code below if needed:
+  //
+  // const { baseURL } = config.projects[0].use;
+  // const browser = await chromium.launch();
+  // const context = await browser.newContext();
+  // const page = await context.newPage();
+  // await page.goto(`${baseURL}/login`);
+  // await page.fill('#password', process.env.TEST_PASSWORD || 'testpassword123');
+  // await page.click('button[type="submit"]');
+  // await page.waitForURL(/\/projects/);
+  // await context.storageState({ path: 'e2e/fixtures/auth.json' });
+  // await browser.close();
+  // console.log('Authentication state saved');
 
   console.log('✅ Global setup complete');
 }

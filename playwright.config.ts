@@ -28,12 +28,16 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
 
   // Reporter configuration
-  reporter: [
-    ['html', { outputFolder: 'playwright-report' }],
-    ['list'],
-    // Add JUnit reporter for CI integration
-    ...(process.env.CI ? [['junit', { outputFile: 'test-results/junit.xml' }]] : []),
-  ],
+  reporter: process.env.CI
+    ? [
+        ['html', { outputFolder: 'playwright-report' }],
+        ['list'],
+        ['junit', { outputFile: 'test-results/junit.xml' }],
+      ]
+    : [
+        ['html', { outputFolder: 'playwright-report' }],
+        ['list'],
+      ],
 
   // Shared settings for all projects
   use: {
