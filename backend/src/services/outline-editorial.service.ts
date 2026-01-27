@@ -252,7 +252,9 @@ export class OutlineEditorialService {
       );
 
       // Call Claude
-      const response = await claudeService.generateText(prompt, {
+      const response = await claudeService.createCompletionWithUsage({
+        system: 'You are a senior developmental editor and story structure expert. Return ONLY valid JSON, no additional text.',
+        messages: [{ role: 'user', content: prompt }],
         maxTokens: 4000,
         temperature: 0.3,
       });
@@ -276,8 +278,8 @@ export class OutlineEditorialService {
       `);
       saveStmt.run(
         JSON.stringify(result),
-        response.usage?.inputTokens || 0,
-        response.usage?.outputTokens || 0,
+        response.usage?.input_tokens || 0,
+        response.usage?.output_tokens || 0,
         reportId
       );
 
@@ -329,7 +331,9 @@ export class OutlineEditorialService {
         outlineStructure
       );
 
-      const response = await claudeService.generateText(prompt, {
+      const response = await claudeService.createCompletionWithUsage({
+        system: 'You are a character development specialist. Return ONLY valid JSON, no additional text.',
+        messages: [{ role: 'user', content: prompt }],
         maxTokens: 4000,
         temperature: 0.3,
       });
@@ -351,8 +355,8 @@ export class OutlineEditorialService {
       `);
       saveStmt.run(
         JSON.stringify(result),
-        response.usage?.inputTokens || 0,
-        response.usage?.outputTokens || 0,
+        response.usage?.input_tokens || 0,
+        response.usage?.output_tokens || 0,
         reportId
       );
 
@@ -406,7 +410,9 @@ export class OutlineEditorialService {
         outlineStructure
       );
 
-      const response = await claudeService.generateText(prompt, {
+      const response = await claudeService.createCompletionWithUsage({
+        system: 'You are a literary agent with expertise in commercial fiction. Return ONLY valid JSON, no additional text.',
+        messages: [{ role: 'user', content: prompt }],
         maxTokens: 4000,
         temperature: 0.3,
       });
@@ -428,8 +434,8 @@ export class OutlineEditorialService {
       `);
       saveStmt.run(
         JSON.stringify(result),
-        response.usage?.inputTokens || 0,
-        response.usage?.outputTokens || 0,
+        response.usage?.input_tokens || 0,
+        response.usage?.output_tokens || 0,
         reportId
       );
 
