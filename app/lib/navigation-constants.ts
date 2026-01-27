@@ -2,12 +2,19 @@
  * Navigation Constants
  *
  * Constants for primary navigation, project navigation tabs, and visual styling
+ *
+ * Navigation structure:
+ * - Overview
+ * - Elements (Characters, World)
+ * - Story (Plot, Outline)
+ * - Novel (Chapters, Analytics, Follow-up)
+ * - Editorial (Editorial Board, Follow-up)
  */
 
 import type { NavigationSection, PrimaryNavigationItem, TabStatus } from '../../shared/types';
 
 /**
- * Tab status colors for visual indicators
+ * Tab status colours for visual indicators
  */
 export const TAB_STATUS_COLORS: Record<TabStatus, string> = {
   completed: '#10B981',  // Green - step completed
@@ -35,7 +42,7 @@ export const PRIMARY_NAV_ITEMS: PrimaryNavigationItem[] = [
   },
   {
     id: 'fully-customized',
-    label: 'Full Customization',
+    label: 'Full Customisation',
     href: '/full-customization',
     icon: '🎨',
   },
@@ -60,89 +67,182 @@ export const PRIMARY_NAV_ITEMS: PrimaryNavigationItem[] = [
 ];
 
 /**
- * Project navigation tabs configuration
- * Order: Overview, Characters, World, Plot, Outline, Chapters, Analytics
- * Note: Style has been removed and moved to Settings
+ * Workflow step type for navigation
  */
-export const PROJECT_NAV_TABS = [
+export type WorkflowStep =
+  | 'concept'
+  | 'characters'
+  | 'world'
+  | 'plots'
+  | 'coherence'
+  | 'originality'
+  | 'outline'
+  | 'outline-review'
+  | 'chapters'
+  | 'analytics'
+  | 'editorial-report'
+  | 'follow-up';
+
+/**
+ * Navigation tab configuration
+ */
+export interface NavTab {
+  id: string;
+  label: string;
+  route: string;
+  icon: string;
+  workflowStep: WorkflowStep;
+}
+
+/**
+ * Navigation group configuration
+ */
+export interface NavGroup {
+  id: string;
+  label: string;
+  icon: string;
+  tabs: NavTab[];
+  /** If true, this is a standalone tab with no children */
+  isStandalone?: boolean;
+  /** Route for standalone tabs */
+  route?: string;
+  /** Workflow step for standalone tabs */
+  workflowStep?: WorkflowStep;
+}
+
+/**
+ * Project navigation groups configuration
+ *
+ * Structure:
+ * - Overview (standalone)
+ * - Elements: Characters, World
+ * - Story: Plot, Outline
+ * - Novel: Chapters, Analytics, Follow-up
+ * - Editorial: Editorial Board, Follow-up
+ */
+export const PROJECT_NAV_GROUPS: NavGroup[] = [
   {
     id: 'overview',
     label: 'Overview',
+    icon: '📋',
+    isStandalone: true,
     route: '',
-    icon: '📋',
-    workflowStep: 'concept' as const,
+    workflowStep: 'concept',
+    tabs: [],
   },
   {
-    id: 'characters',
-    label: 'Characters',
-    route: '/characters',
-    icon: '👥',
-    workflowStep: 'characters' as const,
+    id: 'elements',
+    label: 'Elements',
+    icon: '🎭',
+    tabs: [
+      {
+        id: 'characters',
+        label: 'Characters',
+        route: '/characters',
+        icon: '👥',
+        workflowStep: 'characters',
+      },
+      {
+        id: 'world',
+        label: 'World',
+        route: '/world',
+        icon: '🌍',
+        workflowStep: 'world',
+      },
+    ],
   },
   {
-    id: 'world',
-    label: 'World',
-    route: '/world',
-    icon: '🌍',
-    workflowStep: 'world' as const,
-  },
-  {
-    id: 'plot',
-    label: 'Plot',
-    route: '/plot',
+    id: 'story',
+    label: 'Story',
     icon: '📖',
-    workflowStep: 'plots' as const,
+    tabs: [
+      {
+        id: 'plot',
+        label: 'Plot',
+        route: '/plot',
+        icon: '📖',
+        workflowStep: 'plots',
+      },
+      {
+        id: 'outline',
+        label: 'Outline',
+        route: '/outline',
+        icon: '📝',
+        workflowStep: 'outline',
+      },
+    ],
   },
   {
-    id: 'coherence',
-    label: 'Coherence',
-    route: '/coherence',
-    icon: '🔗',
-    workflowStep: 'coherence' as const,
-  },
-  {
-    id: 'originality',
-    label: 'Originality',
-    route: '/originality',
-    icon: '✨',
-    workflowStep: 'originality' as const,
-  },
-  {
-    id: 'outline',
-    label: 'Outline',
-    route: '/outline',
-    icon: '📝',
-    workflowStep: 'outline' as const,
-  },
-  {
-    id: 'chapters',
-    label: 'Chapters',
-    route: '/progress',
+    id: 'novel',
+    label: 'Novel',
     icon: '📚',
-    workflowStep: 'chapters' as const,
+    tabs: [
+      {
+        id: 'chapters',
+        label: 'Chapters',
+        route: '/progress',
+        icon: '📚',
+        workflowStep: 'chapters',
+      },
+      {
+        id: 'analytics',
+        label: 'Analytics',
+        route: '/analytics',
+        icon: '📊',
+        workflowStep: 'analytics',
+      },
+      {
+        id: 'novel-follow-up',
+        label: 'Follow-up',
+        route: '/follow-up',
+        icon: '🚀',
+        workflowStep: 'follow-up',
+      },
+    ],
   },
   {
-    id: 'analytics',
-    label: 'Analytics',
-    route: '/analytics',
-    icon: '📊',
-    workflowStep: 'analytics' as const,
-  },
-  {
-    id: 'editorial-report',
+    id: 'editorial',
     label: 'Editorial',
-    route: '/editorial-report',
-    icon: '📋',
-    workflowStep: 'editorial-report' as const,
-  },
-  {
-    id: 'follow-up',
-    label: 'Follow-Up',
-    route: '/follow-up',
-    icon: '🚀',
-    workflowStep: 'follow-up' as const,
+    icon: '✏️',
+    tabs: [
+      {
+        id: 'editorial-board',
+        label: 'Editorial Board',
+        route: '/editorial-report',
+        icon: '📋',
+        workflowStep: 'editorial-report',
+      },
+      {
+        id: 'outline-review',
+        label: 'Outline Review',
+        route: '/outline-review',
+        icon: '🔍',
+        workflowStep: 'outline-review',
+      },
+    ],
   },
 ];
+
+/**
+ * Flat list of all tabs for backward compatibility
+ * Maps to PROJECT_NAV_TABS format used by existing code
+ */
+export const PROJECT_NAV_TABS = PROJECT_NAV_GROUPS.flatMap(group => {
+  if (group.isStandalone) {
+    return [{
+      id: group.id,
+      label: group.label,
+      route: group.route || '',
+      icon: group.icon,
+      workflowStep: group.workflowStep || 'concept' as WorkflowStep,
+      groupId: group.id,
+    }];
+  }
+  return group.tabs.map(tab => ({
+    ...tab,
+    groupId: group.id,
+  }));
+});
 
 /**
  * Determine active navigation section from pathname
@@ -198,4 +298,41 @@ export function getTabUnderlineStyle(status: TabStatus): React.CSSProperties {
     };
   }
   return {};
+}
+
+/**
+ * Get group that contains a specific tab
+ */
+export function getGroupForTab(tabId: string): NavGroup | undefined {
+  return PROJECT_NAV_GROUPS.find(group => {
+    if (group.isStandalone && group.id === tabId) return true;
+    return group.tabs.some(tab => tab.id === tabId);
+  });
+}
+
+/**
+ * Get the active group ID from current pathname
+ */
+export function getActiveGroupFromPath(pathname: string, projectId: string): string | null {
+  const projectPath = `/projects/${projectId}`;
+
+  if (!pathname.startsWith(projectPath)) return null;
+
+  const relativePath = pathname.slice(projectPath.length) || '';
+
+  for (const group of PROJECT_NAV_GROUPS) {
+    if (group.isStandalone) {
+      if (relativePath === group.route || relativePath === '') {
+        return group.id;
+      }
+    } else {
+      for (const tab of group.tabs) {
+        if (relativePath === tab.route || relativePath.startsWith(tab.route + '/')) {
+          return group.id;
+        }
+      }
+    }
+  }
+
+  return 'overview';
 }

@@ -8,9 +8,12 @@ import PageLayout from '../../components/shared/PageLayout';
 import LoadingState from '../../components/shared/LoadingState';
 import ErrorMessage from '../../components/shared/ErrorMessage';
 import { fetchJson } from '../../lib/fetch-utils';
+import { getToken } from '../../lib/auth';
 import { colors, gradients, borderRadius, shadows } from '../../lib/constants';
 import { card, statusBadge } from '../../lib/styles';
 import { useProjectNavigation } from '../../hooks/useProjectProgress';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 interface StoryConcept {
   title: string;
@@ -27,6 +30,7 @@ interface Project {
   type: string;
   genre: string;
   status: string;
+  author_name?: string | null;
   story_concept: StoryConcept | null;
   story_dna: any;
   story_bible: any;
@@ -52,6 +56,27 @@ interface Chapter {
   content?: string;
 }
 
+interface Job {
+  id: string;
+  type: string;
+  target_id: string;
+  status: 'pending' | 'running' | 'completed' | 'paused' | 'failed';
+  chapter_number?: number;
+  chapter_title?: string;
+  created_at: string;
+  started_at?: string;
+  completed_at?: string;
+}
+
+interface JobStats {
+  pending: number;
+  running: number;
+  completed: number;
+  paused: number;
+  failed: number;
+  jobs: Job[];
+}
+
 export default function ProjectDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -69,6 +94,16 @@ export default function ProjectDetailPage() {
     plots: 'pending' | 'generating' | 'done' | 'error';
   }>({ characters: 'pending', world: 'pending', plots: 'pending' });
 
+  // Job status state
+  const [jobStats, setJobStats] = useState<JobStats | null>(null);
+
+  // Editing state for book details
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [editingAuthor, setEditingAuthor] = useState(false);
+  const [titleValue, setTitleValue] = useState('');
+  const [authorValue, setAuthorValue] = useState('');
+  const [saving, setSaving] = useState(false);
+
   // IMPORTANT: All hooks must be called before any early returns
   const navigation = useProjectNavigation(projectId, project, outline, chapters);
 
@@ -77,6 +112,14 @@ export default function ProjectDetailPage() {
 
   // Check if we're coming from concept selection (forced auto-generation)
   const forceAutoGenerate = searchParams.get('autoGenerate') === 'true';
+
+  // Initialize edit values when project loads
+  useEffect(() => {
+    if (project) {
+      setTitleValue(project.title || '');
+      setAuthorValue(project.author_name || '');
+    }
+  }, [project]);
 
   const fetchProject = useCallback(async () => {
     try {
@@ -100,8 +143,10 @@ export default function ProjectDetailPage() {
 
           // Fetch chapters
           try {
-            const chaptersData = await fetchJson<Chapter[]>(`/api/chapters/book/${bookId}`);
-            setChapters(chaptersData || []);
+            const chaptersResponse = await fetchJson<{ chapters: Chapter[] } | Chapter[]>(`/api/chapters/book/${bookId}`);
+            // Handle both wrapped and unwrapped response formats
+            const chaptersData = Array.isArray(chaptersResponse) ? chaptersResponse : chaptersResponse?.chapters || [];
+            setChapters(chaptersData);
           } catch {
             // No chapters yet - that's OK
           }
@@ -120,8 +165,74 @@ export default function ProjectDetailPage() {
     }
   }, [projectId]);
 
+  // Fetch job status for this project
+  const fetchJobStats = useCallback(async () => {
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/queue/jobs?projectId=${projectId}&limit=50`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const jobs = data.jobs || [];
+
+        // Calculate stats
+        const stats: JobStats = {
+          pending: jobs.filter((j: Job) => j.status === 'pending').length,
+          running: jobs.filter((j: Job) => j.status === 'running').length,
+          completed: jobs.filter((j: Job) => j.status === 'completed').length,
+          paused: jobs.filter((j: Job) => j.status === 'paused').length,
+          failed: jobs.filter((j: Job) => j.status === 'failed').length,
+          jobs: jobs.slice(0, 10), // Keep top 10 for display
+        };
+
+        setJobStats(stats);
+      }
+    } catch (err) {
+      console.error('Error fetching job stats:', err);
+    }
+  }, [projectId]);
+
+  // Save project details
+  const saveProjectDetails = async (field: 'title' | 'authorName', value: string) => {
+    setSaving(true);
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ [field]: value }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save');
+      }
+
+      // Update local state
+      setProject((prev: any) => ({
+        ...prev,
+        [field === 'authorName' ? 'author_name' : field]: value,
+      }));
+
+      // Close edit mode
+      if (field === 'title') setEditingTitle(false);
+      if (field === 'authorName') setEditingAuthor(false);
+    } catch (err) {
+      console.error('Error saving:', err);
+      alert('Failed to save changes');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Trigger auto-generation when project has a story concept but missing content
-  // This now works regardless of whether ?autoGenerate=true is in the URL
   useEffect(() => {
     if (!projectId || hasAttemptedGeneration) return;
 
@@ -164,7 +275,6 @@ export default function ProjectDetailPage() {
       };
 
       const token = localStorage.getItem('novelforge_token');
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
       // Generate content in sequence for better UX feedback
       try {
@@ -245,6 +355,13 @@ export default function ProjectDetailPage() {
     initializeProject();
   }, [projectId, forceAutoGenerate, fetchProject, hasAttemptedGeneration]);
 
+  // Fetch job stats on mount and periodically
+  useEffect(() => {
+    fetchJobStats();
+    const interval = setInterval(fetchJobStats, 10000); // Every 10 seconds
+    return () => clearInterval(interval);
+  }, [fetchJobStats]);
+
   if (isLoading) {
     return <LoadingState message="Loading project..." />;
   }
@@ -312,6 +429,30 @@ export default function ProjectDetailPage() {
     </div>
   );
 
+  // Helper to get job type display name
+  const getJobTypeName = (type: string) => {
+    const names: Record<string, string> = {
+      'generate_chapter': 'Chapter Generation',
+      'dev_edit': 'Development Edit',
+      'author_revision': 'Author Revision',
+      'line_edit': 'Line Edit',
+      'copy_edit': 'Copy Edit',
+      'coherence_check': 'Coherence Check',
+      'originality_check': 'Originality Check',
+      'veb_beta_swarm': 'VEB Beta Swarm',
+      'veb_ruthless_editor': 'VEB Ruthless Editor',
+      'veb_market_analyst': 'VEB Market Analyst',
+      'veb_finalize': 'VEB Finalise',
+      'analyze_book': 'Book Analysis',
+      'generate_follow_up': 'Follow-up Generation',
+      'outline_structure_analyst': 'Outline Structure',
+      'outline_character_arc': 'Character Arc Analysis',
+      'outline_market_fit': 'Market Fit Analysis',
+      'outline_editorial_finalize': 'Editorial Finalise',
+    };
+    return names[type] || type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
+
   return (
     <PageLayout
       title={project.title}
@@ -321,573 +462,924 @@ export default function ProjectDetailPage() {
       projectNavigation={navigation}
     >
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-            {/* Generation Progress Indicator */}
-            {isGeneratingContent && (
-              <div style={{
-                ...card,
-                marginBottom: '1.5rem',
-                padding: '2rem',
-                background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
-                border: `2px solid ${colors.brandBorder}`,
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-                  <div style={{
-                    width: '48px',
-                    height: '48px',
-                    borderRadius: '50%',
-                    border: '3px solid #E0E7FF',
-                    borderTopColor: '#667eea',
-                    animation: 'spin 1s linear infinite',
-                  }} />
-                  <div>
-                    <h2 style={{ fontSize: '1.25rem', color: colors.text, fontWeight: 700, margin: 0 }}>
-                      Setting Up Your Project...
-                    </h2>
-                    <p style={{ fontSize: '0.875rem', color: colors.textSecondary, margin: '0.25rem 0 0 0' }}>
-                      This may take a minute or two. Please don't navigate away.
-                    </p>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <span style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      background: generationStatus.characters === 'done' ? colors.success
-                        : generationStatus.characters === 'generating' ? colors.brandStart
-                        : generationStatus.characters === 'error' ? colors.error
-                        : colors.border,
-                      color: generationStatus.characters === 'pending' ? colors.textSecondary : 'white',
-                      transition: 'all 0.3s ease',
-                    }}>
-                      {generationStatus.characters === 'done' ? '✓' : generationStatus.characters === 'generating' ? (
-                        <span style={{ animation: 'pulse 1s ease-in-out infinite' }}>•••</span>
-                      ) : generationStatus.characters === 'error' ? '!' : '1'}
-                    </span>
-                    <div style={{ flex: 1 }}>
-                      <span style={{
-                        color: generationStatus.characters === 'generating' ? colors.brandText : colors.text,
-                        fontWeight: generationStatus.characters === 'generating' ? 600 : 400,
-                        fontSize: '0.9375rem',
-                      }}>
-                        {generationStatus.characters === 'generating' ? 'Generating characters...' : generationStatus.characters === 'done' ? 'Characters generated' : generationStatus.characters === 'error' ? 'Character generation failed' : 'Generate characters'}
-                      </span>
-                      {generationStatus.characters === 'generating' && (
-                        <div style={{
-                          marginTop: '0.5rem',
-                          background: '#E0E7FF',
-                          borderRadius: '4px',
-                          height: '4px',
-                          overflow: 'hidden',
-                        }}>
-                          <div style={{
-                            background: 'linear-gradient(90deg, #667eea, #764ba2)',
-                            height: '100%',
-                            width: '100%',
-                            animation: 'progressPulse 2s ease-in-out infinite',
-                          }} />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <span style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      background: generationStatus.world === 'done' ? colors.success
-                        : generationStatus.world === 'generating' ? colors.brandStart
-                        : generationStatus.world === 'error' ? colors.error
-                        : colors.border,
-                      color: generationStatus.world === 'pending' ? colors.textSecondary : 'white',
-                      transition: 'all 0.3s ease',
-                    }}>
-                      {generationStatus.world === 'done' ? '✓' : generationStatus.world === 'generating' ? (
-                        <span style={{ animation: 'pulse 1s ease-in-out infinite' }}>•••</span>
-                      ) : generationStatus.world === 'error' ? '!' : '2'}
-                    </span>
-                    <div style={{ flex: 1 }}>
-                      <span style={{
-                        color: generationStatus.world === 'generating' ? colors.brandText : colors.text,
-                        fontWeight: generationStatus.world === 'generating' ? 600 : 400,
-                        fontSize: '0.9375rem',
-                      }}>
-                        {generationStatus.world === 'generating' ? 'Building world elements...' : generationStatus.world === 'done' ? 'World elements created' : generationStatus.world === 'error' ? 'World generation failed' : 'Build world'}
-                      </span>
-                      {generationStatus.world === 'generating' && (
-                        <div style={{
-                          marginTop: '0.5rem',
-                          background: '#E0E7FF',
-                          borderRadius: '4px',
-                          height: '4px',
-                          overflow: 'hidden',
-                        }}>
-                          <div style={{
-                            background: 'linear-gradient(90deg, #667eea, #764ba2)',
-                            height: '100%',
-                            width: '100%',
-                            animation: 'progressPulse 2s ease-in-out infinite',
-                          }} />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <span style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      background: generationStatus.plots === 'done' ? colors.success
-                        : generationStatus.plots === 'generating' ? colors.brandStart
-                        : generationStatus.plots === 'error' ? colors.error
-                        : colors.border,
-                      color: generationStatus.plots === 'pending' ? colors.textSecondary : 'white',
-                      transition: 'all 0.3s ease',
-                    }}>
-                      {generationStatus.plots === 'done' ? '✓' : generationStatus.plots === 'generating' ? (
-                        <span style={{ animation: 'pulse 1s ease-in-out infinite' }}>•••</span>
-                      ) : generationStatus.plots === 'error' ? '!' : '3'}
-                    </span>
-                    <div style={{ flex: 1 }}>
-                      <span style={{
-                        color: generationStatus.plots === 'generating' ? colors.brandText : colors.text,
-                        fontWeight: generationStatus.plots === 'generating' ? 600 : 400,
-                        fontSize: '0.9375rem',
-                      }}>
-                        {generationStatus.plots === 'generating' ? 'Extracting plot structure...' : generationStatus.plots === 'done' ? 'Plot structure extracted' : generationStatus.plots === 'error' ? 'Plot extraction failed' : 'Extract plots'}
-                      </span>
-                      {generationStatus.plots === 'generating' && (
-                        <div style={{
-                          marginTop: '0.5rem',
-                          background: '#E0E7FF',
-                          borderRadius: '4px',
-                          height: '4px',
-                          overflow: 'hidden',
-                        }}>
-                          <div style={{
-                            background: 'linear-gradient(90deg, #667eea, #764ba2)',
-                            height: '100%',
-                            width: '100%',
-                            animation: 'progressPulse 2s ease-in-out infinite',
-                          }} />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <style jsx>{`
-                  @keyframes spin {
-                    to { transform: rotate(360deg); }
-                  }
-                  @keyframes pulse {
-                    0%, 100% { opacity: 0.4; }
-                    50% { opacity: 1; }
-                  }
-                  @keyframes progressPulse {
-                    0%, 100% { transform: translateX(-100%); }
-                    50% { transform: translateX(100%); }
-                  }
-                `}</style>
-              </div>
-            )}
+        {/* Status Update Section */}
+        <div style={{
+          ...card,
+          marginBottom: '1.5rem',
+          padding: '1.5rem',
+          background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%)',
+          border: `1px solid ${colors.brandBorder}`,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+            <h2 style={{ fontSize: '1.25rem', color: colors.text, fontWeight: 700, margin: 0 }}>
+              Status Update
+            </h2>
+            <span style={{
+              padding: '0.25rem 0.75rem',
+              borderRadius: borderRadius.md,
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              background: project.status === 'completed' ? colors.successLight :
+                         project.status === 'generating' ? colors.brandLight : colors.warningLight,
+              color: project.status === 'completed' ? colors.success :
+                     project.status === 'generating' ? colors.brandText : colors.warning,
+            }}>
+              {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
+            </span>
+          </div>
 
-            {/* Story Concept Section - Prominent display */}
-            {project.story_concept && (project.story_concept.logline || project.story_concept.synopsis) && (
+          {/* Job Statistics */}
+          {jobStats && (jobStats.running > 0 || jobStats.pending > 0 || jobStats.completed > 0) ? (
+            <div>
               <div style={{
-                ...card,
-                marginBottom: '1.5rem',
-                padding: '1.5rem',
-                background: colors.brandLight,
-                border: `2px solid ${colors.brandBorder}`,
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                gap: '1rem',
+                marginBottom: '1rem',
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-                  <h2 style={{ fontSize: '1.5rem', color: colors.text, fontWeight: 700, margin: 0 }}>
-                    Story Concept
-                  </h2>
-                  <Link
-                    href="/saved-summaries"
+                {jobStats.running > 0 && (
+                  <div style={{
+                    padding: '0.75rem',
+                    background: colors.brandLight,
+                    borderRadius: borderRadius.md,
+                    textAlign: 'center',
+                  }}>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: colors.brandText }}>
+                      {jobStats.running}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: colors.brandText }}>Running</div>
+                  </div>
+                )}
+                {jobStats.pending > 0 && (
+                  <div style={{
+                    padding: '0.75rem',
+                    background: colors.warningLight,
+                    borderRadius: borderRadius.md,
+                    textAlign: 'center',
+                  }}>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: colors.warning }}>
+                      {jobStats.pending}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: colors.warning }}>Queued</div>
+                  </div>
+                )}
+                {jobStats.completed > 0 && (
+                  <div style={{
+                    padding: '0.75rem',
+                    background: colors.successLight,
+                    borderRadius: borderRadius.md,
+                    textAlign: 'center',
+                  }}>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: colors.success }}>
+                      {jobStats.completed}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: colors.success }}>Completed</div>
+                  </div>
+                )}
+                {jobStats.failed > 0 && (
+                  <div style={{
+                    padding: '0.75rem',
+                    background: colors.errorLight,
+                    borderRadius: borderRadius.md,
+                    textAlign: 'center',
+                  }}>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: colors.error }}>
+                      {jobStats.failed}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: colors.error }}>Failed</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Active Jobs List */}
+              {(jobStats.running > 0 || jobStats.pending > 0) && (
+                <div style={{
+                  background: colors.surface,
+                  borderRadius: borderRadius.md,
+                  padding: '1rem',
+                  border: `1px solid ${colors.border}`,
+                }}>
+                  <h4 style={{ fontSize: '0.875rem', fontWeight: 600, color: colors.text, margin: '0 0 0.75rem 0' }}>
+                    Active Jobs
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {jobStats.jobs
+                      .filter(j => j.status === 'running' || j.status === 'pending')
+                      .slice(0, 5)
+                      .map((job, index) => (
+                        <div
+                          key={job.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '0.5rem 0.75rem',
+                            background: job.status === 'running' ? 'rgba(102, 126, 234, 0.08)' : 'transparent',
+                            borderRadius: borderRadius.sm,
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{
+                              width: '8px',
+                              height: '8px',
+                              borderRadius: '50%',
+                              background: job.status === 'running' ? colors.brandStart : colors.warning,
+                              animation: job.status === 'running' ? 'pulse 1.5s infinite' : 'none',
+                            }} />
+                            <span style={{ fontSize: '0.8125rem', color: colors.text }}>
+                              {getJobTypeName(job.type)}
+                              {job.chapter_number && ` - Chapter ${job.chapter_number}`}
+                            </span>
+                          </div>
+                          <span style={{
+                            fontSize: '0.75rem',
+                            padding: '0.125rem 0.5rem',
+                            borderRadius: borderRadius.sm,
+                            background: job.status === 'running' ? colors.brandLight : colors.warningLight,
+                            color: job.status === 'running' ? colors.brandText : colors.warning,
+                          }}>
+                            {job.status === 'running' ? 'Running' : 'Queued'}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p style={{ color: colors.textSecondary, fontSize: '0.875rem', margin: 0 }}>
+              No active jobs. Start by creating your story elements below.
+            </p>
+          )}
+
+          <style jsx>{`
+            @keyframes pulse {
+              0%, 100% { opacity: 1; }
+              50% { opacity: 0.5; }
+            }
+          `}</style>
+        </div>
+
+        {/* Book Details Editor */}
+        <div style={{
+          ...card,
+          marginBottom: '1.5rem',
+          padding: '1.5rem',
+        }}>
+          <h2 style={{ fontSize: '1.125rem', color: colors.text, fontWeight: 700, margin: '0 0 1rem 0' }}>
+            Book Details
+          </h2>
+          <div style={{ display: 'grid', gap: '1rem' }}>
+            {/* Title Field */}
+            <div>
+              <label style={{
+                fontSize: '0.75rem',
+                color: colors.textSecondary,
+                fontWeight: 600,
+                display: 'block',
+                marginBottom: '0.375rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+              }}>
+                Book Title
+              </label>
+              {editingTitle ? (
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input
+                    type="text"
+                    value={titleValue}
+                    onChange={(e) => setTitleValue(e.target.value)}
                     style={{
-                      padding: '0.5rem 1rem',
-                      background: colors.surface,
+                      flex: 1,
+                      padding: '0.625rem 0.75rem',
                       border: `1px solid ${colors.brandBorder}`,
                       borderRadius: borderRadius.md,
-                      color: colors.brandText,
-                      fontSize: '0.75rem',
-                      fontWeight: 500,
-                      textDecoration: 'none',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.375rem',
+                      fontSize: '0.9375rem',
+                      outline: 'none',
+                    }}
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => saveProjectDetails('title', titleValue)}
+                    disabled={saving}
+                    style={{
+                      padding: '0.625rem 1rem',
+                      background: gradients.brand,
+                      color: colors.surface,
+                      border: 'none',
+                      borderRadius: borderRadius.md,
+                      cursor: saving ? 'not-allowed' : 'pointer',
+                      fontSize: '0.8125rem',
+                      fontWeight: 600,
+                      opacity: saving ? 0.7 : 1,
                     }}
                   >
-                    View Saved Summaries
-                  </Link>
-                </div>
-
-                <div style={{ display: 'grid', gap: '1.25rem' }}>
-                  {project.story_concept.logline && (
-                    <div>
-                      <strong style={{
-                        color: colors.brandText,
-                        display: 'block',
-                        marginBottom: '0.5rem',
-                        fontSize: '0.875rem',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                        fontWeight: 600,
-                      }}>
-                        Logline
-                      </strong>
-                      <p style={{
-                        margin: 0,
-                        fontStyle: 'italic',
-                        lineHeight: '1.7',
-                        fontSize: '1.125rem',
-                        color: colors.text,
-                      }}>
-                        {project.story_concept.logline}
-                      </p>
-                    </div>
-                  )}
-
-                  {project.story_concept.synopsis && (
-                    <div>
-                      <strong style={{
-                        color: colors.brandText,
-                        display: 'block',
-                        marginBottom: '0.5rem',
-                        fontSize: '0.875rem',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                        fontWeight: 600,
-                      }}>
-                        Synopsis
-                      </strong>
-                      <p style={{
-                        margin: 0,
-                        lineHeight: '1.7',
-                        fontSize: '0.95rem',
-                        color: colors.textSecondary,
-                      }}>
-                        {project.story_concept.synopsis}
-                      </p>
-                    </div>
-                  )}
-
-                  {project.story_concept.hook && (
-                    <div style={{
-                      padding: '1rem',
-                      background: gradients.brand,
+                    {saving ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    onClick={() => { setEditingTitle(false); setTitleValue(project?.title || ''); }}
+                    style={{
+                      padding: '0.625rem 1rem',
+                      background: colors.surface,
+                      color: colors.textSecondary,
+                      border: `1px solid ${colors.border}`,
                       borderRadius: borderRadius.md,
-                      border: `1px solid ${colors.brandBorder}`,
-                    }}>
-                      <strong style={{
-                        color: colors.surface,
-                        display: 'block',
-                        marginBottom: '0.5rem',
-                        fontSize: '0.875rem',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                        fontWeight: 600,
-                      }}>
-                        Hook
-                      </strong>
-                      <p style={{
-                        margin: 0,
-                        lineHeight: '1.6',
-                        fontSize: '0.95rem',
-                        color: colors.surface,
-                      }}>
-                        {project.story_concept.hook}
-                      </p>
-                    </div>
-                  )}
-
-                  {(project.story_concept.protagonistHint || project.story_concept.conflictType) && (
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                      gap: '1rem',
-                      marginTop: '0.5rem',
-                    }}>
-                      {project.story_concept.protagonistHint && (
-                        <div>
-                          <strong style={{
-                            color: colors.brandText,
-                            display: 'block',
-                            marginBottom: '0.25rem',
-                            fontSize: '0.8rem',
-                            fontWeight: 600,
-                          }}>
-                            Protagonist
-                          </strong>
-                          <p style={{
-                            margin: 0,
-                            lineHeight: '1.5',
-                            fontSize: '0.875rem',
-                            color: colors.textSecondary,
-                          }}>
-                            {project.story_concept.protagonistHint}
-                          </p>
-                        </div>
-                      )}
-                      {project.story_concept.conflictType && (
-                        <div>
-                          <strong style={{
-                            color: colors.brandText,
-                            display: 'block',
-                            marginBottom: '0.25rem',
-                            fontSize: '0.8rem',
-                            fontWeight: 600,
-                          }}>
-                            Core Conflict
-                          </strong>
-                          <p style={{
-                            margin: 0,
-                            lineHeight: '1.5',
-                            fontSize: '0.875rem',
-                            color: colors.textSecondary,
-                          }}>
-                            {project.story_concept.conflictType}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Quick Links - show when no story concept */}
-            {(!project.story_concept || (!project.story_concept.logline && !project.story_concept.synopsis)) && (
-              <div style={{ ...card, marginBottom: '1rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <h2 style={{ fontSize: '1.125rem', color: '#1A1A2E', fontWeight: 600, margin: 0 }}>
-                      Story Resources
-                    </h2>
-                    <p style={{ fontSize: '0.875rem', color: colors.textSecondary, margin: '0.25rem 0 0 0' }}>
-                      Access your saved concepts and ideas
-                    </p>
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.75rem' }}>
-                    <Link
-                      href="/saved-summaries"
-                      style={{
-                        padding: '0.5rem 1rem',
-                        background: colors.surface,
-                        border: `1px solid ${colors.border}`,
-                        borderRadius: borderRadius.md,
-                        color: colors.brandStart,
-                        fontSize: '0.75rem',
-                        fontWeight: 500,
-                        textDecoration: 'none',
-                      }}
-                    >
-                      Saved Summaries
-                    </Link>
-                    <Link
-                      href="/saved-concepts"
-                      style={{
-                        padding: '0.5rem 1rem',
-                        background: colors.surface,
-                        border: `1px solid ${colors.border}`,
-                        borderRadius: borderRadius.md,
-                        color: colors.brandStart,
-                        fontSize: '0.75rem',
-                        fontWeight: 500,
-                        textDecoration: 'none',
-                      }}
-                    >
-                      Saved Concepts
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Story DNA Section */}
-            <div style={{ ...card, marginBottom: '1rem' }}>
-              <h2 style={{ fontSize: '1.125rem', marginBottom: '1rem', color: '#1A1A2E', fontWeight: 600 }}>
-                Story DNA
-              </h2>
-              {project.story_dna ? (
-                <div style={{ display: 'grid', gap: '0.75rem', color: '#64748B', fontSize: '0.875rem' }}>
-                  <div>
-                    <strong style={{ color: '#374151' }}>Tone:</strong> {project.story_dna.tone}
-                  </div>
-                  <div>
-                    <strong style={{ color: '#374151' }}>Themes:</strong> {project.story_dna.themes?.join(', ')}
-                  </div>
-                  <div>
-                    <strong style={{ color: '#374151' }}>Point of View:</strong> {project.story_dna.proseStyle?.pointOfView}
-                  </div>
+                      cursor: 'pointer',
+                      fontSize: '0.8125rem',
+                      fontWeight: 500,
+                    }}
+                  >
+                    Cancel
+                  </button>
                 </div>
               ) : (
-                <p style={{ color: '#64748B', fontSize: '0.875rem' }}>Story DNA will be generated when you set up characters.</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <span style={{ fontSize: '1rem', color: colors.text, fontWeight: 500 }}>
+                    {project?.title || 'Untitled'}
+                  </span>
+                  <button
+                    onClick={() => setEditingTitle(true)}
+                    style={{
+                      padding: '0.25rem 0.625rem',
+                      background: 'transparent',
+                      color: colors.brandText,
+                      border: `1px solid ${colors.brandBorder}`,
+                      borderRadius: borderRadius.sm,
+                      cursor: 'pointer',
+                      fontSize: '0.75rem',
+                      fontWeight: 500,
+                    }}
+                  >
+                    Edit
+                  </button>
+                </div>
               )}
             </div>
 
-            {/* Story Bible Section */}
-            <div style={{ ...card, marginBottom: '1rem' }}>
-              <h2 style={{ fontSize: '1.125rem', marginBottom: '1rem', color: '#1A1A2E', fontWeight: 600 }}>
-                Story Bible
-              </h2>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-                <div style={{
-                  padding: '1.25rem',
-                  background: '#EEF2FF',
-                  border: '1px solid #C7D2FE',
-                  borderRadius: '8px',
-                  textAlign: 'center'
-                }}>
-                  <div style={{ fontSize: '1.75rem', marginBottom: '0.5rem' }}>👥</div>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.25rem', color: '#1A1A2E' }}>
-                    {project.story_bible?.characters?.length || 0}
-                  </div>
-                  <div style={{ fontSize: '0.875rem', color: '#64748B' }}>Characters</div>
+            {/* Author Field */}
+            <div>
+              <label style={{
+                fontSize: '0.75rem',
+                color: colors.textSecondary,
+                fontWeight: 600,
+                display: 'block',
+                marginBottom: '0.375rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+              }}>
+                Author Name
+              </label>
+              {editingAuthor ? (
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input
+                    type="text"
+                    value={authorValue}
+                    onChange={(e) => setAuthorValue(e.target.value)}
+                    placeholder="Enter author name for exports"
+                    style={{
+                      flex: 1,
+                      padding: '0.625rem 0.75rem',
+                      border: `1px solid ${colors.brandBorder}`,
+                      borderRadius: borderRadius.md,
+                      fontSize: '0.9375rem',
+                      outline: 'none',
+                    }}
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => saveProjectDetails('authorName', authorValue)}
+                    disabled={saving}
+                    style={{
+                      padding: '0.625rem 1rem',
+                      background: gradients.brand,
+                      color: colors.surface,
+                      border: 'none',
+                      borderRadius: borderRadius.md,
+                      cursor: saving ? 'not-allowed' : 'pointer',
+                      fontSize: '0.8125rem',
+                      fontWeight: 600,
+                      opacity: saving ? 0.7 : 1,
+                    }}
+                  >
+                    {saving ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    onClick={() => { setEditingAuthor(false); setAuthorValue(project?.author_name || ''); }}
+                    style={{
+                      padding: '0.625rem 1rem',
+                      background: colors.surface,
+                      color: colors.textSecondary,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: borderRadius.md,
+                      cursor: 'pointer',
+                      fontSize: '0.8125rem',
+                      fontWeight: 500,
+                    }}
+                  >
+                    Cancel
+                  </button>
                 </div>
-                <div style={{
-                  padding: '1.25rem',
-                  background: '#EEF2FF',
-                  border: '1px solid #C7D2FE',
-                  borderRadius: '8px',
-                  textAlign: 'center'
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <span style={{
+                    fontSize: '1rem',
+                    color: project?.author_name ? colors.text : colors.textSecondary,
+                    fontWeight: project?.author_name ? 500 : 400,
+                    fontStyle: project?.author_name ? 'normal' : 'italic',
+                  }}>
+                    {project?.author_name || 'Not set'}
+                  </span>
+                  <button
+                    onClick={() => setEditingAuthor(true)}
+                    style={{
+                      padding: '0.25rem 0.625rem',
+                      background: 'transparent',
+                      color: colors.brandText,
+                      border: `1px solid ${colors.brandBorder}`,
+                      borderRadius: borderRadius.sm,
+                      cursor: 'pointer',
+                      fontSize: '0.75rem',
+                      fontWeight: 500,
+                    }}
+                  >
+                    Edit
+                  </button>
+                </div>
+              )}
+              <p style={{ fontSize: '0.75rem', color: colors.textSecondary, margin: '0.375rem 0 0 0' }}>
+                This name will be used in all exports (EPUB, PDF, DOCX)
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Generation Progress Indicator */}
+        {isGeneratingContent && (
+          <div style={{
+            ...card,
+            marginBottom: '1.5rem',
+            padding: '2rem',
+            background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
+            border: `2px solid ${colors.brandBorder}`,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '50%',
+                border: '3px solid #E0E7FF',
+                borderTopColor: '#667eea',
+                animation: 'spin 1s linear infinite',
+              }} />
+              <div>
+                <h2 style={{ fontSize: '1.25rem', color: colors.text, fontWeight: 700, margin: 0 }}>
+                  Setting Up Your Project...
+                </h2>
+                <p style={{ fontSize: '0.875rem', color: colors.textSecondary, margin: '0.25rem 0 0 0' }}>
+                  This may take a minute or two. Please don't navigate away.
+                </p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <span style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  background: generationStatus.characters === 'done' ? colors.success
+                    : generationStatus.characters === 'generating' ? colors.brandStart
+                    : generationStatus.characters === 'error' ? colors.error
+                    : colors.border,
+                  color: generationStatus.characters === 'pending' ? colors.textSecondary : 'white',
+                  transition: 'all 0.3s ease',
                 }}>
-                  <div style={{ fontSize: '1.75rem', marginBottom: '0.5rem' }}>🌍</div>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.25rem', color: '#1A1A2E' }}>
-                    {project.story_bible?.world?.length || 0}
-                  </div>
-                  <div style={{ fontSize: '0.875rem', color: '#64748B' }}>World Elements</div>
+                  {generationStatus.characters === 'done' ? '✓' : generationStatus.characters === 'generating' ? (
+                    <span style={{ animation: 'pulse 1s ease-in-out infinite' }}>•••</span>
+                  ) : generationStatus.characters === 'error' ? '!' : '1'}
+                </span>
+                <div style={{ flex: 1 }}>
+                  <span style={{
+                    color: generationStatus.characters === 'generating' ? colors.brandText : colors.text,
+                    fontWeight: generationStatus.characters === 'generating' ? 600 : 400,
+                    fontSize: '0.9375rem',
+                  }}>
+                    {generationStatus.characters === 'generating' ? 'Generating characters...' : generationStatus.characters === 'done' ? 'Characters generated' : generationStatus.characters === 'error' ? 'Character generation failed' : 'Generate characters'}
+                  </span>
+                  {generationStatus.characters === 'generating' && (
+                    <div style={{
+                      marginTop: '0.5rem',
+                      background: '#E0E7FF',
+                      borderRadius: '4px',
+                      height: '4px',
+                      overflow: 'hidden',
+                    }}>
+                      <div style={{
+                        background: 'linear-gradient(90deg, #667eea, #764ba2)',
+                        height: '100%',
+                        width: '100%',
+                        animation: 'progressPulse 2s ease-in-out infinite',
+                      }} />
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <span style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  background: generationStatus.world === 'done' ? colors.success
+                    : generationStatus.world === 'generating' ? colors.brandStart
+                    : generationStatus.world === 'error' ? colors.error
+                    : colors.border,
+                  color: generationStatus.world === 'pending' ? colors.textSecondary : 'white',
+                  transition: 'all 0.3s ease',
+                }}>
+                  {generationStatus.world === 'done' ? '✓' : generationStatus.world === 'generating' ? (
+                    <span style={{ animation: 'pulse 1s ease-in-out infinite' }}>•••</span>
+                  ) : generationStatus.world === 'error' ? '!' : '2'}
+                </span>
+                <div style={{ flex: 1 }}>
+                  <span style={{
+                    color: generationStatus.world === 'generating' ? colors.brandText : colors.text,
+                    fontWeight: generationStatus.world === 'generating' ? 600 : 400,
+                    fontSize: '0.9375rem',
+                  }}>
+                    {generationStatus.world === 'generating' ? 'Building world elements...' : generationStatus.world === 'done' ? 'World elements created' : generationStatus.world === 'error' ? 'World generation failed' : 'Build world'}
+                  </span>
+                  {generationStatus.world === 'generating' && (
+                    <div style={{
+                      marginTop: '0.5rem',
+                      background: '#E0E7FF',
+                      borderRadius: '4px',
+                      height: '4px',
+                      overflow: 'hidden',
+                    }}>
+                      <div style={{
+                        background: 'linear-gradient(90deg, #667eea, #764ba2)',
+                        height: '100%',
+                        width: '100%',
+                        animation: 'progressPulse 2s ease-in-out infinite',
+                      }} />
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <span style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  background: generationStatus.plots === 'done' ? colors.success
+                    : generationStatus.plots === 'generating' ? colors.brandStart
+                    : generationStatus.plots === 'error' ? colors.error
+                    : colors.border,
+                  color: generationStatus.plots === 'pending' ? colors.textSecondary : 'white',
+                  transition: 'all 0.3s ease',
+                }}>
+                  {generationStatus.plots === 'done' ? '✓' : generationStatus.plots === 'generating' ? (
+                    <span style={{ animation: 'pulse 1s ease-in-out infinite' }}>•••</span>
+                  ) : generationStatus.plots === 'error' ? '!' : '3'}
+                </span>
+                <div style={{ flex: 1 }}>
+                  <span style={{
+                    color: generationStatus.plots === 'generating' ? colors.brandText : colors.text,
+                    fontWeight: generationStatus.plots === 'generating' ? 600 : 400,
+                    fontSize: '0.9375rem',
+                  }}>
+                    {generationStatus.plots === 'generating' ? 'Extracting plot structure...' : generationStatus.plots === 'done' ? 'Plot structure extracted' : generationStatus.plots === 'error' ? 'Plot extraction failed' : 'Extract plots'}
+                  </span>
+                  {generationStatus.plots === 'generating' && (
+                    <div style={{
+                      marginTop: '0.5rem',
+                      background: '#E0E7FF',
+                      borderRadius: '4px',
+                      height: '4px',
+                      overflow: 'hidden',
+                    }}>
+                      <div style={{
+                        background: 'linear-gradient(90deg, #667eea, #764ba2)',
+                        height: '100%',
+                        width: '100%',
+                        animation: 'progressPulse 2s ease-in-out infinite',
+                      }} />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
+            <style jsx>{`
+              @keyframes spin {
+                to { transform: rotate(360deg); }
+              }
+              @keyframes pulse {
+                0%, 100% { opacity: 0.4; }
+                50% { opacity: 1; }
+              }
+              @keyframes progressPulse {
+                0%, 100% { transform: translateX(-100%); }
+                50% { transform: translateX(100%); }
+              }
+            `}</style>
+          </div>
+        )}
 
-            {/* Export Section */}
-            {project.status !== 'setup' && (
-              <ExportButtons projectId={project.id} />
-            )}
-
-            {/* Next Steps */}
-            <div style={{ ...card, marginTop: '1rem' }}>
-              <h2 style={{ fontSize: '1.125rem', marginBottom: '1rem', color: '#1A1A2E', fontWeight: 600 }}>
-                Next Steps
+        {/* Story Concept Section - Prominent display */}
+        {project.story_concept && (project.story_concept.logline || project.story_concept.synopsis) && (
+          <div style={{
+            ...card,
+            marginBottom: '1.5rem',
+            padding: '1.5rem',
+            background: colors.brandLight,
+            border: `2px solid ${colors.brandBorder}`,
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h2 style={{ fontSize: '1.5rem', color: colors.text, fontWeight: 700, margin: 0 }}>
+                Story Concept
               </h2>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <Link
-                  href={`/projects/${project.id}/characters`}
-                  style={{
+              <Link
+                href="/saved-summaries"
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: colors.surface,
+                  border: `1px solid ${colors.brandBorder}`,
+                  borderRadius: borderRadius.md,
+                  color: colors.brandText,
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  textDecoration: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.375rem',
+                }}
+              >
+                View Saved Summaries
+              </Link>
+            </div>
+
+            <div style={{ display: 'grid', gap: '1.25rem' }}>
+              {project.story_concept.logline && (
+                <div>
+                  <strong style={{
+                    color: colors.brandText,
                     display: 'block',
-                    padding: '1rem',
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    border: 'none',
-                    borderRadius: '8px',
-                    color: '#fff',
-                    textAlign: 'center',
-                    textDecoration: 'none',
-                    fontSize: '1rem',
+                    marginBottom: '0.5rem',
+                    fontSize: '0.875rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
                     fontWeight: 600,
-                    boxShadow: '0 4px 14px rgba(102, 126, 234, 0.3)',
+                  }}>
+                    Logline
+                  </strong>
+                  <p style={{
+                    margin: 0,
+                    fontStyle: 'italic',
+                    lineHeight: '1.7',
+                    fontSize: '1.125rem',
+                    color: colors.text,
+                  }}>
+                    {project.story_concept.logline}
+                  </p>
+                </div>
+              )}
+
+              {project.story_concept.synopsis && (
+                <div>
+                  <strong style={{
+                    color: colors.brandText,
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontSize: '0.875rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    fontWeight: 600,
+                  }}>
+                    Synopsis
+                  </strong>
+                  <p style={{
+                    margin: 0,
+                    lineHeight: '1.7',
+                    fontSize: '0.95rem',
+                    color: colors.textSecondary,
+                  }}>
+                    {project.story_concept.synopsis}
+                  </p>
+                </div>
+              )}
+
+              {project.story_concept.hook && (
+                <div style={{
+                  padding: '1rem',
+                  background: gradients.brand,
+                  borderRadius: borderRadius.md,
+                  border: `1px solid ${colors.brandBorder}`,
+                }}>
+                  <strong style={{
+                    color: colors.surface,
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontSize: '0.875rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    fontWeight: 600,
+                  }}>
+                    Hook
+                  </strong>
+                  <p style={{
+                    margin: 0,
+                    lineHeight: '1.6',
+                    fontSize: '0.95rem',
+                    color: colors.surface,
+                  }}>
+                    {project.story_concept.hook}
+                  </p>
+                </div>
+              )}
+
+              {(project.story_concept.protagonistHint || project.story_concept.conflictType) && (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                  gap: '1rem',
+                  marginTop: '0.5rem',
+                }}>
+                  {project.story_concept.protagonistHint && (
+                    <div>
+                      <strong style={{
+                        color: colors.brandText,
+                        display: 'block',
+                        marginBottom: '0.25rem',
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                      }}>
+                        Protagonist
+                      </strong>
+                      <p style={{
+                        margin: 0,
+                        lineHeight: '1.5',
+                        fontSize: '0.875rem',
+                        color: colors.textSecondary,
+                      }}>
+                        {project.story_concept.protagonistHint}
+                      </p>
+                    </div>
+                  )}
+                  {project.story_concept.conflictType && (
+                    <div>
+                      <strong style={{
+                        color: colors.brandText,
+                        display: 'block',
+                        marginBottom: '0.25rem',
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                      }}>
+                        Core Conflict
+                      </strong>
+                      <p style={{
+                        margin: 0,
+                        lineHeight: '1.5',
+                        fontSize: '0.875rem',
+                        color: colors.textSecondary,
+                      }}>
+                        {project.story_concept.conflictType}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Quick Links - show when no story concept */}
+        {(!project.story_concept || (!project.story_concept.logline && !project.story_concept.synopsis)) && (
+          <div style={{ ...card, marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 style={{ fontSize: '1.125rem', color: '#1A1A2E', fontWeight: 600, margin: 0 }}>
+                  Story Resources
+                </h2>
+                <p style={{ fontSize: '0.875rem', color: colors.textSecondary, margin: '0.25rem 0 0 0' }}>
+                  Access your saved concepts and ideas
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <Link
+                  href="/saved-summaries"
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: colors.surface,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: borderRadius.md,
+                    color: colors.brandStart,
+                    fontSize: '0.75rem',
+                    fontWeight: 500,
+                    textDecoration: 'none',
                   }}
                 >
-                  {project.story_bible?.characters?.length > 0 ? 'Edit Characters' : 'Generate Characters'} →
+                  Saved Summaries
                 </Link>
-                {project.story_bible?.characters?.length > 0 && (
-                  <Link
-                    href={`/projects/${project.id}/world`}
-                    style={{
-                      display: 'block',
-                      padding: '1rem',
-                      background: project.story_bible?.world?.length > 0
-                        ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                        : '#94A3B8',
-                      border: 'none',
-                      borderRadius: '8px',
-                      color: '#fff',
-                      textAlign: 'center',
-                      textDecoration: 'none',
-                      fontSize: '1rem',
-                      fontWeight: 600,
-                    }}
-                  >
-                    {project.story_bible?.world?.length > 0 ? 'Edit World' : 'Generate World'} →
-                  </Link>
-                )}
-                {project.story_bible?.characters?.length > 0 && project.story_bible?.world?.length > 0 && (
-                  <Link
-                    href={`/projects/${project.id}/outline`}
-                    style={{
-                      display: 'block',
-                      padding: '1rem',
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                      border: 'none',
-                      borderRadius: '8px',
-                      color: '#fff',
-                      textAlign: 'center',
-                      textDecoration: 'none',
-                      fontSize: '1rem',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Create Story Outline →
-                  </Link>
-                )}
-                {(project.type === 'trilogy' || (project.book_count && project.book_count > 1)) && (
-                  <Link
-                    href={`/projects/${project.id}/series`}
-                    style={{
-                      display: 'block',
-                      padding: '1rem',
-                      background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
-                      border: 'none',
-                      borderRadius: '8px',
-                      color: '#fff',
-                      textAlign: 'center',
-                      textDecoration: 'none',
-                      fontSize: '1rem',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Series Management {project.series_bible ? '✓' : ''} →
-                  </Link>
-                )}
-                {project.story_bible?.characters?.length > 0 && (
-                  <Link
-                    href={`/projects/${project.id}/plot`}
-                    style={{
-                      display: 'block',
-                      padding: '1rem',
-                      background: 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)',
-                      border: 'none',
-                      borderRadius: '8px',
-                      color: '#fff',
-                      textAlign: 'center',
-                      textDecoration: 'none',
-                      fontSize: '1rem',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Plot Structure & Timeline →
-                  </Link>
-                )}
+                <Link
+                  href="/saved-concepts"
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: colors.surface,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: borderRadius.md,
+                    color: colors.brandStart,
+                    fontSize: '0.75rem',
+                    fontWeight: 500,
+                    textDecoration: 'none',
+                  }}
+                >
+                  Saved Concepts
+                </Link>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Story DNA Section */}
+        <div style={{ ...card, marginBottom: '1rem' }}>
+          <h2 style={{ fontSize: '1.125rem', marginBottom: '1rem', color: '#1A1A2E', fontWeight: 600 }}>
+            Story DNA
+          </h2>
+          {project.story_dna ? (
+            <div style={{ display: 'grid', gap: '0.75rem', color: '#64748B', fontSize: '0.875rem' }}>
+              <div>
+                <strong style={{ color: '#374151' }}>Tone:</strong> {project.story_dna.tone}
+              </div>
+              <div>
+                <strong style={{ color: '#374151' }}>Themes:</strong> {project.story_dna.themes?.join(', ')}
+              </div>
+              <div>
+                <strong style={{ color: '#374151' }}>Point of View:</strong> {project.story_dna.proseStyle?.pointOfView}
+              </div>
+            </div>
+          ) : (
+            <p style={{ color: '#64748B', fontSize: '0.875rem' }}>Story DNA will be generated when you set up characters.</p>
+          )}
+        </div>
+
+        {/* Story Bible Section */}
+        <div style={{ ...card, marginBottom: '1rem' }}>
+          <h2 style={{ fontSize: '1.125rem', marginBottom: '1rem', color: '#1A1A2E', fontWeight: 600 }}>
+            Story Bible
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+            <div style={{
+              padding: '1.25rem',
+              background: '#EEF2FF',
+              border: '1px solid #C7D2FE',
+              borderRadius: '8px',
+              textAlign: 'center'
+            }}>
+              <div style={{ fontSize: '1.75rem', marginBottom: '0.5rem' }}>👥</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.25rem', color: '#1A1A2E' }}>
+                {project.story_bible?.characters?.length || 0}
+              </div>
+              <div style={{ fontSize: '0.875rem', color: '#64748B' }}>Characters</div>
+            </div>
+            <div style={{
+              padding: '1.25rem',
+              background: '#EEF2FF',
+              border: '1px solid #C7D2FE',
+              borderRadius: '8px',
+              textAlign: 'center'
+            }}>
+              <div style={{ fontSize: '1.75rem', marginBottom: '0.5rem' }}>🌍</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.25rem', color: '#1A1A2E' }}>
+                {project.story_bible?.world?.length || 0}
+              </div>
+              <div style={{ fontSize: '0.875rem', color: '#64748B' }}>World Elements</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Export Section */}
+        {project.status !== 'setup' && (
+          <ExportButtons projectId={project.id} />
+        )}
+
+        {/* Next Steps */}
+        <div style={{ ...card, marginTop: '1rem' }}>
+          <h2 style={{ fontSize: '1.125rem', marginBottom: '1rem', color: '#1A1A2E', fontWeight: 600 }}>
+            Next Steps
+          </h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <Link
+              href={`/projects/${project.id}/characters`}
+              style={{
+                display: 'block',
+                padding: '1rem',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                border: 'none',
+                borderRadius: '8px',
+                color: '#fff',
+                textAlign: 'center',
+                textDecoration: 'none',
+                fontSize: '1rem',
+                fontWeight: 600,
+                boxShadow: '0 4px 14px rgba(102, 126, 234, 0.3)',
+              }}
+            >
+              {project.story_bible?.characters?.length > 0 ? 'Edit Characters' : 'Generate Characters'} →
+            </Link>
+            {project.story_bible?.characters?.length > 0 && (
+              <Link
+                href={`/projects/${project.id}/world`}
+                style={{
+                  display: 'block',
+                  padding: '1rem',
+                  background: project.story_bible?.world?.length > 0
+                    ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                    : '#94A3B8',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  textAlign: 'center',
+                  textDecoration: 'none',
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                }}
+              >
+                {project.story_bible?.world?.length > 0 ? 'Edit World' : 'Generate World'} →
+              </Link>
+            )}
+            {project.story_bible?.characters?.length > 0 && project.story_bible?.world?.length > 0 && (
+              <Link
+                href={`/projects/${project.id}/outline`}
+                style={{
+                  display: 'block',
+                  padding: '1rem',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  textAlign: 'center',
+                  textDecoration: 'none',
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                }}
+              >
+                Create Story Outline →
+              </Link>
+            )}
+            {(project.type === 'trilogy' || (project.book_count && project.book_count > 1)) && (
+              <Link
+                href={`/projects/${project.id}/series`}
+                style={{
+                  display: 'block',
+                  padding: '1rem',
+                  background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  textAlign: 'center',
+                  textDecoration: 'none',
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                }}
+              >
+                Series Management {project.series_bible ? '✓' : ''} →
+              </Link>
+            )}
+            {project.story_bible?.characters?.length > 0 && (
+              <Link
+                href={`/projects/${project.id}/plot`}
+                style={{
+                  display: 'block',
+                  padding: '1rem',
+                  background: 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  textAlign: 'center',
+                  textDecoration: 'none',
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                }}
+              >
+                Plot Structure & Timeline →
+              </Link>
+            )}
+          </div>
+        </div>
       </div>
     </PageLayout>
   );

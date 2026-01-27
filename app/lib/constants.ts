@@ -2,11 +2,12 @@
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-// Common colors (Tailwind-inspired palette)
+// Common colours (Tailwind-inspired palette)
 export const colors = {
   // Backgrounds
   background: '#F8FAFC',
   surface: '#FFFFFF',
+  surfaceAlt: '#F8FAFC',  // Alternate surface for nested elements
   surfaceHover: '#F8FAFC',
 
   // Borders

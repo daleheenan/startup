@@ -81,6 +81,27 @@ export const WORKFLOW_REQUIREMENTS: Record<WorkflowStep, WorkflowRequirement> = 
     label: 'Analytics',
     route: '/analytics',
     icon: '📊'
+  },
+  'outline-review': {
+    step: 'outline-review',
+    requiredSteps: ['concept', 'characters', 'world', 'plots', 'coherence', 'originality', 'outline'],
+    label: 'Outline Review',
+    route: '/outline-review',
+    icon: '🔍'
+  },
+  'editorial-report': {
+    step: 'editorial-report',
+    requiredSteps: ['concept', 'characters', 'world', 'plots', 'coherence', 'originality', 'outline', 'chapters'],
+    label: 'Editorial Report',
+    route: '/editorial-report',
+    icon: '📋'
+  },
+  'follow-up': {
+    step: 'follow-up',
+    requiredSteps: ['concept', 'characters', 'world', 'plots', 'coherence', 'originality', 'outline', 'chapters'],
+    label: 'Follow-up',
+    route: '/follow-up',
+    icon: '🚀'
   }
 };
 
@@ -136,6 +157,18 @@ export function isStepComplete(
     case 'analytics':
       // Has at least one chapter with content
       return (chapters?.filter(ch => ch.content && ch.content.length > 0)?.length ?? 0) > 0;
+
+    case 'outline-review':
+      // Outline review is optional - always accessible if outline exists
+      return outline !== null && (outline?.total_chapters ?? 0) > 0;
+
+    case 'editorial-report':
+      // Editorial report requires completed chapters
+      return (chapters?.filter(ch => ch.content && ch.content.length > 0)?.length ?? 0) > 0;
+
+    case 'follow-up':
+      // Follow-up requires all chapters completed
+      return (chapters?.length ?? 0) > 0 && (chapters?.every(ch => ch.content && ch.content.length > 0) ?? false);
 
     default:
       return false;
@@ -270,7 +303,7 @@ export function getTabStatus(
  * Get all workflow steps in order
  */
 export function getOrderedWorkflowSteps(): WorkflowStep[] {
-  return ['concept', 'characters', 'world', 'plots', 'coherence', 'originality', 'outline', 'chapters', 'analytics'];
+  return ['concept', 'characters', 'world', 'plots', 'coherence', 'originality', 'outline', 'outline-review', 'chapters', 'analytics', 'editorial-report', 'follow-up'];
 }
 
 /**
