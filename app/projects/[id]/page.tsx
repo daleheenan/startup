@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ExportButtons from '../../components/ExportButtons';
+import CloneBookDialog from '../../components/CloneBookDialog';
 import PageLayout from '../../components/shared/PageLayout';
 import LoadingState from '../../components/shared/LoadingState';
 import ErrorMessage from '../../components/shared/ErrorMessage';
@@ -80,11 +81,13 @@ interface JobStats {
 export default function ProjectDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const projectId = params.id as string;
 
   const [project, setProject] = useState<Project | null>(null);
   const [outline, setOutline] = useState<Outline | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [currentBookId, setCurrentBookId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
@@ -103,6 +106,9 @@ export default function ProjectDetailPage() {
   const [titleValue, setTitleValue] = useState('');
   const [authorValue, setAuthorValue] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Clone dialog state
+  const [showCloneDialog, setShowCloneDialog] = useState(false);
 
   // IMPORTANT: All hooks must be called before any early returns
   const navigation = useProjectNavigation(projectId, project, outline, chapters);
@@ -132,6 +138,7 @@ export default function ProjectDetailPage() {
         const booksData = await fetchJson<any[]>(`/api/books/project/${projectId}`);
         if (booksData && booksData.length > 0) {
           const bookId = booksData[0].id;
+          setCurrentBookId(bookId);
 
           // Fetch outline
           try {
@@ -810,8 +817,50 @@ export default function ProjectDetailPage() {
                 This name will be used in all exports (EPUB, PDF, DOCX)
               </p>
             </div>
+
+            {/* Clone Book Button */}
+            {currentBookId && (
+              <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: `1px solid ${colors.border}` }}>
+                <button
+                  onClick={() => setShowCloneDialog(true)}
+                  style={{
+                    padding: '0.625rem 1rem',
+                    background: colors.surface,
+                    color: colors.brandText,
+                    border: `1px solid ${colors.brandBorder}`,
+                    borderRadius: borderRadius.md,
+                    cursor: 'pointer',
+                    fontSize: '0.8125rem',
+                    fontWeight: 500,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                  }}
+                >
+                  <span style={{ fontSize: '1rem' }}>+</span>
+                  Clone Book (Fresh Start)
+                </button>
+                <p style={{ fontSize: '0.75rem', color: colors.textSecondary, margin: '0.375rem 0 0 0' }}>
+                  Create a copy with same characters and world, but fresh plot and chapters
+                </p>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Clone Book Dialog */}
+        {currentBookId && (
+          <CloneBookDialog
+            bookId={currentBookId}
+            bookTitle={project?.title || 'Book'}
+            isOpen={showCloneDialog}
+            onClose={() => setShowCloneDialog(false)}
+            onCloned={(clonedBook) => {
+              // Navigate to the new cloned book's project page or refresh
+              router.refresh();
+            }}
+          />
+        )}
 
         {/* Generation Progress Indicator */}
         {isGeneratingContent && (
@@ -1271,9 +1320,9 @@ export default function ProjectDetailPage() {
           </div>
         </div>
 
-        {/* Export Section */}
-        {project.status !== 'setup' && (
-          <ExportButtons projectId={project.id} />
+        {/* Export Section - show when book has generated content */}
+        {chapters.length > 0 && chapters.some(ch => ch.content) && (
+          <ExportButtons projectId={project.id} hasContent={true} />
         )}
 
         {/* Next Steps */}

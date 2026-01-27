@@ -1,15 +1,17 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { getToken } from '../lib/auth';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 interface ExportButtonsProps {
   projectId: string;
+  hasContent?: boolean;  // Whether book has generated content
 }
 
-export default function ExportButtons({ projectId }: ExportButtonsProps) {
+export default function ExportButtons({ projectId, hasContent = true }: ExportButtonsProps) {
   const [exportingDocx, setExportingDocx] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingBible, setExportingBible] = useState(false);
@@ -116,10 +118,33 @@ export default function ExportButtons({ projectId }: ExportButtonsProps) {
       }}>
       <h2
         id="export-heading"
-        style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#FFFFFF' }}>
-        Export
+        style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#1A1A2E' }}>
+        Your Book
       </h2>
       <div style={{ display: 'grid', gap: '1rem' }}>
+        {/* Read Your Book Button - only shown when content exists */}
+        {hasContent && (
+          <Link
+            href={`/projects/${projectId}/read`}
+            style={{
+              padding: '1rem',
+              minHeight: '44px',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              border: 'none',
+              borderRadius: '8px',
+              color: '#FFFFFF',
+              fontSize: '1rem',
+              fontWeight: 600,
+              textAlign: 'center',
+              textDecoration: 'none',
+              display: 'block',
+              transition: 'all 0.2s',
+            }}
+          >
+            Read Your Book
+          </Link>
+        )}
+
         <button
           onClick={handleExportDocx}
           disabled={exportingDocx}
