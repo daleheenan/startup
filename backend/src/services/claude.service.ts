@@ -92,15 +92,21 @@ export class ClaudeService {
         },
       };
     } catch (error: any) {
-      // Check for rate limit error
-      if (error?.status === 429 || error?.error?.type === 'rate_limit_error') {
+      // Check for rate limit error (429) or overloaded error (529 - "too fast")
+      const isRateLimit = error?.status === 429 || error?.error?.type === 'rate_limit_error';
+      const isOverloaded = error?.status === 529 || error?.error?.type === 'overloaded_error' ||
+                           error?.message?.toLowerCase().includes('overloaded') ||
+                           error?.message?.toLowerCase().includes('too fast');
+
+      if (isRateLimit || isOverloaded) {
         const session = sessionTracker.getCurrentSession();
         const resetTime = session?.session_resets_at
           ? new Date(session.session_resets_at)
-          : new Date(Date.now() + 5 * 60 * 60 * 1000); // Default to +5 hours if unknown
+          : new Date(Date.now() + (isOverloaded ? 5 * 60 * 1000 : 5 * 60 * 60 * 1000)); // 5 min for overloaded, 5 hours for rate limit
 
+        const errorType = isOverloaded ? 'Server overloaded (too fast)' : 'Rate limit exceeded';
         throw new RateLimitError(
-          `Rate limit exceeded. Session resets at ${resetTime.toISOString()}`,
+          `${errorType}. Retry after ${resetTime.toISOString()}`,
           resetTime
         );
       }

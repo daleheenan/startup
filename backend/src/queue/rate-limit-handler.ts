@@ -96,15 +96,23 @@ export class RateLimitHandler {
   }
 
   /**
-   * Check if an error is a rate limit error
+   * Check if an error is a rate limit error or overloaded error
    */
   static isRateLimitError(error: any): boolean {
     if (error instanceof RateLimitError) return true;
 
-    // Check for Anthropic SDK rate limit error
+    // Check for Anthropic SDK rate limit error (429)
     if (error?.status === 429) return true;
     if (error?.error?.type === 'rate_limit_error') return true;
+
+    // Check for Anthropic overloaded error (529) - "too fast" / server busy
+    if (error?.status === 529) return true;
+    if (error?.error?.type === 'overloaded_error') return true;
+
+    // Check message content
     if (error?.message?.includes('rate limit')) return true;
+    if (error?.message?.toLowerCase().includes('overloaded')) return true;
+    if (error?.message?.toLowerCase().includes('too fast')) return true;
 
     return false;
   }
