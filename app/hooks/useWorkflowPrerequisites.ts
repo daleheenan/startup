@@ -29,6 +29,7 @@ export type WorkflowStep =
   | 'coherence'
   | 'originality'
   | 'outline'
+  | 'outline-review'  // Sprint 39: Optional editorial review of outline before chapters
   | 'chapters'
   | 'analytics'
   | 'editorial-report'
@@ -205,8 +206,15 @@ function getMissingItemsForStep(
       }
       break;
 
+    case 'outline-review':
+      // Outline review requires a complete outline
+      if (!hasOutlineContent(outline)) {
+        missing.push('Complete outline');
+      }
+      break;
+
     case 'chapters':
-      // Need outline to be complete first
+      // Need outline to be complete first (outline-review is optional)
       if (!hasOutlineContent(outline)) {
         missing.push('Complete outline');
       }
@@ -252,6 +260,7 @@ const WORKFLOW_STEPS: WorkflowStep[] = [
   'coherence',
   'originality',
   'outline',
+  'outline-review',  // Sprint 39: Optional editorial review before chapters
   'chapters',
   'analytics',
   'editorial-report',
@@ -269,6 +278,7 @@ const STEP_NAMES: Record<WorkflowStep, string> = {
   coherence: 'Coherence Check',
   originality: 'Originality Check',
   outline: 'Outline',
+  'outline-review': 'Outline Review',
   chapters: 'Chapters',
   analytics: 'Analytics',
   'editorial-report': 'Editorial Report',
@@ -336,10 +346,16 @@ export function useWorkflowPrerequisites(
         requiresPrevious: 'originality',
         missingItems: [],
       },
+      'outline-review': {
+        isComplete: false,
+        isRequired: false,  // Outline review is optional
+        requiresPrevious: 'outline',
+        missingItems: [],
+      },
       chapters: {
         isComplete: false,
         isRequired: true,
-        requiresPrevious: 'outline',
+        requiresPrevious: 'outline',  // Chapters require outline (not outline-review, since it's optional)
         missingItems: [],
       },
       analytics: {
@@ -401,6 +417,11 @@ export function useWorkflowPrerequisites(
     // Check outline completion
     checks.outline.missingItems = getMissingItemsForStep('outline', project, outline);
     checks.outline.isComplete = hasOutlineContent(outline);
+
+    // Check outline-review completion (optional - always accessible if outline exists)
+    checks['outline-review'].missingItems = getMissingItemsForStep('outline-review', project, outline);
+    // Outline review is considered "complete" if outline exists (always allow access to skip or review)
+    checks['outline-review'].isComplete = checks.outline.isComplete;
 
     // Check chapters completion (at least one chapter exists)
     checks.chapters.missingItems = getMissingItemsForStep('chapters', project, outline, chapters);

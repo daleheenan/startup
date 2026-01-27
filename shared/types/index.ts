@@ -905,15 +905,18 @@ export interface PrimaryNavigationItem {
 
 // Workflow step types for project creation
 export type WorkflowStep =
-  | 'concept'      // Story concept exists
-  | 'characters'   // Characters created
-  | 'world'        // World elements defined
-  | 'plots'        // Plot layers created
-  | 'coherence'    // Coherence check completed
-  | 'originality'  // Originality check completed
-  | 'outline'      // Outline generated
-  | 'chapters'     // Chapters exist (at least 1)
-  | 'analytics';   // Chapters have content
+  | 'concept'        // Story concept exists
+  | 'characters'     // Characters created
+  | 'world'          // World elements defined
+  | 'plots'          // Plot layers created
+  | 'coherence'      // Coherence check completed
+  | 'originality'    // Originality check completed
+  | 'outline'        // Outline generated
+  | 'outline-review' // Editorial review of outline (optional)
+  | 'chapters'       // Chapters exist (at least 1)
+  | 'analytics'      // Chapters have content
+  | 'editorial-report' // VEB editorial report (post-completion)
+  | 'follow-up';     // Follow-up recommendations
 
 export interface WorkflowRequirement {
   step: WorkflowStep;
