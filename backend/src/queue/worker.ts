@@ -180,6 +180,8 @@ export class QueueWorker {
         return await this.continuityCheck(job);
       case 'copy_edit':
         return await this.copyEdit(job);
+      case 'proofread':
+        return await this.proofread(job);
       case 'generate_summary':
         return await this.generateSummary(job);
       case 'update_states':
@@ -490,7 +492,41 @@ export class QueueWorker {
 
       await editingService.applyEditResult(chapterId, result);
 
-      // After copy edit (final editing step), update word count
+      logger.info('copy_edit: Complete');
+
+      checkpointManager.saveCheckpoint(job.id, 'completed', { chapterId });
+    } catch (error) {
+      logger.error({ error }, 'copy_edit: Error');
+      throw error;
+    }
+  }
+
+  /**
+   * Proofread - Final quality check before export
+   */
+  private async proofread(job: Job): Promise<void> {
+    logger.info({ chapterId: job.target_id }, 'proofread: Processing chapter');
+    const chapterId = job.target_id;
+
+    const { editingService } = await import('../services/editing.service.js');
+    const { metricsService } = await import('../services/metrics.service.js');
+
+    checkpointManager.saveCheckpoint(job.id, 'started', { chapterId });
+
+    try {
+      const result = await editingService.proofread(chapterId);
+
+      // Track token usage
+      if (result.usage) {
+        logger.info({ inputTokens: result.usage.input_tokens, outputTokens: result.usage.output_tokens }, 'proofread: Tracking tokens');
+        metricsService.trackChapterTokens(chapterId, result.usage.input_tokens, result.usage.output_tokens);
+      }
+
+      checkpointManager.saveCheckpoint(job.id, 'proofread_complete', { chapterId });
+
+      await editingService.applyEditResult(chapterId, result);
+
+      // After proofread (final editing step), update word count
       const getContentStmt = db.prepare<[string], { content: string }>(`
         SELECT content FROM chapters WHERE id = ?
       `);
@@ -505,11 +541,11 @@ export class QueueWorker {
         updateWordCountStmt.run(wordCount, new Date().toISOString(), chapterId);
       }
 
-      logger.info('copy_edit: Complete');
+      logger.info('proofread: Complete');
 
       checkpointManager.saveCheckpoint(job.id, 'completed', { chapterId });
     } catch (error) {
-      logger.error({ error }, 'copy_edit: Error');
+      logger.error({ error }, 'proofread: Error');
       throw error;
     }
   }

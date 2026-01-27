@@ -8,9 +8,14 @@ const logger = createLogger('services:chapter-orchestrator');
  * ChapterOrchestratorService orchestrates the full chapter generation workflow
  *
  * For each chapter:
- * 1. generate_chapter - Write the chapter content
- * 2. generate_summary - Create summary for next chapter
- * 3. update_states - Update character states
+ * 1. generate_chapter - Author Agent writes initial draft
+ * 2. dev_edit - Developmental Editor reviews structure and pacing
+ * 3. line_edit - Line Editor polishes prose
+ * 4. continuity_check - Continuity Editor checks consistency
+ * 5. copy_edit - Copy Editor fixes grammar/style
+ * 6. proofread - Proofreader final quality check
+ * 7. generate_summary - Create summary for next chapter
+ * 8. update_states - Update character states
  */
 export class ChapterOrchestratorService {
   /**
@@ -38,7 +43,7 @@ export class ChapterOrchestratorService {
     // Queue jobs for each chapter
     for (const chapter of chapters) {
       this.queueChapterWorkflow(chapter.id);
-      jobsCreated += 7; // generate_chapter, dev_edit, line_edit, continuity_check, copy_edit, generate_summary, update_states
+      jobsCreated += 8; // generate_chapter, dev_edit, line_edit, continuity_check, copy_edit, proofread, generate_summary, update_states
       // Note: +1 additional job (author_revision) may be created dynamically if dev editor requires it
     }
 
@@ -59,8 +64,9 @@ export class ChapterOrchestratorService {
    * 3. line_edit - Line Editor polishes prose
    * 4. continuity_check - Continuity Editor checks consistency
    * 5. copy_edit - Copy Editor fixes grammar/style
-   * 6. generate_summary - Create summary for next chapter
-   * 7. update_states - Update character states
+   * 6. proofread - Proofreader final quality check
+   * 7. generate_summary - Create summary for next chapter
+   * 8. update_states - Update character states
    */
   queueChapterWorkflow(chapterId: string): {
     generateJobId: string;
@@ -68,6 +74,7 @@ export class ChapterOrchestratorService {
     lineEditJobId: string;
     continuityJobId: string;
     copyEditJobId: string;
+    proofreadJobId: string;
     summaryJobId: string;
     statesJobId: string;
   } {
@@ -78,6 +85,7 @@ export class ChapterOrchestratorService {
     const lineEditJobId = QueueWorker.createJob('line_edit', chapterId);
     const continuityJobId = QueueWorker.createJob('continuity_check', chapterId);
     const copyEditJobId = QueueWorker.createJob('copy_edit', chapterId);
+    const proofreadJobId = QueueWorker.createJob('proofread', chapterId);
     const summaryJobId = QueueWorker.createJob('generate_summary', chapterId);
     const statesJobId = QueueWorker.createJob('update_states', chapterId);
 
@@ -87,6 +95,7 @@ export class ChapterOrchestratorService {
     logger.info(`  - Line Edit: ${lineEditJobId}`);
     logger.info(`  - Continuity: ${continuityJobId}`);
     logger.info(`  - Copy Edit: ${copyEditJobId}`);
+    logger.info(`  - Proofread: ${proofreadJobId}`);
     logger.info(`  - Summary: ${summaryJobId}`);
     logger.info(`  - States: ${statesJobId}`);
 
@@ -96,6 +105,7 @@ export class ChapterOrchestratorService {
       lineEditJobId,
       continuityJobId,
       copyEditJobId,
+      proofreadJobId,
       summaryJobId,
       statesJobId,
     };

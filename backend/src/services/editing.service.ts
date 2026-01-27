@@ -10,7 +10,7 @@ const logger = createLogger('services:editing');
  * EditResult captures the output of an editing pass
  */
 export interface EditResult {
-  editorType: 'developmental' | 'line' | 'continuity' | 'copy';
+  editorType: 'developmental' | 'line' | 'continuity' | 'copy' | 'proofread';
   originalContent: string;
   editedContent: string;
   suggestions: EditorSuggestion[];
@@ -363,6 +363,69 @@ Output the corrected chapter text:`;
 
     return {
       editorType: 'copy',
+      originalContent: chapterData.content,
+      editedContent: apiResponse.content.trim(),
+      suggestions: [],
+      flags: [],
+      approved: true,
+      usage: apiResponse.usage,
+    };
+  }
+
+  /**
+   * Proofreader - Final quality pass before export
+   * Catches typos, formatting issues, and ensures professional polish
+   */
+  async proofread(chapterId: string): Promise<EditResult> {
+    logger.info(`[EditingService] Running proofread for chapter ${chapterId}`);
+
+    const chapterData = this.getChapterData(chapterId);
+    if (!chapterData.content) {
+      throw new Error('Chapter content not found');
+    }
+
+    const systemPrompt = `You are a professional proofreader performing the FINAL quality check before a novel goes to publication.
+
+Your task is to catch errors that previous editors may have missed:
+
+1. **Typos & Misspellings**: Words that spell-check misses (e.g., "form" vs "from", "their" vs "there")
+2. **Homophones**: Commonly confused words (affect/effect, its/it's, your/you're, then/than)
+3. **Missing/Extra Words**: "He went to the the store" or "He went the store"
+4. **Punctuation Errors**: Missing periods, incorrect comma placement, dialogue punctuation
+5. **Inconsistent Formatting**: Extra spaces, inconsistent paragraph breaks
+6. **Repeated Words**: "He was was tired" or "the the"
+7. **Capitalization**: Inconsistent capitalization of proper nouns
+8. **Number Consistency**: Mixed use of numerals and spelled-out numbers
+9. **Quotation Marks**: Unclosed quotes, incorrect smart quotes
+10. **Em-dashes & Hyphens**: Ensure proper usage (em-dash for interruption, hyphen for compound words)
+
+CRITICAL FORMATTING CHECK:
+- Remove ANY remaining markdown formatting (#, ##, **, *, _, etc.)
+- Remove ANY scene numbers or structural headers
+- Ensure clean, professional prose ready for publication
+- Scene breaks should be blank lines only
+
+Make direct corrections. This is the FINAL pass - the manuscript goes to export after this.
+Output ONLY the corrected chapter text with no commentary.`;
+
+    const userPrompt = `Proofread this chapter. This is the final check before publication.
+
+CHAPTER CONTENT:
+${chapterData.content}
+
+Return the proofread chapter with all corrections applied. Output only the corrected text:`;
+
+    const apiResponse = await claudeService.createCompletionWithUsage({
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+      maxTokens: 4096,
+      temperature: 0.2, // Very low temperature for precise corrections
+    });
+
+    logger.info(`[EditingService] Proofread complete`);
+
+    return {
+      editorType: 'proofread',
       originalContent: chapterData.content,
       editedContent: apiResponse.content.trim(),
       suggestions: [],

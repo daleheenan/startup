@@ -123,7 +123,7 @@ export interface Flag {
     location?: string;
     resolved: boolean;
 }
-export type JobType = 'generate_chapter' | 'dev_edit' | 'line_edit' | 'continuity_check' | 'copy_edit' | 'generate_summary' | 'update_states';
+export type JobType = 'generate_chapter' | 'dev_edit' | 'author_revision' | 'line_edit' | 'continuity_check' | 'copy_edit' | 'proofread' | 'generate_summary' | 'update_states';
 export type JobStatus = 'pending' | 'running' | 'completed' | 'paused' | 'failed';
 export interface Job {
     id: string;

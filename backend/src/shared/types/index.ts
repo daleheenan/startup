@@ -193,6 +193,7 @@ export type JobType =
   | 'line_edit'
   | 'continuity_check'
   | 'copy_edit'
+  | 'proofread'
   | 'generate_summary'
   | 'update_states';
 
