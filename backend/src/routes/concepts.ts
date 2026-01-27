@@ -69,7 +69,7 @@ router.post('/refine', async (req, res) => {
       feedbackLength: feedback.length,
     }, 'Refining concepts with feedback');
 
-    const concepts = await refineConcepts(preferences as any, existingConcepts, feedback.trim());
+    const concepts = await refineConcepts(preferences as any, existingConcepts, feedback);
 
     res.json({ success: true, concepts });
   } catch (error) {

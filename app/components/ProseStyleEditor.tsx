@@ -32,7 +32,7 @@ export default function ProseStyleEditor({ projectId, currentStyleId, onStyleCha
   const [presets, setPresets] = useState<StylePreset[]>([]);
   const [showPresets, setShowPresets] = useState(false);
   const [voiceSample, setVoiceSample] = useState('');
-  const [analyzing, setAnalyzing] = useState(false);
+  const [analysing, setAnalysing] = useState(false);
 
   // BUG-010 FIX: Add try/catch to async useEffect
   useEffect(() => {
@@ -115,13 +115,13 @@ export default function ProseStyleEditor({ projectId, currentStyleId, onStyleCha
     }
   };
 
-  const handleAnalyzeVoice = async () => {
+  const handleAnalyseVoice = async () => {
     if (!voiceSample.trim()) {
-      alert('Please enter a text sample to analyze');
+      alert('Please enter a text sample to analyse');
       return;
     }
 
-    setAnalyzing(true);
+    setAnalysing(true);
 
     try {
       // First save the style if it doesn't exist
@@ -153,16 +153,21 @@ export default function ProseStyleEditor({ projectId, currentStyleId, onStyleCha
           flesch_kincaid_target: data.sample.flesch_kincaid_score || prev.flesch_kincaid_target,
         }));
 
-        alert('Voice sample analyzed! Style updated based on the sample.');
+        alert('Voice sample analysed! Style updated based on the sample.');
         setVoiceSample('');
       }
     } catch (error) {
-      console.error('Error analyzing voice:', error);
-      alert('Failed to analyze voice sample');
+      console.error('Error analysing voice:', error);
+      alert('Failed to analyse voice sample');
     } finally {
-      setAnalyzing(false);
+      setAnalysing(false);
     }
   };
+
+  // Guard against invalid style state
+  if (!style) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <div style={{ padding: '24px', maxWidth: '800px', margin: '0 auto' }}>
@@ -173,10 +178,11 @@ export default function ProseStyleEditor({ projectId, currentStyleId, onStyleCha
 
       {/* Style Name */}
       <div style={{ marginBottom: '24px' }}>
-        <label style={{ display: 'block', fontWeight: '500', marginBottom: '8px' }}>Style Name</label>
+        <label htmlFor="style-name" style={{ display: 'block', fontWeight: '500', marginBottom: '8px' }}>Style Name</label>
         <input
+          id="style-name"
           type="text"
-          value={style.name || ''}
+          value={style?.name || ''}
           onChange={(e) => setStyle({ ...style, name: e.target.value })}
           style={{
             width: '100%',
@@ -272,6 +278,7 @@ export default function ProseStyleEditor({ projectId, currentStyleId, onStyleCha
             value={style.sentence_variety_score}
             onChange={(e) => setStyle({ ...style, sentence_variety_score: parseFloat(e.target.value) })}
             style={{ width: '100%' }}
+            aria-label="Variety Score"
           />
           <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
             Higher = more varied sentence structures
@@ -309,6 +316,7 @@ export default function ProseStyleEditor({ projectId, currentStyleId, onStyleCha
             value={style.flesch_kincaid_target}
             onChange={(e) => setStyle({ ...style, flesch_kincaid_target: parseFloat(e.target.value) })}
             style={{ width: '100%' }}
+            aria-label="Flesch Reading Ease"
           />
         </div>
       </div>
@@ -359,11 +367,11 @@ export default function ProseStyleEditor({ projectId, currentStyleId, onStyleCha
         </div>
       </div>
 
-      {/* Voice Sample Analyzer */}
+      {/* Voice Sample Analyser */}
       <div style={{ marginBottom: '24px', padding: '16px', background: '#f0f8ff', borderRadius: '8px' }}>
-        <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>Voice Sample Analyzer</h3>
+        <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>Voice Sample Analyser</h3>
         <p style={{ fontSize: '14px', color: '#666', marginBottom: '12px' }}>
-          Paste a sample of your writing to analyze its style patterns
+          Paste a sample of your writing to analyse its style patterns
         </p>
 
         <textarea
@@ -381,18 +389,18 @@ export default function ProseStyleEditor({ projectId, currentStyleId, onStyleCha
         />
 
         <button
-          onClick={handleAnalyzeVoice}
-          disabled={analyzing || !voiceSample.trim()}
+          onClick={handleAnalyseVoice}
+          disabled={analysing || !voiceSample.trim()}
           style={{
             padding: '8px 16px',
-            background: analyzing ? '#ccc' : '#2196F3',
+            background: analysing ? '#ccc' : '#2196F3',
             color: 'white',
             border: 'none',
             borderRadius: '4px',
-            cursor: analyzing ? 'not-allowed' : 'pointer',
+            cursor: analysing ? 'not-allowed' : 'pointer',
           }}
         >
-          {analyzing ? 'Analyzing...' : 'Analyze Sample'}
+          {analysing ? 'Analysing...' : 'Analyse Sample'}
         </button>
       </div>
 

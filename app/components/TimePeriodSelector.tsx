@@ -251,14 +251,18 @@ export function TimePeriodSelector({
             gap: '1rem',
             flexWrap: 'wrap',
           }}>
-            <label style={{
-              fontSize: '0.875rem',
-              color: colors.textSecondary,
-              fontWeight: 500,
-            }}>
+            <label
+              htmlFor="custom-year-input"
+              style={{
+                fontSize: '0.875rem',
+                color: colors.textSecondary,
+                fontWeight: 500,
+              }}
+            >
               Year:
             </label>
             <input
+              id="custom-year-input"
               type="number"
               value={value.year || currentYear}
               onChange={(e) => handleYearChange(e.target.value)}

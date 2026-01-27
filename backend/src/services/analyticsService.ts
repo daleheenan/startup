@@ -87,6 +87,11 @@ export class AnalyticsService {
       const sceneCard = sceneCards[index];
       const sceneWordCount = this.countWords(sceneText);
 
+      // Skip if no scene card or no characters in scene
+      if (!sceneCard || !sceneCard.characters || sceneCard.characters.length === 0) {
+        return;
+      }
+
       // Track all characters in scene
       sceneCard.characters.forEach(charName => {
         if (!characterStats[charName]) {
@@ -182,7 +187,7 @@ export class AnalyticsService {
   /**
    * Calculate tension score for a scene
    */
-  private static calculateSceneTension(sceneText: string, sceneCard: SceneCard): number {
+  private static calculateSceneTension(sceneText: string, sceneCard?: SceneCard): number {
     let tension = 50; // Base tension
 
     // Conflict indicators
@@ -193,13 +198,15 @@ export class AnalyticsService {
     const actionWords = this.countActionWords(sceneText);
     tension += Math.min(actionWords, 15);
 
-    // Emotional intensity from scene card
-    const emotionalBeat = sceneCard.emotionalBeat?.toLowerCase() || '';
-    if (emotionalBeat.match(/fear|terror|anger|rage|despair/)) tension += 15;
-    if (emotionalBeat.match(/calm|peace|content|happy/)) tension -= 10;
+    // Emotional intensity from scene card (if available)
+    if (sceneCard) {
+      const emotionalBeat = sceneCard.emotionalBeat?.toLowerCase() || '';
+      if (emotionalBeat.match(/fear|terror|anger|rage|despair/)) tension += 15;
+      if (emotionalBeat.match(/calm|peace|content|happy/)) tension -= 10;
 
-    // Conflict from scene card
-    if (sceneCard.conflict && sceneCard.conflict.length > 50) tension += 10;
+      // Conflict from scene card
+      if (sceneCard.conflict && sceneCard.conflict.length > 50) tension += 10;
+    }
 
     // Pacing (faster = higher tension)
     const sentences = ProseAnalyzer['splitIntoSentences'](sceneText);
@@ -311,8 +318,8 @@ export class AnalyticsService {
 
     let count = 0;
 
-    // Count full name
-    const fullNameRegex = new RegExp(characterName, 'gi');
+    // Count full name with word boundaries
+    const fullNameRegex = new RegExp(`\\b${characterName}\\b`, 'gi');
     count += (text.match(fullNameRegex) || []).length;
 
     // Count first name only (if not already counted)

@@ -387,13 +387,11 @@ export default function NationalitySelector({
           </div>
           <div style={{ fontSize: '0.875rem', color: '#1A1A2E' }}>
             {value.mode === 'single' && value.singleNationality && (
-              <span>
+              <div>
                 All characters will have{' '}
-                <strong>
-                  {AVAILABLE_NATIONALITIES.find(n => n.value === value.singleNationality)?.label}
-                </strong>{' '}
-                names
-              </span>
+                <strong>{AVAILABLE_NATIONALITIES.find(n => n.value === value.singleNationality)?.label}</strong>
+                {' '}names
+              </div>
             )}
             {value.mode === 'mixed' && value.distribution && (
               <div>
@@ -401,7 +399,7 @@ export default function NationalitySelector({
                   const nat = AVAILABLE_NATIONALITIES.find(n => n.value === entry.nationality);
                   return (
                     <div key={index} style={{ marginBottom: '0.25rem' }}>
-                      {nat?.emoji} <strong>{entry.count}</strong> {nat?.label} character{entry.count !== 1 ? 's' : ''}
+                      {nat?.emoji} {entry.count} {nat?.label} character{entry.count !== 1 ? 's' : ''}
                     </div>
                   );
                 })}

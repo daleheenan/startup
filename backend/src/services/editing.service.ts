@@ -468,7 +468,7 @@ Return the proofread chapter with all corrections applied. Output only the corre
       throw new Error('Chapter content not found');
     }
 
-    if (!devEditResult.approved) {
+    if (devEditResult.approved) {
       throw new Error('Cannot revise without developmental editor feedback');
     }
 

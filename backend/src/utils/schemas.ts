@@ -121,7 +121,7 @@ export const generateConceptsSchema = z.object({
 export const refineConceptsSchema = z.object({
   preferences: z.any(), // Same as above
   existingConcepts: z.array(z.any()).min(1, 'At least one existing concept required'),
-  feedback: z.string().min(1, 'Feedback cannot be empty'),
+  feedback: z.string().trim().min(1, 'Feedback cannot be empty'),
 });
 
 // ============================================================================
