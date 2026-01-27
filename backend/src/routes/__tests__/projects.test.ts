@@ -169,10 +169,11 @@ describe('Projects API Routes', () => {
       }
 
       expect(response.status).toBe(200);
-      expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body.length).toBe(2);
-      expect(response.body[0].id).toBe('project-1');
-      expect(response.body[1].id).toBe('project-2');
+      expect(response.body.projects).toBeDefined();
+      expect(Array.isArray(response.body.projects)).toBe(true);
+      expect(response.body.projects.length).toBe(2);
+      expect(response.body.projects[0].id).toBe('project-1');
+      expect(response.body.projects[1].id).toBe('project-2');
     });
 
     it('should return empty array when no projects exist', async () => {
@@ -187,8 +188,9 @@ describe('Projects API Routes', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
-      expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body.length).toBe(0);
+      expect(response.body.projects).toBeDefined();
+      expect(Array.isArray(response.body.projects)).toBe(true);
+      expect(response.body.projects.length).toBe(0);
     });
 
     it('should parse JSON fields correctly', async () => {
@@ -230,11 +232,11 @@ describe('Projects API Routes', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
-      expect(response.body[0].story_bible).toEqual({
+      expect(response.body.projects[0].story_bible).toEqual({
         characters: [{ name: 'Hero' }],
         world: [{ name: 'Castle' }],
       });
-      expect(response.body[0].plot_structure).toEqual({
+      expect(response.body.projects[0].plot_structure).toEqual({
         acts: [{ name: 'Act 1' }],
       });
     });
@@ -279,7 +281,7 @@ describe('Projects API Routes', () => {
         .expect(200);
 
       // Should return null for invalid JSON
-      expect(response.body[0].story_bible).toBeNull();
+      expect(response.body.projects[0].story_bible).toBeNull();
     });
 
     it('should return 500 on database error', async () => {
@@ -1338,8 +1340,8 @@ describe('Projects API Routes', () => {
         .expect(200);
 
       // Should return null for corrupted JSON
-      expect(response.body[0].story_bible).toBeNull();
-      expect(response.body[0].plot_structure).toBeNull();
+      expect(response.body.projects[0].story_bible).toBeNull();
+      expect(response.body.projects[0].plot_structure).toBeNull();
     });
   });
 });

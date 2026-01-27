@@ -64,7 +64,7 @@ router.get('/book/:bookId', (req, res) => {
       rows = stmt.all(bookId, versionId);
     } else {
       // Get chapters for active version (or legacy chapters without version)
-      const stmt = db.prepare<[string, string], any>(`
+      const stmt = db.prepare<[string], any>(`
         SELECT c.* FROM chapters c
         LEFT JOIN book_versions bv ON c.version_id = bv.id
         WHERE c.book_id = ?

@@ -145,7 +145,7 @@ router.get('/', (req, res) => {
       };
     });
 
-    res.json(parsedProjects);
+    res.json({ projects: parsedProjects });
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack }, 'Error fetching projects');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });

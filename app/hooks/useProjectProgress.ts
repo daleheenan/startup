@@ -2,8 +2,7 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import type { CreationProgressData, CreationStep } from '@/shared/types';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+import { API_BASE_URL } from '@/app/lib/constants';
 
 // Flexible outline type that works with both full and partial Outline data
 // This allows pages with local Outline interfaces to work without type errors

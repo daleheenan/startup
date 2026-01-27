@@ -47,7 +47,7 @@ export class BookVersioningService {
    * This snapshots the current plot and outline, and makes the new version active
    */
   async createVersion(bookId: string, options: CreateVersionOptions = {}): Promise<BookVersion> {
-    logger.info(`Creating new version for book ${bookId}`, { options });
+    logger.info({ options }, `Creating new version for book ${bookId}`);
 
     const transaction = db.transaction(() => {
       // 1. Get book and project info
@@ -120,7 +120,7 @@ export class BookVersioningService {
       logger.info(`Created version ${version.version_number} for book ${bookId}`);
       return version;
     } catch (error: any) {
-      logger.error(`Failed to create version for book ${bookId}`, { error: error.message });
+      logger.error({ error: error.message }, `Failed to create version for book ${bookId}`);
       throw error;
     }
   }
@@ -189,7 +189,7 @@ export class BookVersioningService {
    * Cannot delete the only version or the active version (unless forced)
    */
   async deleteVersion(bookId: string, versionId: string, force: boolean = false): Promise<void> {
-    logger.info(`Deleting version ${versionId} for book ${bookId}`, { force });
+    logger.info({ force }, `Deleting version ${versionId} for book ${bookId}`);
 
     const transaction = db.transaction(() => {
       // Get version info

@@ -2,77 +2,82 @@
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-// Common colours (Tailwind-inspired palette)
+// Re-export design tokens for backwards compatibility
+// New code should import directly from design-tokens.ts
+export { borderRadius, shadows, spacing } from './design-tokens';
+import { colors as designColors } from './design-tokens';
+
+// Create a flattened colors object for backwards compatibility
+// Maps old flat property names to new nested structure
 export const colors = {
-  // Backgrounds
-  background: '#F8FAFC',
-  surface: '#FFFFFF',
-  surfaceAlt: '#F8FAFC',  // Alternate surface for nested elements
-  surfaceHover: '#F8FAFC',
+  // Include all the nested structure from design-tokens
+  ...designColors,
 
-  // Borders
-  border: '#E2E8F0',
-  borderHover: '#CBD5E1',
+  // Legacy flat property aliases
+  // Background colors
+  background: designColors.background.primary,
+  surface: designColors.background.surface,
+  surfaceAlt: designColors.background.secondary,
+  surfaceHover: designColors.background.surfaceHover,
+  overlay: designColors.background.overlay,
 
-  // Text
-  text: '#1A1A2E',
-  textSecondary: '#64748B',
-  textTertiary: '#94A3B8',
-  textDisabled: '#CBD5E1',
+  // Text colors
+  text: designColors.text.primary,
+  textPrimary: designColors.text.primary,
+  textSecondary: designColors.text.secondary,
+  textTertiary: designColors.text.tertiary,
+  textDisabled: designColors.text.disabled,
+  textInverse: designColors.text.inverse,
 
-  // Brand gradient
-  brandStart: '#667eea',
-  brandEnd: '#764ba2',
-  brandLight: '#EEF2FF',
-  brandBorder: '#C7D2FE',
-  brandText: '#4F46E5',
+  // Border colors
+  border: designColors.border.default,
+  borderHover: designColors.border.hover,
+  borderFocus: designColors.border.focus,
 
-  // Status colors
-  success: '#10B981',
-  successLight: '#D1FAE5',
-  successBorder: '#6EE7B7',
+  // Brand colors (flat aliases)
+  brandStart: designColors.brand.primary,
+  brandEnd: designColors.brand.primaryDark,
+  brandPrimary: designColors.brand.primary,
+  brandDark: designColors.brand.primaryDark,
+  brandLight: designColors.brand.primaryLight,
+  brandText: designColors.brand.primary, // alias for consistency
+  brandBorder: designColors.border.focus, // typically uses focus color
 
-  warning: '#F59E0B',
-  warningLight: '#FEF3C7',
-  warningBorder: '#FCD34D',
+  // Simple color names (legacy)
+  purple: designColors.brand.primary,
+  purpleLight: designColors.brand.primaryLight,
+  green: designColors.semantic.success,
+  blue: designColors.semantic.info,
+  yellow: designColors.semantic.warning,
+  red: designColors.semantic.error,
+  orange: designColors.semantic.warning,
+  gray: designColors.text.secondary,
 
-  error: '#DC2626',
-  errorLight: '#FEF2F2',
-  errorBorder: '#FECACA',
-
-  info: '#3B82F6',
-  infoLight: '#DBEAFE',
-  infoBorder: '#93C5FD',
-
-  // Specific UI colors
-  purple: '#667eea',
-  purpleLight: '#EEF2FF',
-  green: '#4ade80',
-  blue: '#60a5fa',
-  yellow: '#fbbf24',
-  red: '#ff6b6b',
-  orange: '#F59E0B',
-  gray: '#64748B',
+  // Semantic colors (flat aliases)
+  success: designColors.semantic.success,
+  successDark: designColors.semantic.successDark,
+  successLight: designColors.semantic.successLight,
+  successBorder: designColors.semantic.successBorder,
+  warning: designColors.semantic.warning,
+  warningDark: designColors.semantic.warningDark,
+  warningLight: designColors.semantic.warningLight,
+  warningBorder: designColors.semantic.warningBorder,
+  error: designColors.semantic.error,
+  errorDark: designColors.semantic.errorDark,
+  errorLight: designColors.semantic.errorLight,
+  errorBorder: designColors.semantic.errorBorder,
+  info: designColors.semantic.info,
+  infoDark: designColors.semantic.infoDark,
+  infoLight: designColors.semantic.infoLight,
+  infoBorder: designColors.semantic.infoBorder,
 };
 
-// Common style patterns
+// Legacy gradients object for backwards compatibility
+// Use colors.brand.gradient for new code
 export const gradients = {
-  brand: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  brand: designColors.brand.gradient,
+  primary: designColors.brand.gradient,
   success: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
   surface: 'rgba(255, 255, 255, 0.05)',
   surfaceLight: 'rgba(255, 255, 255, 0.03)',
-};
-
-export const shadows = {
-  sm: '0 1px 3px rgba(0,0,0,0.05)',
-  md: '0 4px 14px rgba(102, 126, 234, 0.3)',
-  lg: '0 4px 14px rgba(102, 126, 234, 0.4)',
-  error: '0 2px 8px rgba(220, 38, 38, 0.2)',
-};
-
-export const borderRadius = {
-  sm: '6px',
-  md: '8px',
-  lg: '12px',
-  full: '50%',
 };

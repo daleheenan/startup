@@ -51,11 +51,13 @@ interface MobileNavigationProps {
 
 export default function MobileNavigation({ children }: MobileNavigationProps) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [isOnline, setIsOnline] = useState(true);
+  const [isOnline, setIsOnline] = useState<boolean | null>(null); // null until mounted
+  const [isMounted, setIsMounted] = useState(false);
   const pathname = usePathname();
 
-  // Handle online/offline status
+  // Handle mounting and online/offline status
   useEffect(() => {
+    setIsMounted(true);
     setIsOnline(navigator.onLine);
 
     const handleOnline = () => setIsOnline(true);
@@ -198,30 +200,32 @@ export default function MobileNavigation({ children }: MobileNavigationProps) {
           NovelForge
         </Link>
 
-        {/* Online Status Indicator */}
-        <div
-          style={{
-            width: a11y.minTouchTarget,
-            height: a11y.minTouchTarget,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-          title={isOnline ? 'Online' : 'Offline'}
-        >
-          <span
+        {/* Online Status Indicator - only render after mount to avoid hydration mismatch */}
+        {isMounted && isOnline !== null && (
+          <div
             style={{
-              width: '10px',
-              height: '10px',
-              borderRadius: borderRadius.full,
-              background: isOnline ? colors.semantic.success : colors.semantic.error,
+              width: a11y.minTouchTarget,
+              height: a11y.minTouchTarget,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
-          />
-        </div>
+            title={isOnline ? 'Online' : 'Offline'}
+          >
+            <span
+              style={{
+                width: '10px',
+                height: '10px',
+                borderRadius: borderRadius.full,
+                background: isOnline ? colors.semantic.success : colors.semantic.error,
+              }}
+            />
+          </div>
+        )}
       </header>
 
-      {/* Offline Banner */}
-      {!isOnline && (
+      {/* Offline Banner - only render after mount to avoid hydration mismatch */}
+      {isMounted && isOnline === false && (
         <div
           style={{
             position: 'fixed',

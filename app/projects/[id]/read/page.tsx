@@ -163,11 +163,11 @@ export default function ReadBookPage() {
   };
 
   // Handle version selection change
-  const handleVersionChange = async (versionId: string) => {
+  const handleVersionChange = async (version: BookVersion) => {
     if (!selectedBookId) return;
-    setSelectedVersionId(versionId);
+    setSelectedVersionId(version.id);
     setSelectedChapter(null);
-    await fetchVersionsAndChapters(selectedBookId, versionId);
+    await fetchVersionsAndChapters(selectedBookId, version.id);
   };
 
   // Navigate chapters
@@ -292,8 +292,6 @@ export default function ReadBookPage() {
               <div style={{ marginBottom: '1rem' }}>
                 <BookVersionSelector
                   bookId={selectedBookId}
-                  versions={versions}
-                  selectedVersionId={selectedVersionId || undefined}
                   onVersionChange={handleVersionChange}
                   showCreateButton={false}
                 />

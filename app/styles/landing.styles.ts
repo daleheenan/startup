@@ -4,6 +4,7 @@
  */
 
 import { CSSProperties } from 'react';
+import { colors } from '@/app/lib/design-tokens';
 
 export const LANDING_STYLES = {
   main: {
@@ -25,14 +26,14 @@ export const LANDING_STYLES = {
   logo: {
     fontSize: '1.5rem',
     fontWeight: '700',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: colors.brand.gradient,
     WebkitBackgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
   } as CSSProperties,
 
   signInButton: {
     padding: '0.625rem 1.5rem',
-    background: '#667eea',
+    background: colors.brand.primary,
     color: '#FFFFFF',
     borderRadius: '6px',
     textDecoration: 'none',
@@ -64,7 +65,7 @@ export const LANDING_STYLES = {
 
   h1Gradient: {
     display: 'block',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: colors.brand.gradient,
     WebkitBackgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
   } as CSSProperties,
@@ -87,7 +88,7 @@ export const LANDING_STYLES = {
 
   ctaButton: {
     padding: '1rem 2.5rem',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: colors.brand.gradient,
     color: '#FFFFFF',
     borderRadius: '8px',
     textDecoration: 'none',
