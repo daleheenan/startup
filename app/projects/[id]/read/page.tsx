@@ -6,10 +6,26 @@ import Link from 'next/link';
 import PageLayout from '../../../components/shared/PageLayout';
 import LoadingState from '../../../components/shared/LoadingState';
 import ErrorMessage from '../../../components/shared/ErrorMessage';
+import BookVersionSelector from '../../../components/BookVersionSelector';
 import { fetchJson } from '../../../lib/fetch-utils';
+import { getToken } from '../../../lib/auth';
 import { useProjectNavigation } from '../../../hooks/useProjectProgress';
 import { colors, borderRadius } from '../../../lib/constants';
 import { card } from '../../../lib/styles';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+interface BookVersion {
+  id: string;
+  book_id: string;
+  version_number: number;
+  version_name: string | null;
+  is_active: number;
+  word_count: number;
+  chapter_count: number;
+  actual_chapter_count?: number;
+  actual_word_count?: number;
+}
 
 interface Chapter {
   id: string;
@@ -47,6 +63,8 @@ export default function ReadBookPage() {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
   const [selectedChapter, setSelectedChapter] = useState<Chapter | null>(null);
+  const [versions, setVersions] = useState<BookVersion[]>([]);
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,20 +88,8 @@ export default function ReadBookPage() {
         const firstBook = booksData[0];
         setSelectedBookId(firstBook.id);
 
-        // Fetch chapters for first book
-        const chaptersResponse = await fetchJson<{ chapters: Chapter[] } | Chapter[]>(
-          `/api/chapters/book/${firstBook.id}`
-        );
-        const chaptersData = Array.isArray(chaptersResponse)
-          ? chaptersResponse
-          : chaptersResponse?.chapters || [];
-        setChapters(chaptersData);
-
-        // Select first chapter with content
-        const firstWithContent = chaptersData.find(ch => ch.content);
-        if (firstWithContent) {
-          setSelectedChapter(firstWithContent);
-        }
+        // Fetch versions for the book
+        await fetchVersionsAndChapters(firstBook.id);
       }
     } catch (err: any) {
       console.error('Error fetching data:', err);
@@ -97,27 +103,71 @@ export default function ReadBookPage() {
     fetchData();
   }, [fetchData]);
 
-  // Handle book selection change
-  const handleBookChange = async (bookId: string) => {
-    setSelectedBookId(bookId);
-    setSelectedChapter(null);
-
+  // Fetch versions and chapters for a book
+  const fetchVersionsAndChapters = async (bookId: string, versionId?: string) => {
     try {
-      const chaptersResponse = await fetchJson<{ chapters: Chapter[] } | Chapter[]>(
-        `/api/chapters/book/${bookId}`
-      );
+      const token = getToken();
+
+      // Fetch versions
+      const versionsRes = await fetch(`${API_BASE_URL}/api/books/${bookId}/versions`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      let versionsData: BookVersion[] = [];
+      let activeVersionId: string | null = null;
+
+      if (versionsRes.ok) {
+        const data = await versionsRes.json();
+        versionsData = data.versions || [];
+        setVersions(versionsData);
+
+        // Find active version
+        const activeVersion = versionsData.find(v => v.is_active === 1);
+        activeVersionId = versionId || activeVersion?.id || null;
+        setSelectedVersionId(activeVersionId);
+      } else {
+        setVersions([]);
+        setSelectedVersionId(null);
+      }
+
+      // Fetch chapters (will automatically use active version)
+      const chaptersUrl = activeVersionId
+        ? `/api/chapters/book/${bookId}?versionId=${activeVersionId}`
+        : `/api/chapters/book/${bookId}`;
+
+      const chaptersResponse = await fetchJson<{ chapters: Chapter[] } | Chapter[]>(chaptersUrl);
       const chaptersData = Array.isArray(chaptersResponse)
         ? chaptersResponse
         : chaptersResponse?.chapters || [];
       setChapters(chaptersData);
 
+      // Select first chapter with content
       const firstWithContent = chaptersData.find(ch => ch.content);
       if (firstWithContent) {
         setSelectedChapter(firstWithContent);
+      } else {
+        setSelectedChapter(null);
       }
     } catch (err: any) {
-      console.error('Error fetching chapters:', err);
+      console.error('Error fetching versions/chapters:', err);
+      setChapters([]);
+      setSelectedChapter(null);
     }
+  };
+
+  // Handle book selection change
+  const handleBookChange = async (bookId: string) => {
+    setSelectedBookId(bookId);
+    setSelectedChapter(null);
+    await fetchVersionsAndChapters(bookId);
+  };
+
+  // Handle version selection change
+  const handleVersionChange = async (versionId: string) => {
+    if (!selectedBookId) return;
+    setSelectedVersionId(versionId);
+    setSelectedChapter(null);
+    await fetchVersionsAndChapters(selectedBookId, versionId);
   };
 
   // Navigate chapters
@@ -235,6 +285,19 @@ export default function ReadBookPage() {
                   </option>
                 ))}
               </select>
+            )}
+
+            {/* Version selector */}
+            {selectedBookId && versions.length > 1 && (
+              <div style={{ marginBottom: '1rem' }}>
+                <BookVersionSelector
+                  bookId={selectedBookId}
+                  versions={versions}
+                  selectedVersionId={selectedVersionId || undefined}
+                  onVersionChange={handleVersionChange}
+                  showCreateButton={false}
+                />
+              </div>
             )}
 
             {/* Chapter list */}

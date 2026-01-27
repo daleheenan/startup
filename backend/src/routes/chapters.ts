@@ -38,13 +38,45 @@ function parseChapterRow(row: any) {
 /**
  * GET /api/chapters/book/:bookId
  * Get all chapters for a book
+ * Query params:
+ * - versionId: Specific version to fetch (optional, defaults to active version)
+ * - allVersions: Set to 'true' to get all chapters regardless of version (legacy behavior)
  */
 router.get('/book/:bookId', (req, res) => {
   try {
-    const stmt = db.prepare<[string], any>(`
-      SELECT * FROM chapters WHERE book_id = ? ORDER BY chapter_number ASC
-    `);
-    const rows = stmt.all(req.params.bookId);
+    const bookId = req.params.bookId;
+    const versionId = req.query.versionId as string | undefined;
+    const allVersions = req.query.allVersions === 'true';
+
+    let rows: any[];
+
+    if (allVersions) {
+      // Legacy behavior - get all chapters regardless of version
+      const stmt = db.prepare<[string], any>(`
+        SELECT * FROM chapters WHERE book_id = ? ORDER BY chapter_number ASC
+      `);
+      rows = stmt.all(bookId);
+    } else if (versionId) {
+      // Get chapters for specific version
+      const stmt = db.prepare<[string, string], any>(`
+        SELECT * FROM chapters WHERE book_id = ? AND version_id = ? ORDER BY chapter_number ASC
+      `);
+      rows = stmt.all(bookId, versionId);
+    } else {
+      // Get chapters for active version (or legacy chapters without version)
+      const stmt = db.prepare<[string, string], any>(`
+        SELECT c.* FROM chapters c
+        LEFT JOIN book_versions bv ON c.version_id = bv.id
+        WHERE c.book_id = ?
+          AND (
+            c.version_id IS NULL
+            OR bv.is_active = 1
+          )
+        ORDER BY c.chapter_number ASC
+      `);
+      rows = stmt.all(bookId);
+    }
+
     const chapters = rows.map(parseChapterRow);
     res.json({ chapters });
   } catch (error: any) {
