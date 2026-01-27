@@ -22,7 +22,7 @@ export interface Project {
 
 export class ExportService {
   /**
-   * Clean content of any markdown artifacts or structural markers
+   * Clean content of any markdown artifacts, structural markers, and AI tells
    */
   private cleanContent(content: string): string {
     let cleaned = content;
@@ -41,6 +41,16 @@ export class ExportService {
 
     // Remove any remaining markdown-style formatting
     cleaned = cleaned.replace(/^[-*]\s+/gm, '');
+
+    // Replace em-dashes with appropriate punctuation (AI tell removal)
+    // Em-dash followed by space and lowercase = likely parenthetical, use comma
+    cleaned = cleaned.replace(/—\s+([a-z])/g, ', $1');
+    // Em-dash at end of sentence fragment = use period
+    cleaned = cleaned.replace(/—$/gm, '.');
+    // Remaining em-dashes = use comma
+    cleaned = cleaned.replace(/—/g, ', ');
+    // Clean up double commas that might result
+    cleaned = cleaned.replace(/,\s*,/g, ',');
 
     // Clean up multiple blank lines to single blank line
     cleaned = cleaned.replace(/\n{3,}/g, '\n\n');

@@ -165,6 +165,17 @@ Your task is to polish the chapter at the sentence and paragraph level:
 9. **Adjective/Adverb Overload**: Prune excessive modifiers - keep only what's essential
 10. **Dialogue Tags**: Reduce adverb-heavy dialogue tags (e.g., "she said angrily") - let dialogue speak for itself
 
+REMOVE AI WRITING TELLS (CRITICAL):
+- Replace ALL em-dashes (—) with commas, periods, or restructured sentences
+- Replace overused transitions: "however", "moreover", "furthermore", "additionally"
+- Remove "a sense of", "couldn't help but", "felt a wave of", "washed over"
+- Remove "the weight of" metaphors unless truly effective
+- Fix sentences starting with "As" or "While" if used repeatedly
+- Remove unnecessary qualifiers: "quite", "rather", "somewhat", "simply"
+- Vary sentence openings - not all should be subject-verb
+- Add natural contractions in dialogue and close POV
+- Break up lists of three consecutive adjectives/descriptions
+
 FORMATTING REQUIREMENT:
 - Output PURE PROSE only - like a professionally published novel
 - Remove any markdown formatting (#, ##, **, *, etc.) if present
@@ -325,15 +336,20 @@ Output only valid JSON, no commentary:`;
 
 Check and fix:
 1. **Grammar**: Subject-verb agreement, tense consistency, pronoun agreement
-2. **Punctuation**: Dialogue tags, commas, apostrophes, em-dashes
+2. **Punctuation**: Dialogue tags, commas, apostrophes
 3. **Spelling**: Consistent spelling of names and places
 4. **Style Guide**:
-   - Use em-dashes (—) not hyphens for interruptions
    - Dialogue: "Quote," tag. OR "Quote."
    - Numbers: spell out one through nine, use numerals for 10+
    - Oxford comma: use it
 5. **Formatting**: Consistent paragraph breaks, use blank lines for scene breaks
 6. **Capitalization**: Proper nouns, beginning of sentences
+
+AI WRITING TELLS - REMOVE OR REPLACE:
+- Replace ALL em-dashes (—) with commas, periods, or restructure the sentence
+- Em-dashes are a strong AI signal - professional editors avoid overusing them
+- If an em-dash creates a dramatic pause, use a period and new sentence instead
+- If an em-dash sets off a clause, use commas instead
 
 CRITICAL - Remove any non-prose elements:
 - Remove ALL markdown formatting (#, ##, **, *, _, etc.)
@@ -341,7 +357,7 @@ CRITICAL - Remove any non-prose elements:
 - The output should be pure prose like a professionally published novel
 - Scene transitions should be indicated by a blank line only, not text markers
 
-Make direct corrections. Do NOT change word choice, sentence structure, or prose style unless it's a clear grammatical error.`;
+Make direct corrections. Do NOT change word choice, sentence structure, or prose style unless it's a clear grammatical error or AI tell.`;
 
     const userPrompt = `Copy edit this chapter. Fix grammar, punctuation, and style issues.
 
@@ -397,7 +413,13 @@ Your task is to catch errors that previous editors may have missed:
 7. **Capitalization**: Inconsistent capitalization of proper nouns
 8. **Number Consistency**: Mixed use of numerals and spelled-out numbers
 9. **Quotation Marks**: Unclosed quotes, incorrect smart quotes
-10. **Em-dashes & Hyphens**: Ensure proper usage (em-dash for interruption, hyphen for compound words)
+
+FINAL AI TELL REMOVAL (CRITICAL):
+- Replace ANY remaining em-dashes (—) with commas, periods, or restructure
+- Flag and fix any remaining "however", "moreover", "furthermore" at sentence starts
+- Remove any "a sense of", "couldn't help but", "felt a wave of"
+- Ensure natural contractions are used in dialogue
+- Check for repetitive sentence structures
 
 CRITICAL FORMATTING CHECK:
 - Remove ANY remaining markdown formatting (#, ##, **, *, _, etc.)

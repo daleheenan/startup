@@ -973,8 +973,24 @@ function propagateCharacterNameChange(
   oldName: string,
   newName: string,
   options: { updateChapterContent?: boolean } = {}
-): { updatedSceneCards: number; updatedRelationships: number; updatedTimeline: number; updatedChapters: number } {
-  const stats = { updatedSceneCards: 0, updatedRelationships: 0, updatedTimeline: 0, updatedChapters: 0 };
+): {
+  updatedSceneCards: number;
+  updatedRelationships: number;
+  updatedTimeline: number;
+  updatedChapters: number;
+  updatedStoryConcept: boolean;
+  updatedPlotStructure: boolean;
+  updatedCharacterFields: number;
+} {
+  const stats = {
+    updatedSceneCards: 0,
+    updatedRelationships: 0,
+    updatedTimeline: 0,
+    updatedChapters: 0,
+    updatedStoryConcept: false,
+    updatedPlotStructure: false,
+    updatedCharacterFields: 0,
+  };
 
   if (oldName === newName) return stats;
 
@@ -1046,28 +1062,188 @@ function propagateCharacterNameChange(
     }
   }
 
-  // Update story bible (relationships, timeline)
+  // Update story bible, story concept, plot structure
   const projectStmt = db.prepare<[string], any>(`
-    SELECT story_bible, series_bible FROM projects WHERE id = ?
+    SELECT story_bible, series_bible, story_concept, plot_structure FROM projects WHERE id = ?
   `);
   const project = projectStmt.get(projectId);
+
+  // Create name replacement regex
+  const nameRegex = new RegExp(`\\b${escapeRegex(oldName)}\\b`, 'g');
+
+  // Update story_concept (logline, synopsis, hook, protagonistHint)
+  if (project?.story_concept) {
+    const storyConcept = safeJsonParse(project.story_concept, null);
+    if (storyConcept) {
+      let conceptChanged = false;
+      const textFields = ['logline', 'synopsis', 'hook', 'protagonistHint', 'title'];
+      for (const field of textFields) {
+        if (storyConcept[field] && typeof storyConcept[field] === 'string') {
+          const updated = storyConcept[field].replace(nameRegex, newName);
+          if (updated !== storyConcept[field]) {
+            storyConcept[field] = updated;
+            conceptChanged = true;
+          }
+        }
+      }
+      if (conceptChanged) {
+        const updateConceptStmt = db.prepare(`
+          UPDATE projects SET story_concept = ?, updated_at = ? WHERE id = ?
+        `);
+        updateConceptStmt.run(JSON.stringify(storyConcept), new Date().toISOString(), projectId);
+        stats.updatedStoryConcept = true;
+      }
+    }
+  }
+
+  // Update plot_structure (acts, plot points, character arcs within plot)
+  if (project?.plot_structure) {
+    const plotStructure = safeJsonParse(project.plot_structure, null);
+    if (plotStructure) {
+      let plotChanged = false;
+
+      // Recursively replace names in plot structure
+      const replaceInObject = (obj: any): boolean => {
+        let changed = false;
+        if (!obj || typeof obj !== 'object') return false;
+
+        if (Array.isArray(obj)) {
+          for (let i = 0; i < obj.length; i++) {
+            if (typeof obj[i] === 'string') {
+              const updated = obj[i].replace(nameRegex, newName);
+              if (updated !== obj[i]) {
+                obj[i] = updated;
+                changed = true;
+              }
+            } else if (typeof obj[i] === 'object') {
+              if (replaceInObject(obj[i])) changed = true;
+            }
+          }
+        } else {
+          for (const key of Object.keys(obj)) {
+            if (typeof obj[key] === 'string') {
+              const updated = obj[key].replace(nameRegex, newName);
+              if (updated !== obj[key]) {
+                obj[key] = updated;
+                changed = true;
+              }
+            } else if (typeof obj[key] === 'object') {
+              if (replaceInObject(obj[key])) changed = true;
+            }
+          }
+        }
+        return changed;
+      };
+
+      plotChanged = replaceInObject(plotStructure);
+
+      if (plotChanged) {
+        const updatePlotStmt = db.prepare(`
+          UPDATE projects SET plot_structure = ?, updated_at = ? WHERE id = ?
+        `);
+        updatePlotStmt.run(JSON.stringify(plotStructure), new Date().toISOString(), projectId);
+        stats.updatedPlotStructure = true;
+      }
+    }
+  }
 
   if (project?.story_bible) {
     const storyBible = safeJsonParse(project.story_bible, null);
     if (storyBible) {
-      // Update relationships in all characters
+      let bibleChanged = false;
+
+      // Update ALL characters' text fields (voiceSample, backstory, characterArc, physicalDescription, goals, conflicts)
+      // This catches references to the renamed character in OTHER characters' text
       for (const character of storyBible.characters || []) {
+        // Update character name if it's the one being renamed
+        if (character.name === oldName) {
+          character.name = newName;
+          bibleChanged = true;
+        }
+
+        // Update text fields that might reference the old name (in any character)
+        const textFields = ['voiceSample', 'backstory', 'characterArc', 'physicalDescription'];
+        for (const field of textFields) {
+          if (character[field] && typeof character[field] === 'string') {
+            const updated = character[field].replace(nameRegex, newName);
+            if (updated !== character[field]) {
+              character[field] = updated;
+              stats.updatedCharacterFields++;
+              bibleChanged = true;
+            }
+          }
+        }
+
+        // Update array fields (goals, conflicts) that might reference the character
+        const arrayFields = ['goals', 'conflicts', 'personalityTraits'];
+        for (const field of arrayFields) {
+          if (character[field] && Array.isArray(character[field])) {
+            for (let i = 0; i < character[field].length; i++) {
+              if (typeof character[field][i] === 'string') {
+                const updated = character[field][i].replace(nameRegex, newName);
+                if (updated !== character[field][i]) {
+                  character[field][i] = updated;
+                  stats.updatedCharacterFields++;
+                  bibleChanged = true;
+                }
+              }
+            }
+          }
+        }
+
+        // Update relationships
         if (character.relationships && Array.isArray(character.relationships)) {
           for (const rel of character.relationships) {
+            // Update characterName/characterId reference
             if (rel.characterName === oldName) {
               rel.characterName = newName;
               stats.updatedRelationships++;
+              bibleChanged = true;
+            }
+            // Update relationship description text
+            if (rel.description && typeof rel.description === 'string') {
+              const updated = rel.description.replace(nameRegex, newName);
+              if (updated !== rel.description) {
+                rel.description = updated;
+                stats.updatedRelationships++;
+                bibleChanged = true;
+              }
+            }
+          }
+        }
+
+        // Update currentState if present
+        if (character.currentState) {
+          const stateTextFields = ['location', 'emotionalState'];
+          for (const field of stateTextFields) {
+            if (character.currentState[field] && typeof character.currentState[field] === 'string') {
+              const updated = character.currentState[field].replace(nameRegex, newName);
+              if (updated !== character.currentState[field]) {
+                character.currentState[field] = updated;
+                stats.updatedCharacterFields++;
+                bibleChanged = true;
+              }
+            }
+          }
+          const stateArrayFields = ['goals', 'conflicts'];
+          for (const field of stateArrayFields) {
+            if (character.currentState[field] && Array.isArray(character.currentState[field])) {
+              for (let i = 0; i < character.currentState[field].length; i++) {
+                if (typeof character.currentState[field][i] === 'string') {
+                  const updated = character.currentState[field][i].replace(nameRegex, newName);
+                  if (updated !== character.currentState[field][i]) {
+                    character.currentState[field][i] = updated;
+                    stats.updatedCharacterFields++;
+                    bibleChanged = true;
+                  }
+                }
+              }
             }
           }
         }
       }
 
-      // Update timeline participants
+      // Update timeline participants and descriptions
       if (storyBible.timeline && Array.isArray(storyBible.timeline)) {
         for (const event of storyBible.timeline) {
           if (event.participants && Array.isArray(event.participants)) {
@@ -1075,16 +1251,71 @@ function propagateCharacterNameChange(
             if (idx !== -1) {
               event.participants[idx] = newName;
               stats.updatedTimeline++;
+              bibleChanged = true;
+            }
+          }
+          // Also update description text
+          if (event.description && typeof event.description === 'string') {
+            const updated = event.description.replace(nameRegex, newName);
+            if (updated !== event.description) {
+              event.description = updated;
+              stats.updatedTimeline++;
+              bibleChanged = true;
             }
           }
         }
       }
 
-      // Save updated story bible
-      const updateProjectStmt = db.prepare(`
-        UPDATE projects SET story_bible = ?, updated_at = ? WHERE id = ?
-      `);
-      updateProjectStmt.run(JSON.stringify(storyBible), new Date().toISOString(), projectId);
+      // Update world elements that might reference character names
+      if (storyBible.world) {
+        // Update locations
+        if (storyBible.world.locations && Array.isArray(storyBible.world.locations)) {
+          for (const loc of storyBible.world.locations) {
+            const locFields = ['description', 'significance'];
+            for (const field of locFields) {
+              if (loc[field] && typeof loc[field] === 'string') {
+                const updated = loc[field].replace(nameRegex, newName);
+                if (updated !== loc[field]) {
+                  loc[field] = updated;
+                  bibleChanged = true;
+                }
+              }
+            }
+          }
+        }
+
+        // Update factions
+        if (storyBible.world.factions && Array.isArray(storyBible.world.factions)) {
+          for (const faction of storyBible.world.factions) {
+            if (faction.description && typeof faction.description === 'string') {
+              const updated = faction.description.replace(nameRegex, newName);
+              if (updated !== faction.description) {
+                faction.description = updated;
+                bibleChanged = true;
+              }
+            }
+            if (faction.goals && Array.isArray(faction.goals)) {
+              for (let i = 0; i < faction.goals.length; i++) {
+                if (typeof faction.goals[i] === 'string') {
+                  const updated = faction.goals[i].replace(nameRegex, newName);
+                  if (updated !== faction.goals[i]) {
+                    faction.goals[i] = updated;
+                    bibleChanged = true;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Save updated story bible if any changes were made
+      if (bibleChanged) {
+        const updateProjectStmt = db.prepare(`
+          UPDATE projects SET story_bible = ?, updated_at = ? WHERE id = ?
+        `);
+        updateProjectStmt.run(JSON.stringify(storyBible), new Date().toISOString(), projectId);
+      }
     }
   }
 
@@ -1102,7 +1333,6 @@ function propagateCharacterNameChange(
           if (entry.development && Array.isArray(entry.development)) {
             for (const dev of entry.development) {
               if (dev.changes && typeof dev.changes === 'string') {
-                const nameRegex = new RegExp(`\\b${escapeRegex(oldName)}\\b`, 'g');
                 dev.changes = dev.changes.replace(nameRegex, newName);
               }
             }
@@ -1125,6 +1355,224 @@ function propagateCharacterNameChange(
  */
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Propagate world element name changes throughout the project
+ * Updates: scene_cards locations, story_bible references, story_concept, plot_structure, chapter content
+ */
+function propagateWorldNameChange(
+  projectId: string,
+  oldName: string,
+  newName: string,
+  options: { updateChapterContent?: boolean } = {}
+): {
+  updatedSceneCards: number;
+  updatedStoryBible: boolean;
+  updatedStoryConcept: boolean;
+  updatedPlotStructure: boolean;
+  updatedChapters: number;
+} {
+  const stats = {
+    updatedSceneCards: 0,
+    updatedStoryBible: false,
+    updatedStoryConcept: false,
+    updatedPlotStructure: false,
+    updatedChapters: 0,
+  };
+
+  if (oldName === newName) return stats;
+
+  const nameRegex = new RegExp(`\\b${escapeRegex(oldName)}\\b`, 'g');
+
+  // Get all books for this project
+  const booksStmt = db.prepare<[string], any>(`
+    SELECT id FROM books WHERE project_id = ?
+  `);
+  const books = booksStmt.all(projectId);
+
+  // Update scene cards in all chapters (location field)
+  for (const book of books) {
+    const chaptersStmt = db.prepare<[string], any>(`
+      SELECT id, scene_cards, content, summary FROM chapters WHERE book_id = ?
+    `);
+    const chapters = chaptersStmt.all(book.id);
+
+    for (const chapter of chapters) {
+      let needsUpdate = false;
+      let sceneCards = safeJsonParse(chapter.scene_cards, []);
+      let content = chapter.content || '';
+      let summary = chapter.summary || '';
+
+      // Update scene cards - location field
+      for (const scene of sceneCards) {
+        if (scene.location && typeof scene.location === 'string') {
+          const updated = scene.location.replace(nameRegex, newName);
+          if (updated !== scene.location) {
+            scene.location = updated;
+            stats.updatedSceneCards++;
+            needsUpdate = true;
+          }
+        }
+      }
+
+      // Optionally update chapter content
+      if (options.updateChapterContent && content) {
+        if (nameRegex.test(content)) {
+          content = content.replace(nameRegex, newName);
+          stats.updatedChapters++;
+          needsUpdate = true;
+        }
+        if (summary && nameRegex.test(summary)) {
+          summary = summary.replace(nameRegex, newName);
+          needsUpdate = true;
+        }
+      }
+
+      if (needsUpdate) {
+        const updateChapterStmt = db.prepare(`
+          UPDATE chapters SET scene_cards = ?, content = ?, summary = ?, updated_at = ? WHERE id = ?
+        `);
+        updateChapterStmt.run(
+          JSON.stringify(sceneCards),
+          content,
+          summary,
+          new Date().toISOString(),
+          chapter.id
+        );
+      }
+    }
+  }
+
+  // Update project fields
+  const projectStmt = db.prepare<[string], any>(`
+    SELECT story_bible, story_concept, plot_structure FROM projects WHERE id = ?
+  `);
+  const project = projectStmt.get(projectId);
+
+  // Update story_concept
+  if (project?.story_concept) {
+    const storyConcept = safeJsonParse(project.story_concept, null);
+    if (storyConcept) {
+      let conceptChanged = false;
+      const textFields = ['logline', 'synopsis', 'hook', 'protagonistHint', 'title'];
+      for (const field of textFields) {
+        if (storyConcept[field] && typeof storyConcept[field] === 'string') {
+          const updated = storyConcept[field].replace(nameRegex, newName);
+          if (updated !== storyConcept[field]) {
+            storyConcept[field] = updated;
+            conceptChanged = true;
+          }
+        }
+      }
+      if (conceptChanged) {
+        const updateConceptStmt = db.prepare(`
+          UPDATE projects SET story_concept = ?, updated_at = ? WHERE id = ?
+        `);
+        updateConceptStmt.run(JSON.stringify(storyConcept), new Date().toISOString(), projectId);
+        stats.updatedStoryConcept = true;
+      }
+    }
+  }
+
+  // Update plot_structure
+  if (project?.plot_structure) {
+    const plotStructure = safeJsonParse(project.plot_structure, null);
+    if (plotStructure) {
+      const replaceInObject = (obj: any): boolean => {
+        let changed = false;
+        if (!obj || typeof obj !== 'object') return false;
+
+        if (Array.isArray(obj)) {
+          for (let i = 0; i < obj.length; i++) {
+            if (typeof obj[i] === 'string') {
+              const updated = obj[i].replace(nameRegex, newName);
+              if (updated !== obj[i]) {
+                obj[i] = updated;
+                changed = true;
+              }
+            } else if (typeof obj[i] === 'object') {
+              if (replaceInObject(obj[i])) changed = true;
+            }
+          }
+        } else {
+          for (const key of Object.keys(obj)) {
+            if (typeof obj[key] === 'string') {
+              const updated = obj[key].replace(nameRegex, newName);
+              if (updated !== obj[key]) {
+                obj[key] = updated;
+                changed = true;
+              }
+            } else if (typeof obj[key] === 'object') {
+              if (replaceInObject(obj[key])) changed = true;
+            }
+          }
+        }
+        return changed;
+      };
+
+      if (replaceInObject(plotStructure)) {
+        const updatePlotStmt = db.prepare(`
+          UPDATE projects SET plot_structure = ?, updated_at = ? WHERE id = ?
+        `);
+        updatePlotStmt.run(JSON.stringify(plotStructure), new Date().toISOString(), projectId);
+        stats.updatedPlotStructure = true;
+      }
+    }
+  }
+
+  // Update story_bible (character text fields that might reference locations)
+  if (project?.story_bible) {
+    const storyBible = safeJsonParse(project.story_bible, null);
+    if (storyBible) {
+      let bibleChanged = false;
+
+      // Update character descriptions, backstories, etc. that might reference locations
+      for (const character of storyBible.characters || []) {
+        const textFields = ['backstory', 'physicalDescription', 'characterArc'];
+        for (const field of textFields) {
+          if (character[field] && typeof character[field] === 'string') {
+            const updated = character[field].replace(nameRegex, newName);
+            if (updated !== character[field]) {
+              character[field] = updated;
+              bibleChanged = true;
+            }
+          }
+        }
+        // Update currentState location
+        if (character.currentState?.location && typeof character.currentState.location === 'string') {
+          const updated = character.currentState.location.replace(nameRegex, newName);
+          if (updated !== character.currentState.location) {
+            character.currentState.location = updated;
+            bibleChanged = true;
+          }
+        }
+      }
+
+      // Update timeline descriptions
+      if (storyBible.timeline && Array.isArray(storyBible.timeline)) {
+        for (const event of storyBible.timeline) {
+          if (event.description && typeof event.description === 'string') {
+            const updated = event.description.replace(nameRegex, newName);
+            if (updated !== event.description) {
+              event.description = updated;
+              bibleChanged = true;
+            }
+          }
+        }
+      }
+
+      if (bibleChanged) {
+        const updateBibleStmt = db.prepare(`
+          UPDATE projects SET story_bible = ?, updated_at = ? WHERE id = ?
+        `);
+        updateBibleStmt.run(JSON.stringify(storyBible), new Date().toISOString(), projectId);
+        stats.updatedStoryBible = true;
+      }
+    }
+  }
+
+  return stats;
 }
 
 /**
@@ -1181,7 +1629,15 @@ router.put('/:id/characters/:characterId', (req, res) => {
     updateStmt.run(JSON.stringify(storyBible), new Date().toISOString(), projectId);
 
     // If name changed, propagate to scene cards and relationships
-    let propagationStats: { updatedSceneCards: number; updatedRelationships: number; updatedTimeline: number; updatedChapters: number } | null = null;
+    let propagationStats: {
+      updatedSceneCards: number;
+      updatedRelationships: number;
+      updatedTimeline: number;
+      updatedChapters: number;
+      updatedStoryConcept: boolean;
+      updatedPlotStructure: boolean;
+      updatedCharacterFields: number;
+    } | null = null;
     if (oldName && newName && oldName !== newName) {
       propagationStats = propagateCharacterNameChange(projectId, oldName, newName, {
         updateChapterContent: propagateToContent === 'true',
@@ -1862,11 +2318,13 @@ router.get('/:id/metrics', (req, res) => {
 /**
  * PUT /api/projects/:id/world/:elementId
  * Update a world element
+ * If name changes, propagates the change throughout the project
  */
 router.put('/:id/world/:elementId', (req, res) => {
   try {
     const { id: projectId, elementId } = req.params;
     const updatedElement = req.body;
+    const { propagateToContent } = req.query; // Optional: also update chapter content
 
     // Get current story bible
     const getStmt = db.prepare<[string], Project>(`
@@ -1895,6 +2353,10 @@ router.put('/:id/world/:elementId', (req, res) => {
       });
     }
 
+    const oldElement = storyBible.world[elemIndex];
+    const oldName = oldElement.name;
+    const newName = updatedElement.name;
+
     storyBible.world[elemIndex] = { ...storyBible.world[elemIndex], ...updatedElement };
 
     // Save to database
@@ -1906,7 +2368,19 @@ router.put('/:id/world/:elementId', (req, res) => {
 
     updateStmt.run(JSON.stringify(storyBible), new Date().toISOString(), projectId);
 
-    res.json(storyBible.world[elemIndex]);
+    // If name changed, propagate to all references
+    let propagationStats = null;
+    if (oldName && newName && oldName !== newName) {
+      propagationStats = propagateWorldNameChange(projectId, oldName, newName, {
+        updateChapterContent: propagateToContent === 'true',
+      });
+      logger.info({ projectId, oldName, newName, stats: propagationStats }, 'World element name propagated');
+    }
+
+    res.json({
+      element: storyBible.world[elemIndex],
+      propagation: propagationStats,
+    });
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack }, 'Error updating world element');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });

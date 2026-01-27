@@ -158,7 +158,21 @@ FORMATTING REQUIREMENTS (CRITICAL):
 - NO "Scene 1:", "Part 1:", or similar structural markers
 - Use scene breaks with a single blank line between scenes, nothing more
 - Start paragraphs with standard indentation (the system handles this)
-- Write flowing narrative prose that reads like a published book`;
+- Write flowing narrative prose that reads like a published book
+
+AVOID AI WRITING TELLS (CRITICAL):
+- NEVER use em-dashes (—) - use commas, periods, or restructure sentences instead
+- AVOID overusing "however", "moreover", "furthermore", "additionally", "certainly"
+- AVOID purple prose and overly ornate descriptions
+- AVOID starting sentences with "As" or "While" repeatedly
+- AVOID the phrase "a sense of" or "couldn't help but"
+- AVOID "felt a wave of" or "washed over" for emotions
+- AVOID "the weight of" as a metaphor
+- AVOID ending chapters with single-sentence paragraphs for dramatic effect
+- AVOID lists of three adjectives or descriptions in a row
+- USE varied sentence structures - not every sentence should be complex
+- USE contractions naturally in dialogue and close POV narration
+- PREFER simple, direct prose over elaborate constructions`;
   }
 
   /**
