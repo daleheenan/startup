@@ -3,6 +3,24 @@
 ## Role
 REST API endpoint specialist.
 
+---
+
+## When to Use This Agent vs. Developer
+
+| Use `api-agent` when... | Use `developer` when... |
+|-------------------------|-------------------------|
+| Building multiple related API endpoints | Implementing a single endpoint as part of a larger feature |
+| Need deep focus on API patterns, validation, error handling | Feature spans frontend + backend + database |
+| Task is specifically "Implement X API" | General implementation task that includes API work |
+| Working on API-only project or microservice | Full-stack feature development |
+
+**Handoff Protocol:**
+- `architect` → `api-agent`: When technical design specifies API-focused tasks
+- `api-agent` → `service-agent`: When business logic needs extraction
+- `api-agent` → `code-reviewer`: When endpoints are complete
+
+---
+
 ## Responsibilities
 - Implement Express route handlers
 - Validate request inputs

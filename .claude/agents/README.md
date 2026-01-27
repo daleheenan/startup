@@ -9,6 +9,7 @@ This directory contains reusable agent prompts for common tasks. Reference these
 | [project-director.md](project-director.md) | Executive orchestrator for complete projects | `Use project-director to implement [feature]` |
 | [sprint-orchestrator.md](sprint-orchestrator.md) | Execute single sprint with existing agents | `Run sprint-orchestrator for Sprint 1` |
 | [progress-reporter.md](progress-reporter.md) | Monitor active sprints and report progress | `Monitor sprint progress` |
+| [sprint-retrospective-facilitator.md](sprint-retrospective-facilitator.md) | End-of-sprint retrospectives with automated learning | `Facilitate retrospective for Sprint N` |
 
 ### Recommended Workflow
 
@@ -34,6 +35,12 @@ For large projects with multiple sprints:
 │  Monitors and reports       │  (polls during execution)
 │  progress to user           │
 └─────────────────────────────┘
+              │
+              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              SPRINT RETROSPECTIVE FACILITATOR                   │
+│     Gathers lessons, updates shared learning, tracks metrics    │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 **Benefits:**
@@ -41,18 +48,34 @@ For large projects with multiple sprints:
 - Real-time progress visibility
 - Natural decision points between sprints
 - Clear accountability per sprint
+- Continuous learning via retrospectives
 
 ## Development Agents
 
-| Agent | Purpose | Usage |
-|-------|---------|-------|
-| [developer.md](developer.md) | Feature implementation | `Implement [task]` |
-| [architect.md](architect.md) | Technical design, task breakdown | `Design architecture for [feature]` |
-| [api-agent.md](api-agent.md) | REST API endpoints | `Create API for [resource]` |
-| [frontend-agent.md](frontend-agent.md) | UI pages and components | `Build UI for [feature]` |
-| [schema-agent.md](schema-agent.md) | Database schemas and migrations | `Design schema for [feature]` |
-| [service-agent.md](service-agent.md) | Business logic with TDD | `Implement [service] with tests` |
-| [feature-builder.md](feature-builder.md) | 7-phase structured feature development | `Build feature: [description]` |
+| Agent | Purpose | When to Use |
+|-------|---------|-------------|
+| [developer.md](developer.md) | General feature implementation | Full-stack features, general coding tasks |
+| [implementation-engineer.md](implementation-engineer.md) | Complex implementations with best practices | Critical features, high-quality implementations |
+| [architect.md](architect.md) | Technical design, task breakdown | Before implementation, system design |
+| [api-agent.md](api-agent.md) | REST API endpoints | API-focused tasks, multiple endpoints |
+| [frontend-agent.md](frontend-agent.md) | UI pages and components | UI-focused tasks, SPA development |
+| [schema-agent.md](schema-agent.md) | Database schemas and migrations | Database-focused tasks, schema design |
+| [service-agent.md](service-agent.md) | Business logic with TDD | Complex business rules, financial calculations |
+| [integration-agent.md](integration-agent.md) | E2E testing and deployment | Cross-stack integration, E2E tests |
+| [feature-builder.md](feature-builder.md) | 7-phase structured feature development | Complex features needing structured approach |
+
+### Developer vs. Specialty Agent Decision Tree
+
+```
+Task involves multiple layers (frontend + backend + DB)?
+├── YES → Use developer
+└── NO → Task is focused on one layer?
+    ├── API endpoints → Use api-agent
+    ├── UI components → Use frontend-agent
+    ├── Database schema → Use schema-agent
+    ├── Business logic with TDD → Use service-agent
+    └── General implementation → Use developer
+```
 
 ## Quality Agents
 
@@ -67,15 +90,16 @@ For large projects with multiple sprints:
 | [code-simplifier.md](code-simplifier.md) | Refactor for clarity | `Simplify [code]` |
 | [code-optimizer.md](code-optimizer.md) | Performance optimization | `Optimize [code]` |
 
-## Security & Performance Agents
+## Security, Performance & Testing Agents
 
 | Agent | Purpose | Usage |
 |-------|---------|-------|
 | [pen-test.md](pen-test.md) | Security vulnerability scanning | `Pen test [feature]` |
 | [security-hardener.md](security-hardener.md) | Security assessment, hardening | `Harden [feature]` |
+| [performance-test-engineer.md](performance-test-engineer.md) | Load testing, benchmarks, baselines | `Performance test [endpoint]` |
 | [seo-architect.md](seo-architect.md) | Full-stack SEO optimization | `Optimize SEO for [pages]` |
 
-## Planning Agents
+## Planning & Design Agents
 
 | Agent | Purpose | Usage |
 |-------|---------|-------|
@@ -83,22 +107,21 @@ For large projects with multiple sprints:
 | [agile-product-strategist.md](agile-product-strategist.md) | Product roadmaps, sprint planning | `Plan sprints for [project]` |
 | [software-architect-designer.md](software-architect-designer.md) | SOLID architecture, system design | `Design [system]` |
 | [ux-design-specialist.md](ux-design-specialist.md) | UI/UX design, accessibility | `Design UX for [feature]` |
+| [documentation-agent.md](documentation-agent.md) | API docs, ADRs, README updates | `Document [feature]` |
 
-## Council/Political Agents
+## Deployment & Operations Agents
 
 | Agent | Purpose | Usage |
 |-------|---------|-------|
-| [meeting-assistant.md](meeting-assistant.md) | Analyze agendas, suggest scrutiny questions | `Analyze this meeting agenda` |
-| [council-motion.md](council-motion.md) | Draft formal council motions | `Draft a motion about [topic]` |
-| [lines-to-take.md](lines-to-take.md) | Create Q&A briefing documents | `Create lines to take on [topic]` |
+| [deployer.md](deployer.md) | Commit, push, deploy code | `Deploy [changes]` |
+| [deployment-monitor.md](deployment-monitor.md) | Health checks, monitoring | `Monitor deployment` |
+| [deployment-doctor.md](deployment-doctor.md) | Diagnose and fix deployment failures | `Fix deployment failure` |
 
-## Workflows
+## Maintenance Agents
 
-| Workflow | Purpose | Usage |
-|----------|---------|-------|
-| [feature-workflow.md](feature-workflow.md) | PM → Architect → Dev → Review → QA | `/feature-workflow [feature]` |
-| [qc-workflow.md](qc-workflow.md) | Optimizer → Tester → Bug Hunter → Security | `/qc-workflow` |
-| [design-workflow.md](design-workflow.md) | Complete UI/UX design implementation | `/design-workflow [feature]` |
+| Agent | Purpose | Usage |
+|-------|---------|-------|
+| [lessons-curator.md](lessons-curator.md) | Curate and maintain agent lessons | `Curate lessons` |
 
 ## How to Use
 
@@ -106,6 +129,20 @@ For large projects with multiple sprints:
 2. **Combine agents**: "Run the feature-builder agent, then the code-simplifier agent"
 3. **Use orchestration**: "Use project-director to implement [complex feature]"
 4. **Monitor progress**: Run progress-reporter alongside sprint-orchestrator
+
+## Workflows (See .claude/commands/)
+
+Workflows orchestrate multiple agents. They live in `.claude/commands/`:
+
+| Workflow | Purpose | Command |
+|----------|---------|---------|
+| project | Universal entry point for any requirement | `/project [requirement]` |
+| feature-workflow | PM → Architect → Dev → Review → QA | `/feature-workflow [feature]` |
+| qc-workflow | Optimizer → Tester → Bug Hunter → Security | `/qc-workflow [target]` |
+| ci-workflow | Pre-commit quality gate | `/ci-workflow [target]` |
+| deploy-workflow | Commit → Deploy → Monitor → Verify | `/deploy-workflow [message]` |
+| design-workflow | UX → Architect → Dev → QA → Verify | `/design-workflow [feature]` |
+| tech-request | Technical request without PM spec | `/tech-request [request]` |
 
 ## Adding New Agents
 
@@ -120,15 +157,26 @@ model: sonnet
 ---
 
 # Agent content here...
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/agent-name.lessons.md` and `.claude/lessons/shared.lessons.md`
+
+### Post-Task: Reflect and Record
+1. **Reflect**: What worked? What didn't?
+2. **Update Scores**: Increment scores for patterns that worked
+3. **Record New Lesson**: Append to lessons file with tags
 ```
+
+Don't forget to create a corresponding `.claude/lessons/agent-name.lessons.md` file!
 
 ## Agent Categories
 
-- **Orchestration**: project-director, sprint-orchestrator, progress-reporter
-- **Security**: pen-test, security-hardener
-- **Performance**: seo-architect, code-optimizer
-- **Code Quality**: code-simplifier, code-quality-inspector, bug-hunter
-- **Development Process**: feature-builder, developer, architect
-- **Testing**: qa-tester, qa-test-engineer, test-architect
-- **Planning**: pm-spec-writer, agile-product-strategist
-- **Content Generation**: council-motion, lines-to-take, meeting-assistant
+- **Orchestration**: project-director, sprint-orchestrator, progress-reporter, sprint-retrospective-facilitator
+- **Development**: developer, implementation-engineer, architect, api-agent, frontend-agent, schema-agent, service-agent, integration-agent, feature-builder
+- **Quality**: code-reviewer, qa-tester, qa-test-engineer, test-architect, bug-hunter, code-quality-inspector, code-simplifier, code-optimizer
+- **Security & Performance**: pen-test, security-hardener, performance-test-engineer, seo-architect
+- **Planning & Design**: pm-spec-writer, agile-product-strategist, software-architect-designer, ux-design-specialist, documentation-agent
+- **Deployment**: deployer, deployment-monitor, deployment-doctor
+- **Maintenance**: lessons-curator

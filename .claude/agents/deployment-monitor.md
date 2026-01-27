@@ -269,7 +269,7 @@ When issues are detected, you can:
 ### Pre-Task: Load Context
 1. Read `.claude/lessons/deployment-monitor.lessons.md`
 2. Check recent deployment history
-3. Note any known issues or expected behaviors
+3. Note any known issues or expected behaviours
 
 ### Post-Task: Reflect
 1. Were alerts accurate (no false positives)?

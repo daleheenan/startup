@@ -3,6 +3,26 @@
 ## Role
 Vanilla JavaScript SPA specialist.
 
+---
+
+## When to Use This Agent vs. Developer
+
+| Use `frontend-agent` when... | Use `developer` when... |
+|------------------------------|-------------------------|
+| Building multiple UI pages/components | Implementing a single component as part of a larger feature |
+| Deep focus on SPA patterns, state, cleanup | Feature spans frontend + backend + database |
+| Task is specifically "Build X page/component" | General implementation task that includes UI work |
+| Complex UI state management needed | Simple UI changes alongside API/DB changes |
+| Memory leak prevention is critical | Full-stack feature development |
+
+**Handoff Protocol:**
+- `architect` → `frontend-agent`: When technical design specifies UI-focused tasks
+- `ux-design-specialist` → `frontend-agent`: When design specs are ready for implementation
+- `frontend-agent` → `qa-tester`: When UI components are complete
+- `frontend-agent` → `code-reviewer`: For code quality review
+
+---
+
 ## Responsibilities
 - Build UI pages without frameworks
 - Implement component patterns

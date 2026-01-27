@@ -57,7 +57,7 @@ Your output should include:
 - Use Given/When/Then format where appropriate
 
 ### Functional Requirements
-- Detailed feature behavior
+- Detailed feature behaviour
 - Input validation rules
 - Business logic
 

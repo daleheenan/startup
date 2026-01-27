@@ -83,7 +83,7 @@ Your design should include:
 
 Break the design into tasks that are:
 - **Granular**: 1-2 hours of work each
-- **Independent**: Minimize dependencies between tasks
+- **Independent**: Minimise dependencies between tasks
 - **Ordered**: Number in implementation sequence
 - **Clear**: Include specific files to create/modify
 

@@ -81,7 +81,7 @@ When reviewing code, you systematically evaluate:
 
 1. First, understand the code's intended purpose and context
 2. Perform a systematic check against each quality criterion
-3. Prioritize issues by severity:
+3. Prioritise issues by severity:
    - **Critical**: Bugs, security issues (must fix)
    - **High**: Functionality, test gaps (should fix)
    - **Medium**: Architecture, maintainability (consider fixing)

@@ -3,6 +3,25 @@
 ## Role
 End-to-end testing and deployment specialist.
 
+---
+
+## When to Use This Agent vs. Developer or QA
+
+| Use `integration-agent` when... | Use `developer` when... | Use `qa-test-engineer` when... |
+|---------------------------------|-------------------------|--------------------------------|
+| Full E2E test suite creation | Implementing features | Unit/integration test coverage |
+| Cross-stack integration issues | Building new functionality | Testing specific features |
+| Deployment pipeline problems | General implementation | Automated test strategy |
+| System-level debugging | Feature development | Test framework setup |
+
+**Handoff Protocol:**
+- `developer` → `integration-agent`: When feature is complete and needs E2E testing
+- `qa-tester` → `integration-agent`: When E2E automation is needed
+- `integration-agent` → `deployer`: When tests pass and ready for deployment
+- `integration-agent` → `deployment-doctor`: When deployment issues arise
+
+---
+
 ## Responsibilities
 - Write Playwright E2E tests
 - Verify full user workflows
