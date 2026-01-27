@@ -90,6 +90,13 @@ export default function ProgressPage() {
   const [error, setError] = useState<string | null>(null);
   const [project, setProject] = useState<any>(null);
 
+  // Editing state for book details
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [editingAuthor, setEditingAuthor] = useState(false);
+  const [titleValue, setTitleValue] = useState('');
+  const [authorValue, setAuthorValue] = useState('');
+  const [saving, setSaving] = useState(false);
+
   // IMPORTANT: All hooks must be called before any early returns
   const navigation = useProjectNavigation(projectId, project);
 
@@ -204,6 +211,48 @@ export default function ProgressPage() {
       setError(err.message || 'Failed to load progress');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Initialize edit values when project loads
+  useEffect(() => {
+    if (project) {
+      setTitleValue(project.title || '');
+      setAuthorValue(project.author_name || '');
+    }
+  }, [project]);
+
+  const saveProjectDetails = async (field: 'title' | 'authorName', value: string) => {
+    setSaving(true);
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ [field]: value }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save');
+      }
+
+      // Update local state
+      setProject((prev: any) => ({
+        ...prev,
+        [field === 'authorName' ? 'author_name' : field]: value,
+      }));
+
+      // Close edit mode
+      if (field === 'title') setEditingTitle(false);
+      if (field === 'authorName') setEditingAuthor(false);
+    } catch (err) {
+      console.error('Error saving:', err);
+      alert('Failed to save changes');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -477,6 +526,156 @@ export default function ProgressPage() {
                   }}>
                     Your novel is ready to read and export.
                   </p>
+
+                  {/* Book Details Editor */}
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.7)',
+                    borderRadius: '8px',
+                    padding: '1rem',
+                    marginBottom: '1.5rem',
+                    textAlign: 'left',
+                  }}>
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <label style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>
+                        Book Title
+                      </label>
+                      {editingTitle ? (
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <input
+                            type="text"
+                            value={titleValue}
+                            onChange={(e) => setTitleValue(e.target.value)}
+                            style={{
+                              flex: 1,
+                              padding: '0.5rem',
+                              border: '1px solid #10B981',
+                              borderRadius: '4px',
+                              fontSize: '0.875rem',
+                            }}
+                          />
+                          <button
+                            onClick={() => saveProjectDetails('title', titleValue)}
+                            disabled={saving}
+                            style={{
+                              padding: '0.5rem 0.75rem',
+                              background: '#10B981',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: saving ? 'not-allowed' : 'pointer',
+                              fontSize: '0.75rem',
+                            }}
+                          >
+                            {saving ? '...' : 'Save'}
+                          </button>
+                          <button
+                            onClick={() => { setEditingTitle(false); setTitleValue(project?.title || ''); }}
+                            style={{
+                              padding: '0.5rem 0.75rem',
+                              background: '#E5E7EB',
+                              color: '#374151',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '0.75rem',
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontSize: '0.875rem', color: '#1A1A2E' }}>{project?.title || 'Untitled'}</span>
+                          <button
+                            onClick={() => setEditingTitle(true)}
+                            style={{
+                              padding: '0.25rem 0.5rem',
+                              background: 'transparent',
+                              color: '#10B981',
+                              border: '1px solid #10B981',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '0.7rem',
+                            }}
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>
+                        Author Name
+                      </label>
+                      {editingAuthor ? (
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <input
+                            type="text"
+                            value={authorValue}
+                            onChange={(e) => setAuthorValue(e.target.value)}
+                            placeholder="Enter author name for exports"
+                            style={{
+                              flex: 1,
+                              padding: '0.5rem',
+                              border: '1px solid #10B981',
+                              borderRadius: '4px',
+                              fontSize: '0.875rem',
+                            }}
+                          />
+                          <button
+                            onClick={() => saveProjectDetails('authorName', authorValue)}
+                            disabled={saving}
+                            style={{
+                              padding: '0.5rem 0.75rem',
+                              background: '#10B981',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: saving ? 'not-allowed' : 'pointer',
+                              fontSize: '0.75rem',
+                            }}
+                          >
+                            {saving ? '...' : 'Save'}
+                          </button>
+                          <button
+                            onClick={() => { setEditingAuthor(false); setAuthorValue(project?.author_name || ''); }}
+                            style={{
+                              padding: '0.5rem 0.75rem',
+                              background: '#E5E7EB',
+                              color: '#374151',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '0.75rem',
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontSize: '0.875rem', color: project?.author_name ? '#1A1A2E' : '#9CA3AF', fontStyle: project?.author_name ? 'normal' : 'italic' }}>
+                            {project?.author_name || 'Not set'}
+                          </span>
+                          <button
+                            onClick={() => setEditingAuthor(true)}
+                            style={{
+                              padding: '0.25rem 0.5rem',
+                              background: 'transparent',
+                              color: '#10B981',
+                              border: '1px solid #10B981',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '0.7rem',
+                            }}
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   <div style={{
                     display: 'flex',
                     gap: '1rem',

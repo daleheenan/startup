@@ -655,7 +655,7 @@ router.put('/:id', (req, res) => {
       return res.status(400).json({ error: validation.error });
     }
 
-    const { storyDNA, storyBible, status } = validation.data;
+    const { storyDNA, storyBible, status, title, authorName } = validation.data;
 
     // Whitelist of allowed update fields (prevents SQL injection)
     const updates: string[] = [];
@@ -675,6 +675,16 @@ router.put('/:id', (req, res) => {
     if (status !== undefined) {
       updates.push('status = ?');
       params.push(status);
+    }
+
+    if (title !== undefined) {
+      updates.push('title = ?');
+      params.push(title);
+    }
+
+    if (authorName !== undefined) {
+      updates.push('author_name = ?');
+      params.push(authorName);
     }
 
     if (updates.length === 0) {

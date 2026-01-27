@@ -17,6 +17,7 @@ export interface Project {
   genre: string;
   story_dna: any;
   story_bible: any;
+  author_name?: string | null;
 }
 
 export class ExportService {
@@ -76,7 +77,7 @@ export class ExportService {
               },
             }),
             new Paragraph({
-              text: 'by Your Name',
+              text: project.author_name ? `by ${project.author_name}` : '',
               alignment: AlignmentType.CENTER,
               spacing: {
                 after: convertInchesToTwip(0.5),
@@ -240,10 +241,12 @@ export class ExportService {
           align: 'center',
         });
         doc.moveDown();
-        doc.fontSize(14).text('by Your Name', {
-          align: 'center',
-        });
-        doc.moveDown();
+        if (project.author_name) {
+          doc.fontSize(14).text(`by ${project.author_name}`, {
+            align: 'center',
+          });
+          doc.moveDown();
+        }
         doc.fontSize(12).text(`Genre: ${project.genre}`, {
           align: 'center',
         });
