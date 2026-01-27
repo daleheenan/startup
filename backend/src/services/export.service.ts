@@ -64,6 +64,7 @@ export class ExportService {
   /**
    * Generate DOCX file for a project
    * Sprint 16: Include edited versions when available
+   * Sprint D: Only export chapters from active version of each book
    */
   async generateDOCX(projectId: string): Promise<Buffer> {
     // Get project and chapters
@@ -73,6 +74,7 @@ export class ExportService {
     }
 
     // Get chapters with edited versions if available
+    // Only get chapters from the active version (or legacy chapters without version)
     const chapters = db.prepare(`
       SELECT
         c.id,
@@ -83,7 +85,12 @@ export class ExportService {
       FROM chapters c
       JOIN books b ON c.book_id = b.id
       LEFT JOIN chapter_edits ce ON ce.chapter_id = c.id
+      LEFT JOIN book_versions bv ON c.version_id = bv.id
       WHERE b.project_id = ?
+        AND (
+          c.version_id IS NULL
+          OR bv.is_active = 1
+        )
       ORDER BY b.book_number, c.chapter_number
     `).all(projectId) as Chapter[];
 
@@ -232,6 +239,7 @@ export class ExportService {
   /**
    * Generate PDF file for a project
    * Sprint 16: Include edited versions when available
+   * Sprint D: Only export chapters from active version of each book
    */
   async generatePDF(projectId: string): Promise<Buffer> {
     return new Promise<Buffer>(async (resolve, reject) => {
@@ -243,6 +251,7 @@ export class ExportService {
         }
 
         // Get chapters with edited versions if available
+        // Only get chapters from the active version (or legacy chapters without version)
         const chapters = db.prepare(`
           SELECT
             c.id,
@@ -253,7 +262,12 @@ export class ExportService {
           FROM chapters c
           JOIN books b ON c.book_id = b.id
           LEFT JOIN chapter_edits ce ON ce.chapter_id = c.id
+          LEFT JOIN book_versions bv ON c.version_id = bv.id
           WHERE b.project_id = ?
+            AND (
+              c.version_id IS NULL
+              OR bv.is_active = 1
+            )
           ORDER BY b.book_number, c.chapter_number
         `).all(projectId) as Chapter[];
 

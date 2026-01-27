@@ -8,6 +8,7 @@ import GenerationProgress from '../../../components/GenerationProgress';
 import ProjectNavigation from '../../../components/shared/ProjectNavigation';
 import { useProjectNavigation } from '../../../hooks/useProjectProgress';
 import ConfirmDialog from '../../../components/shared/ConfirmDialog';
+import VersionPromptDialog from '../../../components/VersionPromptDialog';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -98,6 +99,13 @@ export default function OutlinePage() {
   const [generationStep, setGenerationStep] = useState<string>('');
   const [chaptersExist, setChaptersExist] = useState(false);
   const [hasQueuedJobs, setHasQueuedJobs] = useState(false);
+
+  // Version prompt state
+  const [versionPromptOpen, setVersionPromptOpen] = useState(false);
+  const [versioningStatus, setVersioningStatus] = useState<{
+    existingChapterCount: number;
+    existingWordCount: number;
+  } | null>(null);
 
   // Act management state
   const [editingActNumber, setEditingActNumber] = useState<number | null>(null);
@@ -331,16 +339,57 @@ export default function OutlinePage() {
   };
 
   const startGeneration = async () => {
-    if (!outline) return;
+    if (!outline || !book) return;
 
-    if (!confirm(`This will create ${outline.total_chapters} chapters and queue them for generation. Continue?`)) {
-      return;
+    // Check if versioning is needed
+    try {
+      const token = getToken();
+      const versionCheckRes = await fetch(`${API_BASE_URL}/api/books/${book.id}/versioning-status`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (versionCheckRes.ok) {
+        const status = await versionCheckRes.json();
+        if (status.required) {
+          // Show version prompt dialog
+          setVersioningStatus({
+            existingChapterCount: status.existingChapterCount,
+            existingWordCount: status.existingWordCount,
+          });
+          setVersionPromptOpen(true);
+          return;
+        }
+      }
+    } catch (err) {
+      console.error('Error checking versioning status:', err);
+      // Continue without versioning check
     }
+
+    // No existing content - proceed with normal generation
+    await doStartGeneration(false);
+  };
+
+  const doStartGeneration = async (createVersion: boolean, versionName?: string) => {
+    if (!outline) return;
 
     try {
       setIsGenerating(true);
       const token = getToken();
-      const response = await fetch(`${API_BASE_URL}/api/outlines/${outline.id}/start-generation`, {
+
+      const queryParams = new URLSearchParams();
+      if (createVersion) {
+        queryParams.set('createVersion', 'true');
+        if (versionName) {
+          queryParams.set('versionName', versionName);
+        }
+      }
+
+      const url = `${API_BASE_URL}/api/outlines/${outline.id}/start-generation${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -352,14 +401,22 @@ export default function OutlinePage() {
         throw new Error('Failed to start generation');
       }
 
-      alert('Chapter generation started! Check the queue for progress.');
-      router.push(`/projects/${projectId}`);
+      router.push(`/projects/${projectId}/progress`);
     } catch (err: any) {
       console.error('Error starting generation:', err);
       setError(err.message);
     } finally {
       setIsGenerating(false);
+      setVersionPromptOpen(false);
     }
+  };
+
+  const handleCreateNewVersion = (versionName: string) => {
+    doStartGeneration(true, versionName);
+  };
+
+  const handleOverwriteVersion = () => {
+    doStartGeneration(false);
   };
 
   // Act management functions
@@ -1337,6 +1394,16 @@ export default function OutlinePage() {
               confirmStyle={confirmDialog.confirmStyle}
               onConfirm={confirmDialog.onConfirm}
               onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+            />
+
+            {/* Version Prompt Dialog */}
+            <VersionPromptDialog
+              isOpen={versionPromptOpen}
+              existingChapterCount={versioningStatus?.existingChapterCount || 0}
+              existingWordCount={versioningStatus?.existingWordCount || 0}
+              onCreateNewVersion={handleCreateNewVersion}
+              onOverwrite={handleOverwriteVersion}
+              onCancel={() => setVersionPromptOpen(false)}
             />
           </div>
         </div>
