@@ -15,10 +15,13 @@ NovelForge is an AI-powered novel writing platform that transforms story ideas i
 | **Phase 1B: Quality & Testing** (Sprints 12-15) | 142 | ✅ Complete |
 | **Phase 2A: User Experience** (Sprints 16-19) | 161 | ✅ Complete |
 | **Phase 2B: Advanced Features** (Sprints 22-23, 26) | 112 | ✅ Complete |
-| **Phase 2C: Remaining** (Sprints 20-21, 24-25, 27-29, 31-32) | ~372 | ❌ Not Started |
+| **Phase 2C: Remaining** (Sprints 20-21, 24-25, 27-29, 31) | ~317 | ❌ Not Started |
+| **Phase 3B: Testing & Quality** (Sprints 34-37) | 190 | ❌ Not Started |
+| **Sprint 38: Post-Completion Features** | 35 | ❌ Not Started |
 | **Sprint 30: AI Agent Expansion** | 40 | ✅ Complete |
+| **Sprint 32: Virtual Editorial Board** | 55 | ✅ Complete |
 
-**Total Completed**: ~785 points | **Remaining**: ~332 points
+**Total Completed**: ~840 points | **Remaining**: ~557 points
 
 ---
 
@@ -241,20 +244,20 @@ NovelForge is an AI-powered novel writing platform that transforms story ideas i
 
 ---
 
-#### Sprint 32: Virtual Editorial Board (~55 points)
+#### Sprint 32: Virtual Editorial Board (~55 points) ✅ COMPLETED
 
 **Goal**: Post-manuscript AI review system with actionable feedback
 
 **Overview**: After the draft manuscript is completed, it is submitted to a Virtual Editorial Board (VEB) as a background job. The VEB consists of three distinct AI personas that analyze the manuscript and produce a comprehensive "Editorial Report."
 
-| Task | Points | Description |
-|------|--------|-------------|
-| VEB architecture design | 8 | Research approaches, design system |
-| Module A: Beta Swarm | 13 | Sentiment/engagement analysis |
-| Module B: Ruthless Editor | 13 | Structural analysis |
-| Module C: Market Analyst | 13 | Commercial viability |
-| Editorial Report UI | 5 | Display findings on dashboard |
-| Feedback submission system | 3 | Submit findings for rewrites |
+| Task | Points | Description | Status |
+|------|--------|-------------|--------|
+| VEB architecture design | 8 | Research approaches, design system | ✅ Done |
+| Module A: Beta Swarm | 13 | Sentiment/engagement analysis | ✅ Done |
+| Module B: Ruthless Editor | 13 | Structural analysis | ✅ Done |
+| Module C: Market Analyst | 13 | Commercial viability | ✅ Done |
+| Editorial Report UI | 5 | Display findings on dashboard | ✅ Done |
+| Feedback submission system | 3 | Submit findings for rewrites | ✅ Done |
 
 **Module A: Beta Swarm (Sentiment Analysis)**
 - Input: Raw chapter text
@@ -345,6 +348,222 @@ Completed Manuscript → Submit to VEB (Background Job)
 
 ---
 
+#### Sprint 34: Comprehensive Testing - Backend Unit Tests (~45 points)
+
+**Goal**: Achieve 80%+ unit test coverage on backend services and utilities
+
+**Current State Analysis**:
+- 29 backend test files covering ~30% of 96 source files
+- 13/40 services tested, 26 services untested
+- Core AI and generation services well-tested
+- New features (VEB, specialist agents) completely untested
+
+| Task | Points | Description |
+|------|--------|-------------|
+| VEB service tests | 8 | Test Virtual Editorial Board (Beta Swarm, Ruthless Editor, Market Analyst) |
+| Specialist agents tests | 6 | Test all 6 specialist agent implementations |
+| Generation pipeline tests | 8 | character-generator, world-generator, story-ideas-generator |
+| Analytics service tests | 5 | analyticsService, proseAnalyzer |
+| Plagiarism service tests | 5 | plagiarism-checker.service.ts |
+| Genre services tests | 5 | genre-conventions, genre-tropes |
+| Utility function tests | 5 | schemas, validation, genre-helpers, response-helpers |
+| Test data factories | 3 | Create reusable test data builders |
+
+**Test Infrastructure Improvements**:
+- Expand mock library in `backend/src/__mocks__/`
+- Create test data factories for Projects, Books, Chapters
+- Add Anthropic SDK mock for AI response simulation
+- Standardize async test patterns
+
+**Coverage Targets**:
+| Area | Current | Target |
+|------|---------|--------|
+| Services | 33% | 85% |
+| Utilities | 10% | 80% |
+| Overall Backend | 30% | 75% |
+
+---
+
+#### Sprint 35: Comprehensive Testing - Backend API/Route Tests (~40 points)
+
+**Goal**: Achieve comprehensive API endpoint test coverage
+
+**Current State Analysis**:
+- Only 4/30 routes have tests (health, concepts, 2 integration)
+- No route-level error handling tests
+- No authentication/authorization tests for protected routes
+
+| Task | Points | Description |
+|------|--------|-------------|
+| Generation routes tests | 8 | /generation, /outlines, /chapters endpoints |
+| Content CRUD routes tests | 8 | /projects, /books, /chapters CRUD operations |
+| Analysis routes tests | 6 | /plagiarism, /analytics endpoints |
+| Auth routes tests | 5 | /auth login, register, token refresh |
+| Export routes tests | 4 | /export PDF, DOCX, story bible |
+| VEB routes tests | 5 | /veb editorial board endpoints |
+| Error handling tests | 4 | 4xx/5xx responses, validation errors |
+
+**Test Patterns**:
+```typescript
+// Example route test structure
+describe('POST /api/generation/chapter', () => {
+  it('returns 401 without auth token', async () => {...});
+  it('returns 400 with invalid project ID', async () => {...});
+  it('queues generation job and returns 202', async () => {...});
+  it('returns 429 when rate limited', async () => {...});
+});
+```
+
+**Coverage Targets**:
+| Area | Current | Target |
+|------|---------|--------|
+| Routes | 13% | 90% |
+| Middleware | 50% | 90% |
+| Error Handling | 0% | 85% |
+
+---
+
+#### Sprint 36: Comprehensive Testing - Frontend Unit Tests (~50 points)
+
+**Goal**: Achieve 70%+ test coverage on frontend components and hooks
+
+**Current State Analysis**:
+- Only 4 test files for 100 source files (~4% coverage)
+- 6 custom hooks completely untested
+- 38 components untested
+- All pages untested
+
+| Task | Points | Description |
+|------|--------|-------------|
+| Custom hooks tests | 10 | useProjects, useProjectProgress, useWorkflowPrerequisites, useNavigationCounts, useOfflineChapter, useStoryIdeas |
+| API layer tests | 8 | api.ts, api-hooks.ts, fetch-utils.ts |
+| Core component tests | 12 | ChapterEditor, ProseStyleEditor, GenreBlender, TropeSelector, Modal, Toast |
+| Form component tests | 8 | All form inputs, validation, submission |
+| Navigation tests | 5 | PrimaryNavigationBar, MobileNavigation, breadcrumbs |
+| Utility tests | 4 | workflow-utils, plot-recommendations, constants |
+| Test utilities setup | 3 | MSW for API mocking, render helpers, query client wrapper |
+
+**Test Infrastructure**:
+- Configure MSW (Mock Service Worker) for API mocking
+- Create custom render wrapper with QueryClient
+- Add accessibility testing with jest-axe
+- Setup user-event for realistic interactions
+
+**Coverage Targets**:
+| Area | Current | Target |
+|------|---------|--------|
+| Hooks | 0% | 90% |
+| Components | 5% | 70% |
+| Utilities | 0% | 80% |
+| Overall Frontend | 4% | 65% |
+
+---
+
+#### Sprint 37: Integration & E2E Testing (~55 points)
+
+**Goal**: Establish comprehensive integration and end-to-end test suites
+
+**Current State Analysis**:
+- Only 2 integration tests exist (mysteries, trilogy)
+- No E2E testing framework configured
+- No user journey tests
+
+| Task | Points | Description |
+|------|--------|-------------|
+| Playwright setup | 5 | Configure Playwright for E2E testing |
+| Auth flow E2E | 8 | Login, logout, session management |
+| Project creation E2E | 8 | Full project setup workflow |
+| Generation pipeline E2E | 10 | Concept → Outline → Chapter generation |
+| Export workflow E2E | 5 | PDF/DOCX export validation |
+| Backend integration tests | 10 | Cross-service workflows, database transactions |
+| CI/CD test integration | 5 | GitHub Actions test runners |
+| Visual regression setup | 4 | Screenshot comparison for UI changes |
+
+**E2E Test Scenarios**:
+```
+1. New User Journey
+   - Register → Create Project → Generate Concept → View Dashboard
+
+2. Novel Generation Journey
+   - Select Project → Configure Settings → Generate Outline
+   → Generate Chapters → View Progress → Export
+
+3. Editing Workflow
+   - Open Chapter → Edit Content → Regenerate Section
+   → Compare Versions → Save Changes
+
+4. Analytics Journey
+   - Complete Novel → Trigger Analysis → View Pacing
+   → View Character Tracking → Export Report
+```
+
+**Infrastructure**:
+- Playwright config with multiple browsers (Chrome, Firefox, Safari)
+- Test database seeding scripts
+- CI pipeline with parallel test execution
+- Artifact storage for failure screenshots
+
+**Coverage Targets**:
+| Test Type | Current | Target |
+|-----------|---------|--------|
+| Integration Tests | 2 | 15+ |
+| E2E Scenarios | 0 | 10+ |
+| User Journeys | 0 | 5+ |
+
+---
+
+#### Sprint 38: Post-Completion Features (~35 points) ✅ COMPLETED
+
+**Goal**: Auto-trigger analytics and add sequel/series recommendations
+
+**Status**: COMPLETE - All features implemented
+
+**Feature 1: Auto-Analyze on Completion**
+
+| Task | Points | Description |
+|------|--------|-------------|
+| Completion detection | 5 | Detect when all chapters are written |
+| Auto-trigger analytics | 5 | Run "Analyze Book" automatically |
+| Save analysis results | 5 | Persist to database |
+| Analytics page display | 5 | Show saved results on Analytics page |
+| Re-analyze option | 3 | Manual re-trigger capability |
+
+**Workflow**:
+```
+All Chapters Written → Auto-detect Completion
+                           ↓
+                    Trigger Analytics Job
+                           ↓
+                    Save Results to DB
+                           ↓
+                    Display on Analytics Page
+```
+
+**Feature 2: Follow-Up Page (Sequel/Series Recommendations)**
+
+| Task | Points | Description |
+|------|--------|-------------|
+| Follow-up page UI | 5 | New page at /projects/[id]/follow-up |
+| Sequel story generator | 8 | AI-powered sequel recommendations |
+| Series arc planner | 5 | Trilogy/series structure suggestions |
+| Character continuation | 4 | Character arc extensions |
+
+**Follow-Up Page Content**:
+- **Sequel Ideas**: 3-5 story concepts that continue from the ending
+- **Unresolved Threads**: Plot threads that could be expanded
+- **Character Arcs**: How characters could develop in future books
+- **World Expansion**: Unexplored aspects of the world
+- **Series Structure**: Trilogy or 5-book series arc suggestions
+- **Tone Variations**: Alternative directions (darker sequel, spin-off, etc.)
+
+**AI Prompt Strategy**:
+- Analyze completed manuscript's ending, themes, character states
+- Identify unresolved subplots and world-building opportunities
+- Generate coherent continuation ideas that respect established canon
+- Suggest both direct sequels and spin-off possibilities
+
+---
+
 ## Bug Backlog
 
 ### Remaining Issues
@@ -377,7 +596,11 @@ Completed Manuscript → Submit to VEB (Background Job)
 
 | Metric | Current | Target |
 |--------|---------|--------|
-| Test Coverage | 70%+ | 80% |
+| Backend Test Coverage | 30% | 80% |
+| Frontend Test Coverage | 4% | 70% |
+| Backend Route Coverage | 13% | 90% |
+| Integration Tests | 2 | 15+ |
+| E2E Test Scenarios | 0 | 10+ |
 | TypeScript Strict | ✅ | ✅ |
 | Security Score | Medium | High |
 | Accessibility | WCAG AA | WCAG AA |
@@ -392,20 +615,28 @@ Completed Manuscript → Submit to VEB (Background Job)
 1. **Sprint 16**: Security Enhancements - Fix auth gaps
 2. **Sprint 20**: Revenue Infrastructure - Enable monetization
 
+### Phase 3B: Testing & Quality (Parallel with Phase 3)
+
+3. **Sprint 34**: Backend Unit Tests - Services and utilities (45 pts)
+4. **Sprint 35**: Backend API Tests - Route coverage (40 pts)
+5. **Sprint 36**: Frontend Unit Tests - Components and hooks (50 pts)
+6. **Sprint 37**: Integration & E2E Tests - User journeys (55 pts)
+
 ### Phase 4: Growth Features (3-6 months)
 
-3. **Sprint 31**: Competitor Analysis & Feature Parity *(NEW)*
-4. **Sprint 25**: Publishing & Marketing Tools
-5. **Sprint 28**: Publishing Platform Integration
+7. **Sprint 31**: Competitor Analysis & Feature Parity
+8. **Sprint 25**: Publishing & Marketing Tools
+9. **Sprint 28**: Publishing Platform Integration
+10. **Sprint 38**: Post-Completion Features - Auto-analytics, Follow-up page (35 pts) *(NEW)*
 
 ### Phase 5: Expansion (6-12 months)
 
-6. **Sprint 32**: Virtual Editorial Board *(NEW)*
-7. **Sprint 21**: Custom AI Training
-8. **Sprint 24**: Visual Enhancements
-9. **Sprint 27**: Collaboration Features
-10. **Sprint 29**: Community & Marketplace
-11. **Sprint 30**: AI Agent Expansion ✅ COMPLETED
+11. **Sprint 32**: Virtual Editorial Board ✅ COMPLETED
+12. **Sprint 21**: Custom AI Training
+13. **Sprint 24**: Visual Enhancements
+14. **Sprint 27**: Collaboration Features
+15. **Sprint 29**: Community & Marketplace
+16. **Sprint 30**: AI Agent Expansion ✅ COMPLETED
 
 ---
 
@@ -430,3 +661,4 @@ The project will achieve production readiness when:
 | 1.0 | 2026-01-24 | Initial Phase 2 roadmap |
 | 2.0 | 2026-01-25 | Added testing sprints 12-15 |
 | 3.0 | 2026-01-26 | Consolidated from multiple docs, updated completion status |
+| 4.0 | 2026-01-27 | Added comprehensive testing sprints (34-37), post-completion features (38) |

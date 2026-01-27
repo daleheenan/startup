@@ -128,6 +128,20 @@ export const PROJECT_NAV_TABS = [
     icon: '📊',
     workflowStep: 'analytics' as const,
   },
+  {
+    id: 'editorial-report',
+    label: 'Editorial',
+    route: '/editorial-report',
+    icon: '📋',
+    workflowStep: 'editorial-report' as const,
+  },
+  {
+    id: 'follow-up',
+    label: 'Follow-Up',
+    route: '/follow-up',
+    icon: '🚀',
+    workflowStep: 'follow-up' as const,
+  },
 ];
 
 /**

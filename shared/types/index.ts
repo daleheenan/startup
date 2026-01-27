@@ -1012,3 +1012,72 @@ export interface NavigationCounts {
   savedConcepts: number;
   activeProjects: number;
 }
+
+// Follow-Up Recommendations Types (Sprint 38)
+
+export interface SequelIdea {
+  title: string;
+  logline: string;
+  synopsis: string;
+  continuityNotes: string; // How it connects to the original
+  mainConflict: string;
+  potentialThemes: string[];
+}
+
+export interface UnresolvedThread {
+  thread: string;
+  introduction: { chapter: number; context: string };
+  expansionPotential: string;
+  suggestedResolution: string;
+}
+
+export interface CharacterContinuation {
+  characterName: string;
+  currentState: string;
+  potentialArcs: string[];
+  relationshipDevelopments: string[];
+  growthOpportunities: string[];
+}
+
+export interface WorldExpansion {
+  element: string;
+  type: 'location' | 'culture' | 'history' | 'magic_system' | 'technology' | 'faction' | 'other';
+  explorationIdeas: string[];
+  storyPotential: string;
+}
+
+export interface SeriesArcSuggestion {
+  structureType: 'trilogy' | 'five_book' | 'ongoing';
+  overallArc: string;
+  bookBreakdowns: Array<{
+    bookNumber: number;
+    workingTitle: string;
+    focus: string;
+    majorEvents: string[];
+  }>;
+  centralConflict: string;
+  thematicProgression: string[];
+}
+
+export interface ToneVariation {
+  variationType: 'darker' | 'lighter' | 'spin_off' | 'prequel' | 'parallel' | 'genre_shift';
+  description: string;
+  whatChanges: string[];
+  potentialStory: string;
+}
+
+export interface FollowUpRecommendations {
+  id: string;
+  projectId: string;
+  bookId: string;
+  status: 'pending' | 'generating' | 'completed' | 'failed';
+  generatedAt: string | null;
+  sequelIdeas: SequelIdea[];
+  unresolvedThreads: UnresolvedThread[];
+  characterContinuations: CharacterContinuation[];
+  worldExpansions: WorldExpansion[];
+  seriesStructure: SeriesArcSuggestion | null;
+  toneVariations: ToneVariation[];
+  inputTokens: number;
+  outputTokens: number;
+}

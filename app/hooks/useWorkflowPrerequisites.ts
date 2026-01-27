@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import type { Character, PlotStructure, StoryStructure } from '../../shared/types';
 
 // Flexible chapter type for the hook
@@ -30,7 +30,9 @@ export type WorkflowStep =
   | 'originality'
   | 'outline'
   | 'chapters'
-  | 'analytics';
+  | 'analytics'
+  | 'editorial-report'
+  | 'follow-up';
 
 // Project data structure expected by the hook
 export interface WorkflowProjectData {
@@ -217,6 +219,23 @@ function getMissingItemsForStep(
         missing.push('At least one generated chapter with content');
       }
       break;
+
+    case 'editorial-report':
+      // Need completed chapters with content for VEB analysis
+      const completedChapters = chapters?.filter(ch => ch.content && ch.content.length > 0) || [];
+      if (completedChapters.length === 0) {
+        missing.push('At least one completed chapter with content');
+      }
+      break;
+
+    case 'follow-up':
+      // Need all chapters completed (book complete) for follow-up recommendations
+      const allChapters = chapters || [];
+      const writtenChapters = allChapters.filter(ch => ch.content && ch.content.length > 0);
+      if (allChapters.length === 0 || writtenChapters.length < allChapters.length) {
+        missing.push('All chapters must be completed');
+      }
+      break;
   }
 
   return missing;
@@ -235,6 +254,8 @@ const WORKFLOW_STEPS: WorkflowStep[] = [
   'outline',
   'chapters',
   'analytics',
+  'editorial-report',
+  'follow-up',
 ];
 
 /**
@@ -250,6 +271,8 @@ const STEP_NAMES: Record<WorkflowStep, string> = {
   outline: 'Outline',
   chapters: 'Chapters',
   analytics: 'Analytics',
+  'editorial-report': 'Editorial Report',
+  'follow-up': 'Follow-Up Ideas',
 };
 
 /**
@@ -325,6 +348,18 @@ export function useWorkflowPrerequisites(
         requiresPrevious: 'chapters',
         missingItems: [],
       },
+      'editorial-report': {
+        isComplete: false,
+        isRequired: false, // Editorial report is optional
+        requiresPrevious: 'chapters',
+        missingItems: [],
+      },
+      'follow-up': {
+        isComplete: false,
+        isRequired: false, // Follow-up is optional
+        requiresPrevious: 'chapters',
+        missingItems: [],
+      },
     };
 
     if (!project) {
@@ -376,54 +411,58 @@ export function useWorkflowPrerequisites(
     const chaptersWithContent = chapters?.filter(ch => ch.content && ch.content.length > 0) || [];
     checks.analytics.isComplete = chaptersWithContent.length > 0;
 
+    // Check editorial-report completion (requires completed chapters)
+    checks['editorial-report'].missingItems = getMissingItemsForStep('editorial-report', project, outline, chapters);
+    checks['editorial-report'].isComplete = chaptersWithContent.length > 0;
+
+    // Check follow-up completion (requires ALL chapters to be written)
+    checks['follow-up'].missingItems = getMissingItemsForStep('follow-up', project, outline, chapters);
+    const allChaptersWritten = chapters && chapters.length > 0 &&
+      chapters.every(ch => ch.content && ch.content.length > 0);
+    checks['follow-up'].isComplete = allChaptersWritten || false;
+
     return checks;
   }, [project, outline, chapters]);
 
   // Helper: Can access a step?
-  const canAccess = useMemo(() => {
-    return (step: WorkflowStep): boolean => {
-      const check = prerequisites[step];
+  const canAccess = useCallback((step: WorkflowStep): boolean => {
+    const check = prerequisites[step];
 
-      // No previous requirement means always accessible
-      if (!check.requiresPrevious) {
-        return true;
-      }
+    // No previous requirement means always accessible
+    if (!check.requiresPrevious) {
+      return true;
+    }
 
-      // Check if previous step is complete
-      const previousCheck = prerequisites[check.requiresPrevious];
-      return previousCheck.isComplete;
-    };
+    // Check if previous step is complete
+    const previousCheck = prerequisites[check.requiresPrevious];
+    return previousCheck.isComplete;
   }, [prerequisites]);
 
   // Helper: Get blocking reason
-  const getBlockingReason = useMemo(() => {
-    return (step: WorkflowStep): string | null => {
-      if (canAccess(step)) {
-        return null;
-      }
+  const getBlockingReason = useCallback((step: WorkflowStep): string | null => {
+    if (canAccess(step)) {
+      return null;
+    }
 
-      const check = prerequisites[step];
-      if (!check.requiresPrevious) {
-        return null;
-      }
+    const check = prerequisites[step];
+    if (!check.requiresPrevious) {
+      return null;
+    }
 
-      const previousCheck = prerequisites[check.requiresPrevious];
-      const previousStepName = STEP_NAMES[check.requiresPrevious];
-      const missingItems = previousCheck.missingItems;
+    const previousCheck = prerequisites[check.requiresPrevious];
+    const previousStepName = STEP_NAMES[check.requiresPrevious];
+    const missingItems = previousCheck.missingItems;
 
-      if (missingItems.length > 0) {
-        return `Complete ${previousStepName} first. Missing: ${missingItems.join(', ')}`;
-      }
+    if (missingItems.length > 0) {
+      return `Complete ${previousStepName} first. Missing: ${missingItems.join(', ')}`;
+    }
 
-      return `Complete ${previousStepName} before accessing this step`;
-    };
+    return `Complete ${previousStepName} before accessing this step`;
   }, [prerequisites, canAccess]);
 
   // Helper: Get missing items for a step
-  const getMissingItems = useMemo(() => {
-    return (step: WorkflowStep): string[] => {
-      return prerequisites[step].missingItems;
-    };
+  const getMissingItems = useCallback((step: WorkflowStep): string[] => {
+    return prerequisites[step].missingItems;
   }, [prerequisites]);
 
   // Determine current step (first incomplete required step)

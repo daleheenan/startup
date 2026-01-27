@@ -17,11 +17,52 @@ if (process.env.NODE_ENV !== 'test') {
   console.log('[Server] DATABASE_PATH:', process.env.DATABASE_PATH);
 }
 
+// Validate critical environment variables at startup
+function validateEnvironment(): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  // Required in production
+  if (process.env.NODE_ENV === 'production') {
+    if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY === 'placeholder-key-will-be-set-later') {
+      errors.push('ANTHROPIC_API_KEY is required in production');
+    }
+    if (!process.env.JWT_SECRET) {
+      errors.push('JWT_SECRET is required in production');
+    }
+    if (!process.env.OWNER_PASSWORD_HASH) {
+      errors.push('OWNER_PASSWORD_HASH is required in production');
+    }
+  }
+
+  // Warn about missing optional but recommended vars
+  if (!process.env.DATABASE_PATH && process.env.NODE_ENV === 'production') {
+    console.warn('[Server] WARNING: DATABASE_PATH not set, using default location');
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+// Run environment validation
+if (process.env.NODE_ENV !== 'test') {
+  const envValidation = validateEnvironment();
+  if (!envValidation.valid) {
+    console.error('[Server] Environment validation failed:');
+    envValidation.errors.forEach(err => console.error(`  - ${err}`));
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[Server] Exiting due to missing required environment variables');
+      process.exit(1);
+    } else {
+      console.warn('[Server] Continuing with warnings in development mode');
+    }
+  }
+}
+
 // Import database and migrations after env is loaded
 import { runMigrations } from './db/migrate.js';
 import { queueWorker } from './queue/worker.js';
 import { requireAuth } from './middleware/auth.js';
 import { logger, requestLogger } from './services/logger.service.js';
+import { RateLimitConfig } from './config/rate-limits.config.js';
 import authRouter from './routes/auth.js';
 import healthRouter from './routes/health.js';
 import progressRouter from './routes/progress.js';
@@ -51,6 +92,8 @@ import userSettingsRouter from './routes/user-settings.js';
 import storyIdeasRouter from './routes/story-ideas.js';
 import authorsRouter from './routes/authors.js';
 import plagiarismRouter from './routes/plagiarism.js';
+import vebRouter from './routes/veb.js';
+import completionRouter from './routes/completion.js';
 
 // Run database migrations
 try {
@@ -105,8 +148,8 @@ app.use(requestLogger());
 
 // Rate limiting for auth endpoints
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // 10 attempts per window
+  windowMs: RateLimitConfig.AUTH.WINDOW_MS,
+  max: RateLimitConfig.AUTH.MAX_REQUESTS,
   message: { error: { code: 'RATE_LIMITED', message: 'Too many login attempts, please try again later' } },
   standardHeaders: true,
   legacyHeaders: false,
@@ -114,8 +157,8 @@ const authLimiter = rateLimit({
 
 // General API rate limiting
 const apiLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 100, // 100 requests per minute
+  windowMs: RateLimitConfig.API.WINDOW_MS,
+  max: RateLimitConfig.API.MAX_REQUESTS,
   message: { error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down' } },
   standardHeaders: true,
   legacyHeaders: false,
@@ -155,6 +198,8 @@ app.use('/api/user-settings', apiLimiter, requireAuth, userSettingsRouter);
 app.use('/api/story-ideas', apiLimiter, requireAuth, storyIdeasRouter);
 app.use('/api/authors', apiLimiter, requireAuth, authorsRouter);
 app.use('/api/plagiarism', apiLimiter, requireAuth, plagiarismRouter);
+app.use('/api/completion', apiLimiter, requireAuth, completionRouter);
+app.use('/api', apiLimiter, requireAuth, vebRouter); // VEB routes use /api/projects/:id/veb/* and /api/veb/*
 
 // Sentry error handler - must be BEFORE custom error handlers
 app.use(sentryErrorHandler());
@@ -173,25 +218,54 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
+// Track server readiness state
+let serverReady = false;
+let queueWorkerReady = false;
+
 // Start server
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   logger.info({
     port: PORT,
     frontend: FRONTEND_URL,
     environment: process.env.NODE_ENV || 'development',
     logLevel: logger.level,
   }, 'NovelForge Backend Server started');
+  serverReady = true;
 
-  // Start queue worker
-  logger.info('Starting queue worker');
-  queueWorker.start().catch((error) => {
-    logger.error({ error }, 'Queue worker failed to start');
-    if (error instanceof Error) {
-      captureException(error, { context: 'queue_worker_startup' });
-    }
-    process.exit(1);
+  // Start queue worker after server is listening
+  // Use setImmediate to ensure server is fully bound before starting worker
+  setImmediate(() => {
+    logger.info('Starting queue worker');
+    queueWorker.start()
+      .then(() => {
+        queueWorkerReady = true;
+        logger.info('Queue worker started successfully');
+      })
+      .catch((error) => {
+        logger.error({ error }, 'Queue worker failed to start');
+        if (error instanceof Error) {
+          captureException(error, { context: 'queue_worker_startup' });
+        }
+        // In production, exit on queue worker failure
+        // In development, log but continue (allows debugging)
+        if (process.env.NODE_ENV === 'production') {
+          logger.error('Exiting due to queue worker failure in production');
+          process.exit(1);
+        } else {
+          logger.warn('Continuing despite queue worker failure in development mode');
+        }
+      });
   });
 });
+
+// Export readiness check for health endpoints
+export function isServerReady(): boolean {
+  return serverReady;
+}
+
+export function isQueueWorkerReady(): boolean {
+  return queueWorkerReady;
+}
 
 // Graceful shutdown
 async function shutdown(signal: string) {

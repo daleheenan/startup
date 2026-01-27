@@ -201,7 +201,18 @@ export type JobType =
   | 'dialogue_review'
   | 'hook_review'
   | 'generate_summary'
-  | 'update_states';
+  | 'update_states'
+  // VEB (Virtual Editorial Board) job types
+  | 'veb_beta_swarm'
+  | 'veb_ruthless_editor'
+  | 'veb_market_analyst'
+  | 'veb_finalize'
+  // Sprint 38: Post-Completion Features
+  | 'analyze_book'
+  | 'generate_follow_up'
+  // Background validation checks (triggered when plot layers saved)
+  | 'coherence_check'
+  | 'originality_check';
 
 export type JobStatus = 'pending' | 'running' | 'completed' | 'paused' | 'failed';
 
@@ -904,4 +915,73 @@ export interface BatchPlagiarismResult {
   flaggedCount: number;
   averageOriginalityScore: number;
   results: PlagiarismCheckResult[];
+}
+
+// Sprint 38: Post-Completion Features Types
+
+export interface SequelIdea {
+  title: string;
+  logline: string;
+  synopsis: string;
+  continuityNotes: string; // How it connects to the original
+  mainConflict: string;
+  potentialThemes: string[];
+}
+
+export interface UnresolvedThread {
+  thread: string;
+  introduction: { chapter: number; context: string };
+  expansionPotential: string;
+  suggestedResolution: string;
+}
+
+export interface CharacterContinuation {
+  characterName: string;
+  currentState: string;
+  potentialArcs: string[];
+  relationshipDevelopments: string[];
+  growthOpportunities: string[];
+}
+
+export interface WorldExpansion {
+  element: string;
+  type: 'location' | 'culture' | 'history' | 'magic_system' | 'technology' | 'faction' | 'other';
+  explorationIdeas: string[];
+  storyPotential: string;
+}
+
+export interface SeriesArcSuggestion {
+  structureType: 'trilogy' | 'five_book' | 'ongoing';
+  overallArc: string;
+  bookBreakdowns: Array<{
+    bookNumber: number;
+    workingTitle: string;
+    focus: string;
+    majorEvents: string[];
+  }>;
+  centralConflict: string;
+  thematicProgression: string[];
+}
+
+export interface ToneVariation {
+  variationType: 'darker' | 'lighter' | 'spin_off' | 'prequel' | 'parallel' | 'genre_shift';
+  description: string;
+  whatChanges: string[];
+  potentialStory: string;
+}
+
+export interface FollowUpRecommendations {
+  id: string;
+  projectId: string;
+  bookId: string;
+  status: 'pending' | 'generating' | 'completed' | 'failed';
+  generatedAt: string | null;
+  sequelIdeas: SequelIdea[];
+  unresolvedThreads: UnresolvedThread[];
+  characterContinuations: CharacterContinuation[];
+  worldExpansions: WorldExpansion[];
+  seriesStructure: SeriesArcSuggestion | null;
+  toneVariations: ToneVariation[];
+  inputTokens: number;
+  outputTokens: number;
 }

@@ -205,7 +205,17 @@ router.get('/book/:bookId', (req, res) => {
       return sendNotFound(res, 'Book analytics');
     }
 
-    res.json({ analytics: parseAnalyticsRow(analytics) });
+    // Also get completion status to indicate if this is from auto-analysis
+    const completion = db.prepare('SELECT * FROM book_completion WHERE book_id = ?').get(req.params.bookId) as any;
+
+    res.json({
+      analytics: parseAnalyticsRow(analytics),
+      completion: completion ? {
+        completedAt: completion.completed_at,
+        analyticsStatus: completion.analytics_status,
+        analyticsCompletedAt: completion.analytics_completed_at,
+      } : null,
+    });
   } catch (error: any) {
     sendInternalError(res, error, 'fetching book analytics');
   }

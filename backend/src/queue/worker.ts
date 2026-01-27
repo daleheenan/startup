@@ -5,6 +5,7 @@ import type { Job, JobType, JobStatus } from '../shared/types/index.js';
 import { randomUUID } from 'crypto';
 import { createLogger } from '../services/logger.service.js';
 import { extractJsonObject } from '../utils/json-extractor.js';
+import { QueueConfig } from '../config/queue.config.js';
 
 const logger = createLogger('queue:worker');
 
@@ -20,7 +21,7 @@ const logger = createLogger('queue:worker');
 export class QueueWorker {
   private isRunning = false;
   private currentJob: Job | null = null;
-  private pollIntervalMs = 1000; // Check queue every second
+  private pollIntervalMs = QueueConfig.POLL_INTERVAL_MS;
   private shutdownPromise: Promise<void> | null = null;
   private shutdownResolve: (() => void) | null = null;
 
@@ -71,13 +72,13 @@ export class QueueWorker {
       this.shutdownResolve = resolve;
       logger.info({ jobId: this.currentJob?.id }, 'Waiting for job to complete...');
 
-      // Timeout after 60 seconds
+      // Timeout after configured period
       setTimeout(() => {
         if (this.currentJob) {
           logger.warn(`[QueueWorker] Timeout waiting for job ${this.currentJob.id}, forcing shutdown`);
         }
         resolve();
-      }, 60000);
+      }, QueueConfig.GRACEFUL_SHUTDOWN_TIMEOUT_MS);
     });
 
     return this.shutdownPromise;
@@ -198,6 +199,25 @@ export class QueueWorker {
         return await this.generateSummary(job);
       case 'update_states':
         return await this.updateStates(job);
+      // VEB (Virtual Editorial Board) job types
+      case 'veb_beta_swarm':
+        return await this.vebBetaSwarm(job);
+      case 'veb_ruthless_editor':
+        return await this.vebRuthlessEditor(job);
+      case 'veb_market_analyst':
+        return await this.vebMarketAnalyst(job);
+      case 'veb_finalize':
+        return await this.vebFinalize(job);
+      // Sprint 38: Post-Completion Features (TODO: implement methods)
+      // case 'analyze_book':
+      //   return await this.analyzeBook(job);
+      // case 'generate_follow_up':
+      //   return await this.generateFollowUp(job);
+      // Background validation checks
+      case 'coherence_check':
+        return await this.coherenceCheck(job);
+      case 'originality_check':
+        return await this.originalityCheck(job);
       default:
         throw new Error(`Unknown job type: ${job.type}`);
     }
@@ -1042,6 +1062,555 @@ Output only valid JSON, no commentary:`;
     logger.info({ chapterId }, 'Chapter marked as completed');
   }
 
+  // ==========================================================================
+  // VEB (Virtual Editorial Board) Handlers
+  // ==========================================================================
+
+  /**
+   * VEB Module A: Beta Swarm - Reader engagement analysis
+   * target_id = report ID
+   */
+  private async vebBetaSwarm(job: Job): Promise<void> {
+    const reportId = job.target_id;
+    logger.info({ reportId }, 'veb_beta_swarm: Starting Beta Swarm analysis');
+
+    try {
+      // Import VEB service dynamically
+      const { vebService } = await import('../services/veb.service.js');
+
+      checkpointManager.saveCheckpoint(job.id, 'started', { reportId });
+
+      // Run the Beta Swarm analysis
+      const result = await vebService.runBetaSwarm(reportId);
+
+      logger.info({
+        reportId,
+        overallEngagement: result.overallEngagement,
+        chaptersAnalyzed: result.chapterResults.length
+      }, 'veb_beta_swarm: Completed Beta Swarm analysis');
+
+      checkpointManager.saveCheckpoint(job.id, 'completed', { reportId });
+    } catch (error) {
+      logger.error({ error, reportId }, 'veb_beta_swarm: Error in Beta Swarm analysis');
+      throw error;
+    }
+  }
+
+  /**
+   * VEB Module B: Ruthless Editor - Structural analysis
+   * target_id = report ID
+   */
+  private async vebRuthlessEditor(job: Job): Promise<void> {
+    const reportId = job.target_id;
+    logger.info({ reportId }, 'veb_ruthless_editor: Starting Ruthless Editor analysis');
+
+    try {
+      const { vebService } = await import('../services/veb.service.js');
+
+      checkpointManager.saveCheckpoint(job.id, 'started', { reportId });
+
+      const result = await vebService.runRuthlessEditor(reportId);
+
+      logger.info({
+        reportId,
+        overallStructureScore: result.overallStructureScore,
+        chaptersAnalyzed: result.chapterResults.length
+      }, 'veb_ruthless_editor: Completed Ruthless Editor analysis');
+
+      checkpointManager.saveCheckpoint(job.id, 'completed', { reportId });
+    } catch (error) {
+      logger.error({ error, reportId }, 'veb_ruthless_editor: Error in Ruthless Editor analysis');
+      throw error;
+    }
+  }
+
+  /**
+   * VEB Module C: Market Analyst - Commercial viability
+   * target_id = report ID
+   */
+  private async vebMarketAnalyst(job: Job): Promise<void> {
+    const reportId = job.target_id;
+    logger.info({ reportId }, 'veb_market_analyst: Starting Market Analyst analysis');
+
+    try {
+      const { vebService } = await import('../services/veb.service.js');
+
+      checkpointManager.saveCheckpoint(job.id, 'started', { reportId });
+
+      const result = await vebService.runMarketAnalyst(reportId);
+
+      logger.info({
+        reportId,
+        commercialViabilityScore: result.commercialViabilityScore,
+        compTitles: result.compTitles.length
+      }, 'veb_market_analyst: Completed Market Analyst analysis');
+
+      checkpointManager.saveCheckpoint(job.id, 'completed', { reportId });
+    } catch (error) {
+      logger.error({ error, reportId }, 'veb_market_analyst: Error in Market Analyst analysis');
+      throw error;
+    }
+  }
+
+  /**
+   * VEB Finalize - Aggregate results and generate overall report
+   * target_id = report ID
+   */
+  private async vebFinalize(job: Job): Promise<void> {
+    const reportId = job.target_id;
+    logger.info({ reportId }, 'veb_finalize: Starting report finalization');
+
+    try {
+      const { vebService } = await import('../services/veb.service.js');
+
+      checkpointManager.saveCheckpoint(job.id, 'started', { reportId });
+
+      const report = await vebService.finalizeReport(reportId);
+
+      logger.info({
+        reportId,
+        overallScore: report.overallScore,
+        status: report.status
+      }, 'veb_finalize: Completed report finalization');
+
+      checkpointManager.saveCheckpoint(job.id, 'completed', { reportId });
+    } catch (error) {
+      logger.error({ error, reportId }, 'veb_finalize: Error finalizing report');
+      throw error;
+    }
+  }
+
+  // ==========================================================================
+  // Background Validation Checks (triggered when plot layers saved)
+  // ==========================================================================
+
+  /**
+   * Coherence check - validates plots align with story concept
+   * target_id = project ID
+   */
+  private async coherenceCheck(job: Job): Promise<void> {
+    const projectId = job.target_id;
+    logger.info({ projectId }, 'coherence_check: Starting coherence validation');
+
+    try {
+      checkpointManager.saveCheckpoint(job.id, 'started', { projectId });
+
+      // Get project data
+      const projectStmt = db.prepare<[string], any>(`
+        SELECT title, genre, story_dna, story_bible, plot_structure FROM projects WHERE id = ?
+      `);
+      const project = projectStmt.get(projectId);
+
+      if (!project) {
+        throw new Error('Project not found');
+      }
+
+      const storyDNA = project.story_dna ? JSON.parse(project.story_dna) : null;
+      const storyBible = project.story_bible ? JSON.parse(project.story_bible) : null;
+      const plotStructure = project.plot_structure ? JSON.parse(project.plot_structure) : { plot_layers: [] };
+
+      // If no plot layers, save a simple result
+      if (!plotStructure.plot_layers || plotStructure.plot_layers.length === 0) {
+        const checkId = randomUUID();
+        const now = new Date().toISOString();
+
+        db.prepare(`
+          INSERT INTO coherence_checks (id, project_id, checked_at, status, is_coherent, warnings, suggestions, plot_analysis)
+          VALUES (?, ?, ?, 'completed', 0, ?, ?, '[]')
+        `).run(
+          checkId, projectId, now,
+          JSON.stringify(['No plots defined. Your story needs at least a main plot to generate a quality outline.']),
+          JSON.stringify(['Visit the Plot page to define your main plot and subplots.'])
+        );
+
+        logger.info({ projectId, checkId }, 'coherence_check: No plots to validate');
+        checkpointManager.saveCheckpoint(job.id, 'completed', { projectId, checkId });
+        return;
+      }
+
+      // Check for main plot
+      const hasMainPlot = plotStructure.plot_layers.some((l: any) => l.type === 'main');
+      const warnings: string[] = [];
+      const suggestions: string[] = [];
+
+      if (!hasMainPlot) {
+        warnings.push('No main plot (golden thread) defined. Every novel needs a central narrative arc.');
+        suggestions.push('Convert one of your subplots to main plot, or create a new main plot that ties everything together.');
+      }
+
+      // Build context for AI validation
+      const storyContext = `
+Title: ${project.title}
+Genre: ${project.genre}
+${storyDNA?.themes?.length > 0 ? `Themes: ${storyDNA.themes.join(', ')}` : ''}
+${storyDNA?.tone ? `Tone: ${storyDNA.tone}` : ''}
+${storyBible?.characters?.length > 0 ? `Main Characters: ${storyBible.characters.slice(0, 5).map((c: any) => c.name).join(', ')}` : ''}
+      `.trim();
+
+      const plotSummaries = plotStructure.plot_layers.map((p: any) =>
+        `- ${p.name} (${p.type}): ${p.description}`
+      ).join('\n');
+
+      checkpointManager.saveCheckpoint(job.id, 'context_built', { projectId });
+
+      // Use Claude to validate coherence
+      const { default: Anthropic } = await import('@anthropic-ai/sdk');
+      const anthropic = new Anthropic();
+
+      const message = await anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        temperature: 0.3,
+        messages: [{
+          role: 'user',
+          content: `You are a story coherence validator. Analyse whether these plots fit the story concept.
+
+**Story Context:**
+${storyContext}
+
+**Defined Plots:**
+${plotSummaries}
+
+Evaluate:
+1. Does each plot fit the genre (${project.genre})?
+2. Are plots thematically consistent with the story?
+3. Are there any plots that seem out of place or contradictory?
+4. Are character arcs connected to characters in the story?
+
+Return ONLY a JSON object:
+{
+  "isCoherent": true/false,
+  "plotAnalysis": [
+    {
+      "plotName": "Plot name",
+      "isCoherent": true/false,
+      "reason": "Brief explanation"
+    }
+  ],
+  "overallWarnings": ["Any warnings about the plot structure"],
+  "suggestions": ["Actionable suggestions for improvement"]
+}`,
+        }],
+      });
+
+      const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+
+      let analysis: any = { isCoherent: hasMainPlot, plotAnalysis: [], overallWarnings: [], suggestions: [] };
+      if (jsonMatch) {
+        try {
+          analysis = JSON.parse(jsonMatch[0]);
+        } catch (e) {
+          logger.warn({ projectId }, 'coherence_check: Failed to parse AI response');
+        }
+      }
+
+      // Merge AI analysis with basic checks
+      const finalWarnings = [...warnings, ...(analysis.overallWarnings || [])];
+      const finalSuggestions = [...suggestions, ...(analysis.suggestions || [])];
+
+      // Check for incoherent individual plots
+      const incoherentPlots = (analysis.plotAnalysis || []).filter((p: any) => !p.isCoherent);
+      incoherentPlots.forEach((p: any) => {
+        finalWarnings.push(`"${p.plotName}" may not fit: ${p.reason}`);
+      });
+
+      const isCoherent = hasMainPlot && (analysis.isCoherent ?? true) && incoherentPlots.length === 0;
+
+      // Save the result
+      const checkId = randomUUID();
+      const now = new Date().toISOString();
+
+      db.prepare(`
+        INSERT INTO coherence_checks (id, project_id, checked_at, status, is_coherent, warnings, suggestions, plot_analysis)
+        VALUES (?, ?, ?, 'completed', ?, ?, ?, ?)
+      `).run(
+        checkId, projectId, now, isCoherent ? 1 : 0,
+        JSON.stringify(finalWarnings),
+        JSON.stringify(finalSuggestions),
+        JSON.stringify(analysis.plotAnalysis || [])
+      );
+
+      logger.info({ projectId, checkId, isCoherent, warningCount: finalWarnings.length }, 'coherence_check: Completed');
+      checkpointManager.saveCheckpoint(job.id, 'completed', { projectId, checkId });
+    } catch (error) {
+      // Save failed check
+      const checkId = randomUUID();
+      const now = new Date().toISOString();
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+
+      db.prepare(`
+        INSERT INTO coherence_checks (id, project_id, checked_at, status, is_coherent, warnings, suggestions, plot_analysis, error)
+        VALUES (?, ?, ?, 'failed', 0, '[]', '[]', '[]', ?)
+      `).run(checkId, projectId, now, errorMsg);
+
+      logger.error({ error, projectId }, 'coherence_check: Error');
+      throw error;
+    }
+  }
+
+  /**
+   * Originality check - validates story concept for originality
+   * target_id = project ID
+   */
+  private async originalityCheck(job: Job): Promise<void> {
+    const projectId = job.target_id;
+    logger.info({ projectId }, 'originality_check: Starting originality validation');
+
+    try {
+      checkpointManager.saveCheckpoint(job.id, 'started', { projectId });
+
+      // Import plagiarism service
+      const { plagiarismCheckerService } = await import('../services/plagiarism-checker.service.js');
+
+      // Get project data
+      const projectStmt = db.prepare<[string], any>(`
+        SELECT title, story_concept, source_concept_id FROM projects WHERE id = ?
+      `);
+      const project = projectStmt.get(projectId);
+
+      if (!project) {
+        throw new Error('Project not found');
+      }
+
+      const storyConcept = project.story_concept ? JSON.parse(project.story_concept) : null;
+
+      if (!storyConcept) {
+        logger.info({ projectId }, 'originality_check: No story concept, skipping');
+        checkpointManager.saveCheckpoint(job.id, 'completed', { projectId, skipped: true });
+        return;
+      }
+
+      // Run the plagiarism/originality check using checkRawContent
+      const result = await plagiarismCheckerService.checkRawContent({
+        title: project.title || storyConcept.title,
+        logline: storyConcept.logline,
+        synopsis: storyConcept.synopsis,
+        hook: storyConcept.hook,
+        protagonistHint: storyConcept.protagonistHint,
+      });
+
+      // Save result to plagiarism_checks table (using project_id as content_id)
+      const checkId = randomUUID();
+      const now = new Date().toISOString();
+
+      db.prepare(`
+        INSERT INTO plagiarism_checks (id, content_type, content_id, checked_at, status, originality_score, similar_works, flags, recommendations, analysis_details)
+        VALUES (?, 'concept', ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        checkId,
+        projectId,
+        now,
+        result.status,
+        JSON.stringify(result.originalityScore),
+        JSON.stringify(result.similarWorks),
+        JSON.stringify(result.flags),
+        JSON.stringify(result.recommendations),
+        JSON.stringify(result.analysisDetails)
+      );
+
+      logger.info({
+        projectId,
+        checkId,
+        overallScore: result.originalityScore.overall,
+        status: result.status
+      }, 'originality_check: Completed');
+
+      checkpointManager.saveCheckpoint(job.id, 'completed', { projectId, checkId });
+    } catch (error) {
+      logger.error({ error, projectId }, 'originality_check: Error');
+      throw error;
+    }
+  }
+
+  // ==========================================================================
+  // Sprint 38: Post-Completion Features Handlers
+  // ==========================================================================
+
+  /**
+   * Analyze a completed book and cache the results
+   * target_id = book ID
+   */
+  private async analyzeBook(job: Job): Promise<void> {
+    const bookId = job.target_id;
+    logger.info({ bookId }, 'analyze_book: Starting book analysis');
+
+    try {
+      // Import services dynamically
+      const { AnalyticsService } = await import('../services/analyticsService.js');
+      const { completionDetectionService } = await import('../services/completion-detection.service.js');
+
+      checkpointManager.saveCheckpoint(job.id, 'started', { bookId });
+
+      // Get all chapters for this book
+      const chaptersStmt = db.prepare<[string], any>(`
+        SELECT id, content, scene_cards FROM chapters WHERE book_id = ? ORDER BY chapter_number
+      `);
+      const chapters = chaptersStmt.all(bookId);
+
+      if (chapters.length === 0) {
+        throw new Error('No chapters found for this book');
+      }
+
+      logger.info({ bookId, chapterCount: chapters.length }, 'analyze_book: Analyzing chapters');
+
+      // Analyse each chapter
+      const chapterAnalytics: any[] = [];
+
+      for (const chapter of chapters) {
+        if (!chapter.content) continue;
+
+        const sceneCards = chapter.scene_cards ? JSON.parse(chapter.scene_cards) : [];
+        const analytics = await AnalyticsService.analyzeChapter(chapter.id, chapter.content, sceneCards);
+
+        // Upsert chapter analytics
+        const existingAnalytics = db.prepare('SELECT id FROM chapter_analytics WHERE chapter_id = ?').get(chapter.id);
+
+        if (existingAnalytics) {
+          db.prepare(`
+            UPDATE chapter_analytics
+            SET pacing_score = ?, pacing_data = ?, character_screen_time = ?,
+                dialogue_percentage = ?, dialogue_word_count = ?, narrative_word_count = ?,
+                readability_score = ?, avg_sentence_length = ?, complex_word_percentage = ?,
+                tension_score = ?, tension_arc = ?, updated_at = datetime('now')
+            WHERE chapter_id = ?
+          `).run(
+            analytics.pacing_score,
+            JSON.stringify(analytics.pacing_data),
+            JSON.stringify(analytics.character_screen_time),
+            analytics.dialogue_percentage,
+            analytics.dialogue_word_count,
+            analytics.narrative_word_count,
+            analytics.readability_score,
+            analytics.avg_sentence_length,
+            analytics.complex_word_percentage,
+            analytics.tension_score,
+            JSON.stringify(analytics.tension_arc),
+            chapter.id
+          );
+        } else {
+          db.prepare(`
+            INSERT INTO chapter_analytics (
+              id, chapter_id, pacing_score, pacing_data, character_screen_time,
+              dialogue_percentage, dialogue_word_count, narrative_word_count,
+              readability_score, avg_sentence_length, complex_word_percentage,
+              tension_score, tension_arc
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            randomUUID(), chapter.id,
+            analytics.pacing_score, JSON.stringify(analytics.pacing_data),
+            JSON.stringify(analytics.character_screen_time),
+            analytics.dialogue_percentage, analytics.dialogue_word_count, analytics.narrative_word_count,
+            analytics.readability_score, analytics.avg_sentence_length, analytics.complex_word_percentage,
+            analytics.tension_score, JSON.stringify(analytics.tension_arc)
+          );
+        }
+
+        chapterAnalytics.push(analytics);
+      }
+
+      checkpointManager.saveCheckpoint(job.id, 'chapters_analyzed', { bookId, chapterCount: chapterAnalytics.length });
+
+      // Calculate book-level analytics
+      const bookStmt = db.prepare<[string], { genre: string }>(`
+        SELECT p.genre FROM books b JOIN projects p ON b.project_id = p.id WHERE b.id = ?
+      `);
+      const book = bookStmt.get(bookId);
+      const genre = book?.genre || 'general';
+
+      const bookAnalytics = AnalyticsService.calculateBookAnalytics(chapterAnalytics, genre);
+
+      // Get genre benchmark for comparison
+      const benchmark = db.prepare('SELECT * FROM genre_benchmarks WHERE genre = ?').get(genre) as any;
+      if (bookAnalytics && benchmark) {
+        bookAnalytics.genre_comparison = {
+          genre,
+          pacing_vs_norm: bookAnalytics.avg_pacing_score - benchmark.typical_pacing_score,
+          dialogue_vs_norm: bookAnalytics.avg_dialogue_percentage - benchmark.typical_dialogue_percentage,
+          readability_vs_norm: bookAnalytics.avg_readability_score - benchmark.typical_readability_score,
+        };
+      }
+
+      // Upsert book analytics
+      const existingBookAnalytics = db.prepare('SELECT id FROM book_analytics WHERE book_id = ?').get(bookId);
+
+      if (existingBookAnalytics) {
+        db.prepare(`
+          UPDATE book_analytics
+          SET avg_pacing_score = ?, pacing_consistency = ?, character_balance = ?,
+              avg_dialogue_percentage = ?, avg_readability_score = ?,
+              overall_tension_arc = ?, genre_comparison = ?, updated_at = datetime('now')
+          WHERE book_id = ?
+        `).run(
+          bookAnalytics.avg_pacing_score, bookAnalytics.pacing_consistency,
+          JSON.stringify(bookAnalytics.character_balance),
+          bookAnalytics.avg_dialogue_percentage, bookAnalytics.avg_readability_score,
+          JSON.stringify(bookAnalytics.overall_tension_arc),
+          JSON.stringify(bookAnalytics.genre_comparison), bookId
+        );
+      } else {
+        db.prepare(`
+          INSERT INTO book_analytics (
+            id, book_id, avg_pacing_score, pacing_consistency, character_balance,
+            avg_dialogue_percentage, avg_readability_score, overall_tension_arc, genre_comparison
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          randomUUID(), bookId, bookAnalytics.avg_pacing_score, bookAnalytics.pacing_consistency,
+          JSON.stringify(bookAnalytics.character_balance),
+          bookAnalytics.avg_dialogue_percentage, bookAnalytics.avg_readability_score,
+          JSON.stringify(bookAnalytics.overall_tension_arc),
+          JSON.stringify(bookAnalytics.genre_comparison)
+        );
+      }
+
+      // Cache analytics in completion record
+      completionDetectionService.cacheAnalyticsResults(bookId, JSON.stringify(bookAnalytics));
+
+      logger.info({
+        bookId,
+        avgPacing: bookAnalytics.avg_pacing_score,
+        avgDialogue: bookAnalytics.avg_dialogue_percentage
+      }, 'analyze_book: Completed book analysis');
+
+      checkpointManager.saveCheckpoint(job.id, 'completed', { bookId });
+    } catch (error) {
+      // Update completion record to failed
+      const now = new Date().toISOString();
+      db.prepare(`
+        UPDATE book_completion SET analytics_status = 'failed', updated_at = ? WHERE book_id = ?
+      `).run(now, bookId);
+
+      logger.error({ error, bookId }, 'analyze_book: Error analysing book');
+      throw error;
+    }
+  }
+
+  // TODO: Sprint 38 - Implement follow-up service first
+  // /**
+  //  * Generate follow-up recommendations (sequel ideas, series arcs)
+  //  * target_id = book ID
+  //  */
+  // private async generateFollowUp(job: Job): Promise<void> {
+  //   const bookId = job.target_id;
+  //   logger.info({ bookId }, 'generate_follow_up: Starting follow-up generation');
+  //
+  //   try {
+  //     // Import services dynamically
+  //     const { followUpService } = await import('../services/follow-up.service.js');
+  //
+  //     checkpointManager.saveCheckpoint(job.id, 'started', { bookId });
+  //
+  //     // Generate all follow-up content
+  //     await followUpService.generateFollowUpRecommendations(bookId);
+  //
+  //     logger.info({ bookId }, 'generate_follow_up: Completed follow-up generation');
+  //     checkpointManager.saveCheckpoint(job.id, 'completed', { bookId });
+  //   } catch (error) {
+  //     logger.error({ error, bookId }, 'generate_follow_up: Error generating follow-up');
+  //     throw error;
+  //   }
+  // }
+
   /**
    * Mark job as completed
    */
@@ -1062,7 +1631,7 @@ Output only valid JSON, no commentary:`;
    * Retry job or mark as failed
    */
   private async retryOrFail(job: Job, error: any): Promise<void> {
-    const maxAttempts = 3;
+    const maxAttempts = QueueConfig.MAX_JOB_RETRY_ATTEMPTS;
     const newAttempts = job.attempts + 1;
 
     // Build detailed error message with stack trace and code
