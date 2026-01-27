@@ -1,6 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { getToken } from '../lib/auth';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 interface ExportButtonsProps {
   projectId: string;
@@ -14,7 +17,12 @@ export default function ExportButtons({ projectId }: ExportButtonsProps) {
   const handleExportDocx = async () => {
     setExportingDocx(true);
     try {
-      const response = await fetch(`http://localhost:3001/api/export/docx/${projectId}`);
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/export/docx/${projectId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
       if (!response.ok) {
         throw new Error('Export failed');
       }
@@ -39,7 +47,12 @@ export default function ExportButtons({ projectId }: ExportButtonsProps) {
   const handleExportPdf = async () => {
     setExportingPdf(true);
     try {
-      const response = await fetch(`http://localhost:3001/api/export/pdf/${projectId}`);
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/export/pdf/${projectId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
       if (!response.ok) {
         throw new Error('Export failed');
       }
@@ -64,7 +77,12 @@ export default function ExportButtons({ projectId }: ExportButtonsProps) {
   const handleExportStoryBible = async () => {
     setExportingBible(true);
     try {
-      const response = await fetch(`http://localhost:3001/api/export/story-bible/${projectId}`);
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/export/story-bible/${projectId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
       if (!response.ok) {
         throw new Error('Export failed');
       }
@@ -88,6 +106,7 @@ export default function ExportButtons({ projectId }: ExportButtonsProps) {
 
   return (
     <section
+      id="export"
       aria-labelledby="export-heading"
       style={{
         background: 'rgba(255, 255, 255, 0.05)',

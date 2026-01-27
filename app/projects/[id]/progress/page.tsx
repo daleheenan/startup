@@ -481,27 +481,43 @@ export default function ProgressPage() {
                     gap: '1rem',
                     justifyContent: 'center',
                   }}>
-                    <button
-                      onClick={() => {
-                        if (books.length > 0 && books[0].chapters.length > 0) {
-                          router.push(`/projects/${projectId}/chapters/${books[0].chapters[0].id}`);
-                        }
-                      }}
-                      style={{
-                        padding: '0.75rem 1.5rem',
-                        background: '#10B981',
-                        border: 'none',
-                        borderRadius: '8px',
-                        color: '#FFFFFF',
-                        fontSize: '1rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Read Novel
-                    </button>
+                    {books.length > 0 && books[0].chapters.length > 0 ? (
+                      <Link
+                        href={`/projects/${projectId}/chapters/${books[0].chapters[0].id}`}
+                        style={{
+                          display: 'inline-block',
+                          padding: '0.75rem 1.5rem',
+                          background: '#10B981',
+                          border: 'none',
+                          borderRadius: '8px',
+                          color: '#FFFFFF',
+                          fontSize: '1rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          textDecoration: 'none',
+                        }}
+                      >
+                        Read Novel
+                      </Link>
+                    ) : (
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          padding: '0.75rem 1.5rem',
+                          background: '#9CA3AF',
+                          border: 'none',
+                          borderRadius: '8px',
+                          color: '#FFFFFF',
+                          fontSize: '1rem',
+                          fontWeight: 600,
+                          cursor: 'not-allowed',
+                        }}
+                      >
+                        Loading chapters...
+                      </span>
+                    )}
                     <Link
-                      href={`/projects/${projectId}`}
+                      href={`/projects/${projectId}#export`}
                       style={{
                         display: 'inline-block',
                         padding: '0.75rem 1.5rem',
