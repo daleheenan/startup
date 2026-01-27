@@ -1,9 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { getToken, logout } from '../lib/auth';
+import { colors, typography, spacing, borderRadius } from '../lib/design-tokens';
 import PrimaryNavigationBar from '../components/shared/PrimaryNavigationBar';
+import { ActionButtonsPanel, ConceptsSummaryPanel, ProjectsTable } from '../components/projects';
+import type { SortColumn, SortConfig } from '../components/projects';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -72,6 +75,10 @@ export default function ProjectsPage() {
   const [queueStats, setQueueStats] = useState<QueueStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sortConfig, setSortConfig] = useState<SortConfig>({
+    column: 'updated_at',
+    direction: 'desc',
+  });
 
   useEffect(() => {
     fetchProjects();
@@ -132,15 +139,77 @@ export default function ProjectsPage() {
     window.location.href = '/';
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'setup': return '#667eea';
-      case 'generating': return '#F59E0B';
-      case 'completed': return '#10B981';
-      default: return '#64748B';
-    }
+  const handleSort = (column: SortColumn) => {
+    setSortConfig(prev => ({
+      column,
+      direction: prev.column === column && prev.direction === 'asc' ? 'desc' : 'asc',
+    }));
   };
 
+  const handleDelete = async (projectId: string) => {
+    const token = getToken();
+    const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to delete project');
+    }
+
+    // Remove the project from the local state
+    setProjects(prev => prev.filter(p => p.id !== projectId));
+  };
+
+  const sortedProjects = useMemo(() => {
+    const sorted = [...projects].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      switch (sortConfig.column) {
+        case 'name':
+          aValue = a.title.toLowerCase();
+          bValue = b.title.toLowerCase();
+          break;
+        case 'updated_at':
+          aValue = new Date(a.updated_at).getTime();
+          bValue = new Date(b.updated_at).getTime();
+          break;
+        case 'cost':
+          aValue = parseFloat(a.metrics?.cost?.usd?.replace(/[^0-9.-]/g, '') || '0');
+          bValue = parseFloat(b.metrics?.cost?.usd?.replace(/[^0-9.-]/g, '') || '0');
+          break;
+        case 'type':
+          aValue = a.type;
+          bValue = b.type;
+          break;
+        case 'words':
+          aValue = a.metrics?.content?.words || 0;
+          bValue = b.metrics?.content?.words || 0;
+          break;
+        case 'chapters':
+          aValue = a.progress?.chaptersWritten || 0;
+          bValue = b.progress?.chaptersWritten || 0;
+          break;
+        case 'versions':
+          // Versions not yet available from API
+          aValue = 0;
+          bValue = 0;
+          break;
+        default:
+          return 0;
+      }
+
+      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return sorted;
+  }, [projects, sortConfig]);
 
   if (isLoading) {
     return (
@@ -149,19 +218,19 @@ export default function ProjectsPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#F8FAFC',
+        background: colors.background.primary,
       }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{
             display: 'inline-block',
             width: '48px',
             height: '48px',
-            border: '3px solid #E2E8F0',
-            borderTopColor: '#667eea',
+            border: `3px solid ${colors.border.default}`,
+            borderTopColor: colors.brand.primary,
             borderRadius: '50%',
             animation: 'spin 1s linear infinite'
           }} />
-          <p style={{ marginTop: '1rem', color: '#64748B' }}>Loading...</p>
+          <p style={{ marginTop: spacing[4], color: colors.text.tertiary }}>Loading...</p>
         </div>
         <style jsx>{`
           @keyframes spin {
@@ -175,7 +244,7 @@ export default function ProjectsPage() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#F8FAFC',
+      background: colors.background.primary,
       display: 'flex',
       flexDirection: 'column',
     }}>
@@ -188,23 +257,27 @@ export default function ProjectsPage() {
         <header
           role="banner"
           style={{
-            padding: '1rem 2rem',
-            background: '#FFFFFF',
-            borderBottom: '1px solid #E2E8F0',
+            padding: `${spacing[4]} ${spacing[8]}`,
+            background: colors.background.surface,
+            borderBottom: `1px solid ${colors.border.default}`,
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
           }}>
           <div>
             <h1 style={{
-              fontSize: '1.5rem',
-              fontWeight: '700',
-              color: '#1A1A2E',
+              fontSize: typography.fontSize['2xl'],
+              fontWeight: typography.fontWeight.bold,
+              color: colors.text.primary,
               margin: 0,
             }}>
               Story Architect
             </h1>
-            <p style={{ fontSize: '0.875rem', color: '#475569', margin: 0 }}>
+            <p style={{
+              fontSize: typography.fontSize.sm,
+              color: colors.text.secondary,
+              margin: 0,
+            }}>
               Create and manage your novel projects
             </p>
           </div>
@@ -216,16 +289,16 @@ export default function ProjectsPage() {
               aria-label="System status"
               style={{
                 display: 'flex',
-                gap: '1rem',
+                gap: spacing[4],
                 alignItems: 'center',
               }}>
               <div style={{
-                padding: '0.75rem 1rem',
-                background: '#F1F5F9',
-                borderRadius: '8px',
+                padding: `${spacing[3]} ${spacing[4]}`,
+                background: colors.background.secondary,
+                borderRadius: borderRadius.md,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.75rem',
+                gap: spacing[3],
               }}>
                 <div
                   role="progressbar"
@@ -237,7 +310,7 @@ export default function ProjectsPage() {
                     width: '36px',
                     height: '36px',
                     borderRadius: '50%',
-                    background: `conic-gradient(#667eea ${(queueStats.session.requestsThisSession / 45) * 100}%, #E2E8F0 0%)`,
+                    background: `conic-gradient(${colors.brand.primary} ${(queueStats.session.requestsThisSession / 45) * 100}%, ${colors.border.default} 0%)`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -246,20 +319,20 @@ export default function ProjectsPage() {
                     width: '28px',
                     height: '28px',
                     borderRadius: '50%',
-                    background: '#F1F5F9',
+                    background: colors.background.secondary,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: '0.625rem',
-                    fontWeight: '600',
-                    color: '#667eea',
+                    fontWeight: typography.fontWeight.semibold,
+                    color: colors.brand.primary,
                   }}>
                     {queueStats.session.requestsThisSession}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: '#475569' }}>Claude Max</div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1A1A2E' }}>
+                  <div style={{ fontSize: typography.fontSize.xs, color: colors.text.secondary }}>Claude Max</div>
+                  <div style={{ fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.semibold, color: colors.text.primary }}>
                     Reset in {queueStats.session.timeRemaining || '5h 0m'}
                   </div>
                 </div>
@@ -268,16 +341,16 @@ export default function ProjectsPage() {
               <Link
                 href="/admin/queue"
                 style={{
-                  padding: '0.75rem 1rem',
-                  background: '#F1F5F9',
-                  borderRadius: '8px',
+                  padding: `${spacing[3]} ${spacing[4]}`,
+                  background: colors.background.secondary,
+                  borderRadius: borderRadius.md,
                   textDecoration: 'none',
                   cursor: 'pointer',
                   transition: 'all 0.2s',
                 }}
               >
-                <div style={{ fontSize: '0.75rem', color: '#475569' }}>Job Queue</div>
-                <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1A1A2E' }}>
+                <div style={{ fontSize: typography.fontSize.xs, color: colors.text.secondary }}>Job Queue</div>
+                <div style={{ fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.semibold, color: colors.text.primary }}>
                   PENDING: {queueStats.queue.pending}
                 </div>
               </Link>
@@ -286,16 +359,16 @@ export default function ProjectsPage() {
                 onClick={handleLogout}
                 aria-label="Logout from NovelForge"
                 style={{
-                  padding: '0.75rem 1rem',
-                  background: '#F1F5F9',
-                  borderRadius: '8px',
+                  padding: `${spacing[3]} ${spacing[4]}`,
+                  background: colors.background.secondary,
+                  borderRadius: borderRadius.md,
                   border: 'none',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem',
-                  fontSize: '0.875rem',
-                  color: '#64748B',
+                  gap: spacing[2],
+                  fontSize: typography.fontSize.sm,
+                  color: colors.text.tertiary,
                   transition: 'all 0.2s',
                 }}
               >
@@ -309,460 +382,76 @@ export default function ProjectsPage() {
         {/* Content Area */}
         <div
           role="main"
-          style={{ flex: 1, padding: '2rem', overflow: 'auto' }}>
+          style={{ flex: 1, padding: spacing[8], overflow: 'auto' }}>
           {/* Error Message */}
           {error && (
             <div
               role="alert"
               aria-live="assertive"
               style={{
-                background: '#FEF2F2',
-                border: '1px solid #FECACA',
-                borderRadius: '12px',
-                padding: '1rem 1.5rem',
-                marginBottom: '1.5rem',
-                color: '#DC2626',
+                background: colors.semantic.errorLight,
+                border: `1px solid ${colors.semantic.errorBorder}`,
+                borderRadius: borderRadius.lg,
+                padding: `${spacing[4]} ${spacing[6]}`,
+                marginBottom: spacing[6],
+                color: colors.semantic.error,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.75rem',
+                gap: spacing[3],
               }}>
               <span aria-hidden="true">⚠️</span>
               {error}
             </div>
           )}
 
-          {/* New Project Button */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '1.5rem',
-          }}>
-            <h2 style={{
-              fontSize: '1.125rem',
-              fontWeight: '600',
-              color: '#374151',
-              margin: 0,
-            }}>
-              Your Projects ({projects.length})
-            </h2>
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <Link
-                href="/saved-concepts"
-                aria-label="View saved story concepts"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.75rem 1.25rem',
-                  minHeight: '44px',
-                  background: '#FFFFFF',
-                  color: '#1A1A2E',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: '8px',
-                  textDecoration: 'none',
-                  fontWeight: '600',
-                  fontSize: '0.875rem',
-                  transition: 'all 0.2s',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.outline = '2px solid #667eea';
-                  e.currentTarget.style.outlineOffset = '2px';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.outline = 'none';
-                }}
-              >
-                <span aria-hidden="true">💡</span>
-                Saved Concepts
-              </Link>
-              <Link
-                href="/new"
-                aria-label="Create a new novel project"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.75rem 1.25rem',
-                  minHeight: '44px',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  color: '#FFFFFF',
-                  borderRadius: '8px',
-                  textDecoration: 'none',
-                  fontWeight: '600',
-                  fontSize: '0.875rem',
-                  boxShadow: '0 4px 14px rgba(102, 126, 234, 0.3)',
-                  transition: 'all 0.2s',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.outline = '2px solid #667eea';
-                  e.currentTarget.style.outlineOffset = '2px';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.outline = 'none';
-                }}
-              >
-                <span aria-hidden="true">+</span>
-                New Novel
-              </Link>
-            </div>
+          {/* Top Row - Two Columns */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
+              gap: spacing[6],
+              marginBottom: spacing[8],
+            }}
+          >
+            <ActionButtonsPanel />
+            <ConceptsSummaryPanel />
           </div>
 
-          {/* Projects Grid */}
-          {projects.length === 0 ? (
+          {/* Bottom Row - Projects Table */}
+          <section aria-labelledby="projects-heading">
             <div
-              role="status"
-              aria-label="No projects found"
               style={{
-                textAlign: 'center',
-                padding: '4rem 2rem',
-                background: '#FFFFFF',
-                borderRadius: '16px',
-                border: '2px dashed #E2E8F0',
-              }}>
-              <div
-                aria-hidden="true"
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: spacing[4],
+              }}
+            >
+              <h2
+                id="projects-heading"
                 style={{
-                  width: '64px',
-                  height: '64px',
-                  margin: '0 auto 1.5rem',
-                  background: '#F1F5F9',
-                  borderRadius: '16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '2rem',
-                }}>
-                📖
-              </div>
-              <h3 style={{
-                fontSize: '1.25rem',
-                fontWeight: '600',
-                color: '#1A1A2E',
-                marginBottom: '0.5rem',
-              }}>
-                No Projects Yet
-              </h3>
-              <p style={{
-                fontSize: '0.875rem',
-                color: '#475569',
-                marginBottom: '1.5rem',
-                maxWidth: '300px',
-                margin: '0 auto 1.5rem',
-              }}>
-                Start by creating your first novel. Choose a genre, build characters, and let AI write your story.
-              </p>
-              <Link
-                href="/new"
-                aria-label="Create your first novel project"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.875rem 1.5rem',
-                  minHeight: '44px',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  color: '#FFFFFF',
-                  borderRadius: '8px',
-                  textDecoration: 'none',
-                  fontWeight: '600',
-                  boxShadow: '0 4px 14px rgba(102, 126, 234, 0.4)',
-                  transition: 'all 0.2s',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.outline = '2px solid #667eea';
-                  e.currentTarget.style.outlineOffset = '2px';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.outline = 'none';
+                  fontSize: typography.fontSize.lg,
+                  fontWeight: typography.fontWeight.semibold,
+                  color: colors.text.primary,
+                  margin: 0,
                 }}
               >
-                Create Your First Novel
-              </Link>
+                Your Projects ({projects.length})
+              </h2>
             </div>
-          ) : (
-            <div
-              role="list"
-              aria-label="Your novel projects"
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-                gap: '1rem',
-              }}>
-              {projects.map(project => (
-                <Link
-                  key={project.id}
-                  href={`/projects/${project.id}`}
-                  role="listitem"
-                  aria-label={`Open project: ${project.title}`}
-                  style={{
-                    display: 'block',
-                    padding: '1.5rem',
-                    background: '#FFFFFF',
-                    border: '1px solid #E2E8F0',
-                    borderRadius: '12px',
-                    textDecoration: 'none',
-                    transition: 'all 0.2s',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.outline = '2px solid #667eea';
-                    e.currentTarget.style.outlineOffset = '2px';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.outline = 'none';
-                  }}
-                >
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'start',
-                    marginBottom: '1rem',
-                  }}>
-                    <h3 style={{
-                      fontSize: '1.125rem',
-                      fontWeight: '600',
-                      color: '#1A1A2E',
-                      margin: 0,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                    }}>
-                      {project.title}
-                      {/* Generation Status Indicator */}
-                      {project.progress?.generationStatus === 'generating' && (
-                        <span
-                          aria-label="Currently generating"
-                          style={{
-                            display: 'inline-block',
-                            width: '12px',
-                            height: '12px',
-                            borderRadius: '50%',
-                            background: '#F59E0B',
-                            animation: 'pulse 1.5s ease-in-out infinite',
-                          }}
-                          title="Currently generating chapters..."
-                        />
-                      )}
-                      {project.progress?.generationStatus === 'completed' && project.progress?.chaptersWritten > 0 && (
-                        <span
-                          aria-label="Generation complete"
-                          style={{ fontSize: '0.875rem' }}
-                          title={`${project.progress.chaptersWritten} chapters written`}
-                        >
-                          ✅
-                        </span>
-                      )}
-                    </h3>
-                    <span style={{
-                      padding: '0.25rem 0.75rem',
-                      background: `${getStatusColor(project.status)}15`,
-                      color: getStatusColor(project.status),
-                      borderRadius: '20px',
-                      fontSize: '0.75rem',
-                      fontWeight: '500',
-                      textTransform: 'capitalize',
-                    }}>
-                      {project.status}
-                    </span>
-                  </div>
-
-                  <div style={{
-                    display: 'flex',
-                    gap: '0.75rem',
-                    fontSize: '0.813rem',
-                    color: '#475569',
-                    marginBottom: '0.75rem',
-                  }}>
-                    <span
-                      aria-label={`Genre: ${project.genre}`}
-                      style={{
-                        padding: '0.25rem 0.5rem',
-                        background: '#F1F5F9',
-                        borderRadius: '4px',
-                      }}>
-                      {project.genre}
-                    </span>
-                    <span
-                      aria-label={`Type: ${project.type}`}
-                      style={{
-                        padding: '0.25rem 0.5rem',
-                        background: '#F1F5F9',
-                        borderRadius: '4px',
-                        textTransform: 'capitalize',
-                      }}>
-                      {project.type}
-                    </span>
-                  </div>
-
-                  {/* Progress Stats */}
-                  {project.progress && (
-                    <div style={{
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      gap: '0.5rem',
-                      fontSize: '0.75rem',
-                      marginBottom: '0.75rem',
-                    }}>
-                      <span
-                        aria-label={`${project.progress.characters} characters`}
-                        style={{
-                          padding: '0.25rem 0.5rem',
-                          background: project.progress.characters > 0 ? '#ECFDF5' : '#FEF2F2',
-                          color: project.progress.characters > 0 ? '#047857' : '#991B1B',
-                          borderRadius: '4px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.25rem',
-                        }}>
-                        <span aria-hidden="true">👥</span>
-                        {project.progress.characters}
-                      </span>
-                      <span
-                        aria-label={`${project.progress.worldElements} world elements`}
-                        style={{
-                          padding: '0.25rem 0.5rem',
-                          background: project.progress.worldElements > 0 ? '#ECFDF5' : '#FEF2F2',
-                          color: project.progress.worldElements > 0 ? '#047857' : '#991B1B',
-                          borderRadius: '4px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.25rem',
-                        }}>
-                        <span aria-hidden="true">🌍</span>
-                        {project.progress.worldElements}
-                      </span>
-                      <span
-                        aria-label={`${project.progress.plotLayers} plot layers`}
-                        style={{
-                          padding: '0.25rem 0.5rem',
-                          background: project.progress.plotLayers > 0 ? '#ECFDF5' : '#FEF2F2',
-                          color: project.progress.plotLayers > 0 ? '#047857' : '#991B1B',
-                          borderRadius: '4px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.25rem',
-                        }}>
-                        <span aria-hidden="true">📖</span>
-                        {project.progress.plotLayers}
-                      </span>
-                      <span
-                        aria-label={project.progress.hasOutline ? `Outline: ${project.progress.outlineChapters} chapters` : 'No outline'}
-                        style={{
-                          padding: '0.25rem 0.5rem',
-                          background: project.progress.hasOutline ? '#ECFDF5' : '#FEF2F2',
-                          color: project.progress.hasOutline ? '#047857' : '#991B1B',
-                          borderRadius: '4px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.25rem',
-                        }}>
-                        <span aria-hidden="true">📝</span>
-                        {project.progress.hasOutline ? project.progress.outlineChapters : '—'}
-                      </span>
-                      <span
-                        aria-label={`${project.progress.chaptersWritten} chapters written`}
-                        style={{
-                          padding: '0.25rem 0.5rem',
-                          background: project.progress.chaptersWritten > 0 ? '#ECFDF5' : '#FEF2F2',
-                          color: project.progress.chaptersWritten > 0 ? '#047857' : '#991B1B',
-                          borderRadius: '4px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.25rem',
-                        }}>
-                        <span aria-hidden="true">📚</span>
-                        {project.progress.chaptersWritten}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Metrics Display */}
-                  {project.metrics && (project.metrics.content.chapters > 0 || project.metrics.cost.usd !== '$0.00') && (
-                    <div style={{
-                      padding: '0.75rem',
-                      background: '#F8FAFC',
-                      borderRadius: '8px',
-                      fontSize: '0.75rem',
-                      marginBottom: '0.75rem',
-                    }}>
-                      {/* Content Metrics */}
-                      {project.metrics.content.chapters > 0 && (
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          color: '#475569',
-                          marginBottom: '0.5rem',
-                        }}>
-                          <span style={{ fontSize: '0.875rem' }}>📚</span>
-                          <span style={{ fontWeight: '500' }}>{project.metrics.content.display}</span>
-                        </div>
-                      )}
-
-                      {/* Reading Time */}
-                      {project.metrics.reading.minutes > 0 && (
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          color: '#475569',
-                          marginBottom: '0.5rem',
-                        }}>
-                          <span style={{ fontSize: '0.875rem' }}>⏱️</span>
-                          <span>{project.metrics.reading.display}</span>
-                        </div>
-                      )}
-
-                      {/* Token Usage */}
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        color: '#64748B',
-                        marginBottom: '0.25rem',
-                      }}>
-                        <span style={{ fontSize: '0.875rem' }}>🔢</span>
-                        <span>Tokens: {project.metrics.tokens.display}</span>
-                      </div>
-
-                      {/* Cost */}
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        color: '#667eea',
-                        fontWeight: '600',
-                      }}>
-                        <span style={{ fontSize: '0.875rem' }}>💰</span>
-                        <span>Cost: {project.metrics.cost.display}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  <div style={{
-                    marginTop: '0.75rem',
-                    paddingTop: '0.75rem',
-                    borderTop: '1px solid #F1F5F9',
-                    fontSize: '0.75rem',
-                    color: '#64748B',
-                  }}>
-                    Created {new Date(project.created_at).toLocaleDateString()}
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
+            <ProjectsTable
+              projects={sortedProjects}
+              sortConfig={sortConfig}
+              onSort={handleSort}
+              onDelete={handleDelete}
+            />
+          </section>
         </div>
       </main>
 
       <style jsx>{`
         @keyframes spin {
           to { transform: rotate(360deg); }
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.5; transform: scale(1.2); }
         }
       `}</style>
     </div>
