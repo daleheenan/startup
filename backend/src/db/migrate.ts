@@ -324,6 +324,11 @@ export function runMigrations() {
       '020_backfill_metrics.sql',        // DB version 29 - backfill metrics for existing data
       '026_author_name_field.sql',       // DB version 30 - author name for exports
       '027_editorial_reports.sql',       // DB version 31 - VEB (Virtual Editorial Board) tables
+      '028_post_completion_features.sql', // DB version 32 - post-completion features
+      '029_coherence_checks.sql',        // DB version 33 - coherence analysis
+      '030_auto_veb_on_completion.sql',  // DB version 34 - auto-trigger VEB on book completion
+      '031_outline_editorial_board.sql', // DB version 35 - Outline Editorial Board tables
+      '032_book_cloning.sql',            // DB version 36 - book cloning support
     ];
 
     for (let i = 0; i < migrationFiles.length; i++) {
@@ -427,6 +432,15 @@ export function getMigrationStatus(): {
     '025_concept_source_idea.sql',
     '019_user_settings.sql',
     '019_time_period.sql',
+    '015_fix_metrics_trigger.sql',
+    '020_backfill_metrics.sql',
+    '026_author_name_field.sql',
+    '027_editorial_reports.sql',
+    '028_post_completion_features.sql',
+    '029_coherence_checks.sql',
+    '030_auto_veb_on_completion.sql',
+    '031_outline_editorial_board.sql',
+    '032_book_cloning.sql',
   ];
 
   const pendingMigrations: string[] = [];
