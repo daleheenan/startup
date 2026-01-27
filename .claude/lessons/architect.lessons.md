@@ -1,0 +1,211 @@
+# Lessons Learned: Architect Agent
+
+<!--
+This file stores accumulated lessons learned by the architect agent.
+It is automatically read before each task and updated after task completion.
+
+MAINTENANCE RULES:
+- Maximum 50 lessons per file (older lessons archived automatically)
+- Lessons with score >= 5 are considered "proven" and prioritized
+- Review and prune quarterly or when file exceeds 50 entries
+-->
+
+## Summary Statistics
+
+- **Total tasks completed**: 2
+- **Total lessons recorded**: 7
+- **Last updated**: 2026-01-26
+- **Proven lessons** (score >= 5): 0
+- **Top themes**: #architecture #patterns #database #api #typescript #repository-pattern #circuit-breaker #navigation #ui-redesign #workflow #component-design
+
+---
+
+## Proven Lessons (Score >= 5)
+
+<!-- Lessons that have been applied successfully 5+ times appear here -->
+
+*No proven lessons yet. Lessons graduate here after being applied successfully 5+ times.*
+
+---
+
+## Active Lessons (Most Recent First)
+
+### 2026-01-26 | Task: NovelForge Navigation & UI Redesign Architecture
+
+**Date**: 2026-01-26
+**Task**: Designing comprehensive navigation redesign with workflow enforcement, story ideas feature, and settings reorganization
+**Context**: Large-scale UX improvement affecting navigation, project workflow, story creation flow, and settings organization
+
+**What Worked Well**:
+- Reading lessons from developer and code-reviewer agents first to understand implementation patterns and pain points
+- Systematic codebase exploration: navigation (ProjectNavigation.tsx), new project page, projects dashboard, types, database schema
+- Reading existing similar features (story-ideas routes, saved-concepts page) before designing new ones
+- Creating comprehensive technical design first (architecture, data model, API routes, components) before implementation tasks
+- Breaking implementation into phases with clear dependencies: Foundation → Navigation → Story Ideas → Project Updates → Settings
+- Sizing tasks at 1-3 hours each for realistic tracking and progress visibility
+- Including rollback procedures and feature flags in deployment strategy for risk mitigation
+- Documenting both "what to build" (technical design) and "how to build it" (implementation tasks) in separate documents
+- Providing code examples in technical design so developers have reference implementations
+- Identifying reusable existing components (ProseStyleForm, ConfirmDialog) to reduce implementation time
+- Designing additive changes (new pages, new components) before breaking changes (removing tabs) for safer rollout
+- Including accessibility, performance, and testing strategies in technical design, not as afterthoughts
+
+**What Didn't Work**:
+- Initial design considered creating new database tables for navigation preferences - realized existing user_settings pattern is sufficient
+- Almost designed story idea expansion as synchronous API - realized async job queue is more consistent with existing architecture
+- First draft had prose style defaults in new table - simplified to reuse prose_styles table with project_id = null
+
+**Lesson**: For large-scale UX redesigns affecting multiple pages and workflows: (1) Read existing codebase patterns extensively before designing (navigation, pages, routes, types), (2) Identify and reuse existing components to reduce implementation scope, (3) Design changes in phases: non-breaking additions first, breaking changes last with feature flags, (4) Break implementation into <3 hour tasks grouped by phase with clear dependencies, (5) Provide code examples in technical design docs, not just interfaces - developers implement faster with reference code, (6) Include rollback procedures and feature flags from the start for large changes, (7) Design for consistency - new features should match existing architectural patterns (async jobs, API structure, database conventions), (8) Consider the complete system: types → database → API → components → integration → testing in that order.
+
+**Application Score**: 0
+
+**Tags**: #architecture #navigation #ui-redesign #workflow #ux #component-design #phased-implementation #feature-flags #rollback-planning #code-examples #task-breakdown
+
+---
+
+### 2026-01-25 | Task: Sprint 18 - Database & Architecture Improvements
+
+**Date**: 2026-01-25
+**Task**: Designing database migration improvements, repository layer abstraction, and circuit breaker pattern for NovelForge backend
+**Context**: Production-grade backend architecture using SQLite, Express.js, TypeScript, and Anthropic Claude API
+
+**What Worked Well**:
+- Reading existing codebase patterns first (migrate.ts, services, repositories) before designing new patterns
+- Loading lessons from developer and code-reviewer agents to understand implementation challenges
+- Breaking large architecture changes into phases with minimal dependencies
+- Designing non-breaking changes first (database improvements), breaking changes last (repository layer)
+- Providing specific file paths and code examples in implementation tasks
+- Creating detailed acceptance criteria with clear success metrics
+- Including rollback strategy and deployment order in technical design
+- Using existing patterns as references (mystery-tracking.service.ts as repository refactor example)
+- Estimating task time at 1-3 hours per task for granular tracking
+
+**What Didn't Work**:
+- Initial design considered using external circuit breaker libraries (Opossum, Cockatiel) - decided custom implementation is simpler for single API
+- Almost missed integration points between new services (backup service needs to be called by migration service)
+
+**Lesson**: When designing major architectural improvements, always read the existing codebase patterns first, especially implementations from the same domain. Break changes into phases: non-breaking changes deploy first, breaking changes deploy last with rollback plans. Provide concrete code examples in tasks, not just interfaces - developers implement faster with reference code. Size tasks at 1-3 hours each for realistic tracking. For external dependencies (circuit breakers, ORMs), evaluate if custom implementation (<100 lines) is simpler than library integration (200KB+ dependencies).
+
+**Application Score**: 0
+
+**Tags**: #architecture #repository-pattern #circuit-breaker #migrations #solid-principles #phased-deployment
+
+---
+
+### 2026-01-25 | Task: Database Schema Design
+
+**Date**: 2026-01-25
+**Task**: Designing database schemas for new features
+**Context**: SQLite database with migration system
+
+**What Worked Well**:
+- Creating migration files instead of modifying schema directly
+- Using foreign keys with proper CASCADE rules
+- Adding indexes for frequently queried columns
+
+**What Didn't Work**:
+- Initially forgot to add indexes on foreign keys
+- Missed adding updated_at triggers
+
+**Lesson**: Every database table should have: id (UUID), created_at, updated_at columns. Foreign keys need indexes. Always create migrations, never modify schema directly. Plan for soft deletes if data might need recovery.
+
+**Application Score**: 0
+
+**Tags**: #database #migrations #schema #indexes
+
+---
+
+### 2026-01-25 | Task: API Route Architecture
+
+**Date**: 2026-01-25
+**Task**: Designing RESTful API routes
+**Context**: Express.js backend with TypeScript
+
+**What Worked Well**:
+- Consistent route naming conventions (/api/resource/:id/subresource)
+- Separating route handlers from business logic (services)
+- Using middleware for auth, validation, error handling
+
+**What Didn't Work**:
+- Mixing route logic and database queries in handlers
+
+**Lesson**: Routes should only handle request parsing and response formatting. All business logic goes in services. All database access goes through repositories or dedicated db modules. This separation enables testing and reuse.
+
+**Application Score**: 0
+
+**Tags**: #api #routes #separation-of-concerns #express
+
+---
+
+### 2026-01-25 | Task: Error Handling Strategy
+
+**Date**: 2026-01-25
+**Task**: Designing consistent error handling across the stack
+**Context**: Full-stack TypeScript application
+
+**What Worked Well**:
+- Custom error classes with HTTP status codes
+- Centralized error handler middleware
+- Consistent error response format
+
+**What Didn't Work**:
+- Exposing internal error details to clients
+- Swallowing errors silently in catch blocks
+
+**Lesson**: Create a hierarchy of custom error classes (ValidationError, NotFoundError, AuthError). Map them to HTTP status codes in a central handler. Log full errors server-side, return sanitized messages to clients. Never swallow errors - at minimum, log them.
+
+**Application Score**: 0
+
+**Tags**: #error-handling #api #security #logging
+
+---
+
+### 2026-01-25 | Task: State Management Architecture
+
+**Date**: 2026-01-25
+**Task**: Designing frontend state management
+**Context**: Next.js with React components
+
+**What Worked Well**:
+- Using React Query for server state
+- Keeping form state local to components
+- Context for global app state (auth, theme)
+
+**What Didn't Work**:
+- Putting all state in global context
+- Not cleaning up subscriptions on unmount
+
+**Lesson**: Distinguish between server state (React Query/SWR), global app state (Context/Zustand), and local UI state (useState). Server state should use a data-fetching library with caching. Local state stays in components. Global state should be minimal.
+
+**Application Score**: 0
+
+**Tags**: #state-management #react #frontend #patterns
+
+---
+
+### 2026-01-25 | Task: TypeScript Interface Design
+
+**Date**: 2026-01-25
+**Task**: Designing type definitions for shared models
+**Context**: Full-stack TypeScript with shared types
+
+**What Worked Well**:
+- Shared types between frontend and backend
+- Using discriminated unions for variant types
+- Strict null checking enabled
+
+**What Didn't Work**:
+- Using `any` type as a shortcut
+- Not handling null/undefined cases
+
+**Lesson**: Enable TypeScript strict mode from the start. Share types between frontend and backend via a shared package or directory. Use discriminated unions for types with variants. Never use `any` - use `unknown` and narrow with type guards if needed.
+
+**Application Score**: 0
+
+**Tags**: #typescript #types #strict-mode #patterns
+
+---
+
+## Archived Lessons
+
+*No archived lessons yet.*

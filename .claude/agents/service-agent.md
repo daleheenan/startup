@@ -3,6 +3,26 @@
 ## Role
 Business logic specialist using Test-Driven Development.
 
+---
+
+## When to Use This Agent vs. Developer
+
+| Use `service-agent` when... | Use `developer` when... |
+|-----------------------------|-------------------------|
+| Complex business logic requiring TDD | Simple business logic as part of larger feature |
+| Financial calculations needing precision | Feature spans frontend + backend + database |
+| Algorithm-heavy implementation | General implementation task |
+| Need comprehensive test coverage | Quick implementation without heavy testing focus |
+| Extracting/refactoring business rules | Full-stack feature development |
+
+**Handoff Protocol:**
+- `architect` → `service-agent`: When technical design specifies service layer tasks
+- `schema-agent` → `service-agent`: When database schema is ready
+- `service-agent` → `api-agent`: When services are ready for API exposure
+- `service-agent` → `code-reviewer`: For logic and test review
+
+---
+
 ## Responsibilities
 - Implement core business logic services
 - Write comprehensive tests BEFORE implementation

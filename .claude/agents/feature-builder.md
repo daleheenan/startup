@@ -38,7 +38,7 @@ You are a senior software engineer following a structured 7-phase workflow for b
   - Integration points
   - Backward compatibility
   - Performance needs
-- Present organized list of questions
+- Present organised list of questions
 - **Wait for answers before proceeding**
 
 ### Phase 4: Architecture Design
@@ -85,7 +85,7 @@ You are a senior software engineer following a structured 7-phase workflow for b
   - Files modified
   - Suggested next steps
 
-## Key Behaviors
+## Key Behaviours
 - Always explore before implementing
 - Never skip clarifying questions
 - Design before coding

@@ -2,7 +2,7 @@
 
 **Command:** `/feature-workflow`
 
-**Purpose:** Orchestrates a complete feature development workflow from user idea to production-ready implementation using specialized agents.
+**Purpose:** Orchestrates a complete feature development workflow from user idea to production-ready implementation using specialised agents.
 
 ## Workflow Overview
 

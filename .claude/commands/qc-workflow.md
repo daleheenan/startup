@@ -290,3 +290,216 @@ Bash: npx claude --agent security-hardener --task "audit code"
 - `test-architect` - Phase 2: Test strategy & coverage
 - `bug-hunter` - Phase 3: Bug detection & logic errors
 - `security-hardener` - Phase 4: Security assessment
+
+---
+
+## Continuous QC Automation
+
+### Automatic Trigger Points
+
+The QC workflow can be configured to run automatically at these trigger points:
+
+#### 1. On PR Creation
+When a pull request is created, run a focused QC scan on changed files:
+```
+Trigger: PR created
+Scope: Changed files only
+Mode: Quick (parallel agents)
+Action: Add findings as PR comments
+```
+
+#### 2. After N Commits to Main
+Run full QC after accumulating changes:
+```
+Trigger: Every 10 commits to main branch
+Scope: Full codebase
+Mode: Comprehensive
+Action: Create QC report, notify if critical issues
+```
+
+#### 3. Nightly Full Scan
+Comprehensive overnight analysis:
+```
+Trigger: Daily at 2:00 AM
+Scope: Full codebase
+Mode: Deep analysis
+Action: Generate report, create issues for new findings
+```
+
+#### 4. Pre-Release Gate
+Mandatory QC before deployment:
+```
+Trigger: Before /deploy-workflow
+Scope: Full codebase
+Mode: Comprehensive with security focus
+Action: Block deployment if critical issues, require approval for high issues
+```
+
+---
+
+### Automation Configuration
+
+Create `.qc-config.json` to configure automatic triggers:
+
+```json
+{
+  "triggers": {
+    "onPR": {
+      "enabled": true,
+      "scope": "changed_files",
+      "agents": ["bug-hunter", "security-hardener"],
+      "failOn": "critical"
+    },
+    "onCommitCount": {
+      "enabled": true,
+      "threshold": 10,
+      "branch": "main",
+      "scope": "full",
+      "agents": "all"
+    },
+    "nightly": {
+      "enabled": true,
+      "time": "02:00",
+      "timezone": "UTC",
+      "scope": "full",
+      "agents": "all"
+    },
+    "preRelease": {
+      "enabled": true,
+      "scope": "full",
+      "agents": "all",
+      "failOn": "high",
+      "requireApproval": true
+    }
+  },
+  "notifications": {
+    "slack": "https://hooks.slack.com/...",
+    "email": "team@example.com",
+    "notifyOn": ["critical", "high"]
+  },
+  "history": {
+    "keepReports": 30,
+    "archiveLocation": "docs/qc/archive/"
+  }
+}
+```
+
+---
+
+### Quick QC Mode
+
+For rapid feedback during development:
+
+```
+/qc-workflow src/ --quick
+```
+
+Quick mode:
+- Runs all 4 agents **in parallel** (not sequential)
+- Focuses on critical and high severity only
+- Skips deep analysis, focuses on obvious issues
+- Target completion: < 5 minutes
+- Output: Single consolidated report (no individual phase reports)
+
+---
+
+### Differential QC
+
+Run QC only on files changed since last scan:
+
+```
+/qc-workflow --diff
+```
+
+Differential mode:
+1. Check `.qc-last-scan` timestamp
+2. Find files modified since then
+3. Run QC only on those files
+4. Update timestamp on completion
+
+---
+
+### QC Trend Tracking
+
+Track QC metrics over time:
+
+```markdown
+## QC Health Dashboard
+
+### Trend: Last 10 Scans
+| Date | Health Score | Critical | High | Medium | Low |
+|------|--------------|----------|------|--------|-----|
+| 2026-01-27 | 8.5 | 0 | 2 | 5 | 12 |
+| 2026-01-20 | 7.8 | 1 | 3 | 8 | 15 |
+| 2026-01-13 | 7.2 | 2 | 5 | 10 | 18 |
+
+### Issue Resolution Rate
+| Category | Found | Fixed | Remaining | Fix Rate |
+|----------|-------|-------|-----------|----------|
+| Security | 5 | 4 | 1 | 80% |
+| Bugs | 12 | 10 | 2 | 83% |
+| Tests | 8 | 8 | 0 | 100% |
+| Performance | 3 | 2 | 1 | 67% |
+
+### Top Recurring Issues
+1. **Missing error handling** - Found in 3 consecutive scans
+2. **Insufficient test coverage** - Recurring for 2 weeks
+```
+
+---
+
+### Integration with CI/CD
+
+Add to GitHub Actions workflow:
+
+```yaml
+# .github/workflows/qc-check.yml
+name: Quality Control Check
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 2 * * *'  # Nightly at 2 AM
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  qc-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run QC Workflow
+        run: |
+          # Invoke QC workflow via Claude Code
+          # (Implementation depends on your CI integration)
+
+      - name: Upload QC Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: qc-report
+          path: docs/qc/QC_REPORT.md
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Post QC findings as PR comment
+```
+
+---
+
+### Comparison Mode
+
+Compare current state against baseline:
+
+```
+/qc-workflow src/ --compare baseline
+```
+
+Outputs:
+- New issues introduced since baseline
+- Issues that were fixed
+- Regression detection
+- Health score delta

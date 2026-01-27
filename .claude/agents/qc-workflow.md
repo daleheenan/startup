@@ -36,7 +36,7 @@
 │                           │                                     │
 │                           ▼                                     │
 │  Phase 5: CONSOLIDATION                                         │
-│  ├── Prioritize all findings                                    │
+│  ├── Prioritise all findings                                    │
 │  ├── Generate feature requests                                  │
 │  └── Output: docs/qc/QC_REPORT.md                              │
 │                           │                                     │
@@ -83,7 +83,7 @@ docs/qc/
 ## Integration with Feature Workflow
 
 The consolidated QC_REPORT.md contains:
-- Prioritized issues by severity
+- Prioritised issues by severity
 - Feature requests formatted for `/feature-workflow`
 - Sprint allocation recommendations
 
