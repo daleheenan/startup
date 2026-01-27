@@ -6,6 +6,7 @@ import { generateOutline, type OutlineContext, type OutlineProgress } from '../s
 import { getAllStructureTemplates } from '../services/structure-templates.js';
 import { generateStoryDNA } from '../services/story-dna-generator.js';
 import { createLogger } from '../services/logger.service.js';
+import { bookVersioningService } from '../services/book-versioning.service.js';
 import {
   generateOutlineSchema,
   updateOutlineSchema,
@@ -410,10 +411,16 @@ router.put('/:id', (req, res) => {
 /**
  * POST /api/outlines/:id/start-generation
  * Create chapter rows and queue generation jobs for all chapters
+ *
+ * Query params:
+ * - createVersion: 'true' to create a new version before generating
+ * - versionName: Optional name for the new version
  */
-router.post('/:id/start-generation', (req, res) => {
+router.post('/:id/start-generation', async (req, res) => {
   try {
     const outlineId = req.params.id;
+    const createVersion = req.query.createVersion === 'true' || req.body.createVersion === true;
+    const versionName = (req.query.versionName as string) || req.body.versionName;
 
     // Get outline
     const outlineStmt = db.prepare<[string], Outline>(`
@@ -428,20 +435,51 @@ router.post('/:id/start-generation', (req, res) => {
     }
 
     const structure: StoryStructure = JSON.parse(outline.structure as any);
+    const bookId = outline.book_id;
+    let versionId: string | null = null;
 
-    // Delete any existing chapters and their jobs before creating new ones
-    // This prevents duplicate chapters if generation is restarted
-    const deleteJobsStmt = db.prepare(`
-      DELETE FROM jobs WHERE target_id IN (
-        SELECT id FROM chapters WHERE book_id = ?
-      )
-    `);
-    deleteJobsStmt.run(outline.book_id);
+    // Check if we need to handle versioning
+    const versioningStatus = await bookVersioningService.requiresVersioning(bookId);
 
-    const deleteChaptersStmt = db.prepare(`
-      DELETE FROM chapters WHERE book_id = ?
-    `);
-    deleteChaptersStmt.run(outline.book_id);
+    // First, migrate any legacy chapters if they exist
+    if (!versioningStatus.activeVersion && versioningStatus.existingChapterCount > 0) {
+      logger.info({ bookId }, 'Migrating legacy chapters to version 1');
+      await bookVersioningService.migrateExistingChapters(bookId);
+    }
+
+    // Create a new version if requested
+    if (createVersion) {
+      logger.info({ bookId, versionName }, 'Creating new version before generation');
+      const newVersion = await bookVersioningService.createVersion(bookId, {
+        name: versionName,
+        autoCreated: !versionName,
+      });
+      versionId = newVersion.id;
+    } else {
+      // Get or create active version
+      let activeVersion = await bookVersioningService.getActiveVersion(bookId);
+      if (!activeVersion) {
+        // Create version 1 if no versions exist
+        activeVersion = await bookVersioningService.createVersion(bookId, {
+          name: 'Version 1',
+        });
+      }
+      versionId = activeVersion.id;
+
+      // If there are existing chapters in this version, delete them
+      // This handles regeneration within the same version
+      const deleteJobsStmt = db.prepare(`
+        DELETE FROM jobs WHERE target_id IN (
+          SELECT id FROM chapters WHERE version_id = ?
+        )
+      `);
+      deleteJobsStmt.run(versionId);
+
+      const deleteChaptersStmt = db.prepare(`
+        DELETE FROM chapters WHERE version_id = ?
+      `);
+      deleteChaptersStmt.run(versionId);
+    }
 
     // Create chapter records for all chapters in the outline
     const now = new Date().toISOString();
@@ -453,13 +491,14 @@ router.post('/:id/start-generation', (req, res) => {
         chapterIds.push(chapterId);
 
         const insertChapterStmt = db.prepare(`
-          INSERT INTO chapters (id, book_id, chapter_number, title, scene_cards, content, summary, status, word_count, flags, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, 0, NULL, ?, ?)
+          INSERT INTO chapters (id, book_id, version_id, chapter_number, title, scene_cards, content, summary, status, word_count, flags, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?, 0, NULL, ?, ?)
         `);
 
         insertChapterStmt.run(
           chapterId,
-          outline.book_id,
+          bookId,
+          versionId,
           chapterOutline.number,
           chapterOutline.title,
           JSON.stringify(chapterOutline.scenes || []),
@@ -483,12 +522,13 @@ router.post('/:id/start-generation', (req, res) => {
     const updateBookStmt = db.prepare(`
       UPDATE books SET status = ?, updated_at = ? WHERE id = ?
     `);
-    updateBookStmt.run('generating', now, outline.book_id);
+    updateBookStmt.run('generating', now, bookId);
 
     res.json({
       success: true,
       chaptersCreated: chapterIds.length,
       jobsQueued: chapterIds.length,
+      versionId,
     });
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack }, 'Error starting generation');
