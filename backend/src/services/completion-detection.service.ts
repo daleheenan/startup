@@ -9,6 +9,7 @@ const logger = createLogger('services:completion-detection');
 /**
  * Book Completion Detection Service
  * Sprint 38: Detects when all chapters are written and triggers auto-analysis
+ * Sprint 39: Added automatic VEB (Virtual Editorial Board) trigger on book completion
  */
 
 export interface BookCompletionStatus {
@@ -19,6 +20,7 @@ export interface BookCompletionStatus {
   totalWordCount: number;
   completedAt: string | null;
   analyticsStatus: 'pending' | 'processing' | 'completed' | 'failed' | null;
+  vebStatus: 'pending' | 'processing' | 'completed' | 'failed' | null;
 }
 
 export interface CompletionRecord {
@@ -32,6 +34,9 @@ export interface CompletionRecord {
   analytics_triggered_at: string | null;
   analytics_completed_at: string | null;
   cached_analytics: string | null;
+  veb_status: string | null;
+  veb_triggered_at: string | null;
+  veb_report_id: string | null;
 }
 
 class CompletionDetectionService {
@@ -74,6 +79,7 @@ class CompletionDetectionService {
       totalWordCount,
       completedAt: completionRecord?.completed_at || book.completed_at || null,
       analyticsStatus: completionRecord?.analytics_status as any || null,
+      vebStatus: completionRecord?.veb_status as any || null,
     };
   }
 
@@ -198,8 +204,18 @@ class CompletionDetectionService {
   /**
    * Check if a chapter update triggers book completion
    * Call this after chapter content is saved
+   *
+   * When a book is completed, this method:
+   * 1. Creates a completion record
+   * 2. Triggers auto-analytics
+   * 3. Triggers auto-VEB (Virtual Editorial Board) analysis
    */
-  async checkAndTriggerCompletion(chapterId: string): Promise<{ isNowComplete: boolean; completionRecord: CompletionRecord | null }> {
+  async checkAndTriggerCompletion(chapterId: string): Promise<{
+    isNowComplete: boolean;
+    completionRecord: CompletionRecord | null;
+    vebTriggered: boolean;
+    vebReportId?: string;
+  }> {
     // Get book ID from chapter
     const chapterStmt = db.prepare<[string], { book_id: string }>(`
       SELECT book_id FROM chapters WHERE id = ?
@@ -207,7 +223,7 @@ class CompletionDetectionService {
     const chapter = chapterStmt.get(chapterId);
 
     if (!chapter) {
-      return { isNowComplete: false, completionRecord: null };
+      return { isNowComplete: false, completionRecord: null, vebTriggered: false };
     }
 
     const status = this.checkBookCompletion(chapter.book_id);
@@ -217,17 +233,33 @@ class CompletionDetectionService {
       try {
         const record = await this.markBookComplete(chapter.book_id);
 
-        // Trigger auto-analysis
+        // Trigger auto-analysis (analytics)
         this.triggerAutoAnalysis(chapter.book_id);
 
-        return { isNowComplete: true, completionRecord: record };
+        // Trigger auto-VEB (Virtual Editorial Board)
+        const vebResult = await this.triggerAutoVEB(chapter.book_id);
+
+        logger.info({
+          chapterId,
+          bookId: chapter.book_id,
+          analyticsTriggered: true,
+          vebTriggered: vebResult.success,
+          vebReportId: vebResult.reportId
+        }, 'Book completion triggered - analytics and VEB started');
+
+        return {
+          isNowComplete: true,
+          completionRecord: record,
+          vebTriggered: vebResult.success,
+          vebReportId: vebResult.reportId
+        };
       } catch (error) {
         logger.error({ chapterId, bookId: chapter.book_id, error }, 'Error triggering completion');
-        return { isNowComplete: false, completionRecord: null };
+        return { isNowComplete: false, completionRecord: null, vebTriggered: false };
       }
     }
 
-    return { isNowComplete: false, completionRecord: null };
+    return { isNowComplete: false, completionRecord: null, vebTriggered: false };
   }
 
   /**
@@ -288,6 +320,117 @@ class CompletionDetectionService {
 
     // Trigger analysis
     return this.triggerAutoAnalysis(bookId);
+  }
+
+  /**
+   * Trigger automatic VEB (Virtual Editorial Board) analysis for a completed book
+   * This submits the manuscript to the VEB for comprehensive editorial review
+   */
+  async triggerAutoVEB(bookId: string): Promise<{ success: boolean; message: string; reportId?: string }> {
+    // Get completion record
+    const completionStmt = db.prepare<[string], CompletionRecord>(`
+      SELECT * FROM book_completion WHERE book_id = ?
+    `);
+    const completion = completionStmt.get(bookId);
+
+    if (!completion) {
+      return { success: false, message: 'Book has no completion record. Call markBookComplete first.' };
+    }
+
+    // Check if VEB is already in progress or completed
+    if (completion.veb_status === 'processing') {
+      return { success: false, message: 'VEB analysis already in progress.' };
+    }
+
+    if (completion.veb_status === 'completed' && completion.veb_report_id) {
+      return { success: false, message: 'VEB analysis already completed.', reportId: completion.veb_report_id };
+    }
+
+    const now = new Date().toISOString();
+
+    try {
+      // Import VEB service dynamically to avoid circular dependency
+      const { vebService } = await import('./veb.service.js');
+
+      // Update status to processing
+      const updateStmt = db.prepare(`
+        UPDATE book_completion
+        SET veb_status = 'processing', veb_triggered_at = ?, updated_at = ?
+        WHERE book_id = ?
+      `);
+      updateStmt.run(now, now, bookId);
+
+      // Submit to VEB (this creates the report and queues jobs)
+      const result = await vebService.submitToVEB(completion.project_id);
+
+      // Store the report ID in completion record
+      const linkStmt = db.prepare(`
+        UPDATE book_completion
+        SET veb_report_id = ?, updated_at = ?
+        WHERE book_id = ?
+      `);
+      linkStmt.run(result.reportId, now, bookId);
+
+      logger.info({
+        bookId,
+        projectId: completion.project_id,
+        reportId: result.reportId
+      }, 'Auto-VEB triggered for completed book');
+
+      return { success: true, message: 'VEB analysis started.', reportId: result.reportId };
+    } catch (error) {
+      // Mark as failed
+      const failStmt = db.prepare(`
+        UPDATE book_completion
+        SET veb_status = 'failed', updated_at = ?
+        WHERE book_id = ?
+      `);
+      failStmt.run(now, bookId);
+
+      logger.error({ bookId, error }, 'Failed to trigger auto-VEB');
+      return { success: false, message: `Failed to start VEB analysis: ${(error as Error).message}` };
+    }
+  }
+
+  /**
+   * Update VEB status when the report is completed
+   * Called by the VEB finalise job handler
+   */
+  updateVEBStatus(bookId: string, status: 'completed' | 'failed', reportId?: string): void {
+    const now = new Date().toISOString();
+
+    const stmt = db.prepare(`
+      UPDATE book_completion
+      SET veb_status = ?, veb_report_id = COALESCE(?, veb_report_id), updated_at = ?
+      WHERE book_id = ?
+    `);
+    stmt.run(status, reportId || null, now, bookId);
+
+    logger.info({ bookId, status, reportId }, 'VEB status updated in completion record');
+  }
+
+  /**
+   * Re-run VEB analysis for a completed book
+   */
+  async rerunVEB(bookId: string): Promise<{ success: boolean; message: string; reportId?: string }> {
+    const completion = this.getCompletionRecord(bookId);
+
+    if (!completion) {
+      return { success: false, message: 'Book has no completion record.' };
+    }
+
+    const now = new Date().toISOString();
+
+    // Reset VEB status
+    const updateStmt = db.prepare(`
+      UPDATE book_completion
+      SET veb_status = 'pending', veb_report_id = NULL, veb_triggered_at = NULL, updated_at = ?
+      WHERE book_id = ?
+    `);
+    updateStmt.run(now, bookId);
+
+    // Trigger VEB
+    return this.triggerAutoVEB(bookId);
   }
 }
 

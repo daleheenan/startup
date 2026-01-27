@@ -323,6 +323,7 @@ export function runMigrations() {
       '015_fix_metrics_trigger.sql',     // DB version 28 - fix word_count ambiguity in trigger
       '020_backfill_metrics.sql',        // DB version 29 - backfill metrics for existing data
       '026_author_name_field.sql',       // DB version 30 - author name for exports
+      '027_editorial_reports.sql',       // DB version 31 - VEB (Virtual Editorial Board) tables
     ];
 
     for (let i = 0; i < migrationFiles.length; i++) {

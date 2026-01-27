@@ -2,76 +2,127 @@ import { jest } from '@jest/globals';
 import fs from 'fs';
 import path from 'path';
 
-// Mock dependencies
+// Create mock functions that persist between tests
+const mockDbExec = jest.fn();
+const mockDbPrepare = jest.fn();
+const mockDbPragma = jest.fn();
+const mockBackupSync = jest.fn();
+const mockMigrateFromOldSchema = jest.fn();
+const mockGetAppliedMigrations = jest.fn();
+
+// Mock dependencies before importing
 jest.mock('fs');
+jest.mock('url', () => ({
+  fileURLToPath: jest.fn(() => '/fake/path/db/migrate.ts'),
+}));
+jest.mock('path', () => ({
+  dirname: jest.fn((p: string) => p.substring(0, p.lastIndexOf('/'))),
+  join: jest.fn((...args: string[]) => args.join('/')),
+}));
 jest.mock('../connection.js', () => ({
   default: {
-    exec: jest.fn(),
-    prepare: jest.fn(),
-    pragma: jest.fn(),
+    exec: mockDbExec,
+    prepare: mockDbPrepare,
+    pragma: mockDbPragma,
   },
+}));
+
+jest.mock('../../services/logger.service.js', () => ({
+  createLogger: jest.fn(() => ({
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+  })),
+}));
+
+jest.mock('../../services/backup.service.js', () => ({
+  backupService: {
+    createBackupSync: mockBackupSync,
+    createBackup: jest.fn(),
+  },
+}));
+
+jest.mock('../migration-registry.js', () => ({
+  createMigrationRegistry: jest.fn(() => ({
+    migrateFromOldSchema: mockMigrateFromOldSchema,
+    getAppliedMigrations: mockGetAppliedMigrations,
+  })),
 }));
 
 describe('Database Migrations', () => {
   let runMigrations: any;
-  let mockDb: any;
   let mockFs: typeof fs;
 
   beforeEach(async () => {
+    // Clear all mock calls
     jest.clearAllMocks();
 
-    const dbModule = await import('../connection.js');
-    mockDb = dbModule.default;
+    // Reset mock implementations
+    mockDbExec.mockReset();
+    mockDbPrepare.mockReset();
+    mockDbPragma.mockReset();
+    mockBackupSync.mockReset();
+    mockMigrateFromOldSchema.mockReset();
+    mockGetAppliedMigrations.mockReset();
+
+    // Set default mock implementations
+    mockBackupSync.mockReturnValue({ success: true, backupPath: '/tmp/backup.db', duration: 100 });
+    mockMigrateFromOldSchema.mockReturnValue(undefined);
 
     mockFs = fs as any;
+    (mockFs.existsSync as jest.Mock) = jest.fn().mockReturnValue(false);
+    (mockFs.readFileSync as jest.Mock) = jest.fn().mockReturnValue('');
 
+    // Import the module after mocks are set up
     const migrateModule = await import('../migrate.js');
     runMigrations = migrateModule.runMigrations;
   });
 
   describe('parseSqlStatements', () => {
-    // This is a private function, but we can test it through runMigrations behavior
-    it('should handle single-line comments', async () => {
-      const mockPrepare = jest.fn();
-      mockDb.prepare = mockPrepare;
+    // This is a private function, but we can test it through runMigrations behaviour
+    it('should handle single-line comments', () => {
+      const mockGet = jest.fn().mockReturnValue({ version: 10 }); // All migrations applied
+      const mockRun = jest.fn();
 
-      mockPrepare.mockReturnValue({
-        get: jest.fn().mockReturnValue({ version: 10 }), // All migrations applied
-        run: jest.fn(),
+      mockDbPrepare.mockReturnValue({
+        get: mockGet,
+        run: mockRun,
       });
 
+      expect(runMigrations).toBeDefined();
       runMigrations();
 
       // Verify migration table was created without comment lines
-      expect(mockDb.exec).toHaveBeenCalled();
+      expect(mockDbExec).toHaveBeenCalled();
     });
   });
 
   describe('runMigrations', () => {
     it('should create schema_migrations table if not exists', () => {
-      const mockPrepare = jest.fn();
-      mockDb.prepare = mockPrepare;
+      const mockGet = jest.fn().mockReturnValue({ version: 10 }); // Skip all migrations
+      const mockRun = jest.fn();
 
-      mockPrepare.mockReturnValue({
-        get: jest.fn().mockReturnValue({ version: 10 }), // Skip all migrations
-        run: jest.fn(),
+      mockDbPrepare.mockReturnValue({
+        get: mockGet,
+        run: mockRun,
       });
 
       runMigrations();
 
-      expect(mockDb.exec).toHaveBeenCalledWith(
+      expect(mockDbExec).toHaveBeenCalledWith(
         expect.stringContaining('CREATE TABLE IF NOT EXISTS schema_migrations')
       );
     });
 
     it('should track current migration version', () => {
       const mockGet = jest.fn().mockReturnValue({ version: 5 });
-      const mockPrepare = jest.fn().mockReturnValue({
-        get: mockGet,
-        run: jest.fn(),
-      });
+      const mockRun = jest.fn();
 
-      mockDb.prepare = mockPrepare;
+      mockDbPrepare.mockReturnValue({
+        get: mockGet,
+        run: mockRun,
+      });
 
       runMigrations();
 
@@ -81,15 +132,14 @@ describe('Database Migrations', () => {
     it('should apply base schema (migration 001) when version is 0', () => {
       const mockGet = jest.fn().mockReturnValue(null); // No version = 0
       const mockRun = jest.fn();
-      const mockPrepare = jest.fn().mockReturnValue({
+
+      mockDbPrepare.mockReturnValue({
         get: mockGet,
         run: mockRun,
       });
 
-      mockDb.prepare = mockPrepare;
-      mockDb.exec = jest.fn();
-
       (mockFs.readFileSync as jest.Mock).mockReturnValue('CREATE TABLE test (id TEXT);');
+      (mockFs.existsSync as jest.Mock).mockReturnValue(true);
 
       runMigrations();
 
@@ -97,64 +147,64 @@ describe('Database Migrations', () => {
         expect.stringContaining('schema.sql'),
         'utf-8'
       );
-      expect(mockDb.exec).toHaveBeenCalledWith('BEGIN TRANSACTION');
-      expect(mockDb.exec).toHaveBeenCalledWith('COMMIT');
+      expect(mockDbExec).toHaveBeenCalledWith('BEGIN TRANSACTION');
+      expect(mockDbExec).toHaveBeenCalledWith('COMMIT');
     });
 
     it('should rollback on error during migration', () => {
       const mockGet = jest.fn().mockReturnValue(null);
-      const mockPrepare = jest.fn().mockReturnValue({
+      const mockRun = jest.fn();
+
+      mockDbPrepare.mockReturnValue({
         get: mockGet,
-        run: jest.fn(),
+        run: mockRun,
       });
 
-      mockDb.prepare = mockPrepare;
-      mockDb.exec = jest.fn().mockImplementation((sql: any) => {
+      mockDbExec.mockImplementation((sql: any) => {
         if (sql.includes('CREATE TABLE')) {
           throw new Error('SQL error');
         }
       });
 
       (mockFs.readFileSync as jest.Mock).mockReturnValue('CREATE TABLE test;');
+      (mockFs.existsSync as jest.Mock).mockReturnValue(true);
 
       expect(() => runMigrations()).toThrow('SQL error');
-      expect(mockDb.exec).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockDbExec).toHaveBeenCalledWith('ROLLBACK');
     });
 
     it('should apply migration 002 for trilogy support', () => {
       const mockGet = jest.fn().mockReturnValue({ version: 1 });
       const mockRun = jest.fn();
-      const mockPrepare = jest.fn().mockReturnValue({
+
+      mockDbPrepare.mockReturnValue({
         get: mockGet,
         run: mockRun,
         all: jest.fn().mockReturnValue([]),
       });
 
-      mockDb.prepare = mockPrepare;
-      mockDb.exec = jest.fn();
-      mockDb.pragma = jest.fn().mockReturnValue([
+      mockDbPragma.mockReturnValue([
         { name: 'id' },
         { name: 'title' },
       ]);
 
       runMigrations();
 
-      expect(mockDb.exec).toHaveBeenCalledWith('BEGIN TRANSACTION');
-      expect(mockDb.pragma).toHaveBeenCalledWith('table_info(books)');
+      expect(mockDbExec).toHaveBeenCalledWith('BEGIN TRANSACTION');
+      expect(mockDbPragma).toHaveBeenCalledWith('table_info(books)');
     });
 
     it('should skip adding columns if they already exist', () => {
       const mockGet = jest.fn().mockReturnValue({ version: 1 });
       const mockRun = jest.fn();
-      const mockPrepare = jest.fn().mockReturnValue({
+
+      mockDbPrepare.mockReturnValue({
         get: mockGet,
         run: mockRun,
         all: jest.fn().mockReturnValue([{ name: 'book_transitions' }]),
       });
 
-      mockDb.prepare = mockPrepare;
-      mockDb.exec = jest.fn();
-      mockDb.pragma = jest.fn().mockReturnValue([
+      mockDbPragma.mockReturnValue([
         { name: 'id' },
         { name: 'ending_state' }, // Column already exists
       ]);
@@ -162,7 +212,7 @@ describe('Database Migrations', () => {
       runMigrations();
 
       // Should not try to add the column again
-      const alterCalls = (mockDb.exec as jest.Mock).mock.calls.filter((call: any[]) =>
+      const alterCalls = (mockDbExec as jest.Mock).mock.calls.filter((call: any[]) =>
         call[0].includes('ALTER TABLE books ADD COLUMN ending_state')
       );
       expect(alterCalls).toHaveLength(0);
@@ -171,22 +221,21 @@ describe('Database Migrations', () => {
     it('should create book_transitions table if not exists', () => {
       const mockGet = jest.fn().mockReturnValue({ version: 1 });
       const mockRun = jest.fn();
-      const mockPrepare = jest.fn().mockReturnValue({
+
+      mockDbPrepare.mockReturnValue({
         get: mockGet,
         run: mockRun,
         all: jest.fn().mockReturnValue([]), // Table doesn't exist
       });
 
-      mockDb.prepare = mockPrepare;
-      mockDb.exec = jest.fn();
-      mockDb.pragma = jest.fn().mockReturnValue([
+      mockDbPragma.mockReturnValue([
         { name: 'id' },
         { name: 'ending_state' },
       ]);
 
       runMigrations();
 
-      expect(mockDb.exec).toHaveBeenCalledWith(
+      expect(mockDbExec).toHaveBeenCalledWith(
         expect.stringContaining('CREATE TABLE book_transitions')
       );
     });
@@ -194,19 +243,18 @@ describe('Database Migrations', () => {
     it('should apply migration 003 for agent learning system', () => {
       const mockGet = jest.fn().mockReturnValue({ version: 2 });
       const mockRun = jest.fn();
-      const mockPrepare = jest.fn().mockReturnValue({
+
+      mockDbPrepare.mockReturnValue({
         get: mockGet,
         run: mockRun,
       });
-
-      mockDb.prepare = mockPrepare;
-      mockDb.exec = jest.fn();
 
       (mockFs.readFileSync as jest.Mock).mockReturnValue(`
         -- Agent learning tables
         CREATE TABLE agent_lessons (id TEXT PRIMARY KEY);
         CREATE TABLE agent_reflections (id TEXT PRIMARY KEY);
       `);
+      (mockFs.existsSync as jest.Mock).mockReturnValue(true);
 
       runMigrations();
 
@@ -219,17 +267,16 @@ describe('Database Migrations', () => {
     it('should apply migration 004 for saved concepts', () => {
       const mockGet = jest.fn().mockReturnValue({ version: 3 });
       const mockRun = jest.fn();
-      const mockPrepare = jest.fn().mockReturnValue({
+
+      mockDbPrepare.mockReturnValue({
         get: mockGet,
         run: mockRun,
       });
 
-      mockDb.prepare = mockPrepare;
-      mockDb.exec = jest.fn();
-
       (mockFs.readFileSync as jest.Mock).mockReturnValue(`
         CREATE TABLE saved_concepts (id TEXT PRIMARY KEY);
       `);
+      (mockFs.existsSync as jest.Mock).mockReturnValue(true);
 
       runMigrations();
 
@@ -242,13 +289,11 @@ describe('Database Migrations', () => {
     it('should apply migrations 005-010 from files', () => {
       const mockGet = jest.fn().mockReturnValue({ version: 4 });
       const mockRun = jest.fn();
-      const mockPrepare = jest.fn().mockReturnValue({
+
+      mockDbPrepare.mockReturnValue({
         get: mockGet,
         run: mockRun,
       });
-
-      mockDb.prepare = mockPrepare;
-      mockDb.exec = jest.fn();
 
       (mockFs.existsSync as jest.Mock).mockReturnValue(true);
       (mockFs.readFileSync as jest.Mock).mockReturnValue('CREATE TABLE test;');
@@ -264,32 +309,30 @@ describe('Database Migrations', () => {
     it('should skip migration files that do not exist', () => {
       const mockGet = jest.fn().mockReturnValue({ version: 4 });
       const mockRun = jest.fn();
-      const mockPrepare = jest.fn().mockReturnValue({
+
+      mockDbPrepare.mockReturnValue({
         get: mockGet,
         run: mockRun,
       });
-
-      mockDb.prepare = mockPrepare;
-      mockDb.exec = jest.fn();
 
       (mockFs.existsSync as jest.Mock).mockReturnValue(false);
 
       runMigrations();
 
       // Should not throw error
-      expect(mockDb.exec).toHaveBeenCalled();
+      expect(mockDbExec).toHaveBeenCalled();
     });
 
     it('should handle ALTER TABLE errors for existing columns gracefully', () => {
       const mockGet = jest.fn().mockReturnValue({ version: 4 });
       const mockRun = jest.fn();
-      const mockPrepare = jest.fn().mockReturnValue({
+
+      mockDbPrepare.mockReturnValue({
         get: mockGet,
         run: mockRun,
       });
 
-      mockDb.prepare = mockPrepare;
-      mockDb.exec = jest.fn().mockImplementation((sql: any) => {
+      mockDbExec.mockImplementation((sql: any) => {
         if (sql.includes('ALTER TABLE') && sql.includes('ADD COLUMN')) {
           const error: any = new Error('duplicate column name');
           error.code = 'SQLITE_ERROR';
@@ -307,13 +350,11 @@ describe('Database Migrations', () => {
     it('should handle trigger creation with BEGIN/END blocks', () => {
       const mockGet = jest.fn().mockReturnValue({ version: 4 });
       const mockRun = jest.fn();
-      const mockPrepare = jest.fn().mockReturnValue({
+
+      mockDbPrepare.mockReturnValue({
         get: mockGet,
         run: mockRun,
       });
-
-      mockDb.prepare = mockPrepare;
-      mockDb.exec = jest.fn();
 
       (mockFs.existsSync as jest.Mock).mockReturnValue(true);
       (mockFs.readFileSync as jest.Mock).mockReturnValue(`
@@ -327,7 +368,7 @@ describe('Database Migrations', () => {
       runMigrations();
 
       // Should parse the trigger as a single statement
-      expect(mockDb.exec).toHaveBeenCalledWith(
+      expect(mockDbExec).toHaveBeenCalledWith(
         expect.stringContaining('CREATE TRIGGER')
       );
     });
@@ -335,13 +376,11 @@ describe('Database Migrations', () => {
     it('should record migration version after successful application', () => {
       const mockGet = jest.fn().mockReturnValue({ version: 4 });
       const mockRun = jest.fn();
-      const mockPrepare = jest.fn().mockReturnValue({
+
+      mockDbPrepare.mockReturnValue({
         get: mockGet,
         run: mockRun,
       });
-
-      mockDb.prepare = mockPrepare;
-      mockDb.exec = jest.fn();
 
       (mockFs.existsSync as jest.Mock).mockReturnValue(true);
       (mockFs.readFileSync as jest.Mock).mockReturnValue('SELECT 1;');
@@ -349,24 +388,22 @@ describe('Database Migrations', () => {
       runMigrations();
 
       expect(mockRun).toHaveBeenCalled();
-      expect(mockDb.exec).toHaveBeenCalledWith('COMMIT');
+      expect(mockDbExec).toHaveBeenCalledWith('COMMIT');
     });
 
     it('should skip migrations already applied', () => {
-      const mockGet = jest.fn().mockReturnValue({ version: 10 }); // All migrations applied
+      const mockGet = jest.fn().mockReturnValue({ version: 100 }); // All migrations applied
       const mockRun = jest.fn();
-      const mockPrepare = jest.fn().mockReturnValue({
+
+      mockDbPrepare.mockReturnValue({
         get: mockGet,
         run: mockRun,
       });
 
-      mockDb.prepare = mockPrepare;
-      mockDb.exec = jest.fn();
-
       runMigrations();
 
       // Should only create the migration tracking table
-      const execCalls = (mockDb.exec as jest.Mock).mock.calls;
+      const execCalls = (mockDbExec as jest.Mock).mock.calls;
       const transactionCalls = execCalls.filter(
         (call: any[]) => call[0].includes('BEGIN TRANSACTION')
       );
@@ -376,13 +413,11 @@ describe('Database Migrations', () => {
     it('should handle multiple statements in a migration file', () => {
       const mockGet = jest.fn().mockReturnValue({ version: 4 });
       const mockRun = jest.fn();
-      const mockPrepare = jest.fn().mockReturnValue({
+
+      mockDbPrepare.mockReturnValue({
         get: mockGet,
         run: mockRun,
       });
-
-      mockDb.prepare = mockPrepare;
-      mockDb.exec = jest.fn();
 
       (mockFs.existsSync as jest.Mock).mockReturnValue(true);
       (mockFs.readFileSync as jest.Mock).mockReturnValue(`
@@ -394,7 +429,7 @@ describe('Database Migrations', () => {
       runMigrations();
 
       // Should execute all three statements
-      const createCalls = (mockDb.exec as jest.Mock).mock.calls.filter(
+      const createCalls = (mockDbExec as jest.Mock).mock.calls.filter(
         (call: any[]) => call[0].includes('CREATE')
       );
       expect(createCalls.length).toBeGreaterThan(0);
@@ -403,13 +438,13 @@ describe('Database Migrations', () => {
     it('should rethrow non-ignorable SQL errors', () => {
       const mockGet = jest.fn().mockReturnValue({ version: 4 });
       const mockRun = jest.fn();
-      const mockPrepare = jest.fn().mockReturnValue({
+
+      mockDbPrepare.mockReturnValue({
         get: mockGet,
         run: mockRun,
       });
 
-      mockDb.prepare = mockPrepare;
-      mockDb.exec = jest.fn().mockImplementation((sql: any) => {
+      mockDbExec.mockImplementation((sql: any) => {
         if (sql.includes('CREATE TABLE')) {
           const error: any = new Error('syntax error');
           error.code = 'SQLITE_ERROR';

@@ -94,6 +94,7 @@ import authorsRouter from './routes/authors.js';
 import plagiarismRouter from './routes/plagiarism.js';
 import vebRouter from './routes/veb.js';
 import completionRouter from './routes/completion.js';
+import outlineEditorialRouter from './routes/outline-editorial.js';
 
 // Run database migrations
 try {
@@ -200,6 +201,7 @@ app.use('/api/authors', apiLimiter, requireAuth, authorsRouter);
 app.use('/api/plagiarism', apiLimiter, requireAuth, plagiarismRouter);
 app.use('/api/completion', apiLimiter, requireAuth, completionRouter);
 app.use('/api', apiLimiter, requireAuth, vebRouter); // VEB routes use /api/projects/:id/veb/* and /api/veb/*
+app.use('/api', apiLimiter, requireAuth, outlineEditorialRouter); // Outline Editorial routes
 
 // Sentry error handler - must be BEFORE custom error handlers
 app.use(sentryErrorHandler());

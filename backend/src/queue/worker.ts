@@ -218,6 +218,15 @@ export class QueueWorker {
         return await this.coherenceCheck(job);
       case 'originality_check':
         return await this.originalityCheck(job);
+      // Sprint 39: Outline Editorial Board job types
+      case 'outline_structure_analyst':
+        return await this.outlineStructureAnalyst(job);
+      case 'outline_character_arc':
+        return await this.outlineCharacterArc(job);
+      case 'outline_market_fit':
+        return await this.outlineMarketFit(job);
+      case 'outline_editorial_finalize':
+        return await this.outlineEditorialFinalize(job);
       default:
         throw new Error(`Unknown job type: ${job.type}`);
     }
@@ -1610,6 +1619,119 @@ Return ONLY a JSON object:
   //     throw error;
   //   }
   // }
+
+  // ==========================================================================
+  // Sprint 39: Outline Editorial Board Handlers
+  // ==========================================================================
+
+  /**
+   * Outline Editorial Module A: Story Structure Analyst
+   * target_id = report ID
+   */
+  private async outlineStructureAnalyst(job: Job): Promise<void> {
+    const reportId = job.target_id;
+    logger.info({ reportId }, 'outline_structure_analyst: Starting Structure Analyst');
+
+    try {
+      const { outlineEditorialService } = await import('../services/outline-editorial.service.js');
+
+      checkpointManager.saveCheckpoint(job.id, 'started', { reportId });
+
+      const result = await outlineEditorialService.runStructureAnalyst(reportId);
+
+      logger.info({
+        reportId,
+        plotStructureScore: result.plotStructureScore
+      }, 'outline_structure_analyst: Completed');
+
+      checkpointManager.saveCheckpoint(job.id, 'completed', { reportId });
+    } catch (error) {
+      logger.error({ error, reportId }, 'outline_structure_analyst: Error');
+      throw error;
+    }
+  }
+
+  /**
+   * Outline Editorial Module B: Character Arc Reviewer
+   * target_id = report ID
+   */
+  private async outlineCharacterArc(job: Job): Promise<void> {
+    const reportId = job.target_id;
+    logger.info({ reportId }, 'outline_character_arc: Starting Character Arc Reviewer');
+
+    try {
+      const { outlineEditorialService } = await import('../services/outline-editorial.service.js');
+
+      checkpointManager.saveCheckpoint(job.id, 'started', { reportId });
+
+      const result = await outlineEditorialService.runCharacterArcReviewer(reportId);
+
+      logger.info({
+        reportId,
+        overallCharacterScore: result.overallCharacterScore
+      }, 'outline_character_arc: Completed');
+
+      checkpointManager.saveCheckpoint(job.id, 'completed', { reportId });
+    } catch (error) {
+      logger.error({ error, reportId }, 'outline_character_arc: Error');
+      throw error;
+    }
+  }
+
+  /**
+   * Outline Editorial Module C: Market Fit Analyst
+   * target_id = report ID
+   */
+  private async outlineMarketFit(job: Job): Promise<void> {
+    const reportId = job.target_id;
+    logger.info({ reportId }, 'outline_market_fit: Starting Market Fit Analyst');
+
+    try {
+      const { outlineEditorialService } = await import('../services/outline-editorial.service.js');
+
+      checkpointManager.saveCheckpoint(job.id, 'started', { reportId });
+
+      const result = await outlineEditorialService.runMarketFitAnalyst(reportId);
+
+      logger.info({
+        reportId,
+        marketViabilityScore: result.marketViabilityScore
+      }, 'outline_market_fit: Completed');
+
+      checkpointManager.saveCheckpoint(job.id, 'completed', { reportId });
+    } catch (error) {
+      logger.error({ error, reportId }, 'outline_market_fit: Error');
+      throw error;
+    }
+  }
+
+  /**
+   * Outline Editorial Finalise - Aggregate results and generate overall report
+   * target_id = report ID
+   */
+  private async outlineEditorialFinalize(job: Job): Promise<void> {
+    const reportId = job.target_id;
+    logger.info({ reportId }, 'outline_editorial_finalize: Starting report finalisation');
+
+    try {
+      const { outlineEditorialService } = await import('../services/outline-editorial.service.js');
+
+      checkpointManager.saveCheckpoint(job.id, 'started', { reportId });
+
+      const report = await outlineEditorialService.finaliseReport(reportId);
+
+      logger.info({
+        reportId,
+        overallScore: report.overallScore,
+        readyForGeneration: report.readyForGeneration
+      }, 'outline_editorial_finalize: Completed');
+
+      checkpointManager.saveCheckpoint(job.id, 'completed', { reportId });
+    } catch (error) {
+      logger.error({ error, reportId }, 'outline_editorial_finalize: Error');
+      throw error;
+    }
+  }
 
   /**
    * Mark job as completed

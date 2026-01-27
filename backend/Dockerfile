@@ -36,7 +36,9 @@ RUN mkdir -p /data
 EXPOSE 3001
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+# start-period increased to 120s to allow time for database migrations to complete
+# This prevents premature health check failures during deployment
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
     CMD curl -f http://localhost:3001/api/health || exit 1
 
 # Start server

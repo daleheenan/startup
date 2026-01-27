@@ -6,22 +6,64 @@ import db from '../db/connection.js';
 const router = express.Router();
 const log = createLogger('HealthRouter');
 
+// Import server readiness functions (lazy import to avoid circular dependency)
+let isServerReady: () => boolean;
+let isQueueWorkerReady: () => boolean;
+
+// Initialize readiness functions asynchronously
+(async () => {
+  try {
+    const serverModule = await import('../server.js');
+    isServerReady = serverModule.isServerReady || (() => true);
+    isQueueWorkerReady = serverModule.isQueueWorkerReady || (() => true);
+  } catch {
+    // Fallback if import fails (e.g., during testing)
+    isServerReady = () => true;
+    isQueueWorkerReady = () => true;
+  }
+})();
+
 /**
  * GET /api/health
  *
- * Basic health check endpoint
+ * Basic health check endpoint with database connectivity verification
+ * This is used by Railway and Docker for deployment health checks
  *
- * Response:
+ * Response (healthy):
  * {
  *   "status": "ok",
- *   "timestamp": "ISO 8601 timestamp"
+ *   "timestamp": "ISO 8601 timestamp",
+ *   "database": "connected"
+ * }
+ *
+ * Response (unhealthy):
+ * {
+ *   "status": "unhealthy",
+ *   "timestamp": "ISO 8601 timestamp",
+ *   "error": "error message"
  * }
  */
 router.get('/', (req, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString()
-  });
+  try {
+    // Verify database connectivity with a simple query
+    const result = db.prepare('SELECT 1 as test').get();
+    if (!result) {
+      throw new Error('Database query returned no result');
+    }
+
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      database: 'connected'
+    });
+  } catch (error: any) {
+    log.error({ error: error.message }, 'Health check failed - database not accessible');
+    res.status(503).json({
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      error: error.message || 'Database connection failed'
+    });
+  }
 });
 
 /**
@@ -68,13 +110,27 @@ router.get('/detailed', (req, res) => {
     rss: Math.round(memUsage.rss / 1024 / 1024),
   };
 
+  // Queue worker check
+  try {
+    const queueReady = isQueueWorkerReady ? isQueueWorkerReady() : true;
+    checks.queueWorker = { status: queueReady ? 'ok' : 'starting' };
+    if (!queueReady) {
+      // Queue not ready is not unhealthy during startup, just degraded
+      if (overallStatus === 'ok') {
+        overallStatus = 'degraded';
+      }
+    }
+  } catch (error: any) {
+    checks.queueWorker = { status: 'unknown', error: error.message };
+  }
+
   // Uptime
   checks.uptime = Math.round(process.uptime());
 
   // Environment
   checks.environment = process.env.NODE_ENV || 'development';
 
-  const statusCode = overallStatus === 'ok' ? 200 : 503;
+  const statusCode = overallStatus === 'ok' ? 200 : (overallStatus === 'degraded' ? 200 : 503);
   res.status(statusCode).json({
     status: overallStatus,
     timestamp: new Date().toISOString(),
