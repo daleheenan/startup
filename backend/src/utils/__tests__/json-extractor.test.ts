@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from '@jest/globals';
 import { extractJsonArray, extractJsonObject, cleanJsonString } from '../json-extractor.js';
 
 describe('json-extractor', () => {

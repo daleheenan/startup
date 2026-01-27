@@ -55,7 +55,7 @@ describe('BookTransitionService', () => {
         title: 'Book One',
         word_count: 75000,
         status: 'completed',
-        ending_state: mockEndingState,
+        ending_state: JSON.stringify(mockEndingState) as any,
         book_summary: 'Hero defeats initial threat and finds artifact',
         timeline_end: 'End of Year 1',
         created_at: new Date().toISOString(),
@@ -118,7 +118,7 @@ describe('BookTransitionService', () => {
 
       mockClaudeService.createCompletion = jest
         .fn()
-        .mockResolvedValue(JSON.stringify(mockTransitionData)) as any;
+        .mockImplementation(() => Promise.resolve(JSON.stringify(mockTransitionData))) as any;
 
       const result = await service.generateBookTransition(
         'project-1',
@@ -209,7 +209,7 @@ describe('BookTransitionService', () => {
         title: 'Book Two',
         word_count: 75000,
         status: 'completed',
-        ending_state: { characters: [], world: { politicalChanges: [], physicalChanges: [], socialChanges: [], activeThreats: [], knownSecrets: [] }, timeline: '', unresolved: [] },
+        ending_state: JSON.stringify({ characters: [], world: { politicalChanges: [], physicalChanges: [], socialChanges: [], activeThreats: [], knownSecrets: [] }, timeline: '', unresolved: [] }) as any,
         book_summary: null,
         timeline_end: null,
         created_at: new Date().toISOString(),

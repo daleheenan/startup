@@ -3,16 +3,21 @@ import type { OutlineContext } from '../outline-generator.js';
 
 // Mock dependencies before importing
 jest.mock('@anthropic-ai/sdk', () => {
+  const mockCreate = jest.fn();
+  const MockAnthropic = jest.fn().mockImplementation(() => ({
+    messages: {
+      create: mockCreate,
+    },
+  }));
+
   return {
-    default: jest.fn().mockImplementation(() => ({
-      messages: {
-        create: jest.fn(),
-      },
-    })),
+    __esModule: true,
+    default: MockAnthropic,
   };
 });
 
 jest.mock('../structure-templates.js', () => ({
+  __esModule: true,
   getStructureTemplate: jest.fn(),
 }));
 
@@ -24,6 +29,10 @@ describe('OutlineGenerator', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    jest.resetModules();
+
+    // Set valid API key
+    process.env.ANTHROPIC_API_KEY = 'test-api-key';
 
     // Import mocked modules
     const AnthropicModule = await import('@anthropic-ai/sdk');
@@ -186,35 +195,35 @@ describe('OutlineGenerator', () => {
         },
       ];
 
-      // Setup mock responses
-      (mockCreate as any)
-        .mockResolvedValueOnce({
+      // Setup mock responses using mockImplementationOnce for type safety
+      mockCreate
+        .mockImplementationOnce(() => Promise.resolve({
           // Act breakdown
           content: [{ type: 'text', text: JSON.stringify(mockActBreakdown) }],
-        })
-        .mockResolvedValueOnce({
+        }) as any)
+        .mockImplementationOnce(() => Promise.resolve({
           // Chapters for Act 1
           content: [{ type: 'text', text: JSON.stringify(mockChapters) }],
-        })
-        .mockResolvedValueOnce({
+        }) as any)
+        .mockImplementationOnce(() => Promise.resolve({
           // Chapters for Act 2
           content: [{ type: 'text', text: JSON.stringify(mockChapters) }],
-        })
-        .mockResolvedValueOnce({
+        }) as any)
+        .mockImplementationOnce(() => Promise.resolve({
           // Chapters for Act 3
           content: [{ type: 'text', text: JSON.stringify(mockChapters) }],
-        });
+        }) as any);
 
       // Mock scene card responses for all chapters (need many)
       for (let i = 0; i < 100; i++) {
-        (mockCreate as any).mockResolvedValueOnce({
+        mockCreate.mockImplementationOnce(() => Promise.resolve({
           content: [{ type: 'text', text: JSON.stringify(mockScenes) }],
-        });
+        }) as any);
       }
 
       const result = await generateOutline(mockContext);
 
-      expect(result.type).toBe('three-act');
+      expect(result.type).toBe('three_act');
       expect(result.acts).toHaveLength(3);
       expect(result.acts[0].number).toBe(1);
       expect(result.acts[0].chapters).toBeDefined();
@@ -242,14 +251,14 @@ describe('OutlineGenerator', () => {
         },
       ];
 
-      (mockCreate as any).mockResolvedValue({
-        content: [{ type: 'text', text: JSON.stringify(mockActBreakdown) }],
-      });
-
-      // Mock chapter and scene responses
-      (mockCreate as any).mockResolvedValue({
-        content: [{ type: 'text', text: '[]' }],
-      });
+      // Mock act breakdown response, then chapter and scene responses
+      mockCreate
+        .mockImplementationOnce(() => Promise.resolve({
+          content: [{ type: 'text', text: JSON.stringify(mockActBreakdown) }],
+        }) as any)
+        .mockImplementation(() => Promise.resolve({
+          content: [{ type: 'text', text: '[]' }],
+        }) as any);
 
       const contextWithDifferentLength: OutlineContext = {
         ...mockContext,
@@ -259,7 +268,7 @@ describe('OutlineGenerator', () => {
       await generateOutline(contextWithDifferentLength);
 
       // Verify the prompt includes target chapter count
-      const callArgs = mockCreate.mock.calls[0][0];
+      const callArgs = mockCreate.mock.calls[0][0] as any;
       expect(callArgs.messages[0].content).toContain('30');
     });
 
@@ -296,14 +305,14 @@ describe('OutlineGenerator', () => {
         },
       ];
 
-      (mockCreate as any).mockResolvedValue({
-        content: [{ type: 'text', text: JSON.stringify(mockActBreakdown) }],
-      });
-
-      // Mock empty chapters/scenes to simplify test
-      (mockCreate as any).mockResolvedValue({
-        content: [{ type: 'text', text: '[]' }],
-      });
+      // Mock act breakdown response, then empty chapters/scenes
+      mockCreate
+        .mockImplementationOnce(() => Promise.resolve({
+          content: [{ type: 'text', text: JSON.stringify(mockActBreakdown) }],
+        }) as any)
+        .mockImplementation(() => Promise.resolve({
+          content: [{ type: 'text', text: '[]' }],
+        }) as any);
 
       const result = await generateOutline(mockContext);
 
@@ -314,13 +323,29 @@ describe('OutlineGenerator', () => {
     it('should include protagonist and antagonist in act breakdown prompt', async () => {
       (getStructureTemplate as jest.Mock).mockReturnValue(mockTemplate);
 
-      (mockCreate as any).mockResolvedValue({
-        content: [{ type: 'text', text: '[]' }],
-      });
+      const mockActBreakdown = [
+        {
+          number: 1,
+          name: 'Setup',
+          description: 'Opening',
+          beats: [],
+          targetWordCount: 30000,
+          chapterCount: 1,
+        },
+      ];
+
+      // Mock act breakdown, then empty chapters/scenes
+      mockCreate
+        .mockImplementationOnce(() => Promise.resolve({
+          content: [{ type: 'text', text: JSON.stringify(mockActBreakdown) }],
+        }) as any)
+        .mockImplementation(() => Promise.resolve({
+          content: [{ type: 'text', text: '[]' }],
+        }) as any);
 
       await generateOutline(mockContext);
 
-      const actBreakdownCall = mockCreate.mock.calls[0][0];
+      const actBreakdownCall = mockCreate.mock.calls[0][0] as any;
       expect(actBreakdownCall.messages[0].content).toContain('Aldric');
       expect(actBreakdownCall.messages[0].content).toContain('protagonist');
     });
@@ -333,13 +358,29 @@ describe('OutlineGenerator', () => {
         characters: [mockContext.characters[0]], // Only protagonist
       };
 
-      (mockCreate as any).mockResolvedValue({
-        content: [{ type: 'text', text: '[]' }],
-      });
+      const mockActBreakdown = [
+        {
+          number: 1,
+          name: 'Setup',
+          description: 'Opening',
+          beats: [],
+          targetWordCount: 30000,
+          chapterCount: 1,
+        },
+      ];
+
+      // Mock act breakdown, then empty chapters/scenes
+      mockCreate
+        .mockImplementationOnce(() => Promise.resolve({
+          content: [{ type: 'text', text: JSON.stringify(mockActBreakdown) }],
+        }) as any)
+        .mockImplementation(() => Promise.resolve({
+          content: [{ type: 'text', text: '[]' }],
+        }) as any);
 
       await generateOutline(contextWithoutAntagonist);
 
-      const actBreakdownCall = mockCreate.mock.calls[0][0];
+      const actBreakdownCall = mockCreate.mock.calls[0][0] as any;
       expect(actBreakdownCall.messages[0].content).toContain(
         'No direct antagonist'
       );
@@ -370,17 +411,17 @@ describe('OutlineGenerator', () => {
       ];
 
       mockCreate
-        .mockResolvedValueOnce({
+        .mockImplementationOnce(() => Promise.resolve({
           content: [{ type: 'text', text: JSON.stringify(mockActBreakdown) }],
-        })
-        .mockResolvedValueOnce({
+        }) as any)
+        .mockImplementationOnce(() => Promise.resolve({
           content: [{ type: 'text', text: JSON.stringify(mockChapters) }],
-        });
+        }) as any);
 
       // Mock scenes
-      (mockCreate as any).mockResolvedValue({
+      mockCreate.mockImplementation(() => Promise.resolve({
         content: [{ type: 'text', text: '[]' }],
-      });
+      }) as any);
 
       const result = await generateOutline(mockContext);
 
@@ -427,15 +468,15 @@ describe('OutlineGenerator', () => {
       ];
 
       mockCreate
-        .mockResolvedValueOnce({
+        .mockImplementationOnce(() => Promise.resolve({
           content: [{ type: 'text', text: JSON.stringify(mockActBreakdown) }],
-        })
-        .mockResolvedValueOnce({
+        }) as any)
+        .mockImplementationOnce(() => Promise.resolve({
           content: [{ type: 'text', text: JSON.stringify(mockChapters) }],
-        })
-        .mockResolvedValueOnce({
+        }) as any)
+        .mockImplementationOnce(() => Promise.resolve({
           content: [{ type: 'text', text: JSON.stringify(mockScenes) }],
-        });
+        }) as any);
 
       const result = await generateOutline(mockContext);
 
@@ -471,34 +512,42 @@ describe('OutlineGenerator', () => {
       ];
 
       mockCreate
-        .mockResolvedValueOnce({
+        .mockImplementationOnce(() => Promise.resolve({
           content: [{ type: 'text', text: JSON.stringify(mockActBreakdown) }],
-        })
-        .mockResolvedValueOnce({
+        }) as any)
+        .mockImplementationOnce(() => Promise.resolve({
           content: [{ type: 'text', text: JSON.stringify(mockChapters) }],
-        })
-        .mockResolvedValueOnce({
+        }) as any)
+        .mockImplementationOnce(() => Promise.resolve({
           content: [{ type: 'text', text: '[]' }],
-        });
+        }) as any);
 
       await generateOutline(mockContext);
 
-      // Find the scene card generation call
-      const sceneCardCall = mockCreate.mock.calls.find((call) =>
-        call[0].messages[0].content.includes('Generate')
-      );
+      // Find the scene card generation call - should be the last mock call
+      const calls = mockCreate.mock.calls;
+      expect(calls.length).toBeGreaterThan(0);
+
+      // Scene card call should contain location information
+      const sceneCardCall = calls.find((call: any) => {
+        const content = call[0]?.messages?.[0]?.content || '';
+        return content.includes('The Fallen Capital') || content.includes('The Dark Tower');
+      });
 
       expect(sceneCardCall).toBeDefined();
-      expect(sceneCardCall[0].messages[0].content).toContain('The Fallen Capital');
-      expect(sceneCardCall[0].messages[0].content).toContain('The Dark Tower');
+      if (sceneCardCall) {
+        const content = (sceneCardCall as any)[0].messages[0].content;
+        expect(content).toContain('The Fallen Capital');
+        expect(content).toContain('The Dark Tower');
+      }
     });
 
     it('should handle parsing errors gracefully', async () => {
       (getStructureTemplate as jest.Mock).mockReturnValue(mockTemplate);
 
-      (mockCreate as any).mockResolvedValue({
+      mockCreate.mockImplementation(() => Promise.resolve({
         content: [{ type: 'text', text: 'Invalid JSON response' }],
-      });
+      }) as any);
 
       await expect(generateOutline(mockContext)).rejects.toThrow(/Failed to parse/);
     });
@@ -506,7 +555,7 @@ describe('OutlineGenerator', () => {
     it('should handle API errors during outline generation', async () => {
       (getStructureTemplate as jest.Mock).mockReturnValue(mockTemplate);
 
-      (mockCreate as any).mockRejectedValue(new Error('API connection failed'));
+      mockCreate.mockImplementation(() => Promise.reject(new Error('API connection failed')));
 
       await expect(generateOutline(mockContext)).rejects.toThrow(
         'API connection failed'

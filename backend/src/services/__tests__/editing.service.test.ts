@@ -51,10 +51,10 @@ describe('EditingService', () => {
       jest.spyOn(service as any, 'parseEditorResponse').mockReturnValue(mockEditorResponse);
       jest.spyOn(service as any, 'generateFlagId').mockReturnValue('flag-123');
 
-      (mockClaudeService.createCompletionWithUsage as any).mockResolvedValue({
+      (mockClaudeService.createCompletionWithUsage as any).mockImplementation(() => Promise.resolve({
         content: JSON.stringify(mockEditorResponse),
         usage: { input_tokens: 100, output_tokens: 50 },
-      });
+      }));
 
       const result = await service.developmentalEdit('chapter-1');
 
@@ -92,10 +92,10 @@ describe('EditingService', () => {
       jest.spyOn(service as any, 'parseEditorResponse').mockReturnValue(mockEditorResponse);
       jest.spyOn(service as any, 'generateFlagId').mockReturnValue('flag-456');
 
-      (mockClaudeService.createCompletionWithUsage as any).mockResolvedValue({
+      (mockClaudeService.createCompletionWithUsage as any).mockImplementation(() => Promise.resolve({
         content: JSON.stringify(mockEditorResponse),
         usage: { input_tokens: 100, output_tokens: 50 },
-      });
+      }));
 
       const result = await service.developmentalEdit('chapter-1');
 
@@ -122,34 +122,19 @@ describe('EditingService', () => {
         scene_cards: [],
       };
 
-      const mockEditorResponse = {
-        editedContent: 'Improved prose here...',
-        suggestions: [
-          {
-            type: 'prose',
-            location: 'Paragraph 3',
-            issue: 'Passive voice',
-            suggestion: 'Use active voice',
-            severity: 'minor',
-          },
-        ],
-        flags: [],
-      };
-
       jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
-      jest.spyOn(service as any, 'parseEditorResponse').mockReturnValue(mockEditorResponse);
-      jest.spyOn(service as any, 'generateFlagId').mockReturnValue('flag-789');
+      jest.spyOn(service as any, 'extractAuthorFlags').mockReturnValue([]);
 
-      (mockClaudeService.createCompletionWithUsage as any).mockResolvedValue({
-        content: JSON.stringify(mockEditorResponse),
+      (mockClaudeService.createCompletionWithUsage as any).mockImplementation(() => Promise.resolve({
+        content: 'Improved prose here...',
         usage: { input_tokens: 100, output_tokens: 50 },
-      });
+      }));
 
       const result = await service.lineEdit('chapter-1');
 
       expect(result.editorType).toBe('line');
       expect(result.editedContent).toBe('Improved prose here...');
-      expect(result.suggestions).toHaveLength(1);
+      expect(result.suggestions).toHaveLength(0);
       expect(result.approved).toBe(true);
     });
   });
@@ -162,25 +147,20 @@ describe('EditingService', () => {
         scene_cards: [],
       };
 
-      const mockStoryBible = {
-        characters: [{ id: 'char-1', name: 'Hero', traits: ['brave'] }],
-      };
-
       const mockEditorResponse = {
-        continuityIssues: [],
+        errors: [],
         flags: [],
-        approved: true,
       };
 
       jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
-      jest.spyOn(service as any, 'getStoryBibleContext').mockReturnValue(mockStoryBible);
+      jest.spyOn(service as any, 'getPreviousChapterSummaries').mockReturnValue([]);
       jest.spyOn(service as any, 'parseEditorResponse').mockReturnValue(mockEditorResponse);
       jest.spyOn(service as any, 'generateFlagId').mockReturnValue('flag-101');
 
-      (mockClaudeService.createCompletionWithUsage as any).mockResolvedValue({
+      (mockClaudeService.createCompletionWithUsage as any).mockImplementation(() => Promise.resolve({
         content: JSON.stringify(mockEditorResponse),
         usage: { input_tokens: 100, output_tokens: 50 },
-      });
+      }));
 
       const result = await service.continuityEdit('chapter-1');
 
@@ -197,11 +177,14 @@ describe('EditingService', () => {
       };
 
       const mockEditorResponse = {
-        continuityIssues: [
+        errors: [
           {
-            type: 'character_inconsistency',
-            description: 'Character acting out of character',
+            type: 'continuity',
             location: 'Scene 2',
+            issue: 'Character acting out of character',
+            conflictsWith: 'Story bible character description',
+            suggestion: 'Revise character behavior',
+            severity: 'major',
           },
         ],
         flags: [
@@ -212,18 +195,17 @@ describe('EditingService', () => {
             location: 'Scene 2',
           },
         ],
-        approved: false,
       };
 
       jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
-      jest.spyOn(service as any, 'getStoryBibleContext').mockReturnValue({});
+      jest.spyOn(service as any, 'getPreviousChapterSummaries').mockReturnValue([]);
       jest.spyOn(service as any, 'parseEditorResponse').mockReturnValue(mockEditorResponse);
       jest.spyOn(service as any, 'generateFlagId').mockReturnValue('flag-102');
 
-      (mockClaudeService.createCompletionWithUsage as any).mockResolvedValue({
+      (mockClaudeService.createCompletionWithUsage as any).mockImplementation(() => Promise.resolve({
         content: JSON.stringify(mockEditorResponse),
         usage: { input_tokens: 100, output_tokens: 50 },
-      });
+      }));
 
       const result = await service.continuityEdit('chapter-1');
 
@@ -241,25 +223,12 @@ describe('EditingService', () => {
         scene_cards: [],
       };
 
-      const mockEditorResponse = {
-        editedContent: 'Content without typos...',
-        corrections: [
-          {
-            type: 'grammar',
-            location: 'Line 5',
-            issue: 'Subject-verb agreement',
-            correction: 'Fixed verb tense',
-          },
-        ],
-      };
-
       jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
-      jest.spyOn(service as any, 'parseEditorResponse').mockReturnValue(mockEditorResponse);
 
-      (mockClaudeService.createCompletionWithUsage as any).mockResolvedValue({
-        content: JSON.stringify(mockEditorResponse),
+      (mockClaudeService.createCompletionWithUsage as any).mockImplementation(() => Promise.resolve({
+        content: 'Content without typos...',
         usage: { input_tokens: 100, output_tokens: 50 },
-      });
+      }));
 
       const result = await service.copyEdit('chapter-1');
 
@@ -299,17 +268,17 @@ describe('EditingService', () => {
           },
         ],
         flags: [],
-        approved: false,
+        approved: false, // NOT approved = needs revision
       };
 
       const mockRevisedContent = 'Revised chapter with stronger opening...';
 
       jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
 
-      (mockClaudeService.createCompletionWithUsage as any).mockResolvedValue({
+      (mockClaudeService.createCompletionWithUsage as any).mockImplementation(() => Promise.resolve({
         content: mockRevisedContent,
         usage: { input_tokens: 200, output_tokens: 150 },
-      });
+      }));
 
       const result = await service.authorRevision('chapter-1', mockDevEditResult);
 
@@ -345,7 +314,7 @@ describe('EditingService', () => {
       );
     });
 
-    it('should throw error if dev edit result not approved', async () => {
+    it('should throw error if dev edit result is approved (no revision needed)', async () => {
       const mockChapterData = {
         chapter_number: 1,
         content: 'Content',
@@ -360,7 +329,7 @@ describe('EditingService', () => {
         editedContent: '',
         suggestions: [],
         flags: [],
-        approved: true,
+        approved: true, // Approved = no revision needed
       };
 
       await expect(service.authorRevision('chapter-1', mockDevEditResult)).rejects.toThrow(
@@ -424,9 +393,9 @@ describe('EditingService', () => {
   describe('getPreviousChapterSummaries', () => {
     it('should retrieve previous chapter summaries for continuity checking', () => {
       const mockSummaries = [
-        { chapter_number: 1, summary: 'Chapter 1 summary' },
-        { chapter_number: 2, summary: 'Chapter 2 summary' },
         { chapter_number: 3, summary: 'Chapter 3 summary' },
+        { chapter_number: 2, summary: 'Chapter 2 summary' },
+        { chapter_number: 1, summary: 'Chapter 1 summary' },
       ];
 
       const mockPrepare = jest.fn();
@@ -437,6 +406,7 @@ describe('EditingService', () => {
 
       const result = (service as any).getPreviousChapterSummaries('chapter-5', 5);
 
+      // Function reverses the result to chronological order
       expect(result).toHaveLength(3);
       expect(result[0].chapter_number).toBe(1);
       expect(result[2].chapter_number).toBe(3);
@@ -497,7 +467,7 @@ Final content.`;
       const response = 'This is not JSON at all';
 
       expect(() => (service as any).parseEditorResponse(response)).toThrow(
-        'Failed to parse editor response as JSON'
+        'No valid JSON object found in response'
       );
     });
   });

@@ -39,8 +39,8 @@ describe('ChapterOrchestratorService', () => {
       const result = service.queueBookGeneration('book-1');
 
       expect(result.chaptersQueued).toBe(3);
-      expect(result.jobsCreated).toBe(21); // 3 chapters × 7 jobs each
-      expect(mockQueueWorker.createJob).toHaveBeenCalledTimes(21);
+      expect(result.jobsCreated).toBe(42); // 3 chapters × 14 jobs each
+      expect(mockQueueWorker.createJob).toHaveBeenCalledTimes(42);
     });
 
     it('should return zeros when no pending chapters', () => {
@@ -72,8 +72,15 @@ describe('ChapterOrchestratorService', () => {
         lineEditJobId: 'job-3',
         continuityJobId: 'job-4',
         copyEditJobId: 'job-5',
-        summaryJobId: 'job-6',
-        statesJobId: 'job-7',
+        proofreadJobId: 'job-6',
+        sensitivityJobId: 'job-7',
+        researchJobId: 'job-8',
+        betaReaderJobId: 'job-9',
+        openingJobId: 'job-10',
+        dialogueJobId: 'job-11',
+        hookJobId: 'job-12',
+        summaryJobId: 'job-13',
+        statesJobId: 'job-14',
       });
 
       expect(mockQueueWorker.createJob).toHaveBeenNthCalledWith(1, 'generate_chapter', 'chapter-1');
@@ -81,8 +88,15 @@ describe('ChapterOrchestratorService', () => {
       expect(mockQueueWorker.createJob).toHaveBeenNthCalledWith(3, 'line_edit', 'chapter-1');
       expect(mockQueueWorker.createJob).toHaveBeenNthCalledWith(4, 'continuity_check', 'chapter-1');
       expect(mockQueueWorker.createJob).toHaveBeenNthCalledWith(5, 'copy_edit', 'chapter-1');
-      expect(mockQueueWorker.createJob).toHaveBeenNthCalledWith(6, 'generate_summary', 'chapter-1');
-      expect(mockQueueWorker.createJob).toHaveBeenNthCalledWith(7, 'update_states', 'chapter-1');
+      expect(mockQueueWorker.createJob).toHaveBeenNthCalledWith(6, 'proofread', 'chapter-1');
+      expect(mockQueueWorker.createJob).toHaveBeenNthCalledWith(7, 'sensitivity_review', 'chapter-1');
+      expect(mockQueueWorker.createJob).toHaveBeenNthCalledWith(8, 'research_review', 'chapter-1');
+      expect(mockQueueWorker.createJob).toHaveBeenNthCalledWith(9, 'beta_reader_review', 'chapter-1');
+      expect(mockQueueWorker.createJob).toHaveBeenNthCalledWith(10, 'opening_review', 'chapter-1');
+      expect(mockQueueWorker.createJob).toHaveBeenNthCalledWith(11, 'dialogue_review', 'chapter-1');
+      expect(mockQueueWorker.createJob).toHaveBeenNthCalledWith(12, 'hook_review', 'chapter-1');
+      expect(mockQueueWorker.createJob).toHaveBeenNthCalledWith(13, 'generate_summary', 'chapter-1');
+      expect(mockQueueWorker.createJob).toHaveBeenNthCalledWith(14, 'update_states', 'chapter-1');
     });
   });
 

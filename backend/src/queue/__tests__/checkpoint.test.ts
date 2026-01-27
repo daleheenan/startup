@@ -217,17 +217,10 @@ describe('CheckpointManager', () => {
         completed_at: null,
       };
 
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-
       const restored = checkpointManager.restoreFromCheckpoint(mockJob);
 
       expect(restored).toBeNull();
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to restore checkpoint'),
-        expect.any(Error)
-      );
-
-      consoleErrorSpy.mockRestore();
+      // Note: Error is logged through logger service, not console.error
     });
 
     it('should track completed steps across multiple checkpoints', () => {
@@ -542,14 +535,10 @@ describe('CheckpointManager', () => {
       });
       db.prepare = jest.fn(() => ({ get: mockGet }));
 
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-
       const checkpoint = checkpointManager.getCheckpoint(jobId);
 
       expect(checkpoint).toBeNull();
-      expect(consoleErrorSpy).toHaveBeenCalled();
-
-      consoleErrorSpy.mockRestore();
+      // Note: Error is logged through logger service, not console.error
     });
 
     it('should handle timestamp generation', () => {

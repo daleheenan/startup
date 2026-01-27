@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import GenerationProgress from '../GenerationProgress';
 
@@ -56,18 +56,18 @@ describe('GenerationProgress', () => {
     expect(screen.getByText(/0:00 elapsed/)).toBeInTheDocument();
 
     // Advance time by 5 seconds
-    await vi.advanceTimersByTimeAsync(5000);
-
-    await waitFor(() => {
-      expect(screen.getByText(/0:05 elapsed/)).toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
     });
+
+    expect(screen.getByText(/0:05 elapsed/)).toBeInTheDocument();
 
     // Advance time by 1 minute
-    await vi.advanceTimersByTimeAsync(60000);
-
-    await waitFor(() => {
-      expect(screen.getByText(/1:05 elapsed/)).toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60000);
     });
+
+    expect(screen.getByText(/1:05 elapsed/)).toBeInTheDocument();
   });
 
   it('should calculate remaining time correctly', async () => {
@@ -82,11 +82,11 @@ describe('GenerationProgress', () => {
     expect(screen.getByText(/~2:00 remaining/)).toBeInTheDocument();
 
     // Advance time by 30 seconds
-    await vi.advanceTimersByTimeAsync(30000);
-
-    await waitFor(() => {
-      expect(screen.getByText(/~1:30 remaining/)).toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30000);
     });
+
+    expect(screen.getByText(/~1:30 remaining/)).toBeInTheDocument();
   });
 
   it('should display progress bar', () => {
@@ -106,12 +106,12 @@ describe('GenerationProgress', () => {
     );
 
     // Advance time beyond estimated time
-    await vi.advanceTimersByTimeAsync(15000);
-
-    await waitFor(() => {
-      const progressBar = document.querySelector('[style*="width: 95%"]');
-      expect(progressBar).toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15000);
     });
+
+    const progressBar = document.querySelector('[style*="width: 95%"]');
+    expect(progressBar).toBeInTheDocument();
   });
 
   it('should cycle through default messages', async () => {
@@ -121,11 +121,11 @@ describe('GenerationProgress', () => {
     expect(initialMessage).toBeInTheDocument();
 
     // Advance time by 4 seconds to trigger message change
-    await vi.advanceTimersByTimeAsync(4000);
-
-    await waitFor(() => {
-      expect(screen.getByText(/Crafting narrative structure/)).toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4000);
     });
+
+    expect(screen.getByText(/Crafting narrative structure/)).toBeInTheDocument();
   });
 
   it('should display custom current step', () => {
@@ -259,11 +259,11 @@ describe('GenerationProgress', () => {
     render(<GenerationProgress isActive={true} />);
 
     // Advance time by 5 seconds
-    await vi.advanceTimersByTimeAsync(5000);
-
-    await waitFor(() => {
-      expect(screen.getByText(/0:05 elapsed/)).toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
     });
+
+    expect(screen.getByText(/0:05 elapsed/)).toBeInTheDocument();
   });
 
   it('should reset timer when becoming active after being inactive', async () => {
@@ -276,30 +276,28 @@ describe('GenerationProgress', () => {
     expect(screen.getByText(/0:00 elapsed/)).toBeInTheDocument();
 
     // Advance time
-    await vi.advanceTimersByTimeAsync(3000);
-
-    await waitFor(() => {
-      expect(screen.getByText(/0:03 elapsed/)).toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
     });
+
+    expect(screen.getByText(/0:03 elapsed/)).toBeInTheDocument();
 
     // Make it inactive, then active again
     rerender(<GenerationProgress isActive={false} />);
     rerender(<GenerationProgress isActive={true} />);
 
     // Should reset to 0
-    await waitFor(() => {
-      expect(screen.getByText(/0:00 elapsed/)).toBeInTheDocument();
-    });
+    expect(screen.getByText(/0:00 elapsed/)).toBeInTheDocument();
   });
 
   it('should stop timers when becoming inactive', async () => {
     const { rerender } = render(<GenerationProgress isActive={true} />);
 
-    await vi.advanceTimersByTimeAsync(5000);
-
-    await waitFor(() => {
-      expect(screen.getByText(/0:05 elapsed/)).toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
     });
+
+    expect(screen.getByText(/0:05 elapsed/)).toBeInTheDocument();
 
     // Make inactive
     rerender(<GenerationProgress isActive={false} />);

@@ -94,7 +94,7 @@ describe('QueueWorker', () => {
       });
 
       // Mock job execution to prevent actual work
-      jest.spyOn(queueWorker as any, 'executeJob').mockResolvedValue(undefined);
+      jest.spyOn(queueWorker as any, 'executeJob').mockImplementation(() => Promise.resolve(undefined));
 
       // Start worker in background
       const workerPromise = queueWorker.start();
@@ -161,7 +161,7 @@ describe('QueueWorker', () => {
       (mockError as any).status = 429;
 
       // Mock executeJob to throw rate limit error
-      jest.spyOn(queueWorker as any, 'executeJob').mockRejectedValue(mockError);
+      jest.spyOn(queueWorker as any, 'executeJob').mockImplementation(() => Promise.reject(mockError));
 
       // Mock pickupJob
       jest.spyOn(queueWorker as any, 'pickupJob').mockReturnValue(mockJob);
@@ -193,7 +193,8 @@ describe('QueueWorker', () => {
       await (queueWorker as any).retryOrFail(mockJob, mockError);
 
       expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining('failed'));
-      expect(mockRun).toHaveBeenCalledWith(3, mockError.message, mockJob.id);
+      // formatErrorDetails adds stack trace to the error message
+      expect(mockRun).toHaveBeenCalledWith(3, expect.stringContaining('Service unavailable'), mockJob.id);
     });
 
     it('should retry job (stay in pending) when attempts < max', async () => {
@@ -217,7 +218,8 @@ describe('QueueWorker', () => {
       await (queueWorker as any).retryOrFail(mockJob, mockError);
 
       expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining('pending'));
-      expect(mockRun).toHaveBeenCalledWith(2, mockError.message, mockJob.id);
+      // formatErrorDetails adds stack trace to the error message
+      expect(mockRun).toHaveBeenCalledWith(2, expect.stringContaining('Temporary failure'), mockJob.id);
     });
   });
 
@@ -464,8 +466,8 @@ describe('QueueWorker', () => {
       };
 
       const mockError = new Error('Execution failed');
-      const retryOrFailSpy = jest.spyOn(queueWorker as any, 'retryOrFail').mockResolvedValue(undefined);
-      jest.spyOn(queueWorker as any, 'executeJob').mockRejectedValue(mockError);
+      const retryOrFailSpy = jest.spyOn(queueWorker as any, 'retryOrFail').mockImplementation(() => Promise.resolve(undefined));
+      jest.spyOn(queueWorker as any, 'executeJob').mockImplementation(() => Promise.reject(mockError));
       jest.spyOn(queueWorker as any, 'pickupJob').mockReturnValue(mockJob);
 
       // Make sure rate limit check returns false
@@ -480,8 +482,8 @@ describe('QueueWorker', () => {
     });
 
     it('should catch unexpected errors in worker loop', async () => {
-      jest.spyOn(queueWorker as any, 'processNextJob').mockRejectedValue(
-        new Error('Unexpected error')
+      jest.spyOn(queueWorker as any, 'processNextJob').mockImplementation(() =>
+        Promise.reject(new Error('Unexpected error'))
       );
 
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});

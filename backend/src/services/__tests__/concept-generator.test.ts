@@ -1,37 +1,86 @@
 import { jest } from '@jest/globals';
 import type { StoryConcept, StoryPreferences } from '../concept-generator.js';
 
+// Set environment variables BEFORE any imports
+process.env.ANTHROPIC_API_KEY = 'test-api-key';
+
 // Mock Anthropic SDK before importing
-jest.mock('@anthropic-ai/sdk', () => {
-  return {
-    default: jest.fn().mockImplementation(() => ({
-      messages: {
-        create: jest.fn(),
-      },
-    })),
-  };
-});
+const mockCreate = jest.fn();
+const mockAnthropicConstructor = jest.fn().mockImplementation(() => ({
+  messages: {
+    create: mockCreate,
+  },
+}));
+
+jest.mock('@anthropic-ai/sdk', () => ({
+  __esModule: true,
+  default: mockAnthropicConstructor,
+}));
+
+// Mock logger
+jest.mock('../logger.service.js', () => ({
+  __esModule: true,
+  createLogger: jest.fn(() => ({
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+  })),
+}));
+
+// Mock database
+jest.mock('../../db/connection.js', () => ({
+  __esModule: true,
+  default: {
+    prepare: jest.fn(),
+  },
+}));
+
+// Mock genre helpers
+jest.mock('../../utils/genre-helpers.js', () => ({
+  __esModule: true,
+  formatGenre: jest.fn((preferences: any) => {
+    const { genre, genres } = preferences;
+    return genre || (genres && genres.length > 0 ? genres.join(' + ') : 'Not specified');
+  }),
+  formatSubgenre: jest.fn((preferences: any) => {
+    const { subgenre, subgenres } = preferences;
+    return subgenre || (subgenres && subgenres.length > 0 ? subgenres.join(', ') : 'Not specified');
+  }),
+  formatModifiers: jest.fn((modifiers: any) => {
+    return modifiers && modifiers.length > 0 ? modifiers.join(', ') : null;
+  }),
+  getWordCountContext: jest.fn((targetLength: any) => {
+    if (targetLength < 60000) return 'novella or short novel';
+    if (targetLength < 90000) return 'standard novel';
+    if (targetLength < 120000) return 'longer novel';
+    return 'epic-length novel';
+  }),
+}));
+
+// Mock JSON extractor
+jest.mock('../../utils/json-extractor.js', () => ({
+  __esModule: true,
+  extractJsonArray: jest.fn((response: any) => {
+    // Try to parse JSON directly or from code blocks
+    const responseStr = response as string;
+    const jsonMatch = responseStr.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/) || responseStr.match(/(\[[\s\S]*\])/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[1]);
+    }
+    return JSON.parse(responseStr);
+  }),
+}));
+
+// Import the functions after mocks are set up
+import { generateConcepts, refineConcepts } from '../concept-generator.js';
 
 describe('ConceptGenerator', () => {
-  let generateConcepts: any;
-  let refineConcepts: any;
-  let Anthropic: any;
-  let mockCreate: jest.Mock;
-
-  beforeEach(async () => {
+  beforeEach(() => {
     jest.clearAllMocks();
 
-    // Import after mock is set up
-    const AnthropicModule = await import('@anthropic-ai/sdk');
-    Anthropic = AnthropicModule.default;
-
-    const conceptModule = await import('../concept-generator.js');
-    generateConcepts = conceptModule.generateConcepts;
-    refineConcepts = conceptModule.refineConcepts;
-
-    // Get the mock instance
-    const mockInstance = new Anthropic();
-    mockCreate = mockInstance.messages.create as jest.Mock;
+    // Reset environment variables
+    process.env.ANTHROPIC_API_KEY = 'test-api-key';
   });
 
   describe('generateConcepts', () => {
@@ -92,14 +141,14 @@ describe('ConceptGenerator', () => {
         },
       ];
 
-      (mockCreate as any).mockResolvedValue({
+      (mockCreate as any).mockImplementation(() => Promise.resolve({
         content: [
           {
             type: 'text',
             text: JSON.stringify(mockConcepts),
           },
         ],
-      });
+      }));
 
       const result = await generateConcepts(validPreferences);
 
@@ -150,14 +199,14 @@ describe('ConceptGenerator', () => {
         },
       ];
 
-      (mockCreate as any).mockResolvedValue({
+      (mockCreate as any).mockImplementation(() => Promise.resolve({
         content: [
           {
             type: 'text',
             text: JSON.stringify(mockConcepts),
           },
         ],
-      });
+      }));
 
       await generateConcepts(multiGenrePreferences);
 
@@ -190,9 +239,9 @@ describe('ConceptGenerator', () => {
         },
       ];
 
-      (mockCreate as any).mockResolvedValue({
+      (mockCreate as any).mockImplementation(() => Promise.resolve({
         content: [{ type: 'text', text: JSON.stringify(mockConcepts) }],
-      });
+      }));
 
       await generateConcepts(preferencesWithTimestamp);
 
@@ -200,7 +249,7 @@ describe('ConceptGenerator', () => {
         expect.objectContaining({
           messages: expect.arrayContaining([
             expect.objectContaining({
-              content: expect.stringContaining('[Generation ID: 1234567890]'),
+              content: expect.stringContaining('[Generation ID: 1234567890'),
             }),
           ]),
         })
@@ -220,14 +269,14 @@ describe('ConceptGenerator', () => {
         },
       ];
 
-      (mockCreate as any).mockResolvedValue({
+      (mockCreate as any).mockImplementation(() => Promise.resolve({
         content: [
           {
             type: 'text',
             text: '```json\n' + JSON.stringify(mockConcepts) + '\n```',
           },
         ],
-      });
+      }));
 
       const result = await generateConcepts(validPreferences);
 
@@ -236,14 +285,14 @@ describe('ConceptGenerator', () => {
     });
 
     it('should throw error if response is not valid JSON', async () => {
-      (mockCreate as any).mockResolvedValue({
+      (mockCreate as any).mockImplementation(() => Promise.resolve({
         content: [
           {
             type: 'text',
             text: 'This is not JSON',
           },
         ],
-      });
+      }));
 
       await expect(generateConcepts(validPreferences)).rejects.toThrow(
         /Failed to parse concepts/
@@ -251,14 +300,14 @@ describe('ConceptGenerator', () => {
     });
 
     it('should throw error if response is not an array', async () => {
-      (mockCreate as any).mockResolvedValue({
+      (mockCreate as any).mockImplementation(() => Promise.resolve({
         content: [
           {
             type: 'text',
             text: '{"not": "an array"}',
           },
         ],
-      });
+      }));
 
       await expect(generateConcepts(validPreferences)).rejects.toThrow(
         /Failed to parse concepts/
@@ -274,14 +323,14 @@ describe('ConceptGenerator', () => {
         },
       ];
 
-      (mockCreate as any).mockResolvedValue({
+      (mockCreate as any).mockImplementation(() => Promise.resolve({
         content: [
           {
             type: 'text',
             text: JSON.stringify(invalidConcepts),
           },
         ],
-      });
+      }));
 
       await expect(generateConcepts(validPreferences)).rejects.toThrow(
         /Concept missing required fields/
@@ -289,14 +338,14 @@ describe('ConceptGenerator', () => {
     });
 
     it('should throw error if no concepts returned', async () => {
-      (mockCreate as any).mockResolvedValue({
+      (mockCreate as any).mockImplementation(() => Promise.resolve({
         content: [
           {
             type: 'text',
             text: '[]',
           },
         ],
-      });
+      }));
 
       await expect(generateConcepts(validPreferences)).rejects.toThrow(
         /Failed to parse concepts from Claude response/
@@ -321,9 +370,9 @@ describe('ConceptGenerator', () => {
         },
       ];
 
-      (mockCreate as any).mockResolvedValue({
+      (mockCreate as any).mockImplementation(() => Promise.resolve({
         content: [{ type: 'text', text: JSON.stringify(mockConcepts) }],
-      });
+      }));
 
       await generateConcepts(shortNovel);
 
@@ -339,7 +388,7 @@ describe('ConceptGenerator', () => {
     });
 
     it('should handle API errors gracefully', async () => {
-      (mockCreate as any).mockRejectedValue(new Error('API Error: Service unavailable'));
+      (mockCreate as any).mockImplementation(() => Promise.reject(new Error('API Error: Service unavailable')));
 
       await expect(generateConcepts(validPreferences)).rejects.toThrow(
         'API Error: Service unavailable'
@@ -383,14 +432,14 @@ describe('ConceptGenerator', () => {
         },
       ];
 
-      (mockCreate as any).mockResolvedValue({
+      (mockCreate as any).mockImplementation(() => Promise.resolve({
         content: [
           {
             type: 'text',
             text: JSON.stringify(mockRefinedConcepts),
           },
         ],
-      });
+      }));
 
       const result = await refineConcepts(validPreferences, existingConcepts, feedback);
 
@@ -421,9 +470,9 @@ describe('ConceptGenerator', () => {
         },
       ];
 
-      (mockCreate as any).mockResolvedValue({
+      (mockCreate as any).mockImplementation(() => Promise.resolve({
         content: [{ type: 'text', text: JSON.stringify(mockRefinedConcepts) }],
-      });
+      }));
 
       await refineConcepts(validPreferences, existingConcepts, feedback);
 
@@ -460,9 +509,9 @@ describe('ConceptGenerator', () => {
         },
       ];
 
-      (mockCreate as any).mockResolvedValue({
+      (mockCreate as any).mockImplementation(() => Promise.resolve({
         content: [{ type: 'text', text: JSON.stringify(mockRefinedConcepts) }],
-      });
+      }));
 
       await refineConcepts(multiGenrePreferences, existingConcepts, feedback);
 
@@ -478,9 +527,9 @@ describe('ConceptGenerator', () => {
     });
 
     it('should throw error if refinement returns invalid JSON', async () => {
-      (mockCreate as any).mockResolvedValue({
+      (mockCreate as any).mockImplementation(() => Promise.resolve({
         content: [{ type: 'text', text: 'Invalid JSON' }],
-      });
+      }));
 
       await expect(
         refineConcepts(validPreferences, existingConcepts, feedback)
@@ -488,7 +537,7 @@ describe('ConceptGenerator', () => {
     });
 
     it('should handle API errors during refinement', async () => {
-      (mockCreate as any).mockRejectedValue(new Error('Rate limit exceeded'));
+      (mockCreate as any).mockImplementation(() => Promise.reject(new Error('Rate limit exceeded')));
 
       await expect(
         refineConcepts(validPreferences, existingConcepts, feedback)

@@ -94,9 +94,9 @@ describe('CrossBookContinuityService', () => {
         .mockReturnValueOnce(chapterStmt)  // Third call: get last chapter
         .mockReturnValueOnce(updateStmt);  // Fourth call: update book
 
-      mockClaudeService.createCompletion = jest
-        .fn()
-        .mockResolvedValue(JSON.stringify(mockEndingState)) as any;
+      mockClaudeService.createCompletion = jest.fn().mockImplementation(() =>
+        Promise.resolve(JSON.stringify(mockEndingState))
+      );
 
       // Execute
       const result = await service.generateBookEndingState('book-123');
@@ -213,9 +213,9 @@ describe('CrossBookContinuityService', () => {
         .mockReturnValueOnce(projectStmt)
         .mockReturnValueOnce(chapterStmt);
 
-      mockClaudeService.createCompletion = jest
-        .fn()
-        .mockRejectedValue(new Error('Claude API error')) as any;
+      mockClaudeService.createCompletion = jest.fn().mockImplementation(() =>
+        Promise.reject(new Error('Claude API error'))
+      );
 
       await expect(service.generateBookEndingState('book-123')).rejects.toThrow(
         'Claude API error'
@@ -250,7 +250,9 @@ describe('CrossBookContinuityService', () => {
         .mockReturnValueOnce(chaptersStmt)
         .mockReturnValueOnce(updateStmt);
 
-      mockClaudeService.createCompletion = jest.fn().mockResolvedValue(mockSummary) as any;
+      mockClaudeService.createCompletion = jest.fn().mockImplementation(() =>
+        Promise.resolve(mockSummary)
+      );
 
       const result = await service.generateBookSummary('book-123');
 

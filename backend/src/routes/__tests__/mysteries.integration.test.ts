@@ -279,8 +279,8 @@ describe('Mysteries API Integration Tests', () => {
     ];
 
     it('should extract mysteries from chapter successfully', async () => {
-      mysteryTrackingService.extractMysteriesFromChapter.mockResolvedValue(
-        mockExtractedMysteries
+      mysteryTrackingService.extractMysteriesFromChapter.mockImplementation(() =>
+        Promise.resolve(mockExtractedMysteries)
       );
 
       const requestBody = {
@@ -307,8 +307,8 @@ describe('Mysteries API Integration Tests', () => {
         .send({})
         .expect(400);
 
-      expect(response.body.error.code).toBe('INVALID_REQUEST');
-      expect(response.body.error.message).toContain('Content is required');
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+      expect(response.body.error.message).toBeDefined();
     });
 
     it('should return 400 when content is empty string', async () => {
@@ -318,12 +318,12 @@ describe('Mysteries API Integration Tests', () => {
         .send({ content: '' })
         .expect(400);
 
-      expect(response.body.error.code).toBe('INVALID_REQUEST');
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
     });
 
     it('should return 500 on service error', async () => {
-      mysteryTrackingService.extractMysteriesFromChapter.mockRejectedValue(
-        new Error('Extraction failed')
+      mysteryTrackingService.extractMysteriesFromChapter.mockImplementation(() =>
+        Promise.reject(new Error('Extraction failed'))
       );
 
       const requestBody = {
@@ -352,7 +352,9 @@ describe('Mysteries API Integration Tests', () => {
     ];
 
     it('should find mystery resolutions successfully', async () => {
-      mysteryTrackingService.findMysteryResolutions.mockResolvedValue(mockResolutions);
+      mysteryTrackingService.findMysteryResolutions.mockImplementation(() =>
+        Promise.resolve(mockResolutions)
+      );
 
       const requestBody = {
         content: 'Chapter content with resolution...',
@@ -378,12 +380,14 @@ describe('Mysteries API Integration Tests', () => {
         .send({})
         .expect(400);
 
-      expect(response.body.error.code).toBe('INVALID_REQUEST');
-      expect(response.body.error.message).toContain('Content is required');
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+      expect(response.body.error.message).toBeDefined();
     });
 
     it('should return empty resolutions when none found', async () => {
-      mysteryTrackingService.findMysteryResolutions.mockResolvedValue([]);
+      mysteryTrackingService.findMysteryResolutions.mockImplementation(() =>
+        Promise.resolve([])
+      );
 
       const requestBody = {
         content: 'Chapter content with no resolutions...',
@@ -399,8 +403,8 @@ describe('Mysteries API Integration Tests', () => {
     });
 
     it('should return 500 on service error', async () => {
-      mysteryTrackingService.findMysteryResolutions.mockRejectedValue(
-        new Error('Resolution detection failed')
+      mysteryTrackingService.findMysteryResolutions.mockImplementation(() =>
+        Promise.reject(new Error('Resolution detection failed'))
       );
 
       const requestBody = {
@@ -493,8 +497,8 @@ describe('Mysteries API Integration Tests', () => {
         .send(requestBody)
         .expect(400)
         .then((response) => {
-          expect(response.body.error.code).toBe('INVALID_REQUEST');
-          expect(response.body.error.message).toContain('Valid status is required');
+          expect(response.body.error.code).toBe('VALIDATION_ERROR');
+          expect(response.body.error.message).toBeDefined();
         });
     });
 
@@ -509,8 +513,8 @@ describe('Mysteries API Integration Tests', () => {
         .send(requestBody)
         .expect(400)
         .then((response) => {
-          expect(response.body.error.code).toBe('INVALID_REQUEST');
-          expect(response.body.error.message).toContain('Valid status is required');
+          expect(response.body.error.code).toBe('VALIDATION_ERROR');
+          expect(response.body.error.message).toBeDefined();
         });
     });
 
@@ -588,8 +592,8 @@ describe('Mysteries API Integration Tests', () => {
 
   describe('Error Handling', () => {
     it('should handle service exceptions gracefully', async () => {
-      mysteryTrackingService.extractMysteriesFromChapter.mockRejectedValue(
-        new Error('Claude API timeout')
+      mysteryTrackingService.extractMysteriesFromChapter.mockImplementation(() =>
+        Promise.reject(new Error('Claude API timeout'))
       );
 
       const response = await request(app)

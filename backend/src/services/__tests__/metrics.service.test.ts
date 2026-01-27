@@ -82,7 +82,7 @@ describe('MetricsService', () => {
 
       expect(formatted.cost.usd).toBe('$16.50');
       expect(formatted.cost.gbp).toBe('£13.04');
-      expect(formatted.cost.display).toBe('$16.50 / £13.04');
+      expect(formatted.cost.display).toBe('£13.04'); // Only displays GBP
     });
 
     it('should format content metrics correctly', () => {

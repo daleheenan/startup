@@ -360,7 +360,7 @@ describe('ContextAssemblyService', () => {
         .mockReturnValueOnce(projectStmt);
 
       expect(() => service.assembleChapterContext('chapter-1')).toThrow(
-        'Chapter missing scene cards'
+        'Chapter chapter-1 has no scene cards - cannot generate without scenes'
       );
     });
 
@@ -441,7 +441,7 @@ describe('ContextAssemblyService', () => {
         .mockReturnValueOnce(projectStmt);
 
       expect(() => service.assembleChapterContext('chapter-1')).toThrow(
-        'POV character not found: UnknownHero'
+        'POV character not found in story bible: UnknownHero'
       );
     });
 

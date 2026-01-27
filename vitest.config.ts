@@ -8,6 +8,8 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./app/test/setup.ts'],
     globals: true,
+    include: ['app/**/*.test.{ts,tsx}', 'app/**/*.spec.{ts,tsx}'],
+    exclude: ['node_modules/', 'backend/**', '**/dist/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -16,12 +18,13 @@ export default defineConfig({
         'app/test/',
         '**/*.config.*',
         '**/dist/**',
+        'backend/**',
       ],
     },
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './app'),
+      '@': path.resolve(__dirname, '.'),
     },
   },
 });

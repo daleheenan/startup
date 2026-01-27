@@ -1,55 +1,75 @@
 import { jest } from '@jest/globals';
 
-// Mock Anthropic SDK
-jest.mock('@anthropic-ai/sdk', () => {
-  return {
-    default: jest.fn().mockImplementation(() => ({
-      messages: {
-        create: jest.fn(),
-      },
-    })),
-  };
-});
+// Set environment variables BEFORE any imports
+process.env.ANTHROPIC_API_KEY = 'test-api-key';
+process.env.ANTHROPIC_MODEL = 'claude-opus-4-5-20251101';
 
-// Mock session tracker
-jest.mock('../session-tracker.js', () => ({
-  sessionTracker: {
-    trackRequest: jest.fn(),
-    getCurrentSession: jest.fn(),
-    getSessionStats: jest.fn(),
+// Mock Anthropic SDK
+const mockCreate = jest.fn();
+const mockAnthropicConstructor = jest.fn().mockImplementation(() => ({
+  messages: {
+    create: mockCreate,
   },
 }));
 
-describe('ClaudeService', () => {
-  let ClaudeService: any;
-  let Anthropic: any;
-  let sessionTracker: any;
-  let mockCreate: jest.Mock;
-  let service: any;
+jest.mock('@anthropic-ai/sdk', () => ({
+  __esModule: true,
+  default: mockAnthropicConstructor,
+}));
 
-  beforeEach(async () => {
+// Mock session tracker
+const mockTrackRequest = jest.fn();
+const mockGetCurrentSession = jest.fn();
+const mockGetSessionStats = jest.fn();
+
+jest.mock('../session-tracker.js', () => ({
+  __esModule: true,
+  sessionTracker: {
+    trackRequest: mockTrackRequest,
+    getCurrentSession: mockGetCurrentSession,
+    getSessionStats: mockGetSessionStats,
+  },
+}));
+
+// Mock rate limit handler
+jest.mock('../../queue/rate-limit-handler.js', () => ({
+  __esModule: true,
+  RateLimitError: class RateLimitError extends Error {
+    constructor(message: string, public resetsAt?: string) {
+      super(message);
+      this.name = 'RateLimitError';
+    }
+  },
+}));
+
+// Mock logger
+jest.mock('../logger.service.js', () => ({
+  __esModule: true,
+  createLogger: jest.fn(() => ({
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+  })),
+}));
+
+// Import the service after mocks are set up
+import { ClaudeService } from '../claude.service.js';
+import { sessionTracker } from '../session-tracker.js';
+import Anthropic from '@anthropic-ai/sdk';
+
+describe('ClaudeService', () => {
+  let service: ClaudeService;
+
+  beforeEach(() => {
     jest.clearAllMocks();
 
-    // Set environment variable
+    // Reset environment variables
     process.env.ANTHROPIC_API_KEY = 'test-api-key';
     process.env.ANTHROPIC_MODEL = 'claude-opus-4-5-20251101';
 
-    // Import mocked modules
-    const AnthropicModule = await import('@anthropic-ai/sdk');
-    Anthropic = AnthropicModule.default;
-
-    const trackerModule = await import('../session-tracker.js');
-    sessionTracker = trackerModule.sessionTracker;
-
-    const serviceModule = await import('../claude.service.js');
-    ClaudeService = serviceModule.ClaudeService;
-
     // Create new service instance
     service = new ClaudeService();
-
-    // Get the mock create function
-    const mockInstance = new Anthropic();
-    mockCreate = mockInstance.messages.create as jest.Mock;
   });
 
   afterEach(() => {
@@ -59,8 +79,9 @@ describe('ClaudeService', () => {
 
   describe('constructor', () => {
     it('should initialize with API key from environment', () => {
-      expect(Anthropic).toHaveBeenCalledWith({
+      expect(mockAnthropicConstructor).toHaveBeenCalledWith({
         apiKey: 'test-api-key',
+        timeout: 5 * 60 * 1000,
       });
     });
 
@@ -97,7 +118,7 @@ describe('ClaudeService', () => {
     };
 
     it('should create completion successfully', async () => {
-      (mockCreate as any).mockResolvedValue({
+      (mockCreate as any).mockImplementation(() => Promise.resolve({
         content: [
           {
             type: 'text',
@@ -108,12 +129,12 @@ describe('ClaudeService', () => {
           input_tokens: 10,
           output_tokens: 8,
         },
-      });
+      }));
 
       const result = await service.createCompletion(validParams);
 
       expect(result).toBe('Hello! How can I help you today?');
-      expect(sessionTracker.trackRequest).toHaveBeenCalled();
+      expect(mockTrackRequest).toHaveBeenCalled();
       expect(mockCreate).toHaveBeenCalledWith({
         model: 'claude-opus-4-5-20251101',
         max_tokens: 4096,
@@ -124,10 +145,10 @@ describe('ClaudeService', () => {
     });
 
     it('should use custom maxTokens if provided', async () => {
-      (mockCreate as any).mockResolvedValue({
+      (mockCreate as any).mockImplementation(() => Promise.resolve({
         content: [{ type: 'text', text: 'Response' }],
         usage: { input_tokens: 5, output_tokens: 5 },
-      });
+      }));
 
       await service.createCompletion({
         ...validParams,
@@ -142,10 +163,10 @@ describe('ClaudeService', () => {
     });
 
     it('should use custom temperature if provided', async () => {
-      (mockCreate as any).mockResolvedValue({
+      (mockCreate as any).mockImplementation(() => Promise.resolve({
         content: [{ type: 'text', text: 'Response' }],
         usage: { input_tokens: 5, output_tokens: 5 },
-      });
+      }));
 
       await service.createCompletion({
         ...validParams,
@@ -160,14 +181,14 @@ describe('ClaudeService', () => {
     });
 
     it('should handle multiple text blocks in response', async () => {
-      (mockCreate as any).mockResolvedValue({
+      (mockCreate as any).mockImplementation(() => Promise.resolve({
         content: [
           { type: 'text', text: 'Part 1' },
           { type: 'text', text: 'Part 2' },
           { type: 'text', text: 'Part 3' },
         ],
         usage: { input_tokens: 10, output_tokens: 15 },
-      });
+      }));
 
       const result = await service.createCompletion(validParams);
 
@@ -175,14 +196,14 @@ describe('ClaudeService', () => {
     });
 
     it('should filter out non-text content blocks', async () => {
-      (mockCreate as any).mockResolvedValue({
+      (mockCreate as any).mockImplementation(() => Promise.resolve({
         content: [
           { type: 'text', text: 'Text response' },
           { type: 'image', data: 'image-data' },
           { type: 'text', text: 'More text' },
         ],
         usage: { input_tokens: 10, output_tokens: 10 },
-      });
+      }));
 
       const result = await service.createCompletion(validParams);
 
@@ -202,9 +223,9 @@ describe('ClaudeService', () => {
       const rateLimitError: any = new Error('Rate limit exceeded');
       rateLimitError.status = 429;
 
-      (mockCreate as any).mockRejectedValue(rateLimitError);
+      (mockCreate as any).mockImplementation(() => Promise.reject(rateLimitError));
 
-      sessionTracker.getCurrentSession.mockReturnValue({
+      mockGetCurrentSession.mockReturnValue({
         session_resets_at: '2026-01-24T12:00:00Z',
       });
 
@@ -217,9 +238,9 @@ describe('ClaudeService', () => {
       const rateLimitError: any = new Error('Rate limit');
       rateLimitError.error = { type: 'rate_limit_error' };
 
-      (mockCreate as any).mockRejectedValue(rateLimitError);
+      (mockCreate as any).mockImplementation(() => Promise.reject(rateLimitError));
 
-      sessionTracker.getCurrentSession.mockReturnValue({
+      mockGetCurrentSession.mockReturnValue({
         session_resets_at: '2026-01-24T12:00:00Z',
       });
 
@@ -230,9 +251,9 @@ describe('ClaudeService', () => {
       const rateLimitError: any = new Error('Rate limit');
       rateLimitError.status = 429;
 
-      (mockCreate as any).mockRejectedValue(rateLimitError);
+      (mockCreate as any).mockImplementation(() => Promise.reject(rateLimitError));
 
-      sessionTracker.getCurrentSession.mockReturnValue(null);
+      mockGetCurrentSession.mockReturnValue(null);
 
       await expect(service.createCompletion(validParams)).rejects.toThrow(
         /Rate limit exceeded/
@@ -240,7 +261,7 @@ describe('ClaudeService', () => {
     });
 
     it('should rethrow non-rate-limit errors', async () => {
-      (mockCreate as any).mockRejectedValue(new Error('API connection failed'));
+      (mockCreate as any).mockImplementation(() => Promise.reject(new Error('API connection failed')));
 
       await expect(service.createCompletion(validParams)).rejects.toThrow(
         'API connection failed'
@@ -255,13 +276,13 @@ describe('ClaudeService', () => {
     };
 
     it('should return content and usage data', async () => {
-      (mockCreate as any).mockResolvedValue({
+      (mockCreate as any).mockImplementation(() => Promise.resolve({
         content: [{ type: 'text', text: 'Hello there!' }],
         usage: {
           input_tokens: 15,
           output_tokens: 8,
         },
-      });
+      }));
 
       const result = await service.createCompletionWithUsage(validParams);
 
@@ -271,40 +292,40 @@ describe('ClaudeService', () => {
     });
 
     it('should track request before API call', async () => {
-      (mockCreate as any).mockResolvedValue({
+      (mockCreate as any).mockImplementation(() => Promise.resolve({
         content: [{ type: 'text', text: 'Response' }],
         usage: { input_tokens: 10, output_tokens: 10 },
-      });
+      }));
 
       await service.createCompletionWithUsage(validParams);
 
-      expect(sessionTracker.trackRequest).toHaveBeenCalled();
+      expect(mockTrackRequest).toHaveBeenCalled();
       expect(mockCreate).toHaveBeenCalled();
     });
   });
 
   describe('testConnection', () => {
     it('should return true if connection successful', async () => {
-      (mockCreate as any).mockResolvedValue({
+      (mockCreate as any).mockImplementation(() => Promise.resolve({
         content: [{ type: 'text', text: 'OK' }],
         usage: { input_tokens: 5, output_tokens: 1 },
-      });
+      }));
 
       const result = await service.testConnection();
 
       expect(result).toBe(true);
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          maxTokens: 10,
+          max_tokens: 10,
         })
       );
     });
 
     it('should return true if response contains OK', async () => {
-      (mockCreate as any).mockResolvedValue({
+      (mockCreate as any).mockImplementation(() => Promise.resolve({
         content: [{ type: 'text', text: 'OK, I can read this.' }],
         usage: { input_tokens: 5, output_tokens: 5 },
-      });
+      }));
 
       const result = await service.testConnection();
 
@@ -312,10 +333,10 @@ describe('ClaudeService', () => {
     });
 
     it('should return false if response does not contain OK', async () => {
-      (mockCreate as any).mockResolvedValue({
+      (mockCreate as any).mockImplementation(() => Promise.resolve({
         content: [{ type: 'text', text: 'Something else' }],
         usage: { input_tokens: 5, output_tokens: 5 },
-      });
+      }));
 
       const result = await service.testConnection();
 
@@ -323,7 +344,7 @@ describe('ClaudeService', () => {
     });
 
     it('should return false on error', async () => {
-      (mockCreate as any).mockRejectedValue(new Error('Connection failed'));
+      (mockCreate as any).mockImplementation(() => Promise.reject(new Error('Connection failed')));
 
       const result = await service.testConnection();
 
@@ -331,7 +352,7 @@ describe('ClaudeService', () => {
     });
 
     it('should return false on connection failure', async () => {
-      (mockCreate as any).mockRejectedValue(new Error('Network error'));
+      (mockCreate as any).mockImplementation(() => Promise.reject(new Error('Network error')));
 
       const result = await service.testConnection();
 
@@ -347,12 +368,12 @@ describe('ClaudeService', () => {
         resetTime: '2026-01-24T12:00:00Z',
       };
 
-      sessionTracker.getSessionStats.mockReturnValue(mockStats);
+      mockGetSessionStats.mockReturnValue(mockStats);
 
       const result = service.getSessionStats();
 
       expect(result).toEqual(mockStats);
-      expect(sessionTracker.getSessionStats).toHaveBeenCalled();
+      expect(mockGetSessionStats).toHaveBeenCalled();
     });
   });
 });

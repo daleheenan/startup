@@ -126,7 +126,7 @@ describe('BaseRepository', () => {
 
       repository.findAll({ limit: 10 });
 
-      expect(mockPrepare).toHaveBeenCalledWith('SELECT * FROM test_table LIMIT 10');
+      expect(mockPrepare).toHaveBeenCalledWith('SELECT * FROM test_table LIMIT ?');
     });
 
     it('should apply offset option', () => {
@@ -134,7 +134,7 @@ describe('BaseRepository', () => {
 
       repository.findAll({ limit: 10, offset: 20 });
 
-      expect(mockPrepare).toHaveBeenCalledWith('SELECT * FROM test_table LIMIT 10 OFFSET 20');
+      expect(mockPrepare).toHaveBeenCalledWith('SELECT * FROM test_table LIMIT ? OFFSET ?');
     });
 
     it('should apply columns option', () => {
@@ -156,7 +156,7 @@ describe('BaseRepository', () => {
       });
 
       expect(mockPrepare).toHaveBeenCalledWith(
-        'SELECT id, name FROM test_table ORDER BY name DESC LIMIT 5 OFFSET 10'
+        'SELECT id, name FROM test_table ORDER BY name DESC LIMIT ? OFFSET ?'
       );
     });
   });
@@ -179,7 +179,7 @@ describe('BaseRepository', () => {
       repository.findBy('name', 'Test', { orderBy: 'value ASC', limit: 5 });
 
       expect(mockPrepare).toHaveBeenCalledWith(
-        'SELECT * FROM test_table WHERE name = ? ORDER BY value ASC LIMIT 5'
+        'SELECT * FROM test_table WHERE name = ? ORDER BY value ASC LIMIT ?'
       );
     });
   });
@@ -388,11 +388,11 @@ describe('BaseRepository', () => {
       repository.paginate(3, 10);
 
       // Should use offset 20 for page 3 with pageSize 10
-      // Note: BaseRepository only adds OFFSET when > 0
+      // Note: BaseRepository uses parameterized queries with ?
       const prepareCalls = mockPrepare.mock.calls.map((call: unknown[]) => call[0] as string);
       const selectCall = prepareCalls.find((sql: string) => sql.includes('SELECT *'));
-      expect(selectCall).toContain('LIMIT 10');
-      expect(selectCall).toContain('OFFSET 20');
+      expect(selectCall).toContain('LIMIT ?');
+      expect(selectCall).toContain('OFFSET ?');
     });
 
     it('should apply orderBy option', () => {
@@ -405,7 +405,7 @@ describe('BaseRepository', () => {
       const prepareCalls = mockPrepare.mock.calls.map((call: unknown[]) => call[0] as string);
       const selectCall = prepareCalls.find((sql: string) => sql.includes('SELECT *'));
       expect(selectCall).toContain('ORDER BY name ASC');
-      expect(selectCall).toContain('LIMIT 5');
+      expect(selectCall).toContain('LIMIT ?');
     });
   });
 });

@@ -17,6 +17,18 @@ jest.mock('../../services/session-tracker.js', () => ({
   },
 }));
 
+// Mock logger service
+const mockLogger = {
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn(),
+};
+
+jest.mock('../../services/logger.service.js', () => ({
+  createLogger: jest.fn(() => mockLogger),
+}));
+
 describe('RateLimitHandler', () => {
   let RateLimitHandler: any;
   let RateLimitError: any;
@@ -190,19 +202,19 @@ describe('RateLimitHandler', () => {
       const mockRun = jest.fn().mockReturnValue({ changes: 1 });
       db.prepare = jest.fn(() => ({ run: mockRun }));
 
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-
       const handlePromise = rateLimitHandler.handleRateLimit(mockJob);
 
       await jest.advanceTimersByTimeAsync(waitMs);
       await handlePromise;
 
-      // Verify correct wait time was logged (rounded to 16 minutes)
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('16 minutes')
+      // Verify logger was called with correct wait time (16 minutes)
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          waitMinutes: 16,
+          sessionResetAt: '2026-01-25T10:16:30Z',
+        }),
+        'Pausing queue until session reset'
       );
-
-      consoleLogSpy.mockRestore();
     });
 
     it('should handle very short wait times', async () => {
@@ -285,8 +297,6 @@ describe('RateLimitHandler', () => {
       const mockRun = jest.fn().mockReturnValue({ changes: 3 }); // 3 jobs resumed
       db.prepare = jest.fn(() => ({ run: mockRun }));
 
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-
       await rateLimitHandler.handleRateLimit(mockJob);
 
       // Verify resume query was executed
@@ -294,12 +304,11 @@ describe('RateLimitHandler', () => {
         expect.stringContaining('pending')
       );
 
-      // Verify log shows count
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Resumed 3 paused job')
+      // Verify logger shows count
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        { count: 3 },
+        'Paused jobs resumed'
       );
-
-      consoleLogSpy.mockRestore();
     });
 
     it('should handle case where no jobs are resumed', async () => {
@@ -363,13 +372,12 @@ describe('RateLimitHandler', () => {
       const mockRun = jest.fn().mockReturnValue({ changes: 1 });
       db.prepare = jest.fn(() => ({ run: mockRun }));
 
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-
       const fallbackPromise = rateLimitHandler.handleRateLimitFallback();
 
       // Verify fallback message
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('30-minute fallback')
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        { waitMinutes: 30 },
+        'Using conservative fallback wait'
       );
 
       // Fast-forward 30 minutes
@@ -382,8 +390,6 @@ describe('RateLimitHandler', () => {
       expect(db.prepare).toHaveBeenCalledWith(
         expect.stringContaining('pending')
       );
-
-      consoleLogSpy.mockRestore();
     });
 
     it('should use fallback when session tracking unavailable', async () => {

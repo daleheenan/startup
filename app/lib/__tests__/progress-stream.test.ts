@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import { useProgressStream } from '../progress-stream';
 
 // Mock auth module
@@ -8,31 +8,41 @@ vi.mock('../auth', () => ({
 }));
 
 describe('useProgressStream', () => {
-  let mockEventSource: any;
   let eventListeners: Map<string, (event: MessageEvent) => void>;
+  let eventSourceSpy: ReturnType<typeof vi.fn>;
+  let constructorCalls: string[];
+  let mockClose: ReturnType<typeof vi.fn>;
+  let lastInstance: any;
 
   beforeEach(() => {
     eventListeners = new Map();
+    constructorCalls = [];
+    mockClose = vi.fn();
+    lastInstance = null;
 
-    // Create a mock EventSource instance
-    mockEventSource = {
-      url: '',
-      readyState: 1,
-      addEventListener: vi.fn((type: string, listener: (event: MessageEvent) => void) => {
-        eventListeners.set(type, listener);
-      }),
-      removeEventListener: vi.fn(),
-      close: vi.fn(),
-      onerror: null,
-    };
+    // Create a spy function that we can track
+    eventSourceSpy = vi.fn();
 
     // Override the global EventSource constructor with a proper class
     global.EventSource = class MockEventSource {
       url: string;
+      readyState = 1;
+      onerror: ((ev: Event) => void) | null = null;
+      close: ReturnType<typeof vi.fn>;
+
       constructor(url: string) {
+        eventSourceSpy(url);
+        constructorCalls.push(url);
         this.url = url;
-        Object.assign(this, mockEventSource);
+        this.close = mockClose;
+        lastInstance = this;
       }
+
+      addEventListener(type: string, listener: (event: MessageEvent) => void) {
+        eventListeners.set(type, listener);
+      }
+
+      removeEventListener = vi.fn();
     } as any;
   });
 
@@ -44,7 +54,7 @@ describe('useProgressStream', () => {
     const { result } = renderHook(() => useProgressStream());
 
     await waitFor(() => {
-      expect(global.EventSource).toHaveBeenCalledWith(
+      expect(eventSourceSpy).toHaveBeenCalledWith(
         expect.stringContaining('/api/progress/stream?token=mock-token-123')
       );
     });
@@ -52,7 +62,9 @@ describe('useProgressStream', () => {
     // Trigger init event
     const initListener = eventListeners.get('init');
     if (initListener) {
-      initListener(new MessageEvent('init', { data: 'Connected' }));
+      act(() => {
+        initListener(new MessageEvent('init', { data: 'Connected' }));
+      });
     }
 
     await waitFor(() => {
@@ -62,6 +74,11 @@ describe('useProgressStream', () => {
 
   it('should handle job update events', async () => {
     const { result } = renderHook(() => useProgressStream());
+
+    // Wait for EventSource to be created
+    await waitFor(() => {
+      expect(eventListeners.has('job:update')).toBe(true);
+    });
 
     const jobUpdate = {
       id: 'job-123',
@@ -73,11 +90,11 @@ describe('useProgressStream', () => {
 
     // Trigger job update event
     const jobListener = eventListeners.get('job:update');
-    if (jobListener) {
-      jobListener(new MessageEvent('job:update', {
+    act(() => {
+      jobListener!(new MessageEvent('job:update', {
         data: JSON.stringify(jobUpdate)
       }));
-    }
+    });
 
     await waitFor(() => {
       expect(result.current.jobUpdates).toHaveLength(1);
@@ -88,6 +105,11 @@ describe('useProgressStream', () => {
   it('should handle chapter completion events', async () => {
     const { result } = renderHook(() => useProgressStream());
 
+    // Wait for EventSource to be created
+    await waitFor(() => {
+      expect(eventListeners.has('chapter:complete')).toBe(true);
+    });
+
     const chapterComplete = {
       id: 'chapter-789',
       chapter_number: 5,
@@ -97,11 +119,11 @@ describe('useProgressStream', () => {
 
     // Trigger chapter complete event
     const chapterListener = eventListeners.get('chapter:complete');
-    if (chapterListener) {
-      chapterListener(new MessageEvent('chapter:complete', {
+    act(() => {
+      chapterListener!(new MessageEvent('chapter:complete', {
         data: JSON.stringify(chapterComplete)
       }));
-    }
+    });
 
     await waitFor(() => {
       expect(result.current.chapterCompletions).toHaveLength(1);
@@ -111,6 +133,11 @@ describe('useProgressStream', () => {
 
   it('should handle chapter progress updates', async () => {
     const { result } = renderHook(() => useProgressStream());
+
+    // Wait for EventSource to be created
+    await waitFor(() => {
+      expect(eventListeners.has('chapter:progress')).toBe(true);
+    });
 
     const progressUpdate = {
       chapter_id: 'chapter-101',
@@ -122,11 +149,11 @@ describe('useProgressStream', () => {
 
     // Trigger chapter progress event
     const progressListener = eventListeners.get('chapter:progress');
-    if (progressListener) {
-      progressListener(new MessageEvent('chapter:progress', {
+    act(() => {
+      progressListener!(new MessageEvent('chapter:progress', {
         data: JSON.stringify(progressUpdate)
       }));
-    }
+    });
 
     await waitFor(() => {
       expect(result.current.currentProgress).toEqual(progressUpdate);
@@ -135,6 +162,11 @@ describe('useProgressStream', () => {
 
   it('should handle session status updates', async () => {
     const { result } = renderHook(() => useProgressStream());
+
+    // Wait for EventSource to be created
+    await waitFor(() => {
+      expect(eventListeners.has('session:update')).toBe(true);
+    });
 
     const sessionUpdate = {
       is_active: true,
@@ -145,11 +177,11 @@ describe('useProgressStream', () => {
 
     // Trigger session update event
     const sessionListener = eventListeners.get('session:update');
-    if (sessionListener) {
-      sessionListener(new MessageEvent('session:update', {
+    act(() => {
+      sessionListener!(new MessageEvent('session:update', {
         data: JSON.stringify(sessionUpdate)
       }));
-    }
+    });
 
     await waitFor(() => {
       expect(result.current.sessionStatus).toEqual(sessionUpdate);
@@ -158,6 +190,11 @@ describe('useProgressStream', () => {
 
   it('should handle queue statistics updates', async () => {
     const { result } = renderHook(() => useProgressStream());
+
+    // Wait for EventSource to be created
+    await waitFor(() => {
+      expect(eventListeners.has('queue:stats')).toBe(true);
+    });
 
     const queueStats = {
       pending: 5,
@@ -170,11 +207,11 @@ describe('useProgressStream', () => {
 
     // Trigger queue stats event
     const queueListener = eventListeners.get('queue:stats');
-    if (queueListener) {
-      queueListener(new MessageEvent('queue:stats', {
+    act(() => {
+      queueListener!(new MessageEvent('queue:stats', {
         data: JSON.stringify(queueStats)
       }));
-    }
+    });
 
     await waitFor(() => {
       expect(result.current.queueStats).toEqual(queueStats);
@@ -184,24 +221,29 @@ describe('useProgressStream', () => {
   it('should limit job updates to last 50 entries', async () => {
     const { result } = renderHook(() => useProgressStream());
 
+    // Wait for EventSource to be created
+    await waitFor(() => {
+      expect(eventListeners.has('job:update')).toBe(true);
+    });
+
     const jobListener = eventListeners.get('job:update');
 
     // Send 60 job updates
-    for (let i = 0; i < 60; i++) {
-      const jobUpdate = {
-        id: `job-${i}`,
-        type: 'chapter_generation',
-        status: 'running',
-        target_id: `chapter-${i}`,
-        timestamp: new Date().toISOString(),
-      };
+    act(() => {
+      for (let i = 0; i < 60; i++) {
+        const jobUpdate = {
+          id: `job-${i}`,
+          type: 'chapter_generation',
+          status: 'running',
+          target_id: `chapter-${i}`,
+          timestamp: new Date().toISOString(),
+        };
 
-      if (jobListener) {
-        jobListener(new MessageEvent('job:update', {
+        jobListener!(new MessageEvent('job:update', {
           data: JSON.stringify(jobUpdate)
         }));
       }
-    }
+    });
 
     await waitFor(() => {
       expect(result.current.jobUpdates).toHaveLength(50);
@@ -214,26 +256,29 @@ describe('useProgressStream', () => {
   it('should handle connection errors and attempt reconnection', async () => {
     vi.useFakeTimers();
 
-    const { result } = renderHook(() => useProgressStream());
+    renderHook(() => useProgressStream());
 
-    // Simulate connection error
-    if (mockEventSource.onerror) {
-      mockEventSource.onerror(new Event('error'));
-    }
-
-    await waitFor(() => {
-      expect(result.current.connected).toBe(false);
+    // Wait for EventSource to be created
+    await vi.waitFor(() => {
+      expect(constructorCalls.length).toBe(1);
     });
 
-    expect(mockEventSource.close).toHaveBeenCalled();
+    // Simulate connection error - call the onerror callback that was set on the instance
+    act(() => {
+      if (lastInstance?.onerror) {
+        lastInstance.onerror(new Event('error'));
+      }
+    });
+
+    expect(mockClose).toHaveBeenCalled();
 
     // Fast-forward 5 seconds to trigger reconnection
-    vi.advanceTimersByTime(5000);
-
-    await waitFor(() => {
-      // EventSource should be called again (once initially, once for reconnect)
-      expect(global.EventSource).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      vi.advanceTimersByTime(5000);
     });
+
+    // EventSource should be called again (once initially, once for reconnect)
+    expect(constructorCalls.length).toBe(2);
 
     vi.useRealTimers();
   });
@@ -243,7 +288,7 @@ describe('useProgressStream', () => {
 
     unmount();
 
-    expect(mockEventSource.close).toHaveBeenCalled();
+    expect(mockClose).toHaveBeenCalled();
   });
 
   it('should provide manual reconnect function', async () => {
@@ -251,15 +296,17 @@ describe('useProgressStream', () => {
 
     // Initial connection
     await waitFor(() => {
-      expect(global.EventSource).toHaveBeenCalledTimes(1);
+      expect(constructorCalls.length).toBe(1);
     });
 
     // Call reconnect
-    result.current.reconnect();
+    act(() => {
+      result.current.reconnect();
+    });
 
     await waitFor(() => {
-      expect(global.EventSource).toHaveBeenCalledTimes(2);
-      expect(mockEventSource.close).toHaveBeenCalled();
+      expect(constructorCalls.length).toBe(2);
+      expect(mockClose).toHaveBeenCalled();
     });
   });
 
@@ -267,26 +314,34 @@ describe('useProgressStream', () => {
     const { getToken } = await import('../auth');
     vi.mocked(getToken).mockReturnValue(null);
 
+    // Clear the constructor calls from previous tests
+    constructorCalls.length = 0;
+
     renderHook(() => useProgressStream());
 
     // Wait a bit
     await new Promise(resolve => setTimeout(resolve, 100));
 
     // Should not have created EventSource
-    expect(global.EventSource).not.toHaveBeenCalled();
+    expect(constructorCalls.length).toBe(0);
 
-    // Restore mock
+    // Restore mocks
     vi.mocked(getToken).mockReturnValue('mock-token-123');
   });
 
   it('should update progress incrementally', async () => {
     const { result } = renderHook(() => useProgressStream());
 
+    // Wait for component to mount and register listeners
+    await waitFor(() => {
+      expect(eventListeners.has('chapter:progress')).toBe(true);
+    });
+
     const progressListener = eventListeners.get('chapter:progress');
 
     // Send first progress update
-    if (progressListener) {
-      progressListener(new MessageEvent('chapter:progress', {
+    act(() => {
+      progressListener!(new MessageEvent('chapter:progress', {
         data: JSON.stringify({
           chapter_id: 'chapter-1',
           chapter_number: 1,
@@ -295,15 +350,15 @@ describe('useProgressStream', () => {
           progress: 25,
         })
       }));
-    }
+    });
 
     await waitFor(() => {
       expect(result.current.currentProgress?.progress).toBe(25);
     });
 
     // Send second progress update
-    if (progressListener) {
-      progressListener(new MessageEvent('chapter:progress', {
+    act(() => {
+      progressListener!(new MessageEvent('chapter:progress', {
         data: JSON.stringify({
           chapter_id: 'chapter-1',
           chapter_number: 1,
@@ -312,7 +367,7 @@ describe('useProgressStream', () => {
           progress: 75,
         })
       }));
-    }
+    });
 
     await waitFor(() => {
       expect(result.current.currentProgress?.progress).toBe(75);

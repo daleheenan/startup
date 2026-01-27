@@ -25,7 +25,7 @@ describe('SeriesBibleGeneratorService', () => {
           title: 'Book One',
           word_count: 75000,
           status: 'completed',
-          ending_state: {
+          ending_state: JSON.stringify({
             characters: [
               {
                 characterId: 'char-1',
@@ -48,7 +48,7 @@ describe('SeriesBibleGeneratorService', () => {
             },
             timeline: 'End of Year 1',
             unresolved: ['Who is the dark lord?'],
-          },
+          }) as any,
           book_summary: 'Hero begins quest',
           timeline_end: 'End of Year 1',
           created_at: new Date().toISOString(),
@@ -109,8 +109,8 @@ describe('SeriesBibleGeneratorService', () => {
         type: 'trilogy',
         genre: 'Fantasy',
         book_count: 3,
-        story_bible: mockStoryBible,
-        story_dna: { genre: 'Fantasy', subgenre: 'Epic Fantasy', tone: 'Epic', themes: ['Good vs Evil', 'Courage'], proseStyle: 'Descriptive' },
+        story_bible: JSON.stringify(mockStoryBible) as any,
+        story_dna: JSON.stringify({ genre: 'Fantasy', subgenre: 'Epic Fantasy', tone: 'Epic', themes: ['Good vs Evil', 'Courage'], proseStyle: 'Descriptive' }) as any,
         series_bible: null,
         universe_id: null,
         is_universe_root: false,
@@ -125,12 +125,21 @@ describe('SeriesBibleGeneratorService', () => {
       const booksStmt = { all: jest.fn().mockReturnValue(mockBooks) };
       const projectStmt = { get: jest.fn().mockReturnValue(mockProject) };
       const chaptersStmt = { all: jest.fn().mockReturnValue([]) };
+      const mysteriesStmt = { all: jest.fn().mockReturnValue([]) };
       const updateStmt = { run: jest.fn() };
 
+      // Setup mocks in order of execution:
+      // 1. Books query
+      // 2. Project query
+      // 3. Chapters query for each book (2 books)
+      // 4. Mysteries query
+      // 5. Update statement
       mockPrepare
         .mockReturnValueOnce(booksStmt)
         .mockReturnValueOnce(projectStmt)
-        .mockReturnValue(chaptersStmt)  // Multiple calls for chapters
+        .mockReturnValueOnce(chaptersStmt)  // Book 1 chapters
+        .mockReturnValueOnce(chaptersStmt)  // Book 2 chapters
+        .mockReturnValueOnce(mysteriesStmt)
         .mockReturnValueOnce(updateStmt);
 
       const result = service.generateSeriesBible('project-1');

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { ProgressDashboard } from '../ProgressDashboard';
+import { useProgressStream } from '../../lib/progress-stream';
 
 // Mock the progress stream hook
 vi.mock('../../lib/progress-stream', () => ({
@@ -36,10 +37,9 @@ vi.mock('../../lib/theme', () => ({
   },
 }));
 
+const mockUseProgressStream = vi.mocked(useProgressStream);
+
 describe('ProgressDashboard', () => {
-  const mockUseProgressStream = vi.mocked(
-    (await import('../../lib/progress-stream')).useProgressStream
-  );
 
   beforeEach(() => {
     vi.clearAllMocks();

@@ -12,8 +12,16 @@ module.exports = {
         moduleResolution: 'node',
         esModuleInterop: true,
         allowSyntheticDefaultImports: true,
-      }
+      },
+      diagnostics: {
+        ignoreCodes: [1343], // Ignore "import.meta" errors in tests
+      },
     }],
+  },
+  globals: {
+    'import.meta': {
+      url: 'file:///fake/path/db/migrate.ts'
+    }
   },
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',

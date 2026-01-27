@@ -2,17 +2,45 @@ import { jest } from '@jest/globals';
 import request from 'supertest';
 import express from 'express';
 
-// Mock database connection first
+// Create the mock database with proper structure
+const createMockStatement = () => ({
+  run: jest.fn<() => { changes: number }>(() => ({ changes: 1 })),
+  get: jest.fn<() => any>(() => null),
+  all: jest.fn<() => any[]>(() => []),
+});
+
+const mockPrepare = jest.fn<(sql?: string) => ReturnType<typeof createMockStatement>>(() => createMockStatement());
+
 const mockDb = {
-  prepare: jest.fn().mockReturnValue({
-    run: jest.fn().mockReturnValue({ changes: 1 }),
-    get: jest.fn().mockReturnValue(null),
-    all: jest.fn().mockReturnValue([]),
-  }),
+  prepare: mockPrepare,
+  pragma: jest.fn(),
+  close: jest.fn(),
 };
 
+// Mock database connection - must be before other imports
 jest.mock('../../db/connection.js', () => ({
+  __esModule: true,
   default: mockDb,
+}));
+
+// Mock logger service
+jest.mock('../../services/logger.service.js', () => ({
+  createLogger: jest.fn(() => ({
+    info: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+    warn: jest.fn(),
+  })),
+}));
+
+// Mock cache service
+jest.mock('../../services/cache.service.js', () => ({
+  cache: {
+    get: jest.fn(() => null),
+    set: jest.fn(),
+    invalidate: jest.fn(),
+    clear: jest.fn(),
+  },
 }));
 
 // Mock services
@@ -49,16 +77,13 @@ describe('Trilogy API Integration Tests', () => {
   let crossBookContinuityService: any;
   let seriesBibleGeneratorService: any;
   let bookTransitionService: any;
+  let cacheService: any;
 
   beforeEach(async () => {
     jest.clearAllMocks();
 
-    // Reset mock implementation
-    mockDb.prepare.mockReturnValue({
-      run: jest.fn().mockReturnValue({ changes: 1 }),
-      get: jest.fn().mockReturnValue(null),
-      all: jest.fn().mockReturnValue([]),
-    });
+    // Reset mock implementation with default responses
+    mockPrepare.mockImplementation(() => createMockStatement());
 
     // Import mocked services
     const continuityModule = await import('../../services/cross-book-continuity.service.js');
@@ -69,6 +94,12 @@ describe('Trilogy API Integration Tests', () => {
 
     const transitionModule = await import('../../services/book-transition.service.js');
     bookTransitionService = transitionModule.bookTransitionService;
+
+    const cacheModule = await import('../../services/cache.service.js');
+    cacheService = cacheModule.cache;
+
+    // Reset cache mock
+    cacheService.get.mockReturnValue(null);
 
     // Setup Express app with routes
     app = express();
@@ -98,7 +129,9 @@ describe('Trilogy API Integration Tests', () => {
       };
 
       it('should generate book ending state successfully', async () => {
-        crossBookContinuityService.generateBookEndingState.mockResolvedValue(mockEndingState);
+        crossBookContinuityService.generateBookEndingState.mockImplementation(() =>
+          Promise.resolve(mockEndingState)
+        );
 
         const response = await request(app)
           .post('/api/trilogy/books/book-123/ending-state')
@@ -109,8 +142,8 @@ describe('Trilogy API Integration Tests', () => {
       });
 
       it('should return 500 on service error', async () => {
-        crossBookContinuityService.generateBookEndingState.mockRejectedValue(
-          new Error('Service error')
+        crossBookContinuityService.generateBookEndingState.mockImplementation(() =>
+          Promise.reject(new Error('Service error'))
         );
 
         const response = await request(app)
@@ -124,8 +157,8 @@ describe('Trilogy API Integration Tests', () => {
 
     describe('POST /api/trilogy/books/:bookId/summary', () => {
       it('should generate book summary successfully', async () => {
-        crossBookContinuityService.generateBookSummary.mockResolvedValue(
-          'Book 1 summary: The hero begins their journey...'
+        crossBookContinuityService.generateBookSummary.mockImplementation(() =>
+          Promise.resolve('Book 1 summary: The hero begins their journey...')
         );
 
         const response = await request(app)
@@ -137,8 +170,8 @@ describe('Trilogy API Integration Tests', () => {
       });
 
       it('should return 500 on service error', async () => {
-        crossBookContinuityService.generateBookSummary.mockRejectedValue(
-          new Error('Failed to generate summary')
+        crossBookContinuityService.generateBookSummary.mockImplementation(() =>
+          Promise.reject(new Error('Failed to generate summary'))
         );
 
         const response = await request(app)
@@ -164,11 +197,9 @@ describe('Trilogy API Integration Tests', () => {
           book_number: 2,
         };
 
-        mockDb.prepare.mockReturnValue({
-          run: jest.fn(),
-          get: jest.fn().mockReturnValue(mockBook),
-          all: jest.fn(),
-        });
+        const mockStmt = createMockStatement();
+        mockStmt.get.mockReturnValue(mockBook);
+        mockPrepare.mockReturnValue(mockStmt);
 
         crossBookContinuityService.loadPreviousBookState.mockReturnValue(mockPreviousState);
 
@@ -185,11 +216,9 @@ describe('Trilogy API Integration Tests', () => {
       });
 
       it('should return 404 when book not found', () => {
-        mockDb.prepare.mockReturnValue({
-          run: jest.fn(),
-          get: jest.fn().mockReturnValue(null),
-          all: jest.fn(),
-        });
+        const mockStmt = createMockStatement();
+        mockStmt.get.mockReturnValue(null);
+        mockPrepare.mockReturnValue(mockStmt);
 
         return request(app)
           .get('/api/trilogy/books/book-123/previous-state')
@@ -207,11 +236,9 @@ describe('Trilogy API Integration Tests', () => {
           book_number: 1,
         };
 
-        mockDb.prepare.mockReturnValue({
-          run: jest.fn(),
-          get: jest.fn().mockReturnValue(mockBook),
-          all: jest.fn(),
-        });
+        const mockStmt = createMockStatement();
+        mockStmt.get.mockReturnValue(mockBook);
+        mockPrepare.mockReturnValue(mockStmt);
 
         crossBookContinuityService.loadPreviousBookState.mockReturnValue(null);
 
@@ -269,6 +296,8 @@ describe('Trilogy API Integration Tests', () => {
       };
 
       it('should get existing series bible successfully', () => {
+        // Ensure cache returns null so DB lookup happens
+        cacheService.get.mockReturnValue(null);
         seriesBibleGeneratorService.getSeriesBible.mockReturnValue(mockSeriesBible);
 
         return request(app)
@@ -276,10 +305,12 @@ describe('Trilogy API Integration Tests', () => {
           .expect(200)
           .then((response) => {
             expect(response.body).toEqual(mockSeriesBible);
+            expect(cacheService.set).toHaveBeenCalled();
           });
       });
 
       it('should return 404 when series bible not found', () => {
+        cacheService.get.mockReturnValue(null);
         seriesBibleGeneratorService.getSeriesBible.mockReturnValue(null);
 
         return request(app)
@@ -294,23 +325,29 @@ describe('Trilogy API Integration Tests', () => {
 
   describe('Book Transitions', () => {
     describe('POST /api/trilogy/transitions', () => {
+      const validProjectId = '550e8400-e29b-41d4-a716-446655440000';
+      const validFromBookId = '550e8400-e29b-41d4-a716-446655440001';
+      const validToBookId = '550e8400-e29b-41d4-a716-446655440002';
+
       const mockTransition = {
         id: 'transition-1',
-        projectId: 'project-1',
-        fromBookId: 'book-1',
-        toBookId: 'book-2',
+        projectId: validProjectId,
+        fromBookId: validFromBookId,
+        toBookId: validToBookId,
         timeGap: '6 months',
       };
 
       it('should create book transition successfully', async () => {
-        bookTransitionService.generateBookTransition.mockResolvedValue(mockTransition);
+        bookTransitionService.generateBookTransition.mockImplementation(() =>
+          Promise.resolve(mockTransition)
+        );
 
         const response = await request(app)
           .post('/api/trilogy/transitions')
           .send({
-            projectId: 'project-1',
-            fromBookId: 'book-1',
-            toBookId: 'book-2',
+            projectId: validProjectId,
+            fromBookId: validFromBookId,
+            toBookId: validToBookId,
             timeGap: '6 months',
           })
           .expect(201);
@@ -324,7 +361,7 @@ describe('Trilogy API Integration Tests', () => {
           .send({ fromBookId: 'book-1' })
           .expect(400);
 
-        expect(response.body.error.code).toBe('INVALID_REQUEST');
+        expect(response.body.error.code).toBe('VALIDATION_ERROR');
       });
     });
 
@@ -367,27 +404,22 @@ describe('Trilogy API Integration Tests', () => {
 
   describe('Convert to Trilogy', () => {
     it('should convert standalone project to trilogy', () => {
-      const updateStmt = {
-        run: jest.fn().mockReturnValue({ changes: 1 }),
-        get: jest.fn(),
-        all: jest.fn(),
+      const existingBook = {
+        id: 'existing-book-1',
+        project_id: 'project-1',
+        book_number: 1,
       };
 
-      const getBookStmt = {
-        run: jest.fn(),
-        get: jest.fn().mockReturnValue({
-          id: 'existing-book-1',
-          project_id: 'project-1',
-          book_number: 1,
-        }),
-        all: jest.fn(),
-      };
+      mockPrepare.mockImplementation((sql: any) => {
+        const stmt = createMockStatement();
 
-      (mockDb.prepare as any).mockImplementation((sql: any) => {
         if (typeof sql === 'string' && sql.includes('SELECT * FROM books')) {
-          return getBookStmt;
+          stmt.get.mockReturnValue(existingBook);
+        } else {
+          stmt.run.mockReturnValue({ changes: 1 });
         }
-        return updateStmt;
+
+        return stmt;
       });
 
       return request(app)
@@ -408,7 +440,7 @@ describe('Trilogy API Integration Tests', () => {
         .send({})
         .expect(400)
         .then((response) => {
-          expect(response.body.error.code).toBe('INVALID_REQUEST');
+          expect(response.body.error.code).toBe('VALIDATION_ERROR');
         });
     });
   });

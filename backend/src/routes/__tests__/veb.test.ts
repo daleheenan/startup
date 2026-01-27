@@ -10,10 +10,15 @@ import express, { Response } from 'express';
 const mockGet = jest.fn();
 const mockAll = jest.fn();
 const mockRun = jest.fn();
-const mockPrepare = jest.fn();
+const mockPrepare = jest.fn(() => ({
+  get: mockGet,
+  all: mockAll,
+  run: mockRun,
+}));
 
 // Mock database module
 jest.mock('../../db/connection.js', () => ({
+  __esModule: true,
   default: {
     prepare: mockPrepare,
   },
@@ -100,7 +105,7 @@ describe('VEB Routes', () => {
     mockGet.mockReset();
     mockAll.mockReset();
     mockRun.mockReset();
-    mockPrepare.mockReset();
+    mockPrepare.mockClear(); // Use mockClear instead of mockReset to preserve implementation
     mockSubmitToVEB.mockReset();
 
     // Setup default mock returns
