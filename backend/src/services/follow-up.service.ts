@@ -63,11 +63,26 @@ class FollowUpService {
       throw new Error(`Project not found: ${book.project_id}`);
     }
 
-    // Get all chapter content
-    const chaptersStmt = db.prepare<[string], Chapter>(`
-      SELECT * FROM chapters WHERE book_id = ? ORDER BY chapter_number ASC
+    // Get the active version for the book
+    const activeVersionStmt = db.prepare<[string], { id: string }>(`
+      SELECT id FROM book_versions WHERE book_id = ? AND is_active = 1
     `);
-    const chapters = chaptersStmt.all(bookId);
+    const activeVersion = activeVersionStmt.get(bookId);
+
+    // Get all chapter content - query by version_id if available, otherwise fall back to book_id
+    let chapters: Chapter[];
+    if (activeVersion) {
+      const chaptersStmt = db.prepare<[string], Chapter>(`
+        SELECT * FROM chapters WHERE version_id = ? ORDER BY chapter_number ASC
+      `);
+      chapters = chaptersStmt.all(activeVersion.id);
+    } else {
+      // Legacy chapters without version_id
+      const chaptersStmt = db.prepare<[string], Chapter>(`
+        SELECT * FROM chapters WHERE book_id = ? AND version_id IS NULL ORDER BY chapter_number ASC
+      `);
+      chapters = chaptersStmt.all(bookId);
+    }
 
     if (chapters.length === 0) {
       throw new Error('No chapters found for this book');
