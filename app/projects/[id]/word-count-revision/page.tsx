@@ -132,7 +132,7 @@ export default function WordCountRevisionPage() {
     const fetchBooks = async () => {
       try {
         const token = getToken();
-        const res = await fetch(`${API_BASE_URL}/api/projects/${projectId}/books`, {
+        const res = await fetch(`${API_BASE_URL}/api/books/project/${projectId}`, {
           headers: { 'Authorization': `Bearer ${token}` },
         });
 
