@@ -490,17 +490,21 @@ export default function EditorialActionPlanPage() {
     market_analyst: 'Market Analyst',
   };
 
-  const moduleColors = {
+  const moduleColors: Record<string, { bg: string; text: string; border: string }> = {
     beta_swarm: { bg: '#DBEAFE', text: '#1E40AF', border: '#3B82F6' },
     ruthless_editor: { bg: '#FEE2E2', text: '#991B1B', border: '#EF4444' },
     market_analyst: { bg: '#D1FAE5', text: '#065F46', border: '#10B981' },
   };
 
-  const severityColors = {
+  const severityColors: Record<string, { bg: string; text: string; border: string }> = {
     minor: { bg: '#F3F4F6', text: '#4B5563', border: '#9CA3AF' },
     moderate: { bg: '#FEF3C7', text: '#92400E', border: '#F59E0B' },
     major: { bg: '#FEE2E2', text: '#991B1B', border: '#EF4444' },
   };
+
+  // Fallback colours for unknown module/severity values
+  const defaultModuleColor = { bg: '#F3F4F6', text: '#4B5563', border: '#9CA3AF' };
+  const defaultSeverityColor = { bg: '#F3F4F6', text: '#4B5563', border: '#9CA3AF' };
 
   if (loading) {
     return (
@@ -728,8 +732,8 @@ export default function EditorialActionPlanPage() {
               </div>
             ) : (
               filteredFindings.map((finding) => {
-                const modColor = moduleColors[finding.module];
-                const sevColor = severityColors[finding.severity];
+                const modColor = moduleColors[finding.module] || defaultModuleColor;
+                const sevColor = severityColors[finding.severity] || defaultSeverityColor;
                 const isUpdating = updatingId === finding.id;
 
                 return (
