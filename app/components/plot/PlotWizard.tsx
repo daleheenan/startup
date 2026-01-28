@@ -89,6 +89,9 @@ export default function PlotWizard({
 
   // Sync local state when plotLayers prop changes (e.g., after auto-population)
   useEffect(() => {
+    // Guard against undefined plotLayers
+    if (!plotLayers) return;
+
     if (plotLayers.length > 0 && localPlots.length === 0) {
       setLocalPlots(plotLayers);
     } else if (plotLayers.length > localPlots.length) {

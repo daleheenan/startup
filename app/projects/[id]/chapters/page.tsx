@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
 import ProjectNavigation from '@/app/components/shared/ProjectNavigation';
+import BookVersionSelector from '@/app/components/BookVersionSelector';
 import { fetchWithAuth } from '../../../lib/fetch-utils';
 import { colors, borderRadius, spacing, typography, transitions } from '../../../lib/design-tokens';
 import { useProjectNavigation } from '@/app/hooks';
@@ -57,14 +58,56 @@ export default function ChaptersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedBook, setSelectedBook] = useState<string>('all');
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [project, setProject] = useState<any>(null);
   const [hasQueuedJobs, setHasQueuedJobs] = useState(false);
 
   const navigation = useProjectNavigation(projectId, project);
 
+  // Fetch chapters for a specific book with optional version filter
+  const fetchChaptersForBook = useCallback(async (bookId: string, versionId?: string | null) => {
+    let url = `/api/books/${bookId}/chapters`;
+    if (versionId) {
+      url += `?versionId=${versionId}`;
+    }
+    const chaptersRes = await fetchWithAuth(url);
+    if (chaptersRes.ok) {
+      return await chaptersRes.json() as Chapter[];
+    }
+    return [];
+  }, []);
+
+  // Initial data load
   useEffect(() => {
     fetchChaptersData();
   }, [projectId]);
+
+  // Refetch chapters when book or version selection changes
+  useEffect(() => {
+    if (books.length === 0) return;
+
+    const refetchChapters = async () => {
+      try {
+        if (selectedBook === 'all') {
+          // Fetch chapters from all books (active versions)
+          const allChapters: Chapter[] = [];
+          for (const book of books) {
+            const bookChapters = await fetchChaptersForBook(book.id);
+            allChapters.push(...bookChapters);
+          }
+          setChapters(allChapters);
+        } else {
+          // Fetch chapters for selected book with optional version
+          const bookChapters = await fetchChaptersForBook(selectedBook, selectedVersionId);
+          setChapters(bookChapters);
+        }
+      } catch (err: any) {
+        console.error('Error refetching chapters:', err);
+      }
+    };
+
+    refetchChapters();
+  }, [selectedBook, selectedVersionId, books, fetchChaptersForBook]);
 
   const fetchChaptersData = async () => {
     try {
@@ -82,14 +125,11 @@ export default function ChaptersPage() {
       const booksData: Book[] = await booksRes.json();
       setBooks(booksData);
 
-      // Fetch all chapters for all books
+      // Fetch all chapters for all books (active versions by default)
       const allChapters: Chapter[] = [];
       for (const book of booksData) {
-        const chaptersRes = await fetchWithAuth(`/api/books/${book.id}/chapters`);
-        if (chaptersRes.ok) {
-          const bookChapters: Chapter[] = await chaptersRes.json();
-          allChapters.push(...bookChapters);
-        }
+        const bookChapters = await fetchChaptersForBook(book.id);
+        allChapters.push(...bookChapters);
       }
 
       setChapters(allChapters);
@@ -350,7 +390,10 @@ export default function ChaptersPage() {
               <select
                 id="book-filter"
                 value={selectedBook}
-                onChange={(e) => setSelectedBook(e.target.value)}
+                onChange={(e) => {
+                  setSelectedBook(e.target.value);
+                  setSelectedVersionId(null); // Reset version when changing book
+                }}
                 style={{
                   width: '100%',
                   padding: spacing[3],
@@ -370,6 +413,28 @@ export default function ChaptersPage() {
             </div>
           )}
 
+          {/* Version Selector - only show when a specific book is selected */}
+          {selectedBook !== 'all' && (
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: typography.fontSize.sm,
+                  fontWeight: typography.fontWeight.medium,
+                  color: colors.text.secondary,
+                  marginBottom: spacing[2],
+                }}
+              >
+                Version
+              </label>
+              <BookVersionSelector
+                bookId={selectedBook}
+                compact={true}
+                onVersionChange={(version) => setSelectedVersionId(version.id)}
+              />
+            </div>
+          )}
+
           {/* Clear Filters */}
           {(searchQuery || statusFilter !== 'all' || selectedBook !== 'all') && (
             <div style={{ display: 'flex', alignItems: 'flex-end' }}>
@@ -378,6 +443,7 @@ export default function ChaptersPage() {
                   setSearchQuery('');
                   setStatusFilter('all');
                   setSelectedBook('all');
+                  setSelectedVersionId(null);
                 }}
                 style={{
                   padding: `${spacing[3]} ${spacing[5]}`,

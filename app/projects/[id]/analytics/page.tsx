@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { getToken, logout } from '../../../lib/auth';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
 import ProjectNavigation from '@/app/components/shared/ProjectNavigation';
+import BookVersionSelector from '@/app/components/BookVersionSelector';
 import { useProjectNavigation } from '@/app/hooks';
 
 // Lazy load AnalyticsDashboard - heavy component with charts
@@ -32,6 +33,7 @@ export default function AnalyticsPage() {
 
   const [books, setBooks] = useState<Book[]>([]);
   const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [project, setProject] = useState<any>(null);
 
@@ -107,12 +109,15 @@ export default function AnalyticsPage() {
         chapters={navigation.chapters}
       />
 
-      {/* Book Selector */}
-      {books.length > 1 && (
-        <div style={{ marginBottom: '1.5rem' }}>
+      {/* Book and Version Selectors */}
+      <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        {books.length > 1 && (
           <select
             value={selectedBookId || ''}
-            onChange={(e) => setSelectedBookId(e.target.value)}
+            onChange={(e) => {
+              setSelectedBookId(e.target.value);
+              setSelectedVersionId(null); // Reset version when book changes
+            }}
             style={{
               padding: '8px 12px',
               border: '1px solid #E2E8F0',
@@ -126,8 +131,16 @@ export default function AnalyticsPage() {
               </option>
             ))}
           </select>
-        </div>
-      )}
+        )}
+
+        {selectedBookId && (
+          <BookVersionSelector
+            bookId={selectedBookId}
+            compact={true}
+            onVersionChange={(version) => setSelectedVersionId(version.id)}
+          />
+        )}
+      </div>
 
       {/* Content Area */}
       {loading ? (

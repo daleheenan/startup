@@ -18,9 +18,23 @@ interface Book {
   word_count: number;
 }
 
+interface BookVersion {
+  id: string;
+  book_id: string;
+  version_number: number;
+  version_name: string | null;
+  is_active: number;
+  word_count: number;
+  chapter_count: number;
+  actual_word_count?: number;
+  actual_chapter_count?: number;
+}
+
 interface WordCountRevision {
   id: string;
   bookId: string;
+  sourceVersionId: string | null;
+  targetVersionId: string | null;
   currentWordCount: number;
   targetWordCount: number;
   tolerancePercent: number;
@@ -115,6 +129,7 @@ export default function WordCountRevisionPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [project, setProject] = useState<any>(null);
+  const [versions, setVersions] = useState<BookVersion[]>([]);
 
   const navigation = useProjectNavigation(projectId, project);
 
@@ -233,11 +248,33 @@ export default function WordCountRevisionPage() {
     }
   }, [selectedBookId]);
 
+  // Fetch versions for selected book
+  const fetchVersions = useCallback(async () => {
+    if (!selectedBookId) {
+      setVersions([]);
+      return;
+    }
+
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE_URL}/api/books/${selectedBookId}/versions`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setVersions(data.versions || []);
+      }
+    } catch (err) {
+      console.error('Error fetching versions:', err);
+    }
+  }, [selectedBookId]);
+
   useEffect(() => {
     if (selectedBookId) {
       fetchRevision();
+      fetchVersions();
     }
-  }, [selectedBookId, fetchRevision]);
+  }, [selectedBookId, fetchRevision, fetchVersions]);
 
   // Start a new revision
   const handleStartRevision = async (forceRestart = false) => {
@@ -821,6 +858,14 @@ export default function WordCountRevisionPage() {
                 <div style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1A1A2E', marginBottom: '0.5rem' }}>
                   Current Word Count: {selectedBook.word_count?.toLocaleString() || 0}
                 </div>
+                {versions.length > 1 && (
+                  <div style={{ fontSize: '0.875rem', color: '#64748B', marginBottom: '0.5rem' }}>
+                    <strong>Active Version:</strong>{' '}
+                    {versions.find(v => v.is_active === 1)?.version_name || `Version ${versions.find(v => v.is_active === 1)?.version_number || 1}`}
+                    {' - '}
+                    {((versions.find(v => v.is_active === 1)?.actual_word_count || versions.find(v => v.is_active === 1)?.word_count || 0) / 1000).toFixed(1)}k words
+                  </div>
+                )}
                 <p style={{ margin: 0, color: '#64748B' }}>
                   Set your target word count and tolerance to begin the revision process.
                 </p>
@@ -916,6 +961,39 @@ export default function WordCountRevisionPage() {
                 color: 'white',
                 marginBottom: '1.5rem',
               }}>
+                {/* Version indicator */}
+                {versions.length > 1 && (
+                  <div style={{
+                    marginBottom: '1rem',
+                    padding: '0.5rem 0.75rem',
+                    background: 'rgba(255,255,255,0.15)',
+                    borderRadius: '6px',
+                    fontSize: '0.75rem',
+                    display: 'flex',
+                    gap: '1.5rem',
+                    flexWrap: 'wrap',
+                  }}>
+                    <span>
+                      <strong>Source:</strong>{' '}
+                      {(() => {
+                        const sourceVersion = versions.find(v => v.id === revision.sourceVersionId);
+                        return sourceVersion
+                          ? `v${sourceVersion.version_number}${sourceVersion.version_name ? ` (${sourceVersion.version_name})` : ''}`
+                          : 'Original';
+                      })()}
+                    </span>
+                    <span>
+                      <strong>Target:</strong>{' '}
+                      {(() => {
+                        const targetVersion = versions.find(v => v.id === revision.targetVersionId);
+                        return targetVersion
+                          ? `v${targetVersion.version_number}${targetVersion.version_name ? ` (${targetVersion.version_name})` : ''}`
+                          : 'New version';
+                      })()}
+                    </span>
+                  </div>
+                )}
+
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
                   <div>
                     <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1rem', opacity: 0.9 }}>Progress</h3>

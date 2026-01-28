@@ -82,6 +82,9 @@ export default function PlotLayersVisualization({
   const chapters = Array.from({ length: totalChapters }, (_, i) => i + 1);
   const { act_structure } = structure;
 
+  // Guard against undefined plot_layers
+  const plotLayers = structure.plot_layers || [];
+
   // Calculate intensity at each chapter for a layer (for the line graph)
   const getLayerIntensity = (layer: PlotLayer, chapter: number): number => {
     const point = layer.points.find(p => p.chapter_number === chapter);
@@ -140,7 +143,7 @@ export default function PlotLayersVisualization({
         <div style={{ fontSize: '0.813rem', fontWeight: 600, color: colors.text, marginRight: '1rem' }}>
           Plot Layers:
         </div>
-        {structure.plot_layers.map(layer => (
+        {plotLayers.map(layer => (
           <button
             key={layer.id}
             onClick={() => setSelectedLayer(selectedLayer === layer.id ? null : layer.id)}
@@ -317,7 +320,7 @@ export default function PlotLayersVisualization({
           }}
           preserveAspectRatio="none"
         >
-          {structure.plot_layers.map(layer => {
+          {plotLayers.map(layer => {
             if (selectedLayer && selectedLayer !== layer.id) return null;
 
             const points = chapters.map(ch => ({
@@ -345,7 +348,7 @@ export default function PlotLayersVisualization({
         </svg>
 
         {/* Plot points */}
-        {structure.plot_layers.map(layer => {
+        {plotLayers.map(layer => {
           if (selectedLayer && selectedLayer !== layer.id) return null;
 
           return layer.points.map(point => {
@@ -423,7 +426,7 @@ export default function PlotLayersVisualization({
           borderRadius: '8px',
         }}>
           {(() => {
-            const layer = structure.plot_layers.find(l => l.id === selectedLayer);
+            const layer = plotLayers.find(l => l.id === selectedLayer);
             if (!layer) return null;
 
             return (
