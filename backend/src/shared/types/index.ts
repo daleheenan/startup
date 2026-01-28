@@ -1,7 +1,22 @@
 // Shared types for NovelForge
 
+// Series Types (parent of projects/books)
+export type SeriesStatus = 'active' | 'completed' | 'on_hold';
+
+export interface Series {
+  id: string;
+  title: string;
+  description: string | null;
+  series_bible: SeriesBible | null;
+  status: SeriesStatus;
+  created_at: string;
+  updated_at: string;
+  // Populated when fetching with projects
+  projects?: Project[];
+}
+
 // Project Types
-export type ProjectType = 'standalone' | 'trilogy' | 'series';
+export type ProjectType = 'standalone' | 'trilogy' | 'series';  // 'trilogy' and 'series' are legacy, use Series table instead
 export type ProjectStatus = 'setup' | 'generating' | 'completed';
 
 export interface StoryConcept {
@@ -22,12 +37,14 @@ export interface Project {
   story_concept?: StoryConcept | null;  // Original story concept from saved concepts
   story_dna: StoryDNA | null;
   story_bible: StoryBible | null;
-  series_bible: SeriesBible | null;  // Sprint 8: Aggregated trilogy data
+  series_bible: SeriesBible | null;  // Sprint 8: Aggregated trilogy data (legacy, use Series.series_bible instead)
   plot_structure?: any | null;        // Plot layers and act structure (optional)
-  book_count: number;                 // Sprint 8: Number of books in series
+  book_count: number;                 // Sprint 8: Number of books in series (legacy)
   universe_id: string | null;         // Link to shared universe
   is_universe_root: boolean;          // Is this the origin project for a universe?
   source_concept_id?: string | null;   // Link to original saved_concept
+  series_id?: string | null;           // Link to parent series (if part of a series)
+  series_book_number?: number | null;  // Order within the series
   created_at: string;
   updated_at: string;
 }
@@ -989,4 +1006,116 @@ export interface FollowUpRecommendations {
   toneVariations: ToneVariation[];
   inputTokens: number;
   outputTokens: number;
+}
+
+// Word Count Revision Types
+
+export type WordCountRevisionStatus = 'pending' | 'calculating' | 'ready' | 'in_progress' | 'completed' | 'abandoned';
+export type ChapterProposalStatus = 'pending' | 'generating' | 'ready' | 'approved' | 'rejected' | 'applied' | 'error';
+export type UserDecision = 'pending' | 'approved' | 'rejected' | 'modified';
+
+export interface WordCountRevision {
+  id: string;
+  bookId: string;
+  editorialReportId: string | null;
+  currentWordCount: number;
+  targetWordCount: number;
+  tolerancePercent: number;
+  minAcceptable: number;
+  maxAcceptable: number;
+  wordsToCut: number;
+  status: WordCountRevisionStatus;
+  chaptersReviewed: number;
+  chaptersTotal: number;
+  wordsCutSoFar: number;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+}
+
+export interface CutExplanation {
+  whatWasCut: string;
+  why: string;
+  wordsRemoved: number;
+}
+
+export interface VEBIssueContext {
+  scenePurpose?: {
+    earned: boolean;
+    reasoning: string;
+    recommendation?: string;
+  };
+  expositionIssues?: Array<{
+    issue: string;
+    quote: string;
+    suggestion: string;
+    severity: string;
+  }>;
+  pacingIssues?: Array<{
+    issue: string;
+    location: string;
+    suggestion: string;
+    severity: string;
+  }>;
+}
+
+export interface ChapterReductionProposal {
+  id: string;
+  revisionId: string;
+  chapterId: string;
+  originalWordCount: number;
+  targetWordCount: number;
+  reductionPercent: number;
+  priorityScore: number;
+  vebIssues: VEBIssueContext | null;
+  status: ChapterProposalStatus;
+  condensedContent: string | null;
+  condensedWordCount: number | null;
+  actualReduction: number | null;
+  cutsExplanation: CutExplanation[] | null;
+  preservedElements: string[] | null;
+  userDecision: UserDecision;
+  userNotes: string | null;
+  decisionAt: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+  generatedAt: string | null;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export interface ChapterTarget {
+  chapterId: string;
+  chapterNumber: number;
+  chapterTitle: string | null;
+  originalWordCount: number;
+  targetWordCount: number;
+  reductionPercent: number;
+  priorityScore: number;
+  vebIssues: VEBIssueContext | null;
+}
+
+export interface RevisionProgress {
+  revisionId: string;
+  currentWordCount: number;
+  targetWordCount: number;
+  wordsReduced: number;
+  wordsRemaining: number;
+  percentComplete: number;
+  chaptersReviewed: number;
+  chaptersTotal: number;
+  isWithinTolerance: boolean;
+  minAcceptable: number;
+  maxAcceptable: number;
+}
+
+export interface ValidationResult {
+  isValid: boolean;
+  currentWordCount: number;
+  targetWordCount: number;
+  minAcceptable: number;
+  maxAcceptable: number;
+  wordsRemaining: number;
+  status: 'under_target' | 'over_target' | 'within_tolerance';
 }

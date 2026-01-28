@@ -178,9 +178,12 @@ export default function SeriesManagementPage() {
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [selectedStandalone, setSelectedStandalone] = useState<Project | null>(null);
   const [newSeriesTitle, setNewSeriesTitle] = useState('');
-  const [newSeriesGenre, setNewSeriesGenre] = useState('fantasy');
+  const [newSeriesDescription, setNewSeriesDescription] = useState('');
   const [creating, setCreating] = useState(false);
   const [converting, setConverting] = useState(false);
+
+  // New: Real series data from /api/series
+  const [realSeries, setRealSeries] = useState<any[]>([]);
 
   // Filter to only series/trilogy projects
   const seriesProjects = useMemo(() =>
@@ -308,6 +311,31 @@ export default function SeriesManagementPage() {
     }
   }, []);
 
+  // Fetch real series from /api/series
+  const fetchRealSeries = useCallback(async () => {
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE_URL}/api/series`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!res.ok) {
+        // If series table doesn't exist yet, just return empty
+        console.warn('Series API not available, using legacy mode');
+        return;
+      }
+
+      const data = await res.json();
+      setRealSeries(data.series || []);
+    } catch (err: any) {
+      console.warn('Error fetching series:', err.message);
+      // Don't set error - we can fall back to legacy mode
+    }
+  }, []);
+
   // Fetch series data for a project
   const fetchSeriesData = useCallback(async (project: Project) => {
     try {
@@ -349,11 +377,11 @@ export default function SeriesManagementPage() {
       setLoading(true);
       setError(null);
 
-      await fetchProjects();
+      await Promise.all([fetchProjects(), fetchRealSeries()]);
     };
 
     loadData();
-  }, [fetchProjects]);
+  }, [fetchProjects, fetchRealSeries]);
 
   // Fetch series data for all series projects
   useEffect(() => {
@@ -381,7 +409,7 @@ export default function SeriesManagementPage() {
     }
   }, [projects, seriesProjects, fetchSeriesData]);
 
-  // Create new series
+  // Create new series using the new /api/series endpoint
   const handleCreateSeries = async () => {
     if (!newSeriesTitle.trim()) {
       setError('Please enter a series title');
@@ -393,7 +421,7 @@ export default function SeriesManagementPage() {
 
     try {
       const token = getToken();
-      const res = await fetch(`${API_BASE_URL}/api/projects`, {
+      const res = await fetch(`${API_BASE_URL}/api/series`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -401,8 +429,7 @@ export default function SeriesManagementPage() {
         },
         body: JSON.stringify({
           title: newSeriesTitle.trim(),
-          type: 'series',
-          genre: newSeriesGenre,
+          description: newSeriesDescription.trim() || null,
         }),
       });
 
@@ -411,16 +438,17 @@ export default function SeriesManagementPage() {
         throw new Error(err.error?.message || 'Failed to create series');
       }
 
-      const newProject = await res.json();
+      const data = await res.json();
 
-      // Refresh projects
-      await fetchProjects();
+      // Refresh series list
+      await fetchRealSeries();
 
       setNewSeriesTitle('');
+      setNewSeriesDescription('');
       setShowCreateModal(false);
 
-      // Navigate to the new series
-      router.push(`/projects/${newProject.id}/series`);
+      // Navigate to the new series management page
+      router.push(`/series/${data.series.id}`);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -428,7 +456,7 @@ export default function SeriesManagementPage() {
     }
   };
 
-  // Convert standalone to series
+  // Convert standalone to series - creates a new series and adds the project as Book 1
   const handleConvertToSeries = async () => {
     if (!selectedStandalone || !newSeriesTitle.trim()) {
       setError('Please select a book and enter a series name');
@@ -440,31 +468,53 @@ export default function SeriesManagementPage() {
 
     try {
       const token = getToken();
-      const res = await fetch(`${API_BASE_URL}/api/trilogy/projects/${selectedStandalone.id}/create-series`, {
+
+      // Step 1: Create the new series
+      const createRes = await fetch(`${API_BASE_URL}/api/series`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          seriesName: newSeriesTitle.trim(),
+          title: newSeriesTitle.trim(),
+        }),
+      });
+
+      if (!createRes.ok) {
+        const err = await createRes.json();
+        throw new Error(err.error?.message || 'Failed to create series');
+      }
+
+      const { series: newSeries } = await createRes.json();
+
+      // Step 2: Add the standalone project to the series as Book 1
+      const res = await fetch(`${API_BASE_URL}/api/series/${newSeries.id}/projects`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          projectId: selectedStandalone.id,
+          bookNumber: 1,
         }),
       });
 
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error?.message || 'Failed to convert to series');
+        throw new Error(err.error?.message || 'Failed to add project to series');
       }
 
-      // Refresh projects
-      await fetchProjects();
+      // Refresh both projects and series
+      await Promise.all([fetchProjects(), fetchRealSeries()]);
 
       setNewSeriesTitle('');
       setSelectedStandalone(null);
       setShowConvertModal(false);
 
-      // Navigate to the new series
-      router.push(`/projects/${selectedStandalone.id}/series`);
+      // Navigate to the new series management page
+      router.push(`/series/${newSeries.id}`);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -476,7 +526,6 @@ export default function SeriesManagementPage() {
   const openConvertModal = (project: Project) => {
     setSelectedStandalone(project);
     setNewSeriesTitle(`${project.title} Series`);
-    setNewSeriesGenre(project.genre || 'fantasy');
     setShowConvertModal(true);
   };
 
@@ -651,7 +700,8 @@ export default function SeriesManagementPage() {
         </button>
       </div>
 
-      {seriesProjects.length === 0 ? (
+      {/* Real Series from /api/series */}
+      {realSeries.length === 0 && seriesProjects.length === 0 ? (
         <div style={{ ...cardStyle, textAlign: 'center', padding: spacing[12] }}>
           <div style={{
             fontSize: typography.fontSize['4xl'],
@@ -685,6 +735,121 @@ export default function SeriesManagementPage() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[4] }}>
+          {/* Display real series first */}
+          {realSeries.map((series) => {
+            const totalWords = series.stats?.totalWordCount || 0;
+            const completedProjects = series.stats?.completedProjects || 0;
+
+            return (
+              <Link
+                key={series.id}
+                href={`/series/${series.id}`}
+                style={{ textDecoration: 'none', color: 'inherit' }}
+              >
+                <div
+                  style={seriesCardStyle}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.boxShadow = shadows.md;
+                    e.currentTarget.style.borderColor = colors.brand.primary;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.borderColor = colors.border.default;
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: spacing[3], marginBottom: spacing[2] }}>
+                        <h3 style={{
+                          fontSize: typography.fontSize.lg,
+                          fontWeight: typography.fontWeight.semibold,
+                          color: colors.text.primary,
+                          margin: 0,
+                        }}>
+                          {series.title}
+                        </h3>
+                        <span style={badgeStyle('success')}>
+                          Series
+                        </span>
+                        <span style={badgeStyle(
+                          series.status === 'completed' ? 'success' :
+                          series.status === 'on_hold' ? 'warning' : 'info'
+                        )}>
+                          {series.status}
+                        </span>
+                      </div>
+                      {series.description && (
+                        <p style={{
+                          fontSize: typography.fontSize.sm,
+                          color: colors.text.secondary,
+                          margin: 0,
+                          marginBottom: spacing[2],
+                        }}>
+                          {series.description}
+                        </p>
+                      )}
+                      <p style={{
+                        fontSize: typography.fontSize.sm,
+                        color: colors.text.secondary,
+                        margin: 0,
+                        marginBottom: spacing[3],
+                      }}>
+                        {series.projects?.length || 0} book{(series.projects?.length || 0) !== 1 ? 's' : ''} • {totalWords.toLocaleString()} words
+                      </p>
+
+                      {series.projects && series.projects.length > 0 && (
+                        <div style={{ display: 'flex', gap: spacing[2], flexWrap: 'wrap' }}>
+                          {series.projects.slice(0, 5).map((project: any) => (
+                            <span
+                              key={project.id}
+                              style={{
+                                padding: `${spacing[1]} ${spacing[3]}`,
+                                background: project.status === 'completed'
+                                  ? colors.semantic.successLight
+                                  : colors.background.surfaceHover,
+                                borderRadius: borderRadius.sm,
+                                fontSize: typography.fontSize.xs,
+                                color: project.status === 'completed'
+                                  ? colors.semantic.successDark
+                                  : colors.text.tertiary,
+                              }}
+                            >
+                              Book {project.series_book_number || '?'}: {project.title || 'Untitled'}
+                            </span>
+                          ))}
+                          {series.projects.length > 5 && (
+                            <span style={{
+                              padding: `${spacing[1]} ${spacing[3]}`,
+                              background: colors.background.surfaceHover,
+                              borderRadius: borderRadius.sm,
+                              fontSize: typography.fontSize.xs,
+                              color: colors.text.tertiary,
+                            }}>
+                              +{series.projects.length - 5} more
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: spacing[2],
+                      color: colors.text.tertiary,
+                    }}>
+                      <span style={{ fontSize: typography.fontSize.sm }}>
+                        {completedProjects}/{series.projects?.length || 0} completed
+                      </span>
+                      <ArrowRightIcon />
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+
+          {/* Also display legacy series projects for backwards compatibility */}
           {seriesProjects.map((project) => {
             const seriesData = seriesDataMap.get(project.id);
             const books = seriesData?.books || [];
@@ -720,7 +885,7 @@ export default function SeriesManagementPage() {
                           {project.title}
                         </h3>
                         <span style={badgeStyle(project.type === 'trilogy' ? 'info' : 'success')}>
-                          {project.type === 'trilogy' ? 'Trilogy' : 'Series'}
+                          {project.type === 'trilogy' ? 'Trilogy' : 'Series'} (Legacy)
                         </span>
                         <span style={badgeStyle(
                           project.status === 'completed' ? 'success' :
@@ -1376,29 +1541,34 @@ export default function SeriesManagementPage() {
               color: colors.text.primary,
               marginBottom: spacing[2],
             }}>
-              Genre
+              Description (optional)
             </label>
-            <select
-              value={newSeriesGenre}
-              onChange={(e) => setNewSeriesGenre(e.target.value)}
-              style={selectStyle}
+            <textarea
+              value={newSeriesDescription}
+              onChange={(e) => setNewSeriesDescription(e.target.value)}
+              placeholder="Brief description of the series..."
+              style={{
+                ...inputStyle,
+                minHeight: '80px',
+                resize: 'vertical',
+              }}
               disabled={creating}
-            >
-              <option value="fantasy">Fantasy</option>
-              <option value="science-fiction">Science Fiction</option>
-              <option value="mystery">Mystery</option>
-              <option value="thriller">Thriller</option>
-              <option value="romance">Romance</option>
-              <option value="horror">Horror</option>
-              <option value="historical-fiction">Historical Fiction</option>
-              <option value="literary-fiction">Literary Fiction</option>
-            </select>
+            />
+
+            <p style={{
+              fontSize: typography.fontSize.sm,
+              color: colors.text.tertiary,
+              marginBottom: spacing[4],
+            }}>
+              After creating the series, you can add existing books or create new ones.
+            </p>
 
             <div style={{ display: 'flex', gap: spacing[3], justifyContent: 'flex-end' }}>
               <button
                 onClick={() => {
                   setShowCreateModal(false);
                   setNewSeriesTitle('');
+                  setNewSeriesDescription('');
                   setError(null);
                 }}
                 style={secondaryButtonStyle}

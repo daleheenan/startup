@@ -678,6 +678,8 @@ router.put('/:id', (req, res) => {
 
     const {
       storyDNA, storyBible, storyConcept, status, title, authorName, type, bookCount,
+      // Series relationship fields
+      seriesId, seriesBookNumber,
       // Publishing fields
       dedication, epigraph, epigraphAttribution, isbn, publisher, edition,
       copyrightYear, includeDramatisPersonae, includeAboutAuthor
@@ -726,6 +728,17 @@ router.put('/:id', (req, res) => {
     if (bookCount !== undefined) {
       updates.push('book_count = ?');
       params.push(bookCount);
+    }
+
+    // Series relationship fields (new series system)
+    if (seriesId !== undefined) {
+      updates.push('series_id = ?');
+      params.push(seriesId);
+    }
+
+    if (seriesBookNumber !== undefined) {
+      updates.push('series_book_number = ?');
+      params.push(seriesBookNumber);
     }
 
     // Publishing fields

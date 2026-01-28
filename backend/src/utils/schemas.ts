@@ -61,6 +61,9 @@ export const updateProjectSchema = z.object({
   authorName: z.string().max(200, 'Author name too long').optional().nullable(),
   type: z.enum(['standalone', 'trilogy', 'series']).optional(),
   bookCount: z.number().int().positive().optional(),
+  // Series relationship fields (new series system)
+  seriesId: z.string().uuid('Invalid series ID').optional().nullable(),
+  seriesBookNumber: z.number().int().positive().optional().nullable(),
   // Publishing fields
   dedication: z.string().max(2000, 'Dedication too long').optional().nullable(),
   epigraph: z.string().max(1000, 'Epigraph too long').optional().nullable(),

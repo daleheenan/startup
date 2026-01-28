@@ -138,6 +138,8 @@ import vebRouter from './routes/veb.js';
 import completionRouter from './routes/completion.js';
 import outlineEditorialRouter from './routes/outline-editorial.js';
 import editorialBoardRouter from './routes/editorial-board.js';
+import seriesRouter from './routes/series.js';
+import wordCountRevisionRouter from './routes/word-count-revision.js';
 
 // Run database migrations
 try {
@@ -261,6 +263,8 @@ app.use('/api/completion', apiLimiter, requireAuth, completionRouter);
 app.use('/api', apiLimiter, requireAuth, vebRouter); // VEB routes use /api/projects/:id/veb/* and /api/veb/*
 app.use('/api', apiLimiter, requireAuth, outlineEditorialRouter); // Outline Editorial routes
 app.use('/api/editorial', apiLimiter, requireAuth, editorialBoardRouter); // Editorial Board aggregation routes
+app.use('/api/series', apiLimiter, requireAuth, seriesRouter); // Series management routes
+app.use('/api/word-count-revision', apiLimiter, requireAuth, wordCountRevisionRouter); // Word count revision routes
 
 // Sentry error handler - must be BEFORE custom error handlers
 app.use(sentryErrorHandler());

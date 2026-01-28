@@ -50,3 +50,11 @@ export {
   type MysteryStatus,
   type MysteryImportance,
 } from './mysteries.repository.js';
+
+// Series repository
+export {
+  SeriesRepository,
+  createSeriesRepository,
+  type ParsedSeries,
+  type SeriesWithProjects,
+} from './series.repository.js';
