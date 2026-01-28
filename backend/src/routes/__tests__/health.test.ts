@@ -46,6 +46,15 @@ jest.mock('../../server.js', () => ({
   isQueueWorkerReady: () => true,
 }));
 
+// Mock migrate module to prevent ESM import.meta.url issues
+jest.mock('../../db/migrate.js', () => ({
+  getMigrationStatus: jest.fn().mockReturnValue({
+    currentVersion: 1,
+    pendingMigrations: [],
+    appliedMigrations: ['001_initial.sql'],
+  }),
+}));
+
 // Import after mocks are set up
 import healthRouter from '../health.js';
 
