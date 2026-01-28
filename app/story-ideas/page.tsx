@@ -13,7 +13,10 @@ import SplitView, {
   DetailPanelSection,
   DetailPanelActions,
   ActionButton,
+  Pagination,
 } from '@/app/components/SplitView';
+
+const ITEMS_PER_PAGE = 5;
 import {
   useStoryIdeas,
   useDeleteStoryIdea,
@@ -37,6 +40,7 @@ export default function StoryIdeasPage() {
   const [expandingIdeaId, setExpandingIdeaId] = useState<string | null>(null);
   const [expandingMode, setExpandingMode] = useState<IdeaExpansionMode | null>(null);
   const [expandError, setExpandError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Get unique genres from ideas
   const genres = useMemo(() =>
@@ -53,6 +57,18 @@ export default function StoryIdeasPage() {
     }) || [],
     [ideas, filterGenre, filterStatus]
   );
+
+  // Pagination
+  const totalPages = Math.ceil(filteredIdeas.length / ITEMS_PER_PAGE);
+  const paginatedIdeas = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredIdeas.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredIdeas, currentPage]);
+
+  // Reset to page 1 when filters change
+  useMemo(() => {
+    setCurrentPage(1);
+  }, [filterGenre, filterStatus]);
 
   // Selected idea details
   const selectedIdea = useMemo(() =>
@@ -197,20 +213,27 @@ export default function StoryIdeasPage() {
     }
 
     return (
-      <div>
-        {filteredIdeas.map(idea => (
-          <SplitViewListItem
-            key={idea.id}
-            id={idea.id}
-            title={idea.story_idea.slice(0, 60) + (idea.story_idea.length > 60 ? '...' : '')}
-            date={new Date(idea.created_at).toLocaleDateString()}
-            genre={idea.genre}
-            premise={idea.story_idea}
-            isSelected={selectedIdeaId === idea.id}
-            status={idea.status}
-            onClick={setSelectedIdeaId}
-          />
-        ))}
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {paginatedIdeas.map(idea => (
+            <SplitViewListItem
+              key={idea.id}
+              id={idea.id}
+              title={idea.story_idea.slice(0, 60) + (idea.story_idea.length > 60 ? '...' : '')}
+              date={new Date(idea.created_at).toLocaleDateString()}
+              genre={idea.genre}
+              premise={idea.story_idea}
+              isSelected={selectedIdeaId === idea.id}
+              status={idea.status}
+              onClick={setSelectedIdeaId}
+            />
+          ))}
+        </div>
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
       </div>
     );
   };
@@ -317,6 +340,49 @@ export default function StoryIdeasPage() {
           date={new Date(selectedIdea.created_at).toLocaleDateString()}
         />
 
+        <DetailPanelActions position="top">
+          <ActionButton
+            variant="primary"
+            onClick={() => handleExpand(selectedIdea.id, 'concepts_5')}
+            disabled={expandIdeaMutation.isPending}
+          >
+            {expandIdeaMutation.isPending ? 'Generating...' : 'Generate 5 Concepts'}
+          </ActionButton>
+          <ActionButton
+            variant="secondary"
+            onClick={() => handleExpand(selectedIdea.id, 'concepts_10')}
+            disabled={expandIdeaMutation.isPending}
+          >
+            Generate 10 Concepts
+          </ActionButton>
+          <ActionButton variant="secondary" onClick={() => handleStartEdit(selectedIdea)}>
+            Edit
+          </ActionButton>
+          <select
+            value={selectedIdea.status}
+            onChange={(e) => updateIdeaMutation.mutate({
+              id: selectedIdea.id,
+              updates: { status: e.target.value as 'saved' | 'used' | 'archived' }
+            })}
+            style={{
+              padding: '0.625rem 0.75rem',
+              background: colors.surface,
+              border: `1px solid ${colors.border}`,
+              borderRadius: borderRadius.sm,
+              color: colors.text,
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+            }}
+          >
+            <option value="saved">Saved</option>
+            <option value="used">Used</option>
+            <option value="archived">Archived</option>
+          </select>
+          <ActionButton variant="danger" onClick={() => handleDelete(selectedIdea.id)}>
+            Delete
+          </ActionButton>
+        </DetailPanelActions>
+
         <div style={{ flex: 1, padding: '1.5rem', overflowY: 'auto' }}>
           <DetailPanelSection label="Premise">
             <p style={{ margin: 0 }}>{selectedIdea.story_idea}</p>
@@ -389,49 +455,6 @@ export default function StoryIdeasPage() {
             </DetailPanelSection>
           )}
         </div>
-
-        <DetailPanelActions>
-          <ActionButton
-            variant="primary"
-            onClick={() => handleExpand(selectedIdea.id, 'concepts_5')}
-            disabled={expandIdeaMutation.isPending}
-          >
-            {expandIdeaMutation.isPending ? 'Generating...' : 'Generate 5 Concepts'}
-          </ActionButton>
-          <ActionButton
-            variant="secondary"
-            onClick={() => handleExpand(selectedIdea.id, 'concepts_10')}
-            disabled={expandIdeaMutation.isPending}
-          >
-            Generate 10 Concepts
-          </ActionButton>
-          <ActionButton variant="secondary" onClick={() => handleStartEdit(selectedIdea)}>
-            Edit
-          </ActionButton>
-          <select
-            value={selectedIdea.status}
-            onChange={(e) => updateIdeaMutation.mutate({
-              id: selectedIdea.id,
-              updates: { status: e.target.value as 'saved' | 'used' | 'archived' }
-            })}
-            style={{
-              padding: '0.625rem 0.75rem',
-              background: colors.surface,
-              border: `1px solid ${colors.border}`,
-              borderRadius: borderRadius.sm,
-              color: colors.text,
-              fontSize: '0.875rem',
-              cursor: 'pointer',
-            }}
-          >
-            <option value="saved">Saved</option>
-            <option value="used">Used</option>
-            <option value="archived">Archived</option>
-          </select>
-          <ActionButton variant="danger" onClick={() => handleDelete(selectedIdea.id)}>
-            Delete
-          </ActionButton>
-        </DetailPanelActions>
       </div>
     );
   };

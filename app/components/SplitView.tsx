@@ -395,19 +395,87 @@ export function DetailPanelSection({
 
 interface DetailPanelActionsProps {
   children: ReactNode;
+  /** Position of actions - top or bottom */
+  position?: 'top' | 'bottom';
 }
 
-export function DetailPanelActions({ children }: DetailPanelActionsProps) {
+export function DetailPanelActions({ children, position = 'top' }: DetailPanelActionsProps) {
   return (
     <div style={{
-      padding: '1.5rem',
-      borderTop: `1px solid ${colors.border}`,
+      padding: '1rem 1.5rem',
+      borderBottom: position === 'top' ? `1px solid ${colors.border}` : 'none',
+      borderTop: position === 'bottom' ? `1px solid ${colors.border}` : 'none',
       background: colors.surfaceHover,
       display: 'flex',
       flexWrap: 'wrap',
       gap: '0.75rem',
+      alignItems: 'center',
     }}>
       {children}
+    </div>
+  );
+}
+
+// ============================================================================
+// Pagination Component
+// ============================================================================
+
+interface PaginationProps {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+}
+
+export function Pagination({ currentPage, totalPages, onPageChange }: PaginationProps) {
+  if (totalPages <= 1) return null;
+
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '0.5rem',
+      padding: '0.75rem',
+      borderTop: `1px solid ${colors.border}`,
+      background: colors.surface,
+    }}>
+      <button
+        onClick={() => onPageChange(currentPage - 1)}
+        disabled={currentPage === 1}
+        style={{
+          padding: '0.375rem 0.75rem',
+          background: currentPage === 1 ? colors.surfaceHover : colors.surface,
+          border: `1px solid ${colors.border}`,
+          borderRadius: borderRadius.sm,
+          color: currentPage === 1 ? colors.textTertiary : colors.text,
+          fontSize: '0.75rem',
+          cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+        }}
+      >
+        ← Prev
+      </button>
+      <span style={{
+        fontSize: '0.75rem',
+        color: colors.textSecondary,
+        padding: '0 0.5rem',
+      }}>
+        {currentPage} of {totalPages}
+      </span>
+      <button
+        onClick={() => onPageChange(currentPage + 1)}
+        disabled={currentPage === totalPages}
+        style={{
+          padding: '0.375rem 0.75rem',
+          background: currentPage === totalPages ? colors.surfaceHover : colors.surface,
+          border: `1px solid ${colors.border}`,
+          borderRadius: borderRadius.sm,
+          color: currentPage === totalPages ? colors.textTertiary : colors.text,
+          fontSize: '0.75rem',
+          cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+        }}
+      >
+        Next →
+      </button>
     </div>
   );
 }

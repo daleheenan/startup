@@ -13,9 +13,11 @@ import SplitView, {
   DetailPanelSection,
   DetailPanelActions,
   ActionButton,
+  Pagination,
 } from '../components/SplitView';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const ITEMS_PER_PAGE = 5;
 
 interface SavedConcept {
   id: string;
@@ -82,6 +84,7 @@ function SavedConceptsContent() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterGenre, setFilterGenre] = useState<string>('all');
   const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Check if we're coming from Story Ideas expansion with newly generated concepts
   const newConceptIds = searchParams.get('new')?.split(',').filter(Boolean) || [];
@@ -109,6 +112,18 @@ function SavedConceptsContent() {
       return true;
     });
   }, [concepts, showingNewOnly, newConceptIds, filterStatus, filterGenre]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredConcepts.length / ITEMS_PER_PAGE);
+  const paginatedConcepts = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredConcepts.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredConcepts, currentPage]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterGenre, filterStatus, showingNewOnly]);
 
   // Selected concept details
   const selectedConcept = useMemo(() =>
@@ -373,20 +388,27 @@ function SavedConceptsContent() {
     }
 
     return (
-      <div>
-        {filteredConcepts.map(concept => (
-          <SplitViewListItem
-            key={concept.id}
-            id={concept.id}
-            title={concept.title}
-            date={new Date(concept.created_at).toLocaleDateString()}
-            genre={concept.preferences?.genre || undefined}
-            premise={concept.logline}
-            isSelected={selectedConceptId === concept.id}
-            status={concept.status}
-            onClick={setSelectedConceptId}
-          />
-        ))}
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {paginatedConcepts.map(concept => (
+            <SplitViewListItem
+              key={concept.id}
+              id={concept.id}
+              title={concept.title}
+              date={new Date(concept.created_at).toLocaleDateString()}
+              genre={concept.preferences?.genre || undefined}
+              premise={concept.logline}
+              isSelected={selectedConceptId === concept.id}
+              status={concept.status}
+              onClick={setSelectedConceptId}
+            />
+          ))}
+        </div>
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
       </div>
     );
   };
@@ -561,6 +583,45 @@ function SavedConceptsContent() {
           date={new Date(selectedConcept.created_at).toLocaleDateString()}
         />
 
+        <DetailPanelActions position="top">
+          <ActionButton
+            variant="primary"
+            onClick={() => handleUseConcept(selectedConcept)}
+            disabled={isCreatingProject}
+          >
+            {isCreatingProject ? 'Creating Project...' : 'Use Concept'}
+          </ActionButton>
+          <ActionButton
+            variant="secondary"
+            onClick={() => setShowOriginalityCheck(!showOriginalityCheck)}
+          >
+            {showOriginalityCheck ? 'Hide Originality Check' : 'Check Originality'}
+          </ActionButton>
+          <ActionButton variant="secondary" onClick={() => handleStartEdit(selectedConcept)}>
+            Edit
+          </ActionButton>
+          <select
+            value={selectedConcept.status}
+            onChange={(e) => handleChangeStatus(selectedConcept.id, e.target.value as 'saved' | 'used' | 'archived')}
+            style={{
+              padding: '0.625rem 0.75rem',
+              background: colors.surface,
+              border: `1px solid ${colors.border}`,
+              borderRadius: borderRadius.sm,
+              color: colors.text,
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+            }}
+          >
+            <option value="saved">Saved</option>
+            <option value="used">Used</option>
+            <option value="archived">Archived</option>
+          </select>
+          <ActionButton variant="danger" onClick={() => handleDelete(selectedConcept.id)}>
+            Delete
+          </ActionButton>
+        </DetailPanelActions>
+
         <div style={{ flex: 1, padding: '1.5rem', overflowY: 'auto' }}>
           <DetailPanelSection label="Logline">
             <p style={{ margin: 0, fontStyle: 'italic' }}>{selectedConcept.logline}</p>
@@ -635,45 +696,6 @@ function SavedConceptsContent() {
             </div>
           )}
         </div>
-
-        <DetailPanelActions>
-          <ActionButton
-            variant="primary"
-            onClick={() => handleUseConcept(selectedConcept)}
-            disabled={isCreatingProject}
-          >
-            {isCreatingProject ? 'Creating Project...' : 'Use Concept'}
-          </ActionButton>
-          <ActionButton
-            variant="secondary"
-            onClick={() => setShowOriginalityCheck(!showOriginalityCheck)}
-          >
-            {showOriginalityCheck ? 'Hide Originality Check' : 'Check Originality'}
-          </ActionButton>
-          <ActionButton variant="secondary" onClick={() => handleStartEdit(selectedConcept)}>
-            Edit
-          </ActionButton>
-          <select
-            value={selectedConcept.status}
-            onChange={(e) => handleChangeStatus(selectedConcept.id, e.target.value as 'saved' | 'used' | 'archived')}
-            style={{
-              padding: '0.625rem 0.75rem',
-              background: colors.surface,
-              border: `1px solid ${colors.border}`,
-              borderRadius: borderRadius.sm,
-              color: colors.text,
-              fontSize: '0.875rem',
-              cursor: 'pointer',
-            }}
-          >
-            <option value="saved">Saved</option>
-            <option value="used">Used</option>
-            <option value="archived">Archived</option>
-          </select>
-          <ActionButton variant="danger" onClick={() => handleDelete(selectedConcept.id)}>
-            Delete
-          </ActionButton>
-        </DetailPanelActions>
       </div>
     );
   };
