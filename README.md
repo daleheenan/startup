@@ -195,6 +195,51 @@ Feel free to add new agents or improve existing ones. Each agent should:
 - Provide structured instructions
 - Define expected output format
 
-## License
+## Project Templates
+
+In addition to AI agents, this kit includes production-ready project templates.
+
+### Backend Express Template (`templates/backend-express/`)
+
+Production-ready Express server with:
+
+- **Logger Service** - Structured logging with pino, request correlation
+- **Circuit Breaker** - Protect external API calls from cascading failures
+- **Server State** - Shared readiness state for health checks
+- **Base Repository** - Type-safe CRUD operations with SQL injection prevention
+- **Auth Middleware** - JWT verification
+- **Rate Limiting** - Configurable per-endpoint limits
+- **Health Endpoints** - Basic and detailed health checks
+- **Graceful Shutdown** - Clean container restarts
+- **Environment Validation** - Fail fast on missing config
+
+### Railway Templates (`templates/railway/`)
+
+- `railway.toml` - Optimised Railway configuration
+- `Dockerfile` - Production Docker build
+- `nixpacks.toml` - Nixpacks build config
+
+### GitHub Workflows (`templates/github-workflows/`)
+
+- `ci.yml` - Build and test pipeline
+- `railway-monitor.yml` - Production health monitoring
+
+### Template Usage
+
+```bash
+# Copy backend template to new project
+cp -r templates/backend-express/* /path/to/new-project/backend/
+
+# Copy Railway config
+cp templates/railway/* /path/to/new-project/backend/
+
+# Copy GitHub workflows
+mkdir -p /path/to/new-project/.github/workflows
+cp templates/github-workflows/* /path/to/new-project/.github/workflows/
+```
+
+See [docs/RAILWAY_DEPLOYMENT_PATTERNS.md](docs/RAILWAY_DEPLOYMENT_PATTERNS.md) for comprehensive deployment guidance.
+
+## Licence
 
 MIT

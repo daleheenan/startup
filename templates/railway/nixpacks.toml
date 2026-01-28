@@ -1,0 +1,19 @@
+# Nixpacks configuration for Railway deployment
+# Used when Railway builds with nixpacks instead of Dockerfile
+
+[phases.setup]
+# System packages needed for native modules
+nixPkgs = ["python3", "gcc", "gnumake"]
+
+[phases.install]
+cmds = ["npm ci"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm start"
+
+[variables]
+# Ensure Node 20 is used
+NODE_VERSION = "20"
