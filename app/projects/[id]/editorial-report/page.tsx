@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { getToken, logout } from '@/app/lib/auth';
 import ProjectNavigation from '@/app/components/shared/ProjectNavigation';
+import EditorialWorkflowVisualization from '@/app/components/EditorialWorkflowVisualization';
 import { useProjectNavigation } from '@/app/hooks';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -159,6 +160,282 @@ interface VEBStatus {
 
 type TabType = 'overview' | 'beta-swarm' | 'ruthless-editor' | 'market-analyst';
 
+// Recommendations Section Component with pagination and implement buttons
+function VEBRecommendationsSection({ reportId, recommendations }: { reportId: string; recommendations: string[] }) {
+  const [implementedSet, setImplementedSet] = useState<Set<number>>(new Set());
+  const [implementingIdx, setImplementingIdx] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [loadingFeedback, setLoadingFeedback] = useState(true);
+  const ITEMS_PER_PAGE = 5;
+
+  // Load existing feedback on mount
+  useEffect(() => {
+    const loadFeedback = async () => {
+      try {
+        const token = getToken();
+        const response = await fetch(`${API_BASE_URL}/api/veb/reports/${reportId}/feedback`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const implemented = new Set<number>();
+          data.feedback.forEach((f: any) => {
+            if (f.feedbackType === 'rewrite_completed') {
+              implemented.add(f.findingIndex);
+            }
+          });
+          setImplementedSet(implemented);
+        }
+      } catch (error) {
+        console.error('Error loading feedback:', error);
+      } finally {
+        setLoadingFeedback(false);
+      }
+    };
+    loadFeedback();
+  }, [reportId]);
+
+  const totalPages = Math.ceil(recommendations.length / ITEMS_PER_PAGE);
+  const paginatedRecs = recommendations.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+  const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
+
+  const handleImplement = async (idx: number, rec: string) => {
+    setImplementingIdx(idx);
+    try {
+      // Parse the recommendation to get module
+      const [category] = rec.split(':');
+      let module = 'general';
+      if (category.toLowerCase().includes('beta') || category.toLowerCase().includes('engagement')) module = 'beta_swarm';
+      else if (category.toLowerCase().includes('editor') || category.toLowerCase().includes('structure')) module = 'ruthless_editor';
+      else if (category.toLowerCase().includes('market')) module = 'market_analyst';
+
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/veb/reports/${reportId}/feedback`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          module,
+          findingIndex: idx,
+          feedbackType: 'rewrite_completed',
+          notes: `Implemented recommendation: ${rec}`,
+        }),
+      });
+
+      if (response.ok) {
+        setImplementedSet(prev => new Set(Array.from(prev).concat([idx])));
+      }
+    } catch (error) {
+      console.error('Error implementing recommendation:', error);
+    } finally {
+      setImplementingIdx(null);
+    }
+  };
+
+  const getSeverityFromRec = (rec: string): 'minor' | 'moderate' | 'major' => {
+    const lower = rec.toLowerCase();
+    if (lower.includes('major') || lower.includes('critical')) return 'major';
+    if (lower.includes('moderate') || lower.includes('consider')) return 'moderate';
+    return 'minor';
+  };
+
+  const severityColors = {
+    minor: { bg: '#FEF3C7', text: '#92400E', border: '#F59E0B' },
+    moderate: { bg: '#FED7AA', text: '#9A3412', border: '#F97316' },
+    major: { bg: '#FEE2E2', text: '#991B1B', border: '#EF4444' },
+  };
+
+  return (
+    <div style={{
+      background: 'white',
+      borderRadius: '8px',
+      padding: '1.5rem',
+      border: '1px solid #E2E8F0',
+    }}>
+      <h4 style={{
+        margin: '0 0 1rem 0',
+        color: '#1A1A2E',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.5rem',
+      }}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M9 11l3 3L22 4" />
+          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+        </svg>
+        Priority Recommendations ({recommendations.length - implementedSet.size} remaining)
+      </h4>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        {paginatedRecs.map((rec, localIdx) => {
+          const globalIdx = startIdx + localIdx;
+          const isImplemented = implementedSet.has(globalIdx);
+          const severity = getSeverityFromRec(rec);
+          const colors = severityColors[severity];
+          const [category, ...textParts] = rec.split(':');
+          const text = textParts.join(':').trim() || rec;
+
+          return (
+            <div
+              key={globalIdx}
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                gap: '1rem',
+                padding: '1rem',
+                background: isImplemented ? '#F0FDF4' : '#FAFAFA',
+                border: `1px solid ${isImplemented ? '#10B981' : '#E2E8F0'}`,
+                borderRadius: '8px',
+                opacity: isImplemented ? 0.8 : 1,
+              }}
+            >
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <span style={{
+                    fontSize: '0.75rem',
+                    fontWeight: '500',
+                    padding: '0.25rem 0.5rem',
+                    background: colors.bg,
+                    color: colors.text,
+                    borderRadius: '4px',
+                    textTransform: 'uppercase',
+                  }}>
+                    {severity}
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: '#64748B' }}>
+                    {category.trim()}
+                  </span>
+                </div>
+                <p style={{
+                  margin: 0,
+                  fontSize: '0.875rem',
+                  color: '#374151',
+                  textDecoration: isImplemented ? 'line-through' : 'none',
+                }}>
+                  {text}
+                </p>
+              </div>
+
+              {!isImplemented ? (
+                <button
+                  onClick={() => handleImplement(globalIdx, rec)}
+                  disabled={implementingIdx === globalIdx}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: '#667eea',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    cursor: implementingIdx === globalIdx ? 'not-allowed' : 'pointer',
+                    opacity: implementingIdx === globalIdx ? 0.7 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {implementingIdx === globalIdx ? (
+                    <>
+                      <div style={{
+                        width: '12px',
+                        height: '12px',
+                        border: '2px solid white',
+                        borderTopColor: 'transparent',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite',
+                      }} />
+                      Implementing...
+                    </>
+                  ) : (
+                    <>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M12 5v14M5 12h14" />
+                      </svg>
+                      Implement
+                    </>
+                  )}
+                </button>
+              ) : (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  color: '#059669',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  Done
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: '0.75rem',
+          marginTop: '1rem',
+        }}>
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            style={{
+              padding: '0.5rem 1rem',
+              background: currentPage === 1 ? '#F1F5F9' : 'white',
+              border: '1px solid #E2E8F0',
+              borderRadius: '6px',
+              cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+              opacity: currentPage === 1 ? 0.5 : 1,
+              fontSize: '0.875rem',
+            }}
+          >
+            Previous
+          </button>
+          <span style={{ fontSize: '0.875rem', color: '#64748B' }}>
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            style={{
+              padding: '0.5rem 1rem',
+              background: currentPage === totalPages ? '#F1F5F9' : 'white',
+              border: '1px solid #E2E8F0',
+              borderRadius: '6px',
+              cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+              opacity: currentPage === totalPages ? 0.5 : 1,
+              fontSize: '0.875rem',
+            }}
+          >
+            Next
+          </button>
+        </div>
+      )}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
+
 export default function EditorialReportPage() {
   const params = useParams();
   const projectId = params.id as string;
@@ -167,6 +444,7 @@ export default function EditorialReportPage() {
   const [report, setReport] = useState<VEBReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [showSubmitSuccess, setShowSubmitSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [project, setProject] = useState<any>(null);
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null);
@@ -283,9 +561,9 @@ export default function EditorialReportPage() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const errorData = await response.json();
         // Handle database migration not applied error
-        if (error.code === 'VEB_TABLES_MISSING') {
+        if (errorData.code === 'VEB_TABLES_MISSING') {
           setStatus({
             hasReport: false,
             status: 'unavailable',
@@ -293,12 +571,18 @@ export default function EditorialReportPage() {
           } as VEBStatus);
           return;
         }
-        alert(error.error || 'Failed to submit to VEB');
+        // Extract error message - API returns { error: { code, message } }
+        const errorMessage = errorData.error?.message || errorData.message || 'Failed to submit to VEB';
+        alert(errorMessage);
         return;
       }
 
-      // Refresh status
-      await fetchVEBStatus();
+      // Show success animation briefly
+      setShowSubmitSuccess(true);
+      setTimeout(() => {
+        setShowSubmitSuccess(false);
+        fetchVEBStatus();
+      }, 2000);
     } catch (error) {
       console.error('Error submitting to VEB:', error);
       alert('Failed to submit manuscript for review');
@@ -457,21 +741,10 @@ export default function EditorialReportPage() {
 
         {/* Recommendations */}
         {report.recommendations && report.recommendations.length > 0 && (
-          <div style={{
-            background: 'white',
-            borderRadius: '8px',
-            padding: '1.5rem',
-            border: '1px solid #E2E8F0',
-          }}>
-            <h4 style={{ margin: '0 0 1rem 0', color: '#1A1A2E' }}>Priority Recommendations</h4>
-            <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
-              {report.recommendations.map((rec, idx) => (
-                <li key={idx} style={{ marginBottom: '0.5rem', color: '#475569' }}>
-                  {rec}
-                </li>
-              ))}
-            </ul>
-          </div>
+          <VEBRecommendationsSection
+            reportId={report.id}
+            recommendations={report.recommendations}
+          />
         )}
       </div>
     );
@@ -976,58 +1249,68 @@ export default function EditorialReportPage() {
     if (!status) return null;
 
     return (
-      <div style={{
-        background: 'white',
-        borderRadius: '8px',
-        padding: '2rem',
-        border: '1px solid #E2E8F0',
-        textAlign: 'center',
-      }}>
-        <div style={{
-          width: '60px',
-          height: '60px',
-          margin: '0 auto 1rem',
-          borderRadius: '50%',
-          border: '4px solid #E2E8F0',
-          borderTopColor: '#667eea',
-          animation: 'spin 1s linear infinite',
-        }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-
-        <h3 style={{ margin: '0 0 0.5rem 0', color: '#1A1A2E' }}>
-          Virtual Editorial Board Processing...
-        </h3>
-        <p style={{ margin: '0 0 1.5rem 0', color: '#64748B' }}>
-          Progress: {status.progress}%
-        </p>
-
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '2rem' }}>
-          {status.modules && Object.entries(status.modules).map(([module, moduleStatus]) => (
-            <div key={module} style={{ textAlign: 'center' }}>
-              <div style={{
-                width: '24px',
-                height: '24px',
-                margin: '0 auto 0.5rem',
-                borderRadius: '50%',
-                background: moduleStatus === 'completed' ? '#10B981' :
-                  moduleStatus === 'processing' ? '#F59E0B' : '#E2E8F0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontSize: '0.75rem',
-              }}>
-                {moduleStatus === 'completed' ? '✓' : moduleStatus === 'processing' ? '...' : ''}
-              </div>
-              <div style={{ fontSize: '0.75rem', color: '#64748B', textTransform: 'capitalize' }}>
-                {module.replace(/([A-Z])/g, ' $1').trim()}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <EditorialWorkflowVisualization
+        type="veb"
+        projectId={projectId}
+        reportId={status.reportId}
+        status="processing"
+        modules={{
+          module1: { status: (status.modules?.betaSwarm as any) || 'pending' },
+          module2: { status: (status.modules?.ruthlessEditor as any) || 'pending' },
+          module3: { status: (status.modules?.marketAnalyst as any) || 'pending' },
+        }}
+        createdAt={status.createdAt}
+      />
     );
   };
+
+  const renderSubmitSuccess = () => (
+    <div style={{
+      background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+      borderRadius: '16px',
+      padding: '3rem',
+      textAlign: 'center',
+      color: 'white',
+      animation: 'fadeIn 0.5s ease-out',
+    }}>
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        @keyframes checkmark { 0% { stroke-dashoffset: 100; } 100% { stroke-dashoffset: 0; } }
+        @keyframes bounce { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+      `}</style>
+      <div style={{
+        width: '100px',
+        height: '100px',
+        margin: '0 auto 1.5rem',
+        background: 'rgba(255,255,255,0.2)',
+        borderRadius: '50%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        animation: 'bounce 0.6s ease-out',
+      }}>
+        <svg width="50" height="50" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M20 6L9 17L4 12"
+            stroke="white"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{
+              strokeDasharray: 100,
+              animation: 'checkmark 0.6s ease-out forwards',
+            }}
+          />
+        </svg>
+      </div>
+      <h2 style={{ margin: '0 0 0.5rem 0', fontSize: '1.75rem', fontWeight: '700' }}>
+        Manuscript Submitted!
+      </h2>
+      <p style={{ margin: '0', opacity: 0.9, fontSize: '1.125rem' }}>
+        Your virtual editorial board is now reviewing your manuscript...
+      </p>
+    </div>
+  );
 
   const renderNoReport = () => (
     <div style={{
@@ -1165,6 +1448,8 @@ export default function EditorialReportPage() {
             <div style={{ textAlign: 'center', padding: '3rem', color: '#64748B' }}>
               Loading...
             </div>
+          ) : showSubmitSuccess ? (
+            renderSubmitSuccess()
           ) : status?.status === 'unavailable' ? (
             <div style={{
               background: '#FEF3C7',

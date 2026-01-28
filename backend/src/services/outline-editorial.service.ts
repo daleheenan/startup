@@ -160,8 +160,8 @@ export class OutlineEditorialService {
     // Verify project exists and has an outline
     const projectStmt = db.prepare(`
       SELECT p.id, p.title, p.genre, p.story_dna, p.story_bible,
-             (SELECT id FROM outlines o JOIN books b ON o.book_id = b.id WHERE b.project_id = p.id LIMIT 1) as outline_id,
-             (SELECT structure FROM outlines o JOIN books b ON o.book_id = b.id WHERE b.project_id = p.id LIMIT 1) as outline_structure
+             (SELECT o.id FROM outlines o JOIN books b ON o.book_id = b.id WHERE b.project_id = p.id LIMIT 1) as outline_id,
+             (SELECT o.structure FROM outlines o JOIN books b ON o.book_id = b.id WHERE b.project_id = p.id LIMIT 1) as outline_structure
       FROM projects p WHERE p.id = ?
     `);
     const project = projectStmt.get(projectId) as any;
