@@ -337,6 +337,7 @@ export function runMigrations() {
       '042_author_profile_publishing.sql', // DB version 42 - author profile publishing
       '043_backfill_book_versions.sql',  // DB version 43 - backfill version 1 for all legacy books
       '044_series_refactor.sql',         // DB version 44 - series as parent entities of books/projects
+      '045_word_count_revision.sql',     // DB version 45 - word count revision workflow
     ];
 
     for (let i = 0; i < migrationFiles.length; i++) {
