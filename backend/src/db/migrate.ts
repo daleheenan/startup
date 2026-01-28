@@ -334,6 +334,8 @@ export function runMigrations() {
       '039_fix_duplicate_cleanup.sql',   // DB version 39 - fix duplicate cleanup issues
       '040_cover_image.sql',             // DB version 40 - cover image support
       '041_chapter_generation_cost.sql', // DB version 41 - chapter generation cost tracking
+      '042_author_profile_publishing.sql', // DB version 42 - author profile publishing
+      '043_backfill_book_versions.sql',  // DB version 43 - backfill version 1 for all legacy books
     ];
 
     for (let i = 0; i < migrationFiles.length; i++) {
@@ -451,6 +453,8 @@ export function getMigrationStatus(): {
     '039_fix_duplicate_cleanup.sql',
     '040_cover_image.sql',
     '041_chapter_generation_cost.sql',
+    '042_author_profile_publishing.sql',
+    '043_backfill_book_versions.sql',
   ];
 
   const pendingMigrations: string[] = [];
