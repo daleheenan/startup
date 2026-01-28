@@ -38,6 +38,9 @@ function checkVEBTablesExist(): { exists: boolean; missing: string[] } {
         missing.push(table);
       }
     }
+    if (missing.length > 0) {
+      logger.warn({ missing }, 'VEB tables check: some tables missing');
+    }
     return { exists: missing.length === 0, missing };
   } catch (error) {
     logger.error({ error }, 'Error checking VEB tables');
@@ -157,12 +160,24 @@ router.post('/projects/:projectId/veb/submit', async (req, res) => {
     const { vebService } = await import('../services/veb.service.js');
     const result = await vebService.submitToVEB(projectId);
 
-    logger.info({ projectId, reportId: result.reportId }, 'VEB submission initiated');
+    // Queue the three analysis modules as jobs
+    const { QueueWorker } = await import('../queue/worker.js');
+    QueueWorker.createJob('veb_beta_swarm', result.reportId);
+    QueueWorker.createJob('veb_ruthless_editor', result.reportId);
+    QueueWorker.createJob('veb_market_analyst', result.reportId);
+    QueueWorker.createJob('veb_finalize', result.reportId);
+
+    // Update report status to processing
+    db.prepare(`
+      UPDATE editorial_reports SET status = 'processing' WHERE id = ?
+    `).run(result.reportId);
+
+    logger.info({ projectId, reportId: result.reportId }, 'VEB submission initiated with jobs queued');
 
     res.status(201).json({
       success: true,
       reportId: result.reportId,
-      status: result.status,
+      status: 'processing',
       message: 'Manuscript submitted to Virtual Editorial Board',
     });
   } catch (error: any) {

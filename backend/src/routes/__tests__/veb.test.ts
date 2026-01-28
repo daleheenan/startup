@@ -42,6 +42,14 @@ jest.mock('../../services/veb.service.js', () => ({
   },
 }));
 
+// Mock QueueWorker
+const mockCreateJob = jest.fn();
+jest.mock('../../queue/worker.js', () => ({
+  QueueWorker: {
+    createJob: mockCreateJob,
+  },
+}));
+
 // Mock response helpers
 const sendBadRequest = jest.fn((res: Response, message: string) =>
   res.status(400).json({ error: message })
@@ -107,6 +115,7 @@ describe('VEB Routes', () => {
     mockRun.mockReset();
     mockPrepare.mockClear(); // Use mockClear instead of mockReset to preserve implementation
     mockSubmitToVEB.mockReset();
+    mockCreateJob.mockReset();
 
     // Setup default mock returns
     mockPrepare.mockReturnValue({
@@ -207,11 +216,20 @@ describe('VEB Routes', () => {
       expect(response.body).toEqual({
         success: true,
         reportId: 'report-456',
-        status: 'pending',
+        status: 'processing',
         message: 'Manuscript submitted to Virtual Editorial Board',
       });
 
       expect(mockSubmitToVEB).toHaveBeenCalledWith(projectId);
+
+      // Verify jobs were queued
+      expect(mockCreateJob).toHaveBeenCalledWith('veb_beta_swarm', 'report-456');
+      expect(mockCreateJob).toHaveBeenCalledWith('veb_ruthless_editor', 'report-456');
+      expect(mockCreateJob).toHaveBeenCalledWith('veb_market_analyst', 'report-456');
+      expect(mockCreateJob).toHaveBeenCalledWith('veb_finalize', 'report-456');
+
+      // Verify report status was updated to processing
+      expect(mockRun).toHaveBeenCalled();
     });
 
     it('should return 404 when project not found', async () => {

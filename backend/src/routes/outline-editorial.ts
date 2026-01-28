@@ -155,12 +155,24 @@ router.post('/projects/:projectId/outline-editorial/submit', async (req, res) =>
     const { outlineEditorialService } = await import('../services/outline-editorial.service.js');
     const result = await outlineEditorialService.submitOutlineForReview(projectId);
 
-    logger.info({ projectId, reportId: result.reportId }, 'Outline editorial submission initiated');
+    // Queue the three analysis modules as jobs
+    const { QueueWorker } = await import('../queue/worker.js');
+    QueueWorker.createJob('outline_structure_analyst', result.reportId);
+    QueueWorker.createJob('outline_character_arc', result.reportId);
+    QueueWorker.createJob('outline_market_fit', result.reportId);
+    QueueWorker.createJob('outline_editorial_finalize', result.reportId);
+
+    // Update report status to processing
+    db.prepare(`
+      UPDATE outline_editorial_reports SET status = 'processing' WHERE id = ?
+    `).run(result.reportId);
+
+    logger.info({ projectId, reportId: result.reportId }, 'Outline editorial submission initiated with jobs queued');
 
     res.status(201).json({
       success: true,
       reportId: result.reportId,
-      status: result.status,
+      status: 'processing',
       message: 'Outline submitted for editorial review',
     });
   } catch (error: any) {
