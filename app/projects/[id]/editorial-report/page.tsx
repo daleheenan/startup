@@ -641,11 +641,98 @@ export default function EditorialReportPage() {
     }
   };
 
+  // Helper to format underscore text for display
+  const formatDisplayText = (text: string | undefined | null): string => {
+    if (!text) return 'N/A';
+    return text
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase()); // Capitalise first letter of each word
+  };
+
+  // Score benchmark explanations
+  const getScoreBenchmark = (score: number | undefined, type: 'engagement' | 'structure' | 'commercial' | 'overall') => {
+    if (score === undefined || score === null) return { label: 'Pending', description: 'Analysis not yet complete' };
+
+    const benchmarks = {
+      engagement: [
+        { min: 8, label: 'Excellent', description: 'Highly engaging - readers will struggle to put it down' },
+        { min: 6, label: 'Good', description: 'Solid engagement with some slower sections' },
+        { min: 4, label: 'Fair', description: 'Mixed engagement - significant improvement needed' },
+        { min: 0, label: 'Needs Work', description: 'Struggles to maintain reader attention' },
+      ],
+      structure: [
+        { min: 8, label: 'Excellent', description: 'Strong narrative structure with effective pacing' },
+        { min: 6, label: 'Good', description: 'Solid structure with minor issues' },
+        { min: 4, label: 'Fair', description: 'Structural problems that need addressing' },
+        { min: 0, label: 'Needs Work', description: 'Significant structural overhaul required' },
+      ],
+      commercial: [
+        { min: 8, label: 'Strong', description: 'High commercial potential - agent ready' },
+        { min: 6, label: 'Promising', description: 'Good potential with some revisions' },
+        { min: 4, label: 'Developing', description: 'Needs work before querying agents' },
+        { min: 0, label: 'Early Stage', description: 'Significant development needed' },
+      ],
+      overall: [
+        { min: 80, label: 'Publication Ready', description: 'Ready for agent queries with minor polish' },
+        { min: 60, label: 'Near Ready', description: 'Good foundation - address key issues before submission' },
+        { min: 40, label: 'Revision Needed', description: 'Requires substantial revision work' },
+        { min: 0, label: 'Early Draft', description: 'Focus on fundamentals before seeking feedback' },
+      ],
+    };
+
+    const scale = type === 'overall' ? score : score; // overall is /100, others are /10
+    const thresholds = benchmarks[type];
+    for (const threshold of thresholds) {
+      if (scale >= threshold.min) {
+        return threshold;
+      }
+    }
+    return thresholds[thresholds.length - 1];
+  };
+
   const renderOverview = () => {
     if (!report) return null;
 
+    const overallBenchmark = getScoreBenchmark(report.overallScore ?? undefined, 'overall');
+
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        {/* Re-submit Option */}
+        <div style={{
+          background: '#F0F9FF',
+          borderRadius: '8px',
+          padding: '1rem 1.5rem',
+          border: '1px solid #BAE6FD',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '1rem',
+        }}>
+          <div>
+            <p style={{ margin: 0, fontSize: '0.875rem', color: '#0369A1' }}>
+              <strong>Made changes?</strong> You can request a new analysis at any time to see how your revisions have improved the manuscript.
+            </p>
+          </div>
+          <button
+            onClick={handleSubmit}
+            disabled={submitting}
+            style={{
+              padding: '8px 16px',
+              background: submitting ? '#94A3B8' : '#0284C7',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              cursor: submitting ? 'not-allowed' : 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {submitting ? 'Submitting...' : '🔄 Request New Analysis'}
+          </button>
+        </div>
+
         {/* Overall Score Card */}
         <div style={{
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -653,90 +740,179 @@ export default function EditorialReportPage() {
           padding: '2rem',
           color: 'white',
         }}>
-          <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.25rem' }}>Overall Editorial Score</h3>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
-            <span style={{ fontSize: '4rem', fontWeight: '700' }}>{report.overallScore || 0}</span>
-            <span style={{ fontSize: '1.5rem', opacity: 0.8 }}>/100</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.25rem' }}>Overall Editorial Score</h3>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+                <span style={{ fontSize: '4rem', fontWeight: '700' }}>{report.overallScore || 0}</span>
+                <span style={{ fontSize: '1.5rem', opacity: 0.8 }}>/100</span>
+              </div>
+              <p style={{ margin: '1rem 0 0 0', opacity: 0.9 }}>{report.summary}</p>
+            </div>
+            <div style={{
+              background: 'rgba(255,255,255,0.15)',
+              borderRadius: '8px',
+              padding: '1rem',
+              minWidth: '200px',
+            }}>
+              <div style={{ fontSize: '0.75rem', opacity: 0.8, marginBottom: '0.25rem' }}>BENCHMARK</div>
+              <div style={{ fontSize: '1.125rem', fontWeight: '600' }}>{overallBenchmark.label}</div>
+              <div style={{ fontSize: '0.875rem', opacity: 0.9, marginTop: '0.5rem' }}>{overallBenchmark.description}</div>
+            </div>
           </div>
-          <p style={{ margin: '1rem 0 0 0', opacity: 0.9 }}>{report.summary}</p>
+        </div>
+
+        {/* Score Interpretation Guide */}
+        <div style={{
+          background: '#FFFBEB',
+          borderRadius: '8px',
+          padding: '1rem 1.5rem',
+          border: '1px solid #FDE68A',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <span>💡</span>
+            <strong style={{ color: '#92400E', fontSize: '0.875rem' }}>Understanding Your Scores</strong>
+          </div>
+          <p style={{ margin: 0, fontSize: '0.8125rem', color: '#A16207' }}>
+            Scores of <strong>8-10</strong> are excellent and agent-ready. <strong>6-7</strong> shows promise with minor revisions needed.
+            <strong>4-5</strong> indicates areas requiring focused improvement. Below 4 suggests fundamental issues to address.
+          </p>
         </div>
 
         {/* Module Scores */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
           {/* Beta Swarm Score */}
-          <div style={{
-            background: 'white',
-            borderRadius: '8px',
-            padding: '1.5rem',
-            border: '1px solid #E2E8F0',
-          }}>
-            <h4 style={{ margin: '0 0 0.5rem 0', color: '#64748B', fontSize: '0.875rem' }}>
-              Reader Engagement
-            </h4>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.25rem' }}>
-              <span style={{
-                fontSize: '2rem',
-                fontWeight: '700',
-                color: getScoreColor(report.betaSwarm?.results?.overallEngagement || 0),
+          {(() => {
+            const engagementScore = report.betaSwarm?.results?.overallEngagement;
+            const benchmark = getScoreBenchmark(engagementScore, 'engagement');
+            return (
+              <div style={{
+                background: 'white',
+                borderRadius: '8px',
+                padding: '1.5rem',
+                border: '1px solid #E2E8F0',
               }}>
-                {report.betaSwarm?.results?.overallEngagement || 'N/A'}
-              </span>
-              <span style={{ color: '#64748B' }}>/10</span>
-            </div>
-            <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.875rem', color: '#64748B' }}>
-              {report.betaSwarm?.results?.wouldRecommend ? 'Would recommend' : 'Needs work'}
-            </p>
-          </div>
+                <h4 style={{ margin: '0 0 0.5rem 0', color: '#64748B', fontSize: '0.875rem' }}>
+                  Reader Engagement
+                </h4>
+                <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.75rem', color: '#94A3B8' }}>
+                  How well your story hooks and holds readers
+                </p>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.25rem' }}>
+                  <span style={{
+                    fontSize: '2rem',
+                    fontWeight: '700',
+                    color: getScoreColor(engagementScore || 0),
+                  }}>
+                    {engagementScore ?? 'N/A'}
+                  </span>
+                  <span style={{ color: '#64748B' }}>/10</span>
+                </div>
+                <div style={{
+                  marginTop: '0.75rem',
+                  padding: '0.5rem',
+                  background: '#F8FAFC',
+                  borderRadius: '4px',
+                }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: '600', color: getScoreColor(engagementScore || 0) }}>
+                    {benchmark.label}
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: '#64748B', marginTop: '0.25rem' }}>
+                    {benchmark.description}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Ruthless Editor Score */}
-          <div style={{
-            background: 'white',
-            borderRadius: '8px',
-            padding: '1.5rem',
-            border: '1px solid #E2E8F0',
-          }}>
-            <h4 style={{ margin: '0 0 0.5rem 0', color: '#64748B', fontSize: '0.875rem' }}>
-              Structural Quality
-            </h4>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.25rem' }}>
-              <span style={{
-                fontSize: '2rem',
-                fontWeight: '700',
-                color: getScoreColor(report.ruthlessEditor?.results?.overallStructureScore || 0),
+          {(() => {
+            const structureScore = report.ruthlessEditor?.results?.overallStructureScore;
+            const benchmark = getScoreBenchmark(structureScore, 'structure');
+            return (
+              <div style={{
+                background: 'white',
+                borderRadius: '8px',
+                padding: '1.5rem',
+                border: '1px solid #E2E8F0',
               }}>
-                {report.ruthlessEditor?.results?.overallStructureScore || 'N/A'}
-              </span>
-              <span style={{ color: '#64748B' }}>/10</span>
-            </div>
-            <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.875rem', color: '#64748B' }}>
-              {report.ruthlessEditor?.results?.majorIssuesCount || 0} major issues found
-            </p>
-          </div>
+                <h4 style={{ margin: '0 0 0.5rem 0', color: '#64748B', fontSize: '0.875rem' }}>
+                  Structural Quality
+                </h4>
+                <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.75rem', color: '#94A3B8' }}>
+                  Narrative structure, pacing, and scene craft
+                </p>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.25rem' }}>
+                  <span style={{
+                    fontSize: '2rem',
+                    fontWeight: '700',
+                    color: getScoreColor(structureScore || 0),
+                  }}>
+                    {structureScore ?? 'N/A'}
+                  </span>
+                  <span style={{ color: '#64748B' }}>/10</span>
+                </div>
+                <div style={{
+                  marginTop: '0.75rem',
+                  padding: '0.5rem',
+                  background: '#F8FAFC',
+                  borderRadius: '4px',
+                }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: '600', color: getScoreColor(structureScore || 0) }}>
+                    {benchmark.label}
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: '#64748B', marginTop: '0.25rem' }}>
+                    {report.ruthlessEditor?.results?.majorIssuesCount || 0} major issues • {benchmark.description}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Market Analyst Score */}
-          <div style={{
-            background: 'white',
-            borderRadius: '8px',
-            padding: '1.5rem',
-            border: '1px solid #E2E8F0',
-          }}>
-            <h4 style={{ margin: '0 0 0.5rem 0', color: '#64748B', fontSize: '0.875rem' }}>
-              Commercial Viability
-            </h4>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.25rem' }}>
-              <span style={{
-                fontSize: '2rem',
-                fontWeight: '700',
-                color: getScoreColor(report.marketAnalyst?.results?.commercialViabilityScore || 0),
+          {(() => {
+            const commercialScore = report.marketAnalyst?.results?.commercialViabilityScore;
+            const benchmark = getScoreBenchmark(commercialScore, 'commercial');
+            const recommendation = report.marketAnalyst?.results?.agentRecommendation;
+            return (
+              <div style={{
+                background: 'white',
+                borderRadius: '8px',
+                padding: '1.5rem',
+                border: '1px solid #E2E8F0',
               }}>
-                {report.marketAnalyst?.results?.commercialViabilityScore || 'N/A'}
-              </span>
-              <span style={{ color: '#64748B' }}>/10</span>
-            </div>
-            <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.875rem', color: '#64748B' }}>
-              Agent: {report.marketAnalyst?.results?.agentRecommendation?.replace('_', ' ') || 'N/A'}
-            </p>
-          </div>
+                <h4 style={{ margin: '0 0 0.5rem 0', color: '#64748B', fontSize: '0.875rem' }}>
+                  Commercial Viability
+                </h4>
+                <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.75rem', color: '#94A3B8' }}>
+                  Market positioning and agent appeal
+                </p>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.25rem' }}>
+                  <span style={{
+                    fontSize: '2rem',
+                    fontWeight: '700',
+                    color: getScoreColor(commercialScore || 0),
+                  }}>
+                    {commercialScore ?? 'N/A'}
+                  </span>
+                  <span style={{ color: '#64748B' }}>/10</span>
+                </div>
+                <div style={{
+                  marginTop: '0.75rem',
+                  padding: '0.5rem',
+                  background: '#F8FAFC',
+                  borderRadius: '4px',
+                }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: '600', color: getScoreColor(commercialScore || 0) }}>
+                    {benchmark.label}
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: '#64748B', marginTop: '0.25rem' }}>
+                    Agent: {formatDisplayText(recommendation)} • {benchmark.description}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Recommendations */}

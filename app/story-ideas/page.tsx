@@ -252,8 +252,50 @@ export default function StoryIdeasPage() {
 
     // Edit mode
     if (editingIdea === selectedIdea.id) {
+      const updateArrayItem = (field: 'character_concepts' | 'plot_elements' | 'unique_twists', index: number, value: string) => {
+        const arr = [...(editForm[field] || [])];
+        arr[index] = value;
+        setEditForm({ ...editForm, [field]: arr });
+      };
+
+      const addArrayItem = (field: 'character_concepts' | 'plot_elements' | 'unique_twists') => {
+        const arr = [...(editForm[field] || []), ''];
+        setEditForm({ ...editForm, [field]: arr });
+      };
+
+      const removeArrayItem = (field: 'character_concepts' | 'plot_elements' | 'unique_twists', index: number) => {
+        const arr = [...(editForm[field] || [])];
+        arr.splice(index, 1);
+        setEditForm({ ...editForm, [field]: arr });
+      };
+
+      const labelStyle = {
+        display: 'block',
+        fontSize: '0.875rem',
+        fontWeight: 500,
+        color: colors.text,
+        marginBottom: '0.5rem',
+      };
+
+      const textareaStyle = {
+        width: '100%',
+        padding: '0.75rem',
+        border: `1px solid ${colors.border}`,
+        borderRadius: borderRadius.sm,
+        fontSize: '0.9375rem',
+        resize: 'vertical' as const,
+      };
+
+      const inputStyle = {
+        width: '100%',
+        padding: '0.75rem',
+        border: `1px solid ${colors.border}`,
+        borderRadius: borderRadius.sm,
+        fontSize: '0.9375rem',
+      };
+
       return (
-        <div style={{ padding: '1.5rem' }}>
+        <div style={{ padding: '1.5rem', overflowY: 'auto', height: '100%' }}>
           <h3 style={{
             fontSize: '1.125rem',
             fontWeight: 600,
@@ -263,58 +305,154 @@ export default function StoryIdeasPage() {
             Edit Story Idea
           </h3>
 
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{
-              display: 'block',
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              color: colors.text,
-              marginBottom: '0.5rem',
-            }}>
-              Story Idea
-            </label>
+          {/* Premise */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={labelStyle}>Premise</label>
             <textarea
               value={editForm.story_idea || ''}
               onChange={(e) => setEditForm({ ...editForm, story_idea: e.target.value })}
-              style={{
-                width: '100%',
-                minHeight: '120px',
-                padding: '0.75rem',
-                border: `1px solid ${colors.border}`,
-                borderRadius: borderRadius.sm,
-                fontSize: '0.9375rem',
-                resize: 'vertical',
-              }}
+              style={{ ...textareaStyle, minHeight: '120px' }}
             />
           </div>
 
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{
-              display: 'block',
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              color: colors.text,
-              marginBottom: '0.5rem',
-            }}>
-              Notes
-            </label>
+          {/* Character Concepts */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={labelStyle}>Character Concepts</label>
+            {(editForm.character_concepts || []).map((char, i) => (
+              <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <textarea
+                  value={char}
+                  onChange={(e) => updateArrayItem('character_concepts', i, e.target.value)}
+                  style={{ ...textareaStyle, minHeight: '60px', flex: 1 }}
+                />
+                <button
+                  onClick={() => removeArrayItem('character_concepts', i)}
+                  style={{
+                    padding: '0.5rem',
+                    background: colors.errorLight,
+                    border: `1px solid ${colors.errorBorder}`,
+                    borderRadius: borderRadius.sm,
+                    color: colors.error,
+                    cursor: 'pointer',
+                    alignSelf: 'flex-start',
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={() => addArrayItem('character_concepts')}
+              style={{
+                padding: '0.5rem 1rem',
+                background: colors.surface,
+                border: `1px solid ${colors.border}`,
+                borderRadius: borderRadius.sm,
+                color: colors.text,
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+              }}
+            >
+              + Add Character
+            </button>
+          </div>
+
+          {/* Plot Elements */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={labelStyle}>Plot Elements</label>
+            {(editForm.plot_elements || []).map((elem, i) => (
+              <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <textarea
+                  value={elem}
+                  onChange={(e) => updateArrayItem('plot_elements', i, e.target.value)}
+                  style={{ ...textareaStyle, minHeight: '60px', flex: 1 }}
+                />
+                <button
+                  onClick={() => removeArrayItem('plot_elements', i)}
+                  style={{
+                    padding: '0.5rem',
+                    background: colors.errorLight,
+                    border: `1px solid ${colors.errorBorder}`,
+                    borderRadius: borderRadius.sm,
+                    color: colors.error,
+                    cursor: 'pointer',
+                    alignSelf: 'flex-start',
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={() => addArrayItem('plot_elements')}
+              style={{
+                padding: '0.5rem 1rem',
+                background: colors.surface,
+                border: `1px solid ${colors.border}`,
+                borderRadius: borderRadius.sm,
+                color: colors.text,
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+              }}
+            >
+              + Add Plot Element
+            </button>
+          </div>
+
+          {/* Unique Twists */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={labelStyle}>Unique Twists</label>
+            {(editForm.unique_twists || []).map((twist, i) => (
+              <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <textarea
+                  value={twist}
+                  onChange={(e) => updateArrayItem('unique_twists', i, e.target.value)}
+                  style={{ ...textareaStyle, minHeight: '60px', flex: 1 }}
+                />
+                <button
+                  onClick={() => removeArrayItem('unique_twists', i)}
+                  style={{
+                    padding: '0.5rem',
+                    background: colors.errorLight,
+                    border: `1px solid ${colors.errorBorder}`,
+                    borderRadius: borderRadius.sm,
+                    color: colors.error,
+                    cursor: 'pointer',
+                    alignSelf: 'flex-start',
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={() => addArrayItem('unique_twists')}
+              style={{
+                padding: '0.5rem 1rem',
+                background: colors.surface,
+                border: `1px solid ${colors.border}`,
+                borderRadius: borderRadius.sm,
+                color: colors.text,
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+              }}
+            >
+              + Add Unique Twist
+            </button>
+          </div>
+
+          {/* Notes */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={labelStyle}>Notes</label>
             <textarea
               value={editForm.notes || ''}
               onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-              style={{
-                width: '100%',
-                minHeight: '80px',
-                padding: '0.75rem',
-                border: `1px solid ${colors.border}`,
-                borderRadius: borderRadius.sm,
-                fontSize: '0.9375rem',
-                resize: 'vertical',
-              }}
+              style={{ ...textareaStyle, minHeight: '80px' }}
               placeholder="Add your notes..."
             />
           </div>
 
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', position: 'sticky', bottom: 0, background: colors.surface, paddingTop: '1rem' }}>
             <ActionButton
               variant="primary"
               onClick={handleSaveEdit}
