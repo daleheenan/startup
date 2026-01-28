@@ -224,7 +224,7 @@ export default function SidebarNavGroup({
             icon={item.icon}
             badge={item.badge}
             disabled={item.disabled}
-            isActive={item.id === activeItemId}
+            isActive={activeItemId ? item.id === activeItemId : undefined}
             level={1}
           />
         ))}

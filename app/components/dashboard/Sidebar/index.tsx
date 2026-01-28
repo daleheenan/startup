@@ -238,23 +238,35 @@ const navigationGroups = [
 
 /**
  * Walks the navigation structure and returns the id of the first item whose
- * href matches the current pathname. Standalone groups are matched by their
- * top-level href; nested items are matched individually.
+ * href matches the current pathname. We prioritise nested items over standalone
+ * groups to ensure specific matches (e.g. /projects -> Draft Novels) take
+ * precedence over general matches (e.g. Dashboard -> /projects).
+ *
+ * External URLs (https://) are never matched since they navigate away from the app.
  */
 function deriveActiveItemId(pathname: string): string | null {
+  // First pass: check all nested items (higher priority)
+  for (const group of navigationGroups) {
+    for (const item of group.items) {
+      // Skip external links — they can never be "active"
+      if (item.href.startsWith('http://') || item.href.startsWith('https://')) {
+        continue;
+      }
+      if (pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))) {
+        return item.id;
+      }
+    }
+  }
+
+  // Second pass: check standalone groups (lower priority)
   for (const group of navigationGroups) {
     if (group.isStandalone && group.href) {
       if (pathname === group.href || (group.href !== '/' && pathname.startsWith(group.href))) {
         return group.id;
       }
     }
-
-    for (const item of group.items) {
-      if (pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))) {
-        return item.id;
-      }
-    }
   }
+
   return null;
 }
 
@@ -288,6 +300,28 @@ export default function Sidebar({ collapsed: collapsedProp, onCollapseToggle }: 
   useEffect(() => {
     const activeId = deriveActiveItemId(pathname);
     dispatch({ type: 'SET_ACTIVE_NAV_ITEM', payload: activeId });
+
+    // Find which group contains the active item
+    let activeGroupId: string | null = null;
+    if (activeId) {
+      for (const group of navigationGroups) {
+        if (group.items.some((item) => item.id === activeId)) {
+          activeGroupId = group.id;
+          break;
+        }
+      }
+    }
+
+    // Expand only the active group, collapse all others
+    for (const group of navigationGroups) {
+      if (!group.isStandalone) {
+        if (group.id === activeGroupId) {
+          dispatch({ type: 'EXPAND_NAV_GROUP', payload: group.id });
+        } else {
+          dispatch({ type: 'COLLAPSE_NAV_GROUP', payload: group.id });
+        }
+      }
+    }
   }, [pathname, dispatch]);
 
   // ---- Toggle handlers ----
