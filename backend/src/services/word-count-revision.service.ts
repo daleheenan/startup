@@ -13,6 +13,7 @@ import type {
   CutExplanation,
 } from '../shared/types/index.js';
 import type { RuthlessEditorChapterResult } from './veb.service.js';
+import { bookVersioningService } from './book-versioning.service.js';
 
 const logger = createLogger('services:word-count-revision');
 
@@ -46,6 +47,10 @@ export class WordCountRevisionService {
     // Get editorial report ID if available
     const reportId = this.getLatestEditorialReportId(bookId);
 
+    // Get the current active version (source version for the revision)
+    const sourceVersion = await bookVersioningService.getActiveVersion(bookId);
+    const sourceVersionId = sourceVersion?.id || null;
+
     // Calculate targets
     const minAcceptable = Math.round(targetWordCount * (1 - tolerancePercent / 100));
     const maxAcceptable = Math.round(targetWordCount * (1 + tolerancePercent / 100));
@@ -56,18 +61,19 @@ export class WordCountRevisionService {
 
     const insertStmt = db.prepare(`
       INSERT INTO word_count_revisions (
-        id, book_id, editorial_report_id,
+        id, book_id, editorial_report_id, source_version_id,
         current_word_count, target_word_count, tolerance_percent,
         min_acceptable, max_acceptable, words_to_cut,
         status, chapters_reviewed, chapters_total, words_cut_so_far,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     insertStmt.run(
       revisionId,
       bookId,
       reportId,
+      sourceVersionId,
       bookStats.totalWordCount,
       targetWordCount,
       tolerancePercent,
@@ -82,7 +88,7 @@ export class WordCountRevisionService {
       now
     );
 
-    logger.info({ revisionId, wordsToCut }, 'Created revision session');
+    logger.info({ revisionId, wordsToCut, sourceVersionId }, 'Created revision session');
 
     // Calculate chapter targets and create proposals
     await this.calculateChapterTargets(revisionId);
@@ -458,7 +464,14 @@ Return ONLY valid JSON with the condensed chapter and explanation:`;
   }
 
   /**
-   * Approve a proposal - applies the condensed content to chapter_edits
+   * Approve a proposal - creates a new version if needed and applies the condensed content
+   *
+   * When the first proposal in a revision session is approved:
+   * 1. Creates a new book version (Version N+1)
+   * 2. Copies all chapters from the source version to the new version
+   * 3. Updates the chapter in the new version with the condensed content
+   *
+   * Subsequent approvals in the same session update chapters in the already-created target version.
    */
   async approveProposal(proposalId: string): Promise<void> {
     logger.info({ proposalId }, 'Approving proposal');
@@ -473,69 +486,166 @@ Return ONLY valid JSON with the condensed chapter and explanation:`;
       throw new Error('No condensed content available');
     }
 
+    const revision = this.getRevisionInternal(proposal.revision_id);
     const now = new Date().toISOString();
 
-    // Check if chapter_edit exists
-    const existingEditStmt = db.prepare<[string], { id: string }>(`
-      SELECT id FROM chapter_edits WHERE chapter_id = ?
-    `);
-    const existingEdit = existingEditStmt.get(proposal.chapter_id);
+    // Check if we need to create a new version for this revision session
+    let targetVersionId = revision.target_version_id;
 
-    if (existingEdit) {
-      // Update existing edit
-      const updateEditStmt = db.prepare(`
-        UPDATE chapter_edits SET
-          edited_content = ?,
-          word_count = ?,
-          edit_type = 'word_count_revision',
-          edit_notes = ?,
-          updated_at = ?
-        WHERE chapter_id = ?
-      `);
-      updateEditStmt.run(
-        proposal.condensed_content,
-        proposal.condensed_word_count,
-        `Word count revision: reduced by ${proposal.actual_reduction} words`,
-        now,
-        proposal.chapter_id
-      );
-    } else {
-      // Create new edit
-      const editId = `edit_${randomUUID().replace(/-/g, '').substring(0, 12)}`;
-      const insertEditStmt = db.prepare(`
-        INSERT INTO chapter_edits (
-          id, chapter_id, edited_content, word_count, is_locked,
-          edit_type, edit_notes, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-      insertEditStmt.run(
-        editId,
-        proposal.chapter_id,
-        proposal.condensed_content,
-        proposal.condensed_word_count,
-        0,
-        'word_count_revision',
-        `Word count revision: reduced by ${proposal.actual_reduction} words`,
-        now,
-        now
-      );
+    if (!targetVersionId) {
+      // First approval in this revision - create a new version
+      logger.info({ revisionId: revision.id, bookId: revision.book_id }, 'Creating new version for editorial rewrite');
+
+      // Create the new version
+      const newVersion = await bookVersioningService.createVersion(revision.book_id, {
+        name: `Editorial Revision ${new Date().toLocaleDateString('en-GB')}`,
+        autoCreated: true,
+      });
+      targetVersionId = newVersion.id;
+
+      // Update the revision with the target version
+      db.prepare(`
+        UPDATE word_count_revisions SET target_version_id = ?, updated_at = ? WHERE id = ?
+      `).run(targetVersionId, now, revision.id);
+
+      // Copy all chapters from source version to the new version
+      await this.copyChaptersToNewVersion(revision.book_id, revision.source_version_id, targetVersionId);
+
+      logger.info({
+        revisionId: revision.id,
+        sourceVersionId: revision.source_version_id,
+        targetVersionId,
+        versionNumber: newVersion.version_number,
+      }, 'Created new version and copied chapters for editorial rewrite');
     }
 
+    // Find the chapter in the target version that corresponds to the original chapter
+    const originalChapter = db.prepare<[string], { chapter_number: number; book_id: string }>(`
+      SELECT chapter_number, book_id FROM chapters WHERE id = ?
+    `).get(proposal.chapter_id);
+
+    if (!originalChapter) {
+      throw new Error(`Original chapter not found: ${proposal.chapter_id}`);
+    }
+
+    // Find the corresponding chapter in the target version
+    const targetChapter = db.prepare<[string, number, string], { id: string }>(`
+      SELECT id FROM chapters
+      WHERE book_id = ? AND chapter_number = ? AND version_id = ?
+    `).get(originalChapter.book_id, originalChapter.chapter_number, targetVersionId);
+
+    if (!targetChapter) {
+      throw new Error(`Target chapter not found for chapter_number ${originalChapter.chapter_number} in version ${targetVersionId}`);
+    }
+
+    // Update the chapter content in the target version
+    db.prepare(`
+      UPDATE chapters SET
+        content = ?,
+        word_count = ?,
+        updated_at = ?
+      WHERE id = ?
+    `).run(
+      proposal.condensed_content,
+      proposal.condensed_word_count,
+      now,
+      targetChapter.id
+    );
+
+    // Create chapter_edit record for audit trail
+    const editId = `edit_${randomUUID().replace(/-/g, '').substring(0, 12)}`;
+    db.prepare(`
+      INSERT INTO chapter_edits (
+        id, chapter_id, version_id, edited_content, word_count, is_locked,
+        edit_type, edit_notes, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      editId,
+      targetChapter.id,
+      targetVersionId,
+      proposal.condensed_content,
+      proposal.condensed_word_count,
+      0,
+      'word_count_revision',
+      `Word count revision: reduced by ${proposal.actual_reduction} words (from editorial rewrite)`,
+      now,
+      now
+    );
+
     // Update proposal status
-    const updateProposalStmt = db.prepare(`
+    db.prepare(`
       UPDATE chapter_reduction_proposals SET
         status = 'applied',
         user_decision = 'approved',
         decision_at = ?,
         updated_at = ?
       WHERE id = ?
-    `);
-    updateProposalStmt.run(now, now, proposalId);
+    `).run(now, now, proposalId);
 
     // Update revision progress
     this.updateRevisionProgress(proposal.revision_id);
 
-    logger.info({ proposalId, wordsReduced: proposal.actual_reduction }, 'Proposal approved and applied');
+    // Update version stats
+    await bookVersioningService.updateVersionStats(targetVersionId);
+
+    logger.info({
+      proposalId,
+      wordsReduced: proposal.actual_reduction,
+      targetVersionId,
+      targetChapterId: targetChapter.id,
+    }, 'Proposal approved and applied to new version');
+  }
+
+  /**
+   * Copy all chapters from source version to target version
+   * This preserves the original chapters whilst creating editable copies in the new version
+   */
+  private async copyChaptersToNewVersion(
+    bookId: string,
+    sourceVersionId: string | null,
+    targetVersionId: string
+  ): Promise<void> {
+    const now = new Date().toISOString();
+
+    // Get all chapters from the source version (or legacy chapters if no source version)
+    let chapters: any[];
+    if (sourceVersionId) {
+      chapters = db.prepare(`
+        SELECT * FROM chapters WHERE version_id = ? ORDER BY chapter_number
+      `).all(sourceVersionId);
+    } else {
+      // Legacy chapters without version_id
+      chapters = db.prepare(`
+        SELECT * FROM chapters WHERE book_id = ? AND version_id IS NULL ORDER BY chapter_number
+      `).all(bookId);
+    }
+
+    logger.info({ bookId, sourceVersionId, targetVersionId, chapterCount: chapters.length }, 'Copying chapters to new version');
+
+    for (const chapter of chapters) {
+      const newChapterId = randomUUID();
+
+      db.prepare(`
+        INSERT INTO chapters (
+          id, book_id, version_id, chapter_number, title, scene_cards,
+          content, summary, status, word_count, flags, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        newChapterId,
+        bookId,
+        targetVersionId,
+        chapter.chapter_number,
+        chapter.title,
+        chapter.scene_cards,
+        chapter.content,
+        chapter.summary,
+        chapter.status,
+        chapter.word_count,
+        chapter.flags,
+        now,
+        now
+      );
+    }
   }
 
   /**
@@ -768,6 +878,8 @@ Return ONLY valid JSON with the condensed chapter and explanation:`;
       id: row.id,
       bookId: row.book_id,
       editorialReportId: row.editorial_report_id,
+      sourceVersionId: row.source_version_id,
+      targetVersionId: row.target_version_id,
       currentWordCount: row.current_word_count,
       targetWordCount: row.target_word_count,
       tolerancePercent: row.tolerance_percent,

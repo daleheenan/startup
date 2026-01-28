@@ -1019,6 +1019,8 @@ export interface WordCountRevision {
   id: string;
   bookId: string;
   editorialReportId: string | null;
+  sourceVersionId: string | null;  // Version being revised (original)
+  targetVersionId: string | null;  // Version created for revised content
   currentWordCount: number;
   targetWordCount: number;
   tolerancePercent: number;

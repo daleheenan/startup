@@ -338,6 +338,8 @@ export function runMigrations() {
       '043_backfill_book_versions.sql',  // DB version 43 - backfill version 1 for all legacy books
       '044_series_refactor.sql',         // DB version 44 - series as parent entities of books/projects
       '045_word_count_revision.sql',     // DB version 45 - word count revision workflow
+      '046_editorial_lessons.sql',       // DB version 46 - editorial lessons learned tracking
+      '047_editorial_rewrite_versioning.sql', // DB version 47 - versioning for editorial rewrites
     ];
 
     for (let i = 0; i < migrationFiles.length; i++) {
@@ -458,6 +460,9 @@ export function getMigrationStatus(): {
     '042_author_profile_publishing.sql',
     '043_backfill_book_versions.sql',
     '044_series_refactor.sql',
+    '045_word_count_revision.sql',
+    '046_editorial_lessons.sql',
+    '047_editorial_rewrite_versioning.sql',
   ];
 
   const pendingMigrations: string[] = [];
