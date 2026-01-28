@@ -166,7 +166,13 @@ export default function ProjectsPage() {
       }
 
       const data = await response.json();
-      setProjects(data.projects || []);
+      const allProjects: Project[] = data.projects || [];
+      // Filter out completed/published projects - they should appear in Completed Novels instead
+      const inProgressProjects = allProjects.filter((p: Project) => {
+        const isCompleted = p.status === 'completed' || p.status === 'published';
+        return !isCompleted;
+      });
+      setProjects(inProgressProjects);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load projects';
       console.error('Error fetching projects:', err);

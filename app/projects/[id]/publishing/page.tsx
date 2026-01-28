@@ -26,6 +26,7 @@ interface Project {
   id: string;
   title: string;
   author_name?: string | null;
+  status?: string;
 }
 
 export default function PublishingSettingsPage() {
@@ -35,6 +36,7 @@ export default function PublishingSettingsPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [markingComplete, setMarkingComplete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -125,6 +127,74 @@ export default function PublishingSettingsPage() {
     }
   };
 
+  const handleMarkComplete = async () => {
+    setMarkingComplete(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          status: 'completed',
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to mark book as completed');
+      }
+
+      const updatedProject = await response.json();
+      setProject(updatedProject);
+      setSuccessMessage('Book marked as completed! It will now appear in your Completed Novels.');
+      setTimeout(() => setSuccessMessage(null), 5000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to mark book as completed');
+    } finally {
+      setMarkingComplete(false);
+    }
+  };
+
+  const handleRevertToDraft = async () => {
+    setMarkingComplete(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          status: 'draft',
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to revert book to draft');
+      }
+
+      const updatedProject = await response.json();
+      setProject(updatedProject);
+      setSuccessMessage('Book reverted to draft status.');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to revert book to draft');
+    } finally {
+      setMarkingComplete(false);
+    }
+  };
+
+  const isCompleted = project?.status === 'completed' || project?.status === 'published';
+
   return (
     <DashboardLayout
       header={{
@@ -132,14 +202,14 @@ export default function PublishingSettingsPage() {
         subtitle: project?.title ? `Configure front and back matter for "${project.title}"` : 'Configure publishing options',
       }}
     >
-      <div style={{ display: 'flex', gap: spacing[8] }}>
-        {/* Sidebar */}
-        <div style={{ width: '250px', flexShrink: 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[6] }}>
+        {/* Navigation - full width across top */}
+        <div style={{ width: '100%' }}>
           <ProjectNavigation projectId={projectId} />
         </div>
 
         {/* Main Content */}
-        <div style={{ flex: 1, maxWidth: '800px' }}>
+        <div style={{ maxWidth: '800px' }}>
           {/* Success Message */}
           {successMessage && (
             <div style={{
@@ -177,6 +247,82 @@ export default function PublishingSettingsPage() {
 
           {!loading && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[6] }}>
+
+              {/* Ready for Publishing Card - First Card */}
+              <div style={{
+                background: isCompleted ? '#D1FAE5' : colors.background.surface,
+                border: `1px solid ${isCompleted ? '#6EE7B7' : colors.border.default}`,
+                borderRadius: borderRadius.xl,
+                padding: spacing[6],
+              }}>
+                <h2 style={{
+                  fontSize: typography.fontSize.lg,
+                  fontWeight: typography.fontWeight.semibold,
+                  color: isCompleted ? '#059669' : colors.text.primary,
+                  margin: 0,
+                  marginBottom: spacing[4],
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: spacing[2],
+                }}>
+                  <span>{isCompleted ? '✅' : '📤'}</span> {isCompleted ? 'Book Completed' : 'Ready for Publishing?'}
+                </h2>
+
+                <p style={{
+                  fontSize: typography.fontSize.sm,
+                  color: isCompleted ? '#065F46' : colors.text.tertiary,
+                  margin: 0,
+                  marginBottom: spacing[4],
+                  lineHeight: typography.lineHeight.relaxed,
+                }}>
+                  {isCompleted
+                    ? 'This book has been marked as completed and appears in your Completed Novels section. You can still edit it or revert to draft status if needed.'
+                    : 'Once your novel is finished and you\'re happy with all the content, mark it as completed. Completed novels will be removed from the Books in Progress list and moved to Completed Novels.'
+                  }
+                </p>
+
+                <div style={{ display: 'flex', gap: spacing[3], flexWrap: 'wrap' }}>
+                  {isCompleted ? (
+                    <button
+                      onClick={handleRevertToDraft}
+                      disabled={markingComplete}
+                      style={{
+                        padding: `${spacing[3]} ${spacing[6]}`,
+                        background: colors.background.primary,
+                        border: `1px solid ${colors.border.default}`,
+                        borderRadius: borderRadius.lg,
+                        color: colors.text.secondary,
+                        fontSize: typography.fontSize.sm,
+                        fontWeight: typography.fontWeight.medium,
+                        cursor: markingComplete ? 'not-allowed' : 'pointer',
+                        opacity: markingComplete ? 0.6 : 1,
+                      }}
+                    >
+                      {markingComplete ? 'Updating...' : 'Revert to Draft'}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleMarkComplete}
+                      disabled={markingComplete}
+                      style={{
+                        padding: `${spacing[3]} ${spacing[6]}`,
+                        background: markingComplete ? colors.text.disabled : 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                        border: 'none',
+                        borderRadius: borderRadius.lg,
+                        color: colors.white,
+                        fontSize: typography.fontSize.sm,
+                        fontWeight: typography.fontWeight.semibold,
+                        cursor: markingComplete ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: spacing[2],
+                      }}
+                    >
+                      {markingComplete ? 'Updating...' : '✓ Mark Book as Completed'}
+                    </button>
+                  )}
+                </div>
+              </div>
 
               {/* Front Matter Section */}
               <div style={{

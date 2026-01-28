@@ -28,7 +28,25 @@
       "Bash(git push)",
       "Bash(timeout 60 tail:*)",
       "Skill(deploy-workflow)",
-      "Skill(deploy-workflow:*)"
+      "Skill(deploy-workflow:*)",
+      "Bash(node -e:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: Add create series from existing book functionality\n\n- Add standalone projects section to Series Management page\n- Ability to convert standalone books to series with auto-populated details\n- New API endpoint POST /api/trilogy/projects/:id/create-series\n- New API endpoint DELETE /api/trilogy/books/:id to remove books from series\n- Book genre and title auto-populate when converting to series\n- Book becomes Book 1 of the new series\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(for i in {1..3})",
+      "Bash(do echo \"Attempt $i:\")",
+      "Bash(done)",
+      "Bash(python3:*)",
+      "Bash(for:*)",
+      "Bash(do curl -s -w \"Request $i: %{time_total}s\\\\n\" -o /dev/null https://novelforge-backend-production.up.railway.app/api/health)",
+      "Bash(echo:*)",
+      "Bash(npm test:*)",
+      "Bash(curl:*)",
+      "Bash(npx tsx:*)",
+      "Bash(ls -la \"C:\\\\Users\\\\daleh\\\\Projects\\\\novelforge\\\\app\\\\projects\"\" | grep -E \"^[)",
+      "Bash(^d \")",
+      "Bash(node --loader ts-node/esm:*)",
+      "Bash(sqlite3:*)",
+      "Bash(node scripts/check-versions.js:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: Backfill version 1 for all legacy books without versions\n\nAdds migration 043 that automatically creates version 1 for all books\nthat don''t have any versions, and updates chapters/chapter_edits to\nreference the new version. This fixes the \"Too many requests\" error\nwhen using the version migration button.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }

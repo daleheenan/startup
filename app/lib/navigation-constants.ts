@@ -224,15 +224,6 @@ export const PROJECT_NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    id: 'series',
-    label: 'Series',
-    icon: '📚',
-    isStandalone: true,
-    route: '/series',
-    workflowStep: 'series',
-    tabs: [],
-  },
-  {
     id: 'publishing',
     label: 'Publishing',
     icon: '📄',
