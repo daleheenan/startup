@@ -8,6 +8,11 @@ process.env.ANTHROPIC_API_KEY = 'test-api-key';
 // Set longer timeout for tests
 jest.setTimeout(10000);
 
+// Mock uuid module (ESM-only) to work with Jest's CommonJS environment
+jest.mock('uuid', () => ({
+  v4: () => 'test-uuid-' + Math.random().toString(36).substring(2, 9),
+}));
+
 // Mock console methods to reduce noise
 global.console = {
   ...console,

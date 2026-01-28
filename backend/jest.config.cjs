@@ -26,6 +26,10 @@ module.exports = {
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
+  // Transform ESM packages that don't play well with Jest's CommonJS environment
+  transformIgnorePatterns: [
+    '/node_modules/(?!(uuid)/)',
+  ],
   collectCoverageFrom: [
     'src/services/**/*.ts',
     '!src/services/**/*.test.ts',

@@ -10,6 +10,20 @@ import { QueueConfig } from '../config/queue.config.js';
 const logger = createLogger('queue:worker');
 
 /**
+ * Safely parse JSON with a fallback value
+ * Prevents worker crashes from malformed database data
+ */
+function safeJsonParse<T>(jsonString: string | null | undefined, fallback: T): T {
+  if (!jsonString) return fallback;
+  try {
+    return JSON.parse(jsonString);
+  } catch (error) {
+    logger.warn({ jsonString: jsonString.substring(0, 100) }, 'safeJsonParse: Failed to parse JSON, using fallback');
+    return fallback;
+  }
+}
+
+/**
  * QueueWorker processes jobs sequentially from the queue.
  *
  * Features:
@@ -622,7 +636,7 @@ export class QueueWorker {
       if (result.flags.length > 0) {
         const chapterStmt = db.prepare(`SELECT flags FROM chapters WHERE id = ?`);
         const chapter = chapterStmt.get(chapterId) as any;
-        const existingFlags = chapter?.flags ? JSON.parse(chapter.flags) : [];
+        const existingFlags = safeJsonParse<string[]>(chapter?.flags, []);
         const updateFlagsStmt = db.prepare(`UPDATE chapters SET flags = ? WHERE id = ?`);
         updateFlagsStmt.run(JSON.stringify([...existingFlags, ...result.flags]), chapterId);
       }
@@ -664,7 +678,7 @@ export class QueueWorker {
       if (result.flags.length > 0) {
         const chapterStmt = db.prepare(`SELECT flags FROM chapters WHERE id = ?`);
         const chapter = chapterStmt.get(chapterId) as any;
-        const existingFlags = chapter?.flags ? JSON.parse(chapter.flags) : [];
+        const existingFlags = safeJsonParse<string[]>(chapter?.flags, []);
         const updateFlagsStmt = db.prepare(`UPDATE chapters SET flags = ? WHERE id = ?`);
         updateFlagsStmt.run(JSON.stringify([...existingFlags, ...result.flags]), chapterId);
       }
@@ -700,7 +714,7 @@ export class QueueWorker {
       if (result.flags.length > 0) {
         const chapterStmt = db.prepare(`SELECT flags FROM chapters WHERE id = ?`);
         const chapter = chapterStmt.get(chapterId) as any;
-        const existingFlags = chapter?.flags ? JSON.parse(chapter.flags) : [];
+        const existingFlags = safeJsonParse<string[]>(chapter?.flags, []);
         const updateFlagsStmt = db.prepare(`UPDATE chapters SET flags = ? WHERE id = ?`);
         updateFlagsStmt.run(JSON.stringify([...existingFlags, ...result.flags]), chapterId);
       }
@@ -742,7 +756,7 @@ export class QueueWorker {
       if (result.flags.length > 0) {
         const chapterStmt = db.prepare(`SELECT flags FROM chapters WHERE id = ?`);
         const chapter = chapterStmt.get(chapterId) as any;
-        const existingFlags = chapter?.flags ? JSON.parse(chapter.flags) : [];
+        const existingFlags = safeJsonParse<string[]>(chapter?.flags, []);
         const updateFlagsStmt = db.prepare(`UPDATE chapters SET flags = ? WHERE id = ?`);
         updateFlagsStmt.run(JSON.stringify([...existingFlags, ...result.flags]), chapterId);
       }
@@ -784,7 +798,7 @@ export class QueueWorker {
       if (result.flags.length > 0) {
         const chapterStmt = db.prepare(`SELECT flags FROM chapters WHERE id = ?`);
         const chapter = chapterStmt.get(chapterId) as any;
-        const existingFlags = chapter?.flags ? JSON.parse(chapter.flags) : [];
+        const existingFlags = safeJsonParse<string[]>(chapter?.flags, []);
         const updateFlagsStmt = db.prepare(`UPDATE chapters SET flags = ? WHERE id = ?`);
         updateFlagsStmt.run(JSON.stringify([...existingFlags, ...result.flags]), chapterId);
       }
@@ -826,7 +840,7 @@ export class QueueWorker {
       if (result.flags.length > 0) {
         const chapterStmt = db.prepare(`SELECT flags FROM chapters WHERE id = ?`);
         const chapter = chapterStmt.get(chapterId) as any;
-        const existingFlags = chapter?.flags ? JSON.parse(chapter.flags) : [];
+        const existingFlags = safeJsonParse<string[]>(chapter?.flags, []);
         const updateFlagsStmt = db.prepare(`UPDATE chapters SET flags = ? WHERE id = ?`);
         updateFlagsStmt.run(JSON.stringify([...existingFlags, ...result.flags]), chapterId);
       }
@@ -950,8 +964,8 @@ Write the summary now:`;
         throw new Error('Chapter data not found');
       }
 
-      const storyBible = data.story_bible ? JSON.parse(data.story_bible) : null;
-      const sceneCards = data.scene_cards ? JSON.parse(data.scene_cards) : [];
+      const storyBible = safeJsonParse<any>(data.story_bible, null);
+      const sceneCards = safeJsonParse<any[]>(data.scene_cards, []);
 
       if (!storyBible || !storyBible.characters) {
         logger.info('update_states: No story bible found, skipping state update');
@@ -1214,9 +1228,9 @@ Output only valid JSON, no commentary:`;
         throw new Error('Project not found');
       }
 
-      const storyDNA = project.story_dna ? JSON.parse(project.story_dna) : null;
-      const storyBible = project.story_bible ? JSON.parse(project.story_bible) : null;
-      const plotStructure = project.plot_structure ? JSON.parse(project.plot_structure) : { plot_layers: [] };
+      const storyDNA = safeJsonParse<any>(project.story_dna, null);
+      const storyBible = safeJsonParse<any>(project.story_bible, null);
+      const plotStructure = safeJsonParse<any>(project.plot_structure, { plot_layers: [] });
 
       // If no plot layers, save a simple result
       if (!plotStructure.plot_layers || plotStructure.plot_layers.length === 0) {
@@ -1382,7 +1396,7 @@ Return ONLY a JSON object:
         throw new Error('Project not found');
       }
 
-      const storyConcept = project.story_concept ? JSON.parse(project.story_concept) : null;
+      const storyConcept = safeJsonParse<any>(project.story_concept, null);
 
       if (!storyConcept) {
         logger.info({ projectId }, 'originality_check: No story concept, skipping');
@@ -1469,7 +1483,7 @@ Return ONLY a JSON object:
       for (const chapter of chapters) {
         if (!chapter.content) continue;
 
-        const sceneCards = chapter.scene_cards ? JSON.parse(chapter.scene_cards) : [];
+        const sceneCards = safeJsonParse<any[]>(chapter.scene_cards, []);
         const analytics = await AnalyticsService.analyzeChapter(chapter.id, chapter.content, sceneCards);
 
         // Upsert chapter analytics

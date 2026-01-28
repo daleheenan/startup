@@ -5,6 +5,7 @@ import * as auth from '../auth';
 // Mock the auth module
 vi.mock('../auth', () => ({
   getToken: vi.fn(),
+  logout: vi.fn(),
 }));
 
 describe('api', () => {
@@ -34,7 +35,14 @@ describe('api', () => {
 
       const result = await checkHealth();
 
-      expect(global.fetch).toHaveBeenCalledWith(`${mockApiBaseUrl}/health`);
+      expect(global.fetch).toHaveBeenCalledWith(
+        `${mockApiBaseUrl}/health`,
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+          }),
+        })
+      );
       expect(result).toEqual(mockHealthData);
     });
 
@@ -181,7 +189,8 @@ describe('api', () => {
       });
       vi.mocked(global.fetch).mockResolvedValue(mockResponse);
 
-      await expect(getQueueStats()).rejects.toThrow('Failed to fetch queue stats');
+      // 401 triggers logout and session expired error
+      await expect(getQueueStats()).rejects.toThrow('Session expired');
     });
 
     it('should parse response with all queue states', async () => {
@@ -324,8 +333,9 @@ describe('api', () => {
       });
       vi.mocked(global.fetch).mockResolvedValue(mockResponse);
 
+      // 401 triggers logout and session expired error
       await expect(createTestJob('test-type', 'test-id')).rejects.toThrow(
-        'Failed to create test job'
+        'Session expired'
       );
     });
 

@@ -18,16 +18,32 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 // Validate critical environment variables at startup
-function validateEnvironment(): { valid: boolean; errors: string[] } {
+function validateEnvironment(): { valid: boolean; errors: string[]; warnings: string[] } {
   const errors: string[] = [];
+  const warnings: string[] = [];
+  const MIN_JWT_SECRET_LENGTH = 32;
+
+  // JWT_SECRET is required in all environments for security
+  if (!process.env.JWT_SECRET) {
+    if (process.env.NODE_ENV === 'production') {
+      errors.push('JWT_SECRET is required');
+    } else {
+      warnings.push('JWT_SECRET not set - using insecure default for development only');
+      // Set a development-only default (NEVER use in production)
+      process.env.JWT_SECRET = 'dev-only-insecure-secret-change-in-production';
+    }
+  } else if (process.env.JWT_SECRET.length < MIN_JWT_SECRET_LENGTH) {
+    if (process.env.NODE_ENV === 'production') {
+      errors.push(`JWT_SECRET must be at least ${MIN_JWT_SECRET_LENGTH} characters for security`);
+    } else {
+      warnings.push(`JWT_SECRET is shorter than recommended ${MIN_JWT_SECRET_LENGTH} characters`);
+    }
+  }
 
   // Required in production
   if (process.env.NODE_ENV === 'production') {
     if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY === 'placeholder-key-will-be-set-later') {
       errors.push('ANTHROPIC_API_KEY is required in production');
-    }
-    if (!process.env.JWT_SECRET) {
-      errors.push('JWT_SECRET is required in production');
     }
     if (!process.env.OWNER_PASSWORD_HASH) {
       errors.push('OWNER_PASSWORD_HASH is required in production');
@@ -36,15 +52,23 @@ function validateEnvironment(): { valid: boolean; errors: string[] } {
 
   // Warn about missing optional but recommended vars
   if (!process.env.DATABASE_PATH && process.env.NODE_ENV === 'production') {
-    console.warn('[Server] WARNING: DATABASE_PATH not set, using default location');
+    warnings.push('DATABASE_PATH not set, using default location');
   }
 
-  return { valid: errors.length === 0, errors };
+  return { valid: errors.length === 0, errors, warnings };
 }
 
 // Run environment validation
 if (process.env.NODE_ENV !== 'test') {
   const envValidation = validateEnvironment();
+
+  // Log warnings
+  if (envValidation.warnings.length > 0) {
+    console.warn('[Server] Environment warnings:');
+    envValidation.warnings.forEach(warn => console.warn(`  - ${warn}`));
+  }
+
+  // Handle errors
   if (!envValidation.valid) {
     console.error('[Server] Environment validation failed:');
     envValidation.errors.forEach(err => console.error(`  - ${err}`));

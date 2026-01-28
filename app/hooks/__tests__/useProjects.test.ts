@@ -18,6 +18,7 @@ import { useProjects, useProject, useInvalidateProjects } from '../useProjects';
 // Mock auth module
 vi.mock('../../lib/auth', () => ({
   getToken: vi.fn(() => 'test-token'),
+  logout: vi.fn(),
 }));
 
 describe('useProjects', () => {
@@ -55,6 +56,7 @@ describe('useProjects', () => {
         ok: false,
         status: 500,
         statusText: 'Internal Server Error',
+        json: async () => ({ error: 'Internal Server Error' }),
       });
 
       const { result } = renderHookWithProviders(() => useProjects());
@@ -64,7 +66,8 @@ describe('useProjects', () => {
       });
 
       expect(result.current.error).toBeDefined();
-      expect(result.current.error?.message).toBe('Failed to fetch projects');
+      // fetchWithAuth throws with status code in error message
+      expect(result.current.error?.message).toContain('500');
     });
 
     it('should include auth token in request headers', async () => {
@@ -184,6 +187,7 @@ describe('useProjects', () => {
         ok: false,
         status: 404,
         statusText: 'Not Found',
+        json: async () => ({ error: 'Not Found' }),
       });
 
       const { result } = renderHookWithProviders(() => useProject('non-existent'));
@@ -192,7 +196,8 @@ describe('useProjects', () => {
         expect(result.current.isError).toBe(true);
       });
 
-      expect(result.current.error?.message).toBe('Failed to fetch project');
+      // fetchWithAuth throws with status code in error message
+      expect(result.current.error?.message).toContain('404');
     });
   });
 
