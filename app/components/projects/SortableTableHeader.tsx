@@ -46,10 +46,10 @@ export default function SortableTableHeader({
       scope="col"
       aria-sort={ariaSort}
       style={{
-        padding: `${spacing[3]} ${spacing[4]}`,
+        padding: `${spacing[2]} ${spacing[3]}`,
         textAlign: 'left',
         fontWeight: typography.fontWeight.semibold,
-        fontSize: typography.fontSize.sm,
+        fontSize: typography.fontSize.xs,
         color: isActive ? colors.brand.primary : colors.text.secondary,
         background: colors.background.secondary,
         borderBottom: `2px solid ${colors.border.default}`,
@@ -63,14 +63,14 @@ export default function SortableTableHeader({
       tabIndex={0}
       role="columnheader"
     >
-      <span style={{ display: 'flex', alignItems: 'center', gap: spacing[2] }}>
+      <span style={{ display: 'flex', alignItems: 'center', gap: spacing[1] }}>
         {label}
         <span
           aria-hidden="true"
           style={{
             display: 'inline-flex',
             flexDirection: 'column',
-            fontSize: '0.625rem',
+            fontSize: '0.5rem',
             lineHeight: 1,
             opacity: isActive ? 1 : 0.3,
           }}

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { getToken, logout } from '../lib/auth';
 import { colors, typography, spacing, borderRadius } from '../lib/design-tokens';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
-import MetricCard from '@/app/components/dashboard/MetricCard';
+import StatsBar from '@/app/components/dashboard/StatsBar';
 import RecentActivityFeed from '@/app/components/dashboard/RecentActivityFeed';
 import type { ActivityItem } from '@/app/components/dashboard/RecentActivityFeed';
 import { ProjectsTable } from '../components/projects';
@@ -320,70 +320,33 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {/* Metric cards row */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: spacing[4],
-        marginBottom: spacing[8],
-      }}>
-        <MetricCard
-          title="Total Words"
-          value={metrics.totalWords.toLocaleString()}
-          variant="blue"
-          icon={
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.metrics.blue} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-              <line x1="8" y1="7" x2="16" y2="7" />
-              <line x1="8" y1="11" x2="16" y2="11" />
-              <line x1="8" y1="15" x2="12" y2="15" />
-            </svg>
-          }
-          items={[
-            { label: 'Chapters written', count: metrics.totalChapters },
-            { label: 'Active projects', count: projects.length },
-          ]}
-        />
-
-        <MetricCard
-          title="Chapters Due"
-          value={metrics.outlineChaptersDue}
-          variant="red"
-          icon={
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.metrics.red} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-            </svg>
-          }
-        />
-
-        <MetricCard
-          title="Stories Completed"
-          value={metrics.completedStories}
-          variant="green"
-          icon={
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.metrics.green} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-              <polyline points="22 4 12 14.01 9 11.01" />
-            </svg>
-          }
-        />
-
-        <MetricCard
-          title="Days Active"
-          value={metrics.daysActive}
-          variant="orange"
-          icon={
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.metrics.orange} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-              <line x1="16" y1="2" x2="16" y2="6" />
-              <line x1="8" y1="2" x2="8" y2="6" />
-              <line x1="3" y1="10" x2="21" y2="10" />
-            </svg>
-          }
-        />
-      </div>
+      {/* Compact stats bar */}
+      <StatsBar
+        stats={[
+          {
+            label: 'Total Words',
+            value: metrics.totalWords.toLocaleString(),
+            variant: 'blue',
+          },
+          {
+            label: 'Chapters Due',
+            value: metrics.outlineChaptersDue,
+            variant: 'red',
+          },
+          {
+            label: 'Completed',
+            value: metrics.completedStories,
+            variant: 'green',
+          },
+          {
+            label: 'Days Active',
+            value: metrics.daysActive,
+            variant: 'orange',
+          },
+        ]}
+        collapsible={true}
+        storageKey="projectsOverviewCollapsed"
+      />
 
       {/* Two-column grid: Projects table (left) + Activity feed (right) */}
       <div style={{

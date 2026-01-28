@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { getToken } from '@/app/lib/auth';
-import { colors, typography, spacing, borderRadius, shadows, transitions } from '@/app/lib/design-tokens';
+import { colors, typography, spacing, borderRadius, shadows, transitions, zIndex } from '@/app/lib/design-tokens';
 import SortableTableHeader, { SortColumn, SortConfig } from './SortableTableHeader';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -167,17 +167,40 @@ export default function CompletedNovelsTable({
     setDeleteConfirm(null);
   };
 
-  const formatDate = (dateString: string) => {
+  const formatRelativeDate = (dateString: string) => {
     const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+
+    if (diffMinutes < 1) return 'Just now';
+    if (diffMinutes < 60) return `${diffMinutes}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 14) return '1 week ago';
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+
     return date.toLocaleDateString('en-GB', {
       day: '2-digit',
       month: 'short',
-      year: 'numeric',
     });
   };
 
   const formatNumber = (num: number) => {
+    if (num >= 1000) {
+      return `${Math.floor(num / 1000)}k`;
+    }
     return num.toLocaleString('en-GB');
+  };
+
+  const formatStats = (words: number | undefined, chapters: number | undefined) => {
+    const wordDisplay = words ? formatNumber(words) : '—';
+    const chapterDisplay = chapters ?? '—';
+    return `${wordDisplay} / ${chapterDisplay}`;
   };
 
   const getTypeLabel = (type: string) => {
@@ -251,6 +274,166 @@ export default function CompletedNovelsTable({
     e.currentTarget.style.background = colors.semantic.errorLight;
     e.currentTarget.style.borderColor = colors.semantic.errorBorder;
     e.currentTarget.style.color = colors.semantic.error;
+  };
+
+  // Icon-only action button style (compact)
+  const iconButtonStyle: React.CSSProperties = {
+    padding: spacing[1],
+    background: 'transparent',
+    border: 'none',
+    borderRadius: borderRadius.sm,
+    fontSize: typography.fontSize.base,
+    color: colors.text.tertiary,
+    cursor: 'pointer',
+    transition: transitions.all,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '28px',
+    height: '28px',
+  };
+
+  // Export dropdown component
+  const ExportDropdown = ({ projectId, isPdfExporting, isDocxExporting }: {
+    projectId: string;
+    isPdfExporting: boolean;
+    isDocxExporting: boolean;
+  }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+        if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+          setIsOpen(false);
+        }
+      };
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    return (
+      <div ref={dropdownRef} style={{ position: 'relative' }}>
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsOpen(!isOpen);
+          }}
+          aria-label="Export options"
+          aria-expanded={isOpen}
+          style={{
+            ...iconButtonStyle,
+            color: isOpen ? colors.brand.primary : colors.text.tertiary,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = colors.background.secondary;
+            e.currentTarget.style.color = colors.brand.primary;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+            e.currentTarget.style.color = isOpen ? colors.brand.primary : colors.text.tertiary;
+          }}
+          title="Export"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+        </button>
+        {isOpen && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '100%',
+              right: 0,
+              marginTop: spacing[1],
+              background: colors.background.surface,
+              border: `1px solid ${colors.border.default}`,
+              borderRadius: borderRadius.md,
+              boxShadow: shadows.lg,
+              zIndex: zIndex.dropdown,
+              minWidth: '100px',
+              overflow: 'hidden',
+            }}
+          >
+            <button
+              onClick={(e) => {
+                handleExportPdf(projectId, e);
+                setIsOpen(false);
+              }}
+              disabled={isPdfExporting}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: spacing[2],
+                width: '100%',
+                padding: `${spacing[2]} ${spacing[3]}`,
+                background: 'transparent',
+                border: 'none',
+                fontSize: typography.fontSize.sm,
+                color: colors.text.secondary,
+                cursor: isPdfExporting ? 'not-allowed' : 'pointer',
+                opacity: isPdfExporting ? 0.6 : 1,
+                textAlign: 'left',
+              }}
+              onMouseEnter={(e) => {
+                if (!isPdfExporting) {
+                  e.currentTarget.style.background = colors.background.secondary;
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
+              {isPdfExporting ? 'Exporting...' : 'PDF'}
+            </button>
+            <button
+              onClick={(e) => {
+                handleExportDocx(projectId, e);
+                setIsOpen(false);
+              }}
+              disabled={isDocxExporting}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: spacing[2],
+                width: '100%',
+                padding: `${spacing[2]} ${spacing[3]}`,
+                background: 'transparent',
+                border: 'none',
+                fontSize: typography.fontSize.sm,
+                color: colors.text.secondary,
+                cursor: isDocxExporting ? 'not-allowed' : 'pointer',
+                opacity: isDocxExporting ? 0.6 : 1,
+                textAlign: 'left',
+              }}
+              onMouseEnter={(e) => {
+                if (!isDocxExporting) {
+                  e.currentTarget.style.background = colors.background.secondary;
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+              </svg>
+              {isDocxExporting ? 'Exporting...' : 'DOCX'}
+            </button>
+          </div>
+        )}
+      </div>
+    );
   };
 
   if (projects.length === 0) {
@@ -328,10 +511,10 @@ export default function CompletedNovelsTable({
           style={{
             width: '100%',
             borderCollapse: 'collapse',
-            minWidth: '900px',
+            minWidth: '700px',
           }}
         >
-          <thead>
+          <thead style={{ position: 'sticky', top: 0, zIndex: zIndex.sticky }}>
             <tr>
               <SortableTableHeader
                 label="Name"
@@ -346,36 +529,30 @@ export default function CompletedNovelsTable({
                 onSort={onSort}
               />
               <SortableTableHeader
-                label="Total Cost"
-                column="totalCost"
-                currentSort={sortConfig}
-                onSort={onSort}
-              />
-              <SortableTableHeader
                 label="Type"
                 column="type"
                 currentSort={sortConfig}
                 onSort={onSort}
               />
               <SortableTableHeader
-                label="Words"
+                label="Stats"
                 column="words"
                 currentSort={sortConfig}
                 onSort={onSort}
               />
               <SortableTableHeader
-                label="Chapters"
-                column="chapters"
+                label="Cost"
+                column="totalCost"
                 currentSort={sortConfig}
                 onSort={onSort}
               />
               <th
                 scope="col"
                 style={{
-                  padding: `${spacing[3]} ${spacing[4]}`,
+                  padding: `${spacing[2]} ${spacing[3]}`,
                   textAlign: 'center',
                   fontWeight: typography.fontWeight.semibold,
-                  fontSize: typography.fontSize.sm,
+                  fontSize: typography.fontSize.xs,
                   color: colors.text.secondary,
                   background: colors.background.secondary,
                   borderBottom: `2px solid ${colors.border.default}`,
@@ -387,14 +564,15 @@ export default function CompletedNovelsTable({
               <th
                 scope="col"
                 style={{
-                  padding: `${spacing[3]} ${spacing[4]}`,
-                  textAlign: 'center',
+                  padding: `${spacing[2]} ${spacing[3]}`,
+                  textAlign: 'right',
                   fontWeight: typography.fontWeight.semibold,
-                  fontSize: typography.fontSize.sm,
+                  fontSize: typography.fontSize.xs,
                   color: colors.text.secondary,
                   background: colors.background.secondary,
                   borderBottom: `2px solid ${colors.border.default}`,
                   whiteSpace: 'nowrap',
+                  width: '100px',
                 }}
               >
                 Actions
@@ -411,22 +589,28 @@ export default function CompletedNovelsTable({
               return (
                 <tr
                   key={project.id}
+                  className="project-row"
                   style={{
                     borderBottom: `1px solid ${colors.border.default}`,
                     transition: transitions.colors,
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = colors.background.surfaceHover;
+                    const actions = e.currentTarget.querySelector('.row-actions') as HTMLElement;
+                    if (actions) actions.style.opacity = '1';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = 'transparent';
+                    const actions = e.currentTarget.querySelector('.row-actions') as HTMLElement;
+                    if (actions) actions.style.opacity = '0';
                   }}
                 >
                   {/* Name */}
                   <td
                     style={{
-                      padding: `${spacing[4]}`,
+                      padding: `${spacing[2]} ${spacing[3]}`,
                       fontWeight: typography.fontWeight.medium,
+                      fontSize: typography.fontSize.sm,
                       color: colors.text.primary,
                     }}
                   >
@@ -447,155 +631,150 @@ export default function CompletedNovelsTable({
                     </Link>
                   </td>
 
-                  {/* Completed Date */}
+                  {/* Completed Date - Relative */}
                   <td
                     style={{
-                      padding: `${spacing[4]}`,
-                      fontSize: typography.fontSize.sm,
-                      color: colors.text.secondary,
+                      padding: `${spacing[2]} ${spacing[3]}`,
+                      fontSize: typography.fontSize.xs,
+                      color: colors.text.tertiary,
                     }}
+                    title={new Date(project.updated_at).toLocaleDateString('en-GB', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                    })}
                   >
-                    {formatDate(project.updated_at)}
+                    {formatRelativeDate(project.updated_at)}
                   </td>
 
-                  {/* Total Cost */}
-                  <td
-                    style={{
-                      padding: `${spacing[4]}`,
-                      fontSize: typography.fontSize.sm,
-                      color: colors.text.secondary,
-                    }}
-                  >
-                    {project.metrics?.cost?.display || '—'}
-                  </td>
-
-                  {/* Type */}
-                  <td style={{ padding: `${spacing[4]}` }}>
+                  {/* Type - Compact pill */}
+                  <td style={{ padding: `${spacing[2]} ${spacing[3]}` }}>
                     <span
                       style={{
                         display: 'inline-block',
-                        padding: `${spacing[1]} ${spacing[2]}`,
+                        padding: '2px 6px',
                         background: typeColors.bg,
                         color: typeColors.text,
                         borderRadius: borderRadius.sm,
-                        fontSize: typography.fontSize.xs,
+                        fontSize: '10px',
                         fontWeight: typography.fontWeight.medium,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
                       }}
                     >
                       {getTypeLabel(project.type)}
                     </span>
                   </td>
 
-                  {/* Words */}
+                  {/* Stats (Words / Chapters combined) */}
                   <td
                     style={{
-                      padding: `${spacing[4]}`,
-                      fontSize: typography.fontSize.sm,
+                      padding: `${spacing[2]} ${spacing[3]}`,
+                      fontSize: typography.fontSize.xs,
                       color: colors.text.secondary,
-                      textAlign: 'right',
                     }}
+                    title={`${project.metrics?.content?.words?.toLocaleString() ?? 0} words, ${project.progress?.chaptersWritten ?? 0} chapters`}
                   >
-                    {project.metrics?.content?.words
-                      ? formatNumber(project.metrics.content.words)
-                      : '—'}
+                    {formatStats(project.metrics?.content?.words, project.progress?.chaptersWritten)}
                   </td>
 
-                  {/* Chapters */}
+                  {/* Total Cost */}
                   <td
                     style={{
-                      padding: `${spacing[4]}`,
-                      fontSize: typography.fontSize.sm,
-                      color: colors.text.secondary,
-                      textAlign: 'right',
+                      padding: `${spacing[2]} ${spacing[3]}`,
+                      fontSize: typography.fontSize.xs,
+                      color: colors.text.tertiary,
                     }}
                   >
-                    {project.progress?.chaptersWritten ?? '—'}
+                    {project.metrics?.cost?.display || '—'}
                   </td>
 
-                  {/* Status */}
-                  <td style={{ padding: `${spacing[4]}`, textAlign: 'center' }}>
+                  {/* Status - Compact badge */}
+                  <td style={{ padding: `${spacing[2]} ${spacing[3]}`, textAlign: 'center' }}>
                     <span
                       style={{
                         display: 'inline-block',
-                        padding: `${spacing[1]} ${spacing[2]}`,
+                        padding: '2px 6px',
                         background: statusBadge.bg,
                         color: statusBadge.text,
                         borderRadius: borderRadius.sm,
-                        fontSize: typography.fontSize.xs,
+                        fontSize: '10px',
                         fontWeight: typography.fontWeight.medium,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
                       }}
                     >
                       {statusBadge.label}
                     </span>
                   </td>
 
-                  {/* Actions */}
+                  {/* Actions - Hover reveal with icons */}
                   <td
                     style={{
-                      padding: `${spacing[4]}`,
-                      textAlign: 'center',
+                      padding: `${spacing[2]} ${spacing[3]}`,
+                      textAlign: 'right',
                     }}
                   >
                     <div
+                      className="row-actions"
                       style={{
                         display: 'flex',
-                        gap: spacing[2],
-                        justifyContent: 'center',
-                        flexWrap: 'wrap',
+                        gap: spacing[1],
+                        justifyContent: 'flex-end',
+                        opacity: 0,
+                        transition: transitions.opacity,
                       }}
                     >
                       {/* Read */}
                       <Link
                         href={`/projects/${project.id}/read`}
                         aria-label={`Read ${project.title}`}
-                        style={actionButtonStyle as React.CSSProperties}
-                        onMouseEnter={actionButtonHoverStyle}
-                        onMouseLeave={actionButtonLeaveStyle}
+                        style={iconButtonStyle}
+                        title="Read"
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = colors.background.secondary;
+                          e.currentTarget.style.color = colors.brand.primary;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'transparent';
+                          e.currentTarget.style.color = colors.text.tertiary;
+                        }}
                       >
-                        📖 Read
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                        </svg>
                       </Link>
 
-                      {/* Export PDF */}
-                      <button
-                        onClick={(e) => handleExportPdf(project.id, e)}
-                        disabled={isPdfExporting}
-                        aria-label={isPdfExporting ? 'Exporting PDF...' : `Export ${project.title} as PDF`}
-                        style={{
-                          ...actionButtonStyle,
-                          opacity: isPdfExporting ? 0.6 : 1,
-                          cursor: isPdfExporting ? 'not-allowed' : 'pointer',
-                        }}
-                        onMouseEnter={!isPdfExporting ? actionButtonHoverStyle : undefined}
-                        onMouseLeave={!isPdfExporting ? actionButtonLeaveStyle : undefined}
-                      >
-                        {isPdfExporting ? '...' : '📄 PDF'}
-                      </button>
-
-                      {/* Export DOCX */}
-                      <button
-                        onClick={(e) => handleExportDocx(project.id, e)}
-                        disabled={isDocxExporting}
-                        aria-label={isDocxExporting ? 'Exporting DOCX...' : `Export ${project.title} as DOCX`}
-                        style={{
-                          ...actionButtonStyle,
-                          opacity: isDocxExporting ? 0.6 : 1,
-                          cursor: isDocxExporting ? 'not-allowed' : 'pointer',
-                        }}
-                        onMouseEnter={!isDocxExporting ? actionButtonHoverStyle : undefined}
-                        onMouseLeave={!isDocxExporting ? actionButtonLeaveStyle : undefined}
-                      >
-                        {isDocxExporting ? '...' : '📝 DOCX'}
-                      </button>
+                      {/* Export dropdown */}
+                      <ExportDropdown
+                        projectId={project.id}
+                        isPdfExporting={isPdfExporting}
+                        isDocxExporting={isDocxExporting}
+                      />
 
                       {/* Delete */}
                       <button
                         onClick={(e) => handleDeleteClick(project, e)}
                         aria-label={`Delete ${project.title}`}
-                        style={deleteButtonStyle}
-                        onMouseEnter={deleteButtonHoverStyle}
-                        onMouseLeave={deleteButtonLeaveStyle}
+                        style={{
+                          ...iconButtonStyle,
+                          color: colors.text.tertiary,
+                        }}
+                        title="Delete"
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = colors.semantic.errorLight;
+                          e.currentTarget.style.color = colors.semantic.error;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'transparent';
+                          e.currentTarget.style.color = colors.text.tertiary;
+                        }}
                       >
-                        🗑️ Delete
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
                       </button>
                     </div>
                   </td>
