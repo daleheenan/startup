@@ -204,15 +204,18 @@ router.post('/projects/:projectId/veb/submit', async (req, res) => {
       return sendNotFound(res, 'Project');
     }
 
-    // Check if project has completed chapters
+    // Check if project has chapters with content (regardless of status)
+    // Note: We check for content presence, not status='completed', because:
+    // 1. Chapters can have full content while still in 'writing' or 'editing' status
+    // 2. This aligns with completion-detection.service.ts and veb.service.ts logic
     const chapterCount = db.prepare(`
       SELECT COUNT(*) as count FROM chapters c
       JOIN books b ON c.book_id = b.id
-      WHERE b.project_id = ? AND c.status = 'completed' AND c.content IS NOT NULL
+      WHERE b.project_id = ? AND c.content IS NOT NULL AND c.content != ''
     `).get(projectId) as any;
 
     if (chapterCount.count === 0) {
-      return sendBadRequest(res, 'Project has no completed chapters to analyze');
+      return sendBadRequest(res, 'Project has no chapters with content to analyse');
     }
 
     // Check if there's already a pending/processing VEB report

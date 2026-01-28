@@ -261,7 +261,7 @@ describe('VEB Routes', () => {
         .post(`/api/projects/${projectId}/veb/submit`)
         .expect(400);
 
-      expect(response.body.error).toContain('no completed chapters');
+      expect(response.body.error).toContain('no chapters with content');
     });
 
     it('should return 409 when VEB analysis already in progress', async () => {
