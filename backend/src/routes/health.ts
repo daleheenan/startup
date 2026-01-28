@@ -2,26 +2,10 @@ import express from 'express';
 import Anthropic from '@anthropic-ai/sdk';
 import { createLogger } from '../services/logger.service.js';
 import db from '../db/connection.js';
+import { isServerReady, isQueueWorkerReady } from '../services/server-state.service.js';
 
 const router = express.Router();
 const log = createLogger('HealthRouter');
-
-// Import server readiness functions (lazy import to avoid circular dependency)
-let isServerReady: () => boolean;
-let isQueueWorkerReady: () => boolean;
-
-// Initialize readiness functions asynchronously
-(async () => {
-  try {
-    const serverModule = await import('../server.js');
-    isServerReady = serverModule.isServerReady || (() => true);
-    isQueueWorkerReady = serverModule.isQueueWorkerReady || (() => true);
-  } catch {
-    // Fallback if import fails (e.g., during testing)
-    isServerReady = () => true;
-    isQueueWorkerReady = () => true;
-  }
-})();
 
 /**
  * GET /api/health

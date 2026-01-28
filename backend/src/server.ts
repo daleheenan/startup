@@ -2,6 +2,22 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+// Global exception handlers -- must be registered before any other initialisation.
+// Node 20 terminates on unhandled rejections by default; these ensure Railway logs
+// the error and the process exits cleanly rather than silently crashing.
+process.on('uncaughtException', (error) => {
+  console.error('[Server] UNCAUGHT EXCEPTION -- process will exit:', error);
+  // Give Sentry a chance to flush if it was initialised
+  setTimeout(() => process.exit(1), 1000);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Server] UNHANDLED REJECTION:', reason);
+  console.error('[Server] Promise:', promise);
+  // Do not exit immediately -- the rejection may be from a background task.
+  // Log loudly so Railway captures it, but allow the event loop to continue.
+});
+
 import { initSentry, errorHandler as sentryErrorHandler, captureException } from './services/sentry.service.js';
 initSentry();
 
@@ -85,6 +101,7 @@ if (process.env.NODE_ENV !== 'test') {
 import { runMigrations } from './db/migrate.js';
 import { queueWorker } from './queue/worker.js';
 import { requireAuth } from './middleware/auth.js';
+import { setServerReady, setQueueWorkerReady } from './services/server-state.service.js';
 import { logger, requestLogger } from './services/logger.service.js';
 import { RateLimitConfig } from './config/rate-limits.config.js';
 import authRouter from './routes/auth.js';
@@ -244,10 +261,6 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-// Track server readiness state
-let serverReady = false;
-let queueWorkerReady = false;
-
 // Start server
 const server = app.listen(PORT, () => {
   logger.info({
@@ -256,7 +269,7 @@ const server = app.listen(PORT, () => {
     environment: process.env.NODE_ENV || 'development',
     logLevel: logger.level,
   }, 'NovelForge Backend Server started');
-  serverReady = true;
+  setServerReady(true);
 
   // Start queue worker after server is listening
   // Use setImmediate to ensure server is fully bound before starting worker
@@ -264,7 +277,7 @@ const server = app.listen(PORT, () => {
     logger.info('Starting queue worker');
     queueWorker.start()
       .then(() => {
-        queueWorkerReady = true;
+        setQueueWorkerReady(true);
         logger.info('Queue worker started successfully');
       })
       .catch((error) => {
@@ -272,31 +285,52 @@ const server = app.listen(PORT, () => {
         if (error instanceof Error) {
           captureException(error, { context: 'queue_worker_startup' });
         }
-        // In production, exit on queue worker failure
-        // In development, log but continue (allows debugging)
-        if (process.env.NODE_ENV === 'production') {
-          logger.error('Exiting due to queue worker failure in production');
-          process.exit(1);
-        } else {
-          logger.warn('Continuing despite queue worker failure in development mode');
-        }
+        // Do NOT exit the process on queue worker failure.
+        // The HTTP server is healthy and serving requests; killing it because
+        // of a background worker issue causes Railway to restart the entire
+        // container, compounding the outage. Retry after a delay so that
+        // transient issues (e.g., missing table from partial migration) resolve
+        // without unnecessary downtime.
+        const retryDelaySec = process.env.NODE_ENV === 'production' ? 30 : 10;
+        logger.warn({ retryDelaySeconds: retryDelaySec },
+          'Queue worker failed to start -- will retry in ' + retryDelaySec + 's. Server continues serving requests.');
+        setTimeout(() => {
+          logger.info('Retrying queue worker startup...');
+          queueWorker.start()
+            .then(() => {
+              setQueueWorkerReady(true);
+              logger.info('Queue worker started successfully on retry');
+            })
+            .catch((retryError) => {
+              logger.error({ error: retryError }, 'Queue worker retry also failed -- worker will remain inactive');
+              if (retryError instanceof Error) {
+                captureException(retryError, { context: 'queue_worker_startup_retry' });
+              }
+            });
+        }, retryDelaySec * 1000);
       });
   });
 });
 
-// Export readiness check for health endpoints
-export function isServerReady(): boolean {
-  return serverReady;
-}
-
-export function isQueueWorkerReady(): boolean {
-  return queueWorkerReady;
-}
+// Re-export readiness checks from the shared state module for any legacy consumers
+export { isServerReady, isQueueWorkerReady } from './services/server-state.service.js';
 
 // Graceful shutdown
 async function shutdown(signal: string) {
   logger.info({ signal }, 'Shutting down gracefully');
   try {
+    // Stop accepting new connections first, then drain in-flight requests
+    await new Promise<void>((resolve) => {
+      server.close((err) => {
+        if (err) {
+          logger.warn({ error: err }, 'HTTP server close returned error');
+        }
+        logger.info('HTTP server closed -- no longer accepting new connections');
+        resolve();
+      });
+    });
+
+    // Stop the queue worker (waits for current job up to GRACEFUL_SHUTDOWN_TIMEOUT_MS)
     await queueWorker.stop();
     logger.info('Shutdown complete');
     process.exit(0);
