@@ -81,6 +81,7 @@ export type WorkflowStep =
   | 'chapters'
   | 'analytics'
   | 'editorial-report'
+  | 'word-count-revision'
   | 'follow-up'
   | 'series'
   | 'publishing';
@@ -213,6 +214,13 @@ export const PROJECT_NAV_GROUPS: NavGroup[] = [
         route: '/editorial-report',
         icon: '📋',
         workflowStep: 'editorial-report',
+      },
+      {
+        id: 'word-count-revision',
+        label: 'Word Count',
+        route: '/word-count-revision',
+        icon: '📏',
+        workflowStep: 'word-count-revision',
       },
       {
         id: 'outline-review',

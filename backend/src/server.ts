@@ -140,6 +140,7 @@ import outlineEditorialRouter from './routes/outline-editorial.js';
 import editorialBoardRouter from './routes/editorial-board.js';
 import seriesRouter from './routes/series.js';
 import wordCountRevisionRouter from './routes/word-count-revision.js';
+import editorialLessonsRouter from './routes/editorial-lessons.js';
 
 // Run database migrations
 try {
@@ -265,6 +266,7 @@ app.use('/api', apiLimiter, requireAuth, outlineEditorialRouter); // Outline Edi
 app.use('/api/editorial', apiLimiter, requireAuth, editorialBoardRouter); // Editorial Board aggregation routes
 app.use('/api/series', apiLimiter, requireAuth, seriesRouter); // Series management routes
 app.use('/api/word-count-revision', apiLimiter, requireAuth, wordCountRevisionRouter); // Word count revision routes
+app.use('/api/editorial-lessons', apiLimiter, requireAuth, editorialLessonsRouter); // Editorial lessons routes
 
 // Sentry error handler - must be BEFORE custom error handlers
 app.use(sentryErrorHandler());

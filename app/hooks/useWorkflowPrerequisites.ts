@@ -33,6 +33,7 @@ export type WorkflowStep =
   | 'chapters'
   | 'analytics'
   | 'editorial-report'
+  | 'word-count-revision'  // AI-assisted word count reduction
   | 'follow-up'
   | 'series'
   | 'publishing';
@@ -274,6 +275,7 @@ const WORKFLOW_STEPS: WorkflowStep[] = [
   'chapters',
   'analytics',
   'editorial-report',
+  'word-count-revision',  // AI-assisted word count reduction
   'follow-up',
 ];
 
@@ -292,6 +294,7 @@ const STEP_NAMES: Record<WorkflowStep, string> = {
   chapters: 'Chapters',
   analytics: 'Analytics',
   'editorial-report': 'Editorial Report',
+  'word-count-revision': 'Word Count Revision',
   'follow-up': 'Follow-Up Ideas',
   series: 'Series Management',
   publishing: 'Publishing Settings',
@@ -382,6 +385,12 @@ export function useWorkflowPrerequisites(
         requiresPrevious: 'chapters',
         missingItems: [],
       },
+      'word-count-revision': {
+        isComplete: false,
+        isRequired: false, // Word count revision is optional
+        requiresPrevious: 'chapters',
+        missingItems: [],
+      },
       'follow-up': {
         isComplete: false,
         isRequired: false, // Follow-up is optional
@@ -459,6 +468,10 @@ export function useWorkflowPrerequisites(
     // Check editorial-report completion (requires completed chapters)
     checks['editorial-report'].missingItems = getMissingItemsForStep('editorial-report', project, outline, chapters);
     checks['editorial-report'].isComplete = chaptersWithContent.length > 0;
+
+    // Check word-count-revision completion (requires completed chapters)
+    checks['word-count-revision'].missingItems = getMissingItemsForStep('word-count-revision', project, outline, chapters);
+    checks['word-count-revision'].isComplete = chaptersWithContent.length > 0;
 
     // Check follow-up completion (requires ALL chapters to be written)
     checks['follow-up'].missingItems = getMissingItemsForStep('follow-up', project, outline, chapters);

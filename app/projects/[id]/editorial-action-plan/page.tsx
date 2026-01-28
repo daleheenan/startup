@@ -4,30 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getToken, logout } from '@/app/lib/auth';
-import ProjectNavigation from '@/app/components/shared/ProjectNavigation';
-import { useProjectNavigation } from '@/app/hooks';
 import { fetchWithAuth } from '@/app/lib/fetch-utils';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
-interface ProjectData {
-  id: string;
-  title?: string;
-  story_dna?: {
-    genre?: string;
-    tone?: string;
-    themes?: string[];
-  };
-  story_bible?: {
-    characters?: any[];
-    world?: any[] | {
-      locations?: any[];
-      factions?: any[];
-      systems?: any[];
-    };
-  };
-  book_count?: number;
-}
 
 interface Finding {
   id: string;
@@ -127,13 +106,20 @@ interface Feedback {
   chapterId?: string;
 }
 
+const ITEMS_PER_PAGE = 10;
+
+// Tooltip content for action buttons
+const ACTION_TOOLTIPS = {
+  accept: 'Accept this recommendation for later implementation. The AI will queue this for the next revision pass.',
+  done: 'Mark as already implemented. Use when you have manually addressed this issue.',
+  reject: 'Dismiss this recommendation. The AI will not action this item.',
+  acceptAll: 'Accept all visible pending items for AI-assisted revision in the Word Count Revision tool.',
+};
+
 export default function EditorialActionPlanPage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.id as string;
-
-  const [project, setProject] = useState<ProjectData | null>(null);
-  const { outline, chapters } = useProjectNavigation(projectId, project);
 
   const [report, setReport] = useState<VEBReport | null>(null);
   const [findings, setFindings] = useState<Finding[]>([]);
@@ -144,6 +130,9 @@ export default function EditorialActionPlanPage() {
   const [moduleFilter, setModuleFilter] = useState<'all' | 'beta_swarm' | 'ruthless_editor' | 'market_analyst'>('all');
   const [severityFilter, setSeverityFilter] = useState<'all' | 'major' | 'moderate' | 'minor'>('all');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [showTooltip, setShowTooltip] = useState<string | null>(null);
 
   // Helper to format underscore text
   const formatText = (text: string | undefined | null): string => {
@@ -353,22 +342,6 @@ export default function EditorialActionPlanPage() {
     return extracted;
   }, []);
 
-  // Fetch project data for navigation
-  useEffect(() => {
-    const fetchProject = async () => {
-      try {
-        const res = await fetchWithAuth(`/api/projects/${projectId}`);
-        if (res.ok) {
-          const data = await res.json();
-          setProject(data);
-        }
-      } catch {
-        // Project fetch failed - navigation will work without it
-      }
-    };
-    fetchProject();
-  }, [projectId]);
-
   // Fetch report and feedback
   useEffect(() => {
     const fetchData = async () => {
@@ -462,6 +435,43 @@ export default function EditorialActionPlanPage() {
     }
   };
 
+  // Bulk accept all visible pending items
+  const acceptAllPending = async () => {
+    const pendingItems = filteredFindings.filter(f => f.status === 'pending');
+    if (pendingItems.length === 0) return;
+
+    setBulkUpdating(true);
+    try {
+      const token = getToken();
+
+      for (const finding of pendingItems) {
+        const findingIndex = findings.findIndex(f => f.id === finding.id);
+        await fetch(`${API_BASE_URL}/api/veb/reports/${report?.id}/feedback`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            module: finding.module,
+            findingIndex,
+            feedbackType: 'accept',
+            notes: `${formatText(finding.type)}: ${finding.issue}`,
+          }),
+        });
+      }
+
+      // Update local state
+      setFindings(prev => prev.map(f =>
+        pendingItems.find(p => p.id === f.id) ? { ...f, status: 'accepted' } : f
+      ));
+    } catch (err) {
+      console.error('Error bulk accepting:', err);
+    } finally {
+      setBulkUpdating(false);
+    }
+  };
+
   // Filter findings
   const filteredFindings = findings.filter(f => {
     if (filter !== 'all' && f.status !== filter) return false;
@@ -469,6 +479,18 @@ export default function EditorialActionPlanPage() {
     if (severityFilter !== 'all' && f.severity !== severityFilter) return false;
     return true;
   });
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredFindings.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedFindings = filteredFindings.slice(startIndex, endIndex);
+  const pendingInView = filteredFindings.filter(f => f.status === 'pending').length;
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter, moduleFilter, severityFilter]);
 
   // Calculate stats
   const stats = {
@@ -508,9 +530,8 @@ export default function EditorialActionPlanPage() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', minHeight: '100vh', background: '#F8FAFC' }}>
-        <ProjectNavigation projectId={projectId} project={project} outline={outline} chapters={chapters} />
-        <main style={{ flex: 1, padding: '2rem', marginLeft: '280px' }}>
+      <div style={{ minHeight: '100vh', background: '#F8FAFC' }}>
+        <main style={{ padding: '2rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh' }}>
             <div>Loading editorial action plan...</div>
           </div>
@@ -521,15 +542,16 @@ export default function EditorialActionPlanPage() {
 
   if (error) {
     return (
-      <div style={{ display: 'flex', minHeight: '100vh', background: '#F8FAFC' }}>
-        <ProjectNavigation projectId={projectId} project={project} outline={outline} chapters={chapters} />
-        <main style={{ flex: 1, padding: '2rem', marginLeft: '280px' }}>
+      <div style={{ minHeight: '100vh', background: '#F8FAFC' }}>
+        <main style={{ padding: '2rem' }}>
           <div style={{
             background: '#FEF2F2',
             border: '1px solid #FECACA',
             borderRadius: '8px',
             padding: '2rem',
-            textAlign: 'center'
+            textAlign: 'center',
+            maxWidth: '600px',
+            margin: '0 auto',
           }}>
             <h2 style={{ color: '#991B1B', margin: '0 0 1rem 0' }}>No Report Available</h2>
             <p style={{ color: '#B91C1C', margin: '0 0 1.5rem 0' }}>{error}</p>
@@ -554,10 +576,8 @@ export default function EditorialActionPlanPage() {
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#F8FAFC' }}>
-      <ProjectNavigation projectId={projectId} project={project} outline={outline} chapters={chapters} />
-
-      <main style={{ flex: 1, padding: '2rem', marginLeft: '280px' }}>
+    <div style={{ minHeight: '100vh', background: '#F8FAFC' }}>
+      <main style={{ padding: '2rem' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
           {/* Header */}
           <div style={{ marginBottom: '2rem' }}>
@@ -643,83 +663,341 @@ export default function EditorialActionPlanPage() {
             )}
           </div>
 
-          {/* Filters */}
+          {/* Comprehensive Rewrite Section - Shows when 100+ issues */}
+          {stats.pending >= 100 && (
+            <div style={{
+              background: 'linear-gradient(135deg, #DC2626 0%, #991B1B 100%)',
+              borderRadius: '12px',
+              padding: '1.5rem',
+              marginBottom: '1.5rem',
+              color: 'white',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+                <div style={{ flex: 1, minWidth: '280px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                    <span style={{ fontSize: '1.5rem' }}>🔄</span>
+                    <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600' }}>
+                      Comprehensive Rewrite Recommended
+                    </h3>
+                  </div>
+                  <p style={{ margin: '0 0 1rem 0', opacity: 0.9, lineHeight: 1.6 }}>
+                    With <strong>{stats.pending} pending issues</strong>, individual fixes may not be efficient.
+                    A comprehensive rewrite can address all issues systematically while reducing word count
+                    to meet your target.
+                  </p>
+                  <div style={{
+                    background: 'rgba(255,255,255,0.15)',
+                    borderRadius: '8px',
+                    padding: '1rem',
+                    marginBottom: '1rem',
+                  }}>
+                    <div style={{ fontWeight: '500', marginBottom: '0.5rem' }}>What the rewrite includes:</div>
+                    <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.875rem', opacity: 0.9 }}>
+                      <li>Address all accepted VEB findings in context</li>
+                      <li>Reduce word count by 15-20% to meet target</li>
+                      <li>Preserve plot, character arcs, and essential scenes</li>
+                      <li>Generate lessons learned for future books</li>
+                    </ul>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'stretch' }}>
+                  <Link
+                    href={`/projects/${projectId}/word-count-revision?mode=comprehensive`}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      padding: '0.875rem 1.5rem',
+                      background: 'white',
+                      color: '#991B1B',
+                      borderRadius: '8px',
+                      textDecoration: 'none',
+                      fontWeight: '600',
+                      fontSize: '0.875rem',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Start Comprehensive Rewrite →
+                  </Link>
+                  <div style={{ fontSize: '0.75rem', textAlign: 'center', opacity: 0.8 }}>
+                    Estimated: All chapters will be revised
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Word Count Revision Section */}
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            padding: '1.5rem',
+            border: '1px solid #E2E8F0',
+            marginBottom: '1.5rem',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+              <div>
+                <h3 style={{ margin: '0 0 0.5rem 0', color: '#1A1A2E', fontSize: '1.125rem' }}>
+                  Word Count Revision
+                </h3>
+                <p style={{ margin: 0, color: '#64748B', fontSize: '0.875rem' }}>
+                  Use VEB findings to identify and condense excess content with AI assistance.
+                </p>
+              </div>
+              <Link
+                href={`/projects/${projectId}/word-count-revision`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.75rem 1.5rem',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white',
+                  borderRadius: '8px',
+                  textDecoration: 'none',
+                  fontWeight: '500',
+                  fontSize: '0.875rem',
+                }}
+              >
+                Start Word Count Revision →
+              </Link>
+            </div>
+          </div>
+
+          {/* Filters and Actions */}
           <div style={{
             background: 'white',
             borderRadius: '8px',
             padding: '1rem',
             border: '1px solid #E2E8F0',
             marginBottom: '1.5rem',
-            display: 'flex',
-            gap: '1rem',
-            flexWrap: 'wrap',
-            alignItems: 'center',
           }}>
-            <span style={{ fontWeight: '500', color: '#64748B', fontSize: '0.875rem' }}>Filter:</span>
+            <div style={{
+              display: 'flex',
+              gap: '1rem',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              marginBottom: '1rem',
+            }}>
+              <span style={{ fontWeight: '500', color: '#64748B', fontSize: '0.875rem' }}>Filter:</span>
 
-            <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value as typeof filter)}
-              style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '6px',
-                border: '1px solid #E2E8F0',
-                background: 'white',
-                fontSize: '0.875rem',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="all">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="accepted">Accepted</option>
-              <option value="implemented">Implemented</option>
-              <option value="rejected">Rejected</option>
-            </select>
+              <select
+                value={filter}
+                onChange={(e) => setFilter(e.target.value as typeof filter)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  borderRadius: '6px',
+                  border: '1px solid #E2E8F0',
+                  background: 'white',
+                  fontSize: '0.875rem',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="all">All Status</option>
+                <option value="pending">Pending</option>
+                <option value="accepted">Accepted</option>
+                <option value="implemented">Implemented</option>
+                <option value="rejected">Rejected</option>
+              </select>
 
-            <select
-              value={moduleFilter}
-              onChange={(e) => setModuleFilter(e.target.value as typeof moduleFilter)}
-              style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '6px',
-                border: '1px solid #E2E8F0',
-                background: 'white',
-                fontSize: '0.875rem',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="all">All Modules</option>
-              <option value="beta_swarm">Beta Swarm</option>
-              <option value="ruthless_editor">Ruthless Editor</option>
-              <option value="market_analyst">Market Analyst</option>
-            </select>
+              <select
+                value={moduleFilter}
+                onChange={(e) => setModuleFilter(e.target.value as typeof moduleFilter)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  borderRadius: '6px',
+                  border: '1px solid #E2E8F0',
+                  background: 'white',
+                  fontSize: '0.875rem',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="all">All Modules</option>
+                <option value="beta_swarm">Beta Swarm</option>
+                <option value="ruthless_editor">Ruthless Editor</option>
+                <option value="market_analyst">Market Analyst</option>
+              </select>
 
-            <select
-              value={severityFilter}
-              onChange={(e) => setSeverityFilter(e.target.value as typeof severityFilter)}
-              style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '6px',
-                border: '1px solid #E2E8F0',
-                background: 'white',
-                fontSize: '0.875rem',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="all">All Severity</option>
-              <option value="major">Major</option>
-              <option value="moderate">Moderate</option>
-              <option value="minor">Minor</option>
-            </select>
+              <select
+                value={severityFilter}
+                onChange={(e) => setSeverityFilter(e.target.value as typeof severityFilter)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  borderRadius: '6px',
+                  border: '1px solid #E2E8F0',
+                  background: 'white',
+                  fontSize: '0.875rem',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="all">All Severity</option>
+                <option value="major">Major</option>
+                <option value="moderate">Moderate</option>
+                <option value="minor">Minor</option>
+              </select>
 
-            <span style={{ marginLeft: 'auto', color: '#64748B', fontSize: '0.875rem' }}>
-              Showing {filteredFindings.length} of {findings.length} items
-            </span>
+              <span style={{ marginLeft: 'auto', color: '#64748B', fontSize: '0.875rem' }}>
+                Showing {startIndex + 1}-{Math.min(endIndex, filteredFindings.length)} of {filteredFindings.length} items
+              </span>
+            </div>
+
+            {/* Bulk Actions Row */}
+            <div style={{
+              display: 'flex',
+              gap: '1rem',
+              alignItems: 'center',
+              paddingTop: '0.75rem',
+              borderTop: '1px solid #E2E8F0',
+            }}>
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={acceptAllPending}
+                  disabled={bulkUpdating || pendingInView === 0}
+                  onMouseEnter={() => setShowTooltip('acceptAll')}
+                  onMouseLeave={() => setShowTooltip(null)}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: pendingInView > 0 ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#E2E8F0',
+                    color: pendingInView > 0 ? 'white' : '#9CA3AF',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    cursor: bulkUpdating || pendingInView === 0 ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                  }}
+                >
+                  {bulkUpdating ? 'Processing...' : `Accept All Pending (${pendingInView})`}
+                </button>
+                {showTooltip === 'acceptAll' && (
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '100%',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    marginBottom: '0.5rem',
+                    padding: '0.5rem 0.75rem',
+                    background: '#1A1A2E',
+                    color: 'white',
+                    borderRadius: '6px',
+                    fontSize: '0.75rem',
+                    whiteSpace: 'nowrap',
+                    maxWidth: '300px',
+                    textAlign: 'center',
+                    zIndex: 10,
+                  }}>
+                    {ACTION_TOOLTIPS.acceptAll}
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      border: '6px solid transparent',
+                      borderTopColor: '#1A1A2E',
+                    }} />
+                  </div>
+                )}
+              </div>
+
+              {/* Action Legend */}
+              <div style={{
+                marginLeft: 'auto',
+                display: 'flex',
+                gap: '1.5rem',
+                fontSize: '0.75rem',
+                color: '#64748B',
+              }}>
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'help', position: 'relative' }}
+                  onMouseEnter={() => setShowTooltip('accept')}
+                  onMouseLeave={() => setShowTooltip(null)}
+                >
+                  <span style={{ width: '12px', height: '12px', background: '#DBEAFE', borderRadius: '2px' }} />
+                  <span>Accept</span>
+                  {showTooltip === 'accept' && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '100%',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      marginBottom: '0.5rem',
+                      padding: '0.5rem 0.75rem',
+                      background: '#1A1A2E',
+                      color: 'white',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      width: '220px',
+                      textAlign: 'center',
+                      zIndex: 10,
+                    }}>
+                      {ACTION_TOOLTIPS.accept}
+                    </div>
+                  )}
+                </div>
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'help', position: 'relative' }}
+                  onMouseEnter={() => setShowTooltip('done')}
+                  onMouseLeave={() => setShowTooltip(null)}
+                >
+                  <span style={{ width: '12px', height: '12px', background: '#D1FAE5', borderRadius: '2px' }} />
+                  <span>Done</span>
+                  {showTooltip === 'done' && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '100%',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      marginBottom: '0.5rem',
+                      padding: '0.5rem 0.75rem',
+                      background: '#1A1A2E',
+                      color: 'white',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      width: '220px',
+                      textAlign: 'center',
+                      zIndex: 10,
+                    }}>
+                      {ACTION_TOOLTIPS.done}
+                    </div>
+                  )}
+                </div>
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'help', position: 'relative' }}
+                  onMouseEnter={() => setShowTooltip('reject')}
+                  onMouseLeave={() => setShowTooltip(null)}
+                >
+                  <span style={{ width: '12px', height: '12px', background: '#F3F4F6', borderRadius: '2px' }} />
+                  <span>Reject</span>
+                  {showTooltip === 'reject' && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '100%',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      marginBottom: '0.5rem',
+                      padding: '0.5rem 0.75rem',
+                      background: '#1A1A2E',
+                      color: 'white',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      width: '220px',
+                      textAlign: 'center',
+                      zIndex: 10,
+                    }}>
+                      {ACTION_TOOLTIPS.reject}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Findings List */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {filteredFindings.length === 0 ? (
+            {paginatedFindings.length === 0 ? (
               <div style={{
                 background: 'white',
                 borderRadius: '8px',
@@ -731,7 +1009,7 @@ export default function EditorialActionPlanPage() {
                 No findings match your current filters.
               </div>
             ) : (
-              filteredFindings.map((finding) => {
+              paginatedFindings.map((finding) => {
                 const modColor = moduleColors[finding.module] || defaultModuleColor;
                 const sevColor = severityColors[finding.severity] || defaultSeverityColor;
                 const isUpdating = updatingId === finding.id;
@@ -945,6 +1223,122 @@ export default function EditorialActionPlanPage() {
               })
             )}
           </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div style={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: '0.5rem',
+              marginTop: '1.5rem',
+              padding: '1rem',
+              background: 'white',
+              borderRadius: '8px',
+              border: '1px solid #E2E8F0',
+            }}>
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  background: currentPage === 1 ? '#F3F4F6' : 'white',
+                  color: currentPage === 1 ? '#9CA3AF' : '#4B5563',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                }}
+              >
+                ««
+              </button>
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  background: currentPage === 1 ? '#F3F4F6' : 'white',
+                  color: currentPage === 1 ? '#9CA3AF' : '#4B5563',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                }}
+              >
+                «
+              </button>
+
+              {/* Page numbers */}
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum: number;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    style={{
+                      padding: '0.5rem 0.875rem',
+                      background: currentPage === pageNum
+                        ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                        : 'white',
+                      color: currentPage === pageNum ? 'white' : '#4B5563',
+                      border: currentPage === pageNum ? 'none' : '1px solid #E2E8F0',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      fontWeight: currentPage === pageNum ? '600' : '400',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  background: currentPage === totalPages ? '#F3F4F6' : 'white',
+                  color: currentPage === totalPages ? '#9CA3AF' : '#4B5563',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                }}
+              >
+                »
+              </button>
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  background: currentPage === totalPages ? '#F3F4F6' : 'white',
+                  color: currentPage === totalPages ? '#9CA3AF' : '#4B5563',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                }}
+              >
+                »»
+              </button>
+
+              <span style={{ marginLeft: '1rem', fontSize: '0.875rem', color: '#64748B' }}>
+                Page {currentPage} of {totalPages}
+              </span>
+            </div>
+          )}
         </div>
       </main>
     </div>
