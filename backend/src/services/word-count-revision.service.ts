@@ -11,9 +11,18 @@ import type {
   ValidationResult,
   VEBIssueContext,
   CutExplanation,
+  StoryStructure,
 } from '../shared/types/index.js';
 import type { RuthlessEditorChapterResult } from './veb.service.js';
 import { bookVersioningService } from './book-versioning.service.js';
+import {
+  commercialBeatValidatorService,
+  type CommercialValidationReport,
+} from './commercial-beat-validator.js';
+import {
+  chapterBriefGeneratorService,
+  type DetailedChapterBrief,
+} from './chapter-brief-generator.js';
 
 const logger = createLogger('services:word-count-revision');
 
@@ -922,6 +931,429 @@ Return ONLY valid JSON with the condensed chapter and explanation:`;
       inputTokens: row.input_tokens || 0,
       outputTokens: row.output_tokens || 0,
     };
+  }
+
+  // ============================================================================
+  // Commercial Beat Validation Methods
+  // ============================================================================
+
+  /**
+   * Validate the book's outline against commercial beat structure requirements
+   * Returns validation report with issues and recommendations
+   */
+  async validateCommercialBeats(bookId: string): Promise<CommercialValidationReport> {
+    logger.info({ bookId }, 'Validating commercial beat structure');
+
+    // Get book and outline
+    const bookStmt = db.prepare<[string], any>(`
+      SELECT b.id, p.genre, o.structure, o.target_word_count
+      FROM books b
+      JOIN projects p ON b.project_id = p.id
+      LEFT JOIN outlines o ON o.book_id = b.id
+      WHERE b.id = ?
+    `);
+    const book = bookStmt.get(bookId);
+
+    if (!book || !book.structure) {
+      throw new Error('Book outline not found');
+    }
+
+    const structure: StoryStructure = JSON.parse(book.structure);
+    const targetWordCount = book.target_word_count || 80000;
+
+    // Run commercial validation
+    const report = commercialBeatValidatorService.validateStructure(
+      structure,
+      targetWordCount,
+      book.genre
+    );
+
+    // Store the validation report
+    const reportId = `cvr_${randomUUID().replace(/-/g, '').substring(0, 12)}`;
+    const now = new Date().toISOString();
+
+    const insertStmt = db.prepare(`
+      INSERT INTO commercial_validation_reports (
+        id, book_id, validation_data, overall_score, is_valid,
+        ready_for_generation, critical_issues_count, important_issues_count,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    insertStmt.run(
+      reportId,
+      bookId,
+      JSON.stringify(report),
+      report.overallScore,
+      report.isValid ? 1 : 0,
+      report.readyForGeneration ? 1 : 0,
+      report.criticalIssues.length,
+      report.importantIssues.length,
+      now,
+      now
+    );
+
+    logger.info({
+      bookId,
+      reportId,
+      overallScore: report.overallScore,
+      isValid: report.isValid,
+      criticalIssues: report.criticalIssues.length,
+    }, 'Commercial beat validation complete');
+
+    return report;
+  }
+
+  /**
+   * Get the latest commercial validation report for a book
+   */
+  getLatestCommercialValidation(bookId: string): CommercialValidationReport | null {
+    const stmt = db.prepare<[string], { validation_data: string }>(`
+      SELECT validation_data FROM commercial_validation_reports
+      WHERE book_id = ?
+      ORDER BY created_at DESC LIMIT 1
+    `);
+
+    const result = stmt.get(bookId);
+    if (!result) return null;
+
+    return JSON.parse(result.validation_data);
+  }
+
+  // ============================================================================
+  // Chapter Brief Methods for Revision
+  // ============================================================================
+
+  /**
+   * Generate a revision brief for a specific chapter
+   * Includes editorial guidance and commercial beat context
+   */
+  async generateRevisionBrief(
+    bookId: string,
+    chapterNumber: number,
+    vebIssues?: VEBIssueContext
+  ): Promise<DetailedChapterBrief> {
+    logger.info({ bookId, chapterNumber }, 'Generating revision brief');
+
+    const brief = await chapterBriefGeneratorService.generateRevisionBrief(
+      bookId,
+      chapterNumber,
+      vebIssues
+    );
+
+    return brief;
+  }
+
+  /**
+   * Generate revision briefs for all chapters in a revision session
+   */
+  async generateAllRevisionBriefs(revisionId: string): Promise<DetailedChapterBrief[]> {
+    logger.info({ revisionId }, 'Generating revision briefs for all chapters');
+
+    const revision = this.getRevisionInternal(revisionId);
+    const proposals = this.getProposals(revisionId);
+
+    const briefs: DetailedChapterBrief[] = [];
+
+    for (const proposal of proposals) {
+      // Get chapter number
+      const chapterStmt = db.prepare<[string], { chapter_number: number }>(`
+        SELECT chapter_number FROM chapters WHERE id = ?
+      `);
+      const chapter = chapterStmt.get(proposal.chapterId);
+
+      if (chapter) {
+        const brief = await this.generateRevisionBrief(
+          revision.book_id,
+          chapter.chapter_number,
+          proposal.vebIssues || undefined
+        );
+        briefs.push(brief);
+      }
+    }
+
+    logger.info({ revisionId, briefCount: briefs.length }, 'Revision briefs generated');
+
+    return briefs;
+  }
+
+  /**
+   * Enhanced proposal generation that uses chapter briefs
+   * Provides more context-aware condensation
+   */
+  async generateProposalWithBrief(
+    revisionId: string,
+    chapterId: string
+  ): Promise<ChapterReductionProposal> {
+    logger.info({ revisionId, chapterId }, 'Generating proposal with chapter brief');
+
+    // Get the chapter number
+    const chapterStmt = db.prepare<[string], { chapter_number: number; book_id: string }>(`
+      SELECT chapter_number, book_id FROM chapters WHERE id = ?
+    `);
+    const chapter = chapterStmt.get(chapterId);
+
+    if (!chapter) {
+      throw new Error('Chapter not found');
+    }
+
+    // Get proposal record
+    const proposalStmt = db.prepare<[string, string], any>(`
+      SELECT * FROM chapter_reduction_proposals
+      WHERE revision_id = ? AND chapter_id = ?
+    `);
+    const proposal = proposalStmt.get(revisionId, chapterId);
+
+    if (!proposal) {
+      throw new Error('Proposal not found');
+    }
+
+    // Generate revision brief with editorial context
+    const vebIssues = proposal.veb_issues ? JSON.parse(proposal.veb_issues) : null;
+    const brief = await this.generateRevisionBrief(
+      chapter.book_id,
+      chapter.chapter_number,
+      vebIssues
+    );
+
+    // Get story DNA for style context
+    const storyDNAStmt = db.prepare<[string], { story_dna: string | null }>(`
+      SELECT p.story_dna FROM projects p
+      JOIN books b ON b.project_id = p.id
+      WHERE b.id = ?
+    `);
+    const storyDNAResult = storyDNAStmt.get(chapter.book_id);
+    const storyDNA = storyDNAResult?.story_dna ? JSON.parse(storyDNAResult.story_dna) : {
+      genre: 'fiction',
+      subgenre: '',
+      tone: 'neutral',
+      themes: [],
+      proseStyle: 'standard',
+    };
+
+    // Build enhanced prompt using the brief
+    const briefContext = chapterBriefGeneratorService.buildChapterPromptFromBrief(brief, storyDNA);
+
+    // Update status to generating
+    const updateStatusStmt = db.prepare(`
+      UPDATE chapter_reduction_proposals SET status = 'generating', updated_at = ? WHERE id = ?
+    `);
+    updateStatusStmt.run(new Date().toISOString(), proposal.id);
+
+    // Get chapter content
+    const contentStmt = db.prepare<[string], { content: string; title: string | null }>(`
+      SELECT content, title FROM chapters WHERE id = ?
+    `);
+    const chapterContent = contentStmt.get(chapterId);
+
+    if (!chapterContent?.content) {
+      throw new Error('Chapter content not found');
+    }
+
+    // Build enhanced condensation prompt
+    const { system, user } = this.buildEnhancedCondensationPrompt(
+      chapterContent.content,
+      proposal.reduction_percent,
+      proposal.target_word_count,
+      vebIssues,
+      chapter.chapter_number,
+      chapterContent.title,
+      briefContext
+    );
+
+    try {
+      // Call Claude
+      const response = await claudeService.createCompletionWithUsage({
+        system,
+        messages: [{ role: 'user', content: user }],
+        maxTokens: Math.max(4096, Math.round(chapterContent.content.length / 2)),
+        temperature: 0.7,
+      });
+
+      // Parse response
+      const result = extractJsonObject(response.content) as {
+        condensedContent?: string;
+        cutsExplanation?: CutExplanation[];
+        preservedElements?: string[];
+        wordCount?: number;
+      };
+
+      if (!result?.condensedContent || typeof result.condensedContent !== 'string') {
+        throw new Error('Invalid AI response: missing condensedContent');
+      }
+
+      const condensedWordCount = result.condensedContent.trim().split(/\s+/).filter((w: string) => w.length > 0).length;
+      const actualReduction = proposal.original_word_count - condensedWordCount;
+
+      // Update proposal
+      const now = new Date().toISOString();
+      const updateStmt = db.prepare(`
+        UPDATE chapter_reduction_proposals SET
+          status = 'ready',
+          condensed_content = ?,
+          condensed_word_count = ?,
+          actual_reduction = ?,
+          cuts_explanation = ?,
+          preserved_elements = ?,
+          generated_at = ?,
+          input_tokens = ?,
+          output_tokens = ?,
+          updated_at = ?
+        WHERE id = ?
+      `);
+
+      updateStmt.run(
+        result.condensedContent,
+        condensedWordCount,
+        actualReduction,
+        JSON.stringify(result.cutsExplanation || []),
+        JSON.stringify(result.preservedElements || []),
+        now,
+        response.usage.input_tokens,
+        response.usage.output_tokens,
+        now,
+        proposal.id
+      );
+
+      logger.info({
+        proposalId: proposal.id,
+        originalWordCount: proposal.original_word_count,
+        condensedWordCount,
+        actualReduction,
+        usedBrief: true,
+      }, 'Enhanced proposal generated successfully');
+
+      return this.getProposal(proposal.id);
+    } catch (error) {
+      // Update status to error
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      const updateErrorStmt = db.prepare(`
+        UPDATE chapter_reduction_proposals SET status = 'error', error_message = ?, updated_at = ? WHERE id = ?
+      `);
+      updateErrorStmt.run(errorMsg, new Date().toISOString(), proposal.id);
+
+      logger.error({ error, proposalId: proposal.id }, 'Failed to generate enhanced proposal');
+      throw error;
+    }
+  }
+
+  /**
+   * Build enhanced condensation prompt with chapter brief context
+   */
+  private buildEnhancedCondensationPrompt(
+    content: string,
+    reductionPercent: number,
+    targetWordCount: number,
+    vebIssues: VEBIssueContext | null,
+    chapterNumber: number,
+    chapterTitle: string | null,
+    briefContext: string
+  ): { system: string; user: string } {
+    const vebContext = vebIssues
+      ? `
+KNOWN ISSUES TO ADDRESS (from editorial analysis):
+${vebIssues.scenePurpose ? `- Scene Purpose: ${vebIssues.scenePurpose.earned ? 'Earned' : 'NOT EARNED - ' + vebIssues.scenePurpose.reasoning}` : ''}
+${vebIssues.expositionIssues?.length ? `- Exposition Issues:\n${vebIssues.expositionIssues.map(i => `  * ${i.issue}: "${i.quote}" - ${i.suggestion}`).join('\n')}` : ''}
+${vebIssues.pacingIssues?.length ? `- Pacing Issues:\n${vebIssues.pacingIssues.map(i => `  * ${i.issue} at ${i.location}: ${i.suggestion}`).join('\n')}` : ''}
+`
+      : '';
+
+    const systemPrompt = `You are a senior editor specialising in word count reduction without losing story essence.
+
+Your task is to condense this chapter by approximately ${reductionPercent.toFixed(1)}% (target: ~${targetWordCount} words) whilst preserving:
+- All plot-critical events and revelations
+- Character development moments
+- Essential dialogue and voice
+- Narrative momentum and hooks
+- Commercial beat requirements
+
+${vebContext}
+
+CHAPTER BRIEF (Critical context for this revision):
+${briefContext}
+
+Focus cuts on:
+1. Exposition marked as "telling not showing" - remove or dramatise
+2. Info dumps - cut or weave into action
+3. Unnecessary backstory - cut unless plot-critical
+4. Repetitive pacing sections - consolidate
+5. Scenes not earning their place - trim or cut
+6. Redundant descriptions and excessive modifiers
+7. On-the-nose dialogue - let subtext do the work
+
+CRITICAL FORMATTING REQUIREMENTS:
+- Output PURE PROSE only - like a professionally published novel
+- NO markdown formatting (#, ##, **, *, etc.)
+- NO scene numbers or structural headers
+- Scene breaks indicated by a blank line only
+
+OUTPUT FORMAT (JSON):
+{
+  "condensedContent": "The full condensed chapter text as pure prose",
+  "cutsExplanation": [
+    { "whatWasCut": "Description of what was removed", "why": "Reason for cutting", "wordsRemoved": 150 }
+  ],
+  "preservedElements": ["List of critical elements deliberately kept"],
+  "wordCount": ${targetWordCount}
+}`;
+
+    const userPrompt = `Condense this chapter to approximately ${targetWordCount} words whilst maintaining all commercial beat requirements from the brief.
+
+CHAPTER ${chapterNumber}${chapterTitle ? `: ${chapterTitle}` : ''}
+CURRENT WORD COUNT: ${content.trim().split(/\s+/).length}
+TARGET REDUCTION: ${reductionPercent.toFixed(1)}%
+
+---
+${content}
+---
+
+Return ONLY valid JSON with the condensed chapter and explanation:`;
+
+    return { system: systemPrompt, user: userPrompt };
+  }
+
+  /**
+   * Check if a book's outline meets commercial requirements before starting revision
+   */
+  async preRevisionValidation(bookId: string): Promise<{
+    canProceed: boolean;
+    validationReport: CommercialValidationReport | null;
+    recommendations: string[];
+  }> {
+    logger.info({ bookId }, 'Running pre-revision commercial validation');
+
+    try {
+      const report = await this.validateCommercialBeats(bookId);
+
+      const recommendations: string[] = [];
+
+      if (!report.isValid) {
+        recommendations.push('Consider addressing critical beat issues before revision');
+      }
+
+      if (report.criticalIssues.length > 0) {
+        for (const issue of report.criticalIssues.slice(0, 3)) {
+          recommendations.push(`[CRITICAL] ${issue.issue}`);
+        }
+      }
+
+      if (report.pacingAnalysis.overall !== 'well_paced') {
+        recommendations.push(`Pacing: ${report.pacingAnalysis.suggestions[0] || 'Review act balance'}`);
+      }
+
+      return {
+        canProceed: report.overallScore >= 50, // Allow revision even with some issues
+        validationReport: report,
+        recommendations,
+      };
+    } catch (error) {
+      logger.error({ error, bookId }, 'Pre-revision validation failed');
+      return {
+        canProceed: true, // Don't block on validation errors
+        validationReport: null,
+        recommendations: ['Unable to validate commercial structure - proceeding with standard revision'],
+      };
+    }
   }
 }
 

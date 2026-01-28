@@ -16,6 +16,13 @@ import type {
 import { getStructureTemplate } from './structure-templates.js';
 import { createLogger } from './logger.service.js';
 import { extractJsonArray } from '../utils/json-extractor.js';
+import {
+  commercialBeatValidatorService,
+  type CommercialValidationReport,
+  type CommercialBeat,
+  COMMERCIAL_BEATS,
+  GENRE_EXPECTATIONS,
+} from './commercial-beat-validator.js';
 
 dotenv.config();
 
@@ -45,28 +52,53 @@ export interface OutlineContext {
   onProgress?: (progress: OutlineProgress) => void;
   // Incremental save callback - called after each act/chapter is generated
   onIncrementalSave?: (partialOutline: StoryStructure) => Promise<void>;
+  // Commercial validation callback - called after validation
+  onCommercialValidation?: (report: CommercialValidationReport) => void;
+  // Enable/disable commercial beat validation (default: true)
+  validateCommercialBeats?: boolean;
 }
 
 export interface OutlineProgress {
-  phase: 'acts' | 'chapters' | 'scenes' | 'complete';
+  phase: 'acts' | 'chapters' | 'scenes' | 'validation' | 'complete';
   currentAct?: number;
   totalActs?: number;
   currentChapter?: number;
   totalChapters?: number;
   message: string;
   percentComplete: number;
+  // Commercial validation results (when phase === 'validation')
+  validationReport?: CommercialValidationReport;
+}
+
+export interface OutlineGenerationResult {
+  structure: StoryStructure;
+  commercialValidation?: CommercialValidationReport;
+  wordCountBudgets: ChapterWordCountBudget[];
+}
+
+export interface ChapterWordCountBudget {
+  chapterNumber: number;
+  targetWordCount: number;
+  minWordCount: number;
+  maxWordCount: number;
+  tolerancePercent: number;
+  commercialBeats: string[];
+  pacingGuidance: 'slow' | 'medium' | 'fast';
+  storyPercentage: number;
 }
 
 /**
  * Generate complete story outline with act breakdown and chapter-by-chapter structure
- * Now supports progress tracking and incremental saving for better UX and failsafe recovery
+ * Now supports progress tracking, incremental saving, and commercial beat validation
  */
 export async function generateOutline(context: OutlineContext): Promise<StoryStructure> {
-  const { onProgress, onIncrementalSave } = context;
+  const { onProgress, onIncrementalSave, onCommercialValidation } = context;
+  const validateCommercial = context.validateCommercialBeats !== false; // Default to true
 
   logger.info(`[OutlineGenerator] Generating outline for: ${context.concept.title}`);
   logger.info(`[OutlineGenerator] Structure type: ${context.structureType}`);
   logger.info(`[OutlineGenerator] Target word count: ${context.targetWordCount}`);
+  logger.info(`[OutlineGenerator] Commercial validation: ${validateCommercial ? 'enabled' : 'disabled'}`);
 
   // Helper to report progress
   const reportProgress = (progress: OutlineProgress) => {
@@ -86,11 +118,20 @@ export async function generateOutline(context: OutlineContext): Promise<StoryStr
     throw new Error(`Unknown structure type: ${context.structureType}`);
   }
 
-  // Calculate target chapter count (assuming 2000-2500 words per chapter)
-  const avgWordsPerChapter = 2200;
+  // Get genre-specific expectations for word count guidance
+  const genreExpectations = GENRE_EXPECTATIONS[context.storyDNA.genre.toLowerCase()];
+  const avgWordsPerChapter = genreExpectations?.chapterWordCount
+    ? Math.round((genreExpectations.chapterWordCount.min + genreExpectations.chapterWordCount.max) / 2)
+    : 2200;
+
+  // Calculate target chapter count
   const targetChapterCount = Math.round(context.targetWordCount / avgWordsPerChapter);
 
   logger.info(`[OutlineGenerator] Target chapters: ${targetChapterCount}`);
+  logger.info(`[OutlineGenerator] Avg words per chapter: ${avgWordsPerChapter}`);
+
+  // Build commercial beat context for the prompts
+  const commercialBeatContext = buildCommercialBeatContext(context.storyDNA.genre);
 
   reportProgress({
     phase: 'acts',
@@ -189,17 +230,224 @@ export async function generateOutline(context: OutlineContext): Promise<StoryStr
     }
   }
 
+  // Run commercial beat validation if enabled
+  let validationReport: CommercialValidationReport | undefined;
+  if (validateCommercial) {
+    reportProgress({
+      phase: 'validation',
+      totalActs,
+      totalChapters: globalChapterCount,
+      message: 'Validating commercial beat structure...',
+      percentComplete: 95,
+    });
+
+    try {
+      validationReport = commercialBeatValidatorService.validateStructure(
+        storyStructure,
+        context.targetWordCount,
+        context.storyDNA.genre
+      );
+
+      logger.info({
+        overallScore: validationReport.overallScore,
+        isValid: validationReport.isValid,
+        criticalIssues: validationReport.criticalIssues.length,
+        readyForGeneration: validationReport.readyForGeneration,
+      }, '[OutlineGenerator] Commercial beat validation complete');
+
+      // Report validation results
+      reportProgress({
+        phase: 'validation',
+        totalActs,
+        totalChapters: globalChapterCount,
+        message: `Commercial validation: Score ${validationReport.overallScore}/100 - ${validationReport.isValid ? 'PASSED' : 'NEEDS ATTENTION'}`,
+        percentComplete: 98,
+        validationReport,
+      });
+
+      // Call validation callback if provided
+      if (onCommercialValidation) {
+        try {
+          onCommercialValidation(validationReport);
+        } catch (e) {
+          logger.error({ error: e }, '[OutlineGenerator] Error in commercial validation callback');
+        }
+      }
+
+      // Log any critical issues
+      if (validationReport.criticalIssues.length > 0) {
+        logger.warn({
+          criticalIssues: validationReport.criticalIssues.map(i => ({
+            beat: i.beatName,
+            issue: i.issue,
+          })),
+        }, '[OutlineGenerator] Critical commercial beat issues detected');
+      }
+    } catch (e) {
+      logger.error({ error: e }, '[OutlineGenerator] Commercial beat validation failed');
+      // Don't fail the whole generation for validation errors
+    }
+  }
+
   reportProgress({
     phase: 'complete',
     totalActs,
     totalChapters: globalChapterCount,
     message: 'Outline generation complete!',
     percentComplete: 100,
+    validationReport,
   });
 
   logger.info('[OutlineGenerator] Outline generation complete');
 
   return storyStructure;
+}
+
+/**
+ * Generate outline with full result including validation and word count budgets
+ * This is the enhanced version that returns all proactive quality data
+ */
+export async function generateOutlineWithValidation(
+  context: OutlineContext
+): Promise<OutlineGenerationResult> {
+  let validationReport: CommercialValidationReport | undefined;
+
+  // Capture validation report via callback
+  const originalCallback = context.onCommercialValidation;
+  context.onCommercialValidation = (report) => {
+    validationReport = report;
+    if (originalCallback) {
+      originalCallback(report);
+    }
+  };
+
+  // Generate the outline
+  const structure = await generateOutline(context);
+
+  // If validation wasn't run (disabled), run it now
+  if (!validationReport && context.validateCommercialBeats !== false) {
+    validationReport = commercialBeatValidatorService.validateStructure(
+      structure,
+      context.targetWordCount,
+      context.storyDNA.genre
+    );
+  }
+
+  // Generate word count budgets for each chapter
+  const wordCountBudgets = generateWordCountBudgets(structure, context.targetWordCount, context.storyDNA.genre);
+
+  return {
+    structure,
+    commercialValidation: validationReport,
+    wordCountBudgets,
+  };
+}
+
+/**
+ * Generate word count budgets for all chapters
+ */
+function generateWordCountBudgets(
+  structure: StoryStructure,
+  targetWordCount: number,
+  genre: string
+): ChapterWordCountBudget[] {
+  const budgets: ChapterWordCountBudget[] = [];
+  const genreExpectations = GENRE_EXPECTATIONS[genre.toLowerCase()];
+
+  // Calculate total chapters and cumulative word counts
+  let totalChapters = 0;
+  for (const act of structure.acts) {
+    totalChapters += act.chapters.length;
+  }
+
+  let cumulativeWordCount = 0;
+  const totalWordCount = structure.acts.reduce((sum, act) =>
+    sum + act.chapters.reduce((actSum, ch) => actSum + ch.wordCountTarget, 0), 0);
+
+  for (const act of structure.acts) {
+    for (const chapter of act.chapters) {
+      cumulativeWordCount += chapter.wordCountTarget;
+      const storyPercentage = totalWordCount > 0 ? (cumulativeWordCount / totalWordCount) * 100 : 0;
+
+      // Find commercial beats for this chapter's position
+      const relevantBeats = COMMERCIAL_BEATS.filter(beat =>
+        storyPercentage >= beat.toleranceMin && storyPercentage <= beat.toleranceMax
+      );
+
+      // Determine pacing guidance
+      let pacingGuidance: 'slow' | 'medium' | 'fast' = 'medium';
+      if (storyPercentage < 15) {
+        pacingGuidance = 'medium'; // Setup
+      } else if (storyPercentage >= 15 && storyPercentage < 75) {
+        pacingGuidance = 'fast'; // Rising action
+      } else if (storyPercentage >= 75 && storyPercentage < 90) {
+        pacingGuidance = 'fast'; // Climax approach
+      } else {
+        pacingGuidance = 'medium'; // Resolution
+      }
+
+      // Adjust for specific beats
+      if (relevantBeats.some(b => b.name === 'Dark Moment / All Is Lost')) {
+        pacingGuidance = 'slow';
+      }
+
+      // Calculate tolerance based on genre expectations
+      const tolerancePercent = 10;
+      const minWordCount = Math.round(chapter.wordCountTarget * (1 - tolerancePercent / 100));
+      const maxWordCount = Math.round(chapter.wordCountTarget * (1 + tolerancePercent / 100));
+
+      budgets.push({
+        chapterNumber: chapter.number,
+        targetWordCount: chapter.wordCountTarget,
+        minWordCount,
+        maxWordCount,
+        tolerancePercent,
+        commercialBeats: relevantBeats.map(b => b.name),
+        pacingGuidance,
+        storyPercentage,
+      });
+    }
+  }
+
+  return budgets;
+}
+
+/**
+ * Build commercial beat context for inclusion in generation prompts
+ */
+function buildCommercialBeatContext(genre: string): string {
+  const genreExpectations = GENRE_EXPECTATIONS[genre.toLowerCase()];
+
+  let context = `
+COMMERCIAL BEAT REQUIREMENTS (Critical for mass market success):
+The following story beats MUST occur at their specified percentages:
+
+`;
+
+  // Add standard beats
+  for (const beat of COMMERCIAL_BEATS) {
+    if (beat.importance === 'critical') {
+      context += `- ${beat.name} (${beat.idealPercentage}%): ${beat.description}\n`;
+      context += `  * Reader expectation: ${beat.readerExpectation}\n`;
+    }
+  }
+
+  // Add genre-specific guidance
+  if (genreExpectations) {
+    context += `\nGENRE-SPECIFIC GUIDANCE (${genreExpectations.genre}):\n`;
+    context += `- ${genreExpectations.pacingExpectations}\n`;
+    context += `- Typical word count: ${genreExpectations.typicalWordCount.min.toLocaleString()}-${genreExpectations.typicalWordCount.max.toLocaleString()} words\n`;
+    context += `- Chapter length: ${genreExpectations.chapterWordCount.min}-${genreExpectations.chapterWordCount.max} words\n`;
+
+    if (genreExpectations.customBeats) {
+      context += `- Genre-specific beats:\n`;
+      for (const beat of genreExpectations.customBeats) {
+        context += `  * ${beat.name} (${beat.idealPercentage}%): ${beat.description}\n`;
+      }
+    }
+  }
+
+  return context;
 }
 
 /**
@@ -332,7 +580,10 @@ function buildActBreakdownPrompt(
   const plotSection = formatPlotStructureForPrompt(plotStructure);
   const hasPlots = plotStructure && plotStructure.plot_layers && plotStructure.plot_layers.length > 0;
 
-  return `You are a master story architect. Generate a detailed act breakdown for this novel using the ${template.name} structure.
+  // Get commercial beat context
+  const commercialContext = buildCommercialBeatContext(storyDNA.genre);
+
+  return `You are a master story architect specialising in commercially successful fiction. Generate a detailed act breakdown for this novel using the ${template.name} structure.
 
 **Story Concept:**
 Title: ${concept.title}
@@ -348,7 +599,9 @@ ${protagonist?.voiceSample}
 
 **Antagonist:** ${antagonist?.name || 'No direct antagonist (internal conflict or systemic)'}
 
-**Target:** ${targetChapterCount} chapters total
+**Target:** ${targetChapterCount} chapters total (~${context.targetWordCount.toLocaleString()} words)
+
+${commercialContext}
 
 **Structure Template:**
 ${JSON.stringify(template.acts, null, 2)}
@@ -358,7 +611,9 @@ Generate a detailed act breakdown that:
 2. Describes how each beat will play out in THIS specific story
 3. Assigns chapter counts to each act (total must equal ${targetChapterCount})
 4. Ensures each act has appropriate pacing and word count
-${hasPlots ? '5. CRITICAL: Incorporates ALL plot threads (main plot, subplots, character arcs) defined above\n6. Ensures plot points occur at or near their designated chapters' : ''}
+5. CRITICAL: Places commercial beats at their correct percentages for mass market success
+6. Ensures the Inciting Incident occurs by 12-15%, Midpoint at 50%, Dark Moment at 75%, Climax at 85-90%
+${hasPlots ? '7. Incorporates ALL plot threads (main plot, subplots, character arcs) defined above\n8. Ensures plot points occur at or near their designated chapters' : ''}
 
 Return ONLY a JSON array of acts in this format:
 [
@@ -378,7 +633,7 @@ Return ONLY a JSON array of acts in this format:
   }
 ]
 
-Make the descriptions SPECIFIC to this story, not generic beat descriptions.${hasPlots ? ' Reference specific plot threads by name where relevant.' : ''}`;
+Make the descriptions SPECIFIC to this story, not generic beat descriptions.${hasPlots ? ' Reference specific plot threads by name where relevant.' : ''} Ensure beats align with commercial expectations for reader satisfaction.`;
 }
 
 function parseActBreakdownResponse(responseText: string, template: any): Act[] {
