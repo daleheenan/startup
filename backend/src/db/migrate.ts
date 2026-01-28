@@ -340,6 +340,7 @@ export function runMigrations() {
       '045_word_count_revision.sql',     // DB version 45 - word count revision workflow
       '046_editorial_lessons.sql',       // DB version 46 - editorial lessons learned tracking
       '047_editorial_rewrite_versioning.sql', // DB version 47 - versioning for editorial rewrites
+      '048_commercial_beat_validation.sql', // DB version 48 - commercial beat validation and chapter briefs
     ];
 
     for (let i = 0; i < migrationFiles.length; i++) {
@@ -463,6 +464,7 @@ export function getMigrationStatus(): {
     '045_word_count_revision.sql',
     '046_editorial_lessons.sql',
     '047_editorial_rewrite_versioning.sql',
+    '048_commercial_beat_validation.sql',
   ];
 
   const pendingMigrations: string[] = [];
