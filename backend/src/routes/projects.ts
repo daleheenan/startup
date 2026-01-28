@@ -3068,6 +3068,32 @@ router.put('/:id/plot-structure', (req, res) => {
       }
     }
 
+    // Also update the plot_snapshot for the active version of all books in this project
+    // This ensures version-specific plot data stays in sync with project-level plot
+    try {
+      const booksStmt = db.prepare<[string], { id: string }>(`
+        SELECT id FROM books WHERE project_id = ?
+      `);
+      const books = booksStmt.all(projectId);
+
+      for (const book of books) {
+        // Update the active version's plot_snapshot
+        const updateVersionStmt = db.prepare(`
+          UPDATE book_versions
+          SET plot_snapshot = ?
+          WHERE book_id = ? AND is_active = 1
+        `);
+        const result = updateVersionStmt.run(JSON.stringify(plot_structure), book.id);
+
+        if (result.changes > 0) {
+          logger.debug({ bookId: book.id }, 'Updated active version plot_snapshot');
+        }
+      }
+    } catch (versionError: any) {
+      // Log but don't fail the request - version sync is secondary
+      logger.warn({ error: versionError.message }, 'Failed to sync plot_snapshot to active versions');
+    }
+
     res.json({ success: true, plot_structure });
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack }, 'Error updating plot structure');

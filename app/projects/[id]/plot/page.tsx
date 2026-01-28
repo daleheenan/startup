@@ -66,6 +66,18 @@ interface Character {
   characterArc?: string;
 }
 
+interface BookVersion {
+  id: string;
+  book_id: string;
+  version_number: number;
+  version_name: string | null;
+  plot_snapshot: string | null;
+  is_active: number;
+  word_count: number;
+  chapter_count: number;
+  created_at: string;
+}
+
 const LAYER_COLORS = [
   '#667eea', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6',
   '#3B82F6', '#14B8A6', '#F97316', '#D946EF', '#6366F1',
@@ -141,6 +153,12 @@ export default function PlotStructurePage() {
   const [isWizardMode, setIsWizardMode] = useState(false);
   const [characters, setCharacters] = useState<Character[]>([]);
 
+  // Version-related state
+  const [versions, setVersions] = useState<BookVersion[]>([]);
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const [isViewingSnapshot, setIsViewingSnapshot] = useState(false);
+  const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
+
   // Modal state
   const [showLayerModal, setShowLayerModal] = useState(false);
   const [showPointModal, setShowPointModal] = useState(false);
@@ -215,13 +233,71 @@ export default function PlotStructurePage() {
         const booksData = await booksRes.json();
         setBooks(booksData.books || []);
 
-        // Fetch chapters for first book
+        // Fetch chapters and versions for first book
         if (booksData.books?.length > 0) {
-          const chaptersRes = await fetch(`${API_BASE_URL}/api/chapters/book/${booksData.books[0].id}`, { headers });
+          const firstBookId = booksData.books[0].id;
+
+          const chaptersRes = await fetch(`${API_BASE_URL}/api/chapters/book/${firstBookId}`, { headers });
           if (chaptersRes.ok) {
             const chaptersData = await chaptersRes.json();
             setChapters(chaptersData.chapters || []);
             setTotalChapters(chaptersData.chapters?.length || 25);
+          }
+
+          // Fetch versions for the book
+          const versionsRes = await fetch(`${API_BASE_URL}/api/books/${firstBookId}/versions`, { headers });
+          if (versionsRes.ok) {
+            const versionsData = await versionsRes.json();
+            const bookVersions = versionsData.versions || [];
+            setVersions(bookVersions);
+
+            // Find active version
+            const active = bookVersions.find((v: BookVersion) => v.is_active === 1);
+            if (active) {
+              setActiveVersionId(active.id);
+              setSelectedVersionId(active.id);
+
+              // If active version has a plot_snapshot, use it instead of project-level plot_structure
+              if (active.plot_snapshot) {
+                try {
+                  const snapshotData = typeof active.plot_snapshot === 'string'
+                    ? JSON.parse(active.plot_snapshot)
+                    : active.plot_snapshot;
+
+                  if (snapshotData && snapshotData.plot_layers) {
+                    const plotLayers = (snapshotData.plot_layers || []).map((layer: PlotLayer) => {
+                      const isKey = isKeyPlotLayer(layer.id);
+                      return {
+                        ...layer,
+                        points: layer.points || [], // Ensure points array exists
+                        deletable: layer.deletable !== undefined ? layer.deletable : !isKey,
+                        editable: layer.editable !== undefined ? layer.editable : true,
+                      };
+                    });
+
+                    const safeStructure = {
+                      ...snapshotData,
+                      plot_layers: plotLayers,
+                      act_structure: snapshotData.act_structure || {
+                        act_one_end: 5,
+                        act_two_midpoint: 12,
+                        act_two_end: 20,
+                        act_three_climax: 23,
+                      },
+                      pacing_notes: snapshotData.pacing_notes || '',
+                    };
+                    setStructure(safeStructure);
+                    setIsViewingSnapshot(false); // Active version is current, not a snapshot
+
+                    if (safeStructure.plot_layers.length === 0) {
+                      setIsWizardMode(true);
+                    }
+                  }
+                } catch (parseError) {
+                  console.warn('Failed to parse plot_snapshot, using project-level plot_structure');
+                }
+              }
+            }
           }
         }
       }
@@ -328,6 +404,12 @@ export default function PlotStructurePage() {
   }, [loading, project, characters, structure.plot_layers?.length, extractingFromConcept, hasAttemptedExtraction, hasPopulatedInitialLayers]);
 
   const saveStructure = async (newStructure: StoryStructure) => {
+    // Don't save when viewing a historical snapshot
+    if (isViewingSnapshot) {
+      setError('Cannot save changes while viewing a historical snapshot. Switch to the active version to make changes.');
+      return;
+    }
+
     setSaving(true);
     try {
       const token = getToken();
@@ -766,6 +848,77 @@ export default function PlotStructurePage() {
     }, 1500);
   };
 
+  // Handle version selection change
+  const handleVersionChange = async (versionId: string) => {
+    setSelectedVersionId(versionId);
+    const selectedVersion = versions.find(v => v.id === versionId);
+
+    if (!selectedVersion) return;
+
+    // Check if viewing a historical (non-active) version
+    const isHistorical = selectedVersion.is_active !== 1;
+    setIsViewingSnapshot(isHistorical);
+
+    if (selectedVersion.plot_snapshot) {
+      try {
+        const snapshotData = typeof selectedVersion.plot_snapshot === 'string'
+          ? JSON.parse(selectedVersion.plot_snapshot)
+          : selectedVersion.plot_snapshot;
+
+        if (snapshotData && snapshotData.plot_layers) {
+          const plotLayers = (snapshotData.plot_layers || []).map((layer: PlotLayer) => {
+            const isKey = isKeyPlotLayer(layer.id);
+            return {
+              ...layer,
+              points: layer.points || [], // Ensure points array exists
+              deletable: layer.deletable !== undefined ? layer.deletable : !isKey,
+              editable: layer.editable !== undefined ? layer.editable : true,
+            };
+          });
+
+          const safeStructure = {
+            ...snapshotData,
+            plot_layers: plotLayers,
+            act_structure: snapshotData.act_structure || {
+              act_one_end: 5,
+              act_two_midpoint: 12,
+              act_two_end: 20,
+              act_three_climax: 23,
+            },
+            pacing_notes: snapshotData.pacing_notes || '',
+          };
+          setStructure(safeStructure);
+        }
+      } catch (parseError) {
+        console.error('Failed to parse plot_snapshot:', parseError);
+        setError('Failed to load plot snapshot for this version');
+      }
+    } else if (!isHistorical && project?.plot_structure) {
+      // Active version without snapshot - use project-level plot_structure
+      const plotLayers = (project.plot_structure.plot_layers || []).map((layer: PlotLayer) => {
+        const isKey = isKeyPlotLayer(layer.id);
+        return {
+          ...layer,
+          points: layer.points || [],
+          deletable: layer.deletable !== undefined ? layer.deletable : !isKey,
+          editable: layer.editable !== undefined ? layer.editable : true,
+        };
+      });
+
+      setStructure({
+        ...project.plot_structure,
+        plot_layers: plotLayers,
+        act_structure: project.plot_structure.act_structure || {
+          act_one_end: 5,
+          act_two_midpoint: 12,
+          act_two_end: 20,
+          act_three_climax: 23,
+        },
+        pacing_notes: project.plot_structure.pacing_notes || '',
+      });
+    }
+  };
+
   const cardStyle = {
     background: '#FFFFFF',
     border: '1px solid #E2E8F0',
@@ -953,6 +1106,111 @@ export default function PlotStructurePage() {
           </div>
         )}
 
+        {/* Version Selector - only show if versions exist */}
+        {versions.length > 0 && (
+          <div style={{
+            ...cardStyle,
+            marginBottom: '1.5rem',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+              <label style={{
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                color: colors.textSecondary,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                whiteSpace: 'nowrap',
+              }}>
+                Viewing Plot for Version:
+              </label>
+              <select
+                value={selectedVersionId || ''}
+                onChange={(e) => handleVersionChange(e.target.value)}
+                style={{
+                  flex: 1,
+                  minWidth: '200px',
+                  maxWidth: '350px',
+                  padding: '0.625rem 0.75rem',
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: '8px',
+                  fontSize: '0.875rem',
+                  backgroundColor: '#FFFFFF',
+                  cursor: 'pointer',
+                }}
+              >
+                {versions.map(version => (
+                  <option key={version.id} value={version.id}>
+                    {version.version_name || `Version ${version.version_number}`}
+                    {version.is_active === 1 ? ' (Active)' : ''}
+                  </option>
+                ))}
+              </select>
+              {selectedVersionId && selectedVersionId !== activeVersionId && (
+                <span style={{
+                  padding: '0.375rem 0.75rem',
+                  background: '#FEF3C7',
+                  border: '1px solid #F59E0B',
+                  borderRadius: '6px',
+                  color: '#B45309',
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                }}>
+                  Historical Snapshot
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Historical Snapshot Warning */}
+        {isViewingSnapshot && (
+          <div style={{
+            background: '#FEF3C7',
+            border: '1px solid #F59E0B',
+            borderRadius: '8px',
+            padding: '1rem',
+            marginBottom: '1.5rem',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+              <span style={{ fontSize: '1.25rem' }}>📜</span>
+              <div style={{ flex: 1 }}>
+                <h3 style={{
+                  fontSize: '0.9375rem',
+                  fontWeight: 600,
+                  color: '#B45309',
+                  margin: '0 0 0.25rem 0',
+                }}>
+                  Viewing Historical Plot Snapshot
+                </h3>
+                <p style={{ fontSize: '0.8125rem', color: '#92400E', margin: 0 }}>
+                  This is the plot structure as it was when this version was created.
+                  Changes will NOT be saved. To edit, switch to the active version.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  if (activeVersionId) {
+                    handleVersionChange(activeVersionId);
+                  }
+                }}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: '#FFFFFF',
+                  border: '1px solid #F59E0B',
+                  borderRadius: '6px',
+                  color: '#B45309',
+                  fontSize: '0.8125rem',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Switch to Active Version
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Mode Toggle */}
         <div style={{
           ...cardStyle,
@@ -973,15 +1231,16 @@ export default function PlotStructurePage() {
           </div>
           <button
             onClick={() => setIsWizardMode(!isWizardMode)}
+            disabled={isViewingSnapshot}
             style={{
               padding: '0.75rem 1.5rem',
-              background: isWizardMode ? '#FFFFFF' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              background: isViewingSnapshot ? '#E5E7EB' : (isWizardMode ? '#FFFFFF' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'),
               border: isWizardMode ? '1px solid #E2E8F0' : 'none',
               borderRadius: '8px',
-              color: isWizardMode ? '#667eea' : '#FFFFFF',
+              color: isViewingSnapshot ? '#9CA3AF' : (isWizardMode ? '#667eea' : '#FFFFFF'),
               fontSize: '0.875rem',
               fontWeight: 500,
-              cursor: 'pointer',
+              cursor: isViewingSnapshot ? 'not-allowed' : 'pointer',
             }}
           >
             {isWizardMode ? 'Switch to Advanced Mode' : 'Switch to Wizard'}
