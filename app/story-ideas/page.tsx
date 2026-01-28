@@ -202,9 +202,9 @@ export default function StoryIdeasPage() {
           <SplitViewListItem
             key={idea.id}
             id={idea.id}
-            title={idea.genre || 'Story Idea'}
+            title={idea.story_idea.slice(0, 60) + (idea.story_idea.length > 60 ? '...' : '')}
             date={new Date(idea.created_at).toLocaleDateString()}
-            genre={idea.subgenre || undefined}
+            genre={idea.genre}
             premise={idea.story_idea}
             isSelected={selectedIdeaId === idea.id}
             status={idea.status}
@@ -311,9 +311,9 @@ export default function StoryIdeasPage() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <DetailPanelHeader
-          title={selectedIdea.genre || 'Story Idea'}
+          title="Story Idea"
           status={selectedIdea.status}
-          genre={selectedIdea.subgenre || undefined}
+          genre={selectedIdea.genre}
           date={new Date(selectedIdea.created_at).toLocaleDateString()}
         />
 
