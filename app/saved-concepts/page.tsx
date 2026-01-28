@@ -1,11 +1,19 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getToken, logout } from '../lib/auth';
 import { colors, borderRadius, shadows } from '../lib/constants';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import OriginalityChecker from '../components/OriginalityChecker';
+import SplitView, {
+  SplitViewListItem,
+  SplitViewEmptyState,
+  DetailPanelHeader,
+  DetailPanelSection,
+  DetailPanelActions,
+  ActionButton,
+} from '../components/SplitView';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -67,8 +75,8 @@ function SavedConceptsContent() {
   const [concepts, setConcepts] = useState<SavedConcept[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [expandedConcept, setExpandedConcept] = useState<string | null>(null);
-  const [showOriginalityCheck, setShowOriginalityCheck] = useState<string | null>(null);
+  const [selectedConceptId, setSelectedConceptId] = useState<string | null>(null);
+  const [showOriginalityCheck, setShowOriginalityCheck] = useState(false);
   const [editingConcept, setEditingConcept] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<SavedConcept>>({});
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -85,7 +93,37 @@ function SavedConceptsContent() {
   }, []);
 
   // Get unique genres from concepts
-  const genres = Array.from(new Set(concepts.map(c => c.preferences?.genre).filter(Boolean) || []));
+  const genres = useMemo(() =>
+    Array.from(new Set(concepts.map(c => c.preferences?.genre).filter(Boolean) || [])),
+    [concepts]
+  );
+
+  // Filter concepts
+  const filteredConcepts = useMemo(() => {
+    return concepts.filter(concept => {
+      if (showingNewOnly && newConceptIds.length > 0) {
+        return newConceptIds.includes(concept.id);
+      }
+      if (filterStatus !== 'all' && concept.status !== filterStatus) return false;
+      if (filterGenre !== 'all' && concept.preferences?.genre !== filterGenre) return false;
+      return true;
+    });
+  }, [concepts, showingNewOnly, newConceptIds, filterStatus, filterGenre]);
+
+  // Selected concept details
+  const selectedConcept = useMemo(() =>
+    filteredConcepts.find(c => c.id === selectedConceptId) || null,
+    [filteredConcepts, selectedConceptId]
+  );
+
+  // Auto-select first item when filtered list changes
+  useEffect(() => {
+    if (filteredConcepts.length > 0 && (!selectedConceptId || !filteredConcepts.find(c => c.id === selectedConceptId))) {
+      setSelectedConceptId(filteredConcepts[0].id);
+    } else if (filteredConcepts.length === 0) {
+      setSelectedConceptId(null);
+    }
+  }, [filteredConcepts, selectedConceptId]);
 
   const loadConcepts = async () => {
     try {
@@ -137,6 +175,12 @@ function SavedConceptsContent() {
       }
 
       setConcepts(concepts.filter(c => c.id !== conceptId));
+      // Select next item if current is deleted
+      if (selectedConceptId === conceptId) {
+        const currentIndex = filteredConcepts.findIndex(c => c.id === conceptId);
+        const nextConcept = filteredConcepts[currentIndex + 1] || filteredConcepts[currentIndex - 1];
+        setSelectedConceptId(nextConcept?.id || null);
+      }
     } catch (err: any) {
       console.error('Error deleting concept:', err);
       setError(err.message);
@@ -216,18 +260,14 @@ function SavedConceptsContent() {
     try {
       const token = getToken();
 
-      // Build preferences object, ensuring ALL required fields are present
-      // The createProjectSchema requires: genre, and optionally: subgenre, tone, themes, etc.
       const preferences = {
         ...concept.preferences,
         genre: concept.preferences?.genre || 'General Fiction',
-        // Ensure other fields have reasonable defaults if missing
         subgenre: concept.preferences?.subgenre || concept.preferences?.subgenres?.[0] || undefined,
         tone: concept.preferences?.tone || concept.preferences?.tones?.[0] || undefined,
         themes: concept.preferences?.themes || [],
       };
 
-      // Create project from concept
       const response = await fetch(`${API_BASE_URL}/api/projects`, {
         method: 'POST',
         headers: {
@@ -255,7 +295,6 @@ function SavedConceptsContent() {
 
       const project = await response.json();
 
-      // Mark concept as used
       await fetch(`${API_BASE_URL}/api/saved-concepts/${concept.id}`, {
         method: 'PATCH',
         headers: {
@@ -265,7 +304,6 @@ function SavedConceptsContent() {
         body: JSON.stringify({ status: 'used' }),
       });
 
-      // Redirect to project page with autoGenerate flag to trigger content generation
       router.push(`/projects/${project.id}?autoGenerate=true`);
     } catch (err: any) {
       console.error('Error using concept:', err);
@@ -275,21 +313,8 @@ function SavedConceptsContent() {
     }
   };
 
-  // Filter concepts - if showing new only, filter to just those IDs
-  const filteredConcepts = concepts.filter(concept => {
-    // When showing new concepts only, filter by the new IDs
-    if (showingNewOnly && newConceptIds.length > 0) {
-      return newConceptIds.includes(concept.id);
-    }
-    if (filterStatus !== 'all' && concept.status !== filterStatus) return false;
-    if (filterGenre !== 'all' && concept.preferences?.genre !== filterGenre) return false;
-    return true;
-  });
-
-  // Helper to clear the "new" filter and show all concepts
   const handleShowAllConcepts = () => {
     setShowingNewOnly(false);
-    // Remove query params from URL
     router.replace('/saved-concepts');
   };
 
@@ -325,6 +350,334 @@ function SavedConceptsContent() {
     );
   }
 
+  // Render the left pane list items
+  const renderLeftPane = () => {
+    if (concepts.length === 0) {
+      return (
+        <SplitViewEmptyState
+          icon="📝"
+          title="No Saved Concepts Yet"
+          message="Generate concepts from Quick Start or Full Customisation, then save your favourites here."
+        />
+      );
+    }
+
+    if (filteredConcepts.length === 0) {
+      return (
+        <SplitViewEmptyState
+          icon="🔍"
+          title="No Matching Concepts"
+          message="Try adjusting your filters to see more concepts."
+        />
+      );
+    }
+
+    return (
+      <div>
+        {filteredConcepts.map(concept => (
+          <SplitViewListItem
+            key={concept.id}
+            id={concept.id}
+            title={concept.title}
+            date={new Date(concept.created_at).toLocaleDateString()}
+            genre={concept.preferences?.genre || undefined}
+            premise={concept.logline}
+            isSelected={selectedConceptId === concept.id}
+            status={concept.status}
+            onClick={setSelectedConceptId}
+          />
+        ))}
+      </div>
+    );
+  };
+
+  // Render the right pane detail view
+  const renderRightPane = () => {
+    if (!selectedConcept) {
+      return (
+        <SplitViewEmptyState
+          icon="👈"
+          title="Select a Story Concept"
+          message="Click on a concept from the list to view its details and take action."
+        />
+      );
+    }
+
+    // Edit mode
+    if (editingConcept === selectedConcept.id) {
+      return (
+        <div style={{ padding: '1.5rem' }}>
+          <h3 style={{
+            fontSize: '1.125rem',
+            fontWeight: 600,
+            color: colors.text,
+            marginBottom: '1.5rem',
+          }}>
+            Edit Story Concept
+          </h3>
+
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              color: colors.text,
+              marginBottom: '0.5rem',
+            }}>
+              Title
+            </label>
+            <input
+              type="text"
+              value={editForm.title || ''}
+              onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: `1px solid ${colors.border}`,
+                borderRadius: borderRadius.sm,
+                fontSize: '0.9375rem',
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              color: colors.text,
+              marginBottom: '0.5rem',
+            }}>
+              Logline
+            </label>
+            <input
+              type="text"
+              value={editForm.logline || ''}
+              onChange={(e) => setEditForm({ ...editForm, logline: e.target.value })}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: `1px solid ${colors.border}`,
+                borderRadius: borderRadius.sm,
+                fontSize: '0.9375rem',
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              color: colors.text,
+              marginBottom: '0.5rem',
+            }}>
+              Synopsis
+            </label>
+            <textarea
+              value={editForm.synopsis || ''}
+              onChange={(e) => setEditForm({ ...editForm, synopsis: e.target.value })}
+              style={{
+                width: '100%',
+                minHeight: '150px',
+                padding: '0.75rem',
+                border: `1px solid ${colors.border}`,
+                borderRadius: borderRadius.sm,
+                fontSize: '0.9375rem',
+                resize: 'vertical',
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              color: colors.text,
+              marginBottom: '0.5rem',
+            }}>
+              Hook
+            </label>
+            <input
+              type="text"
+              value={editForm.hook || ''}
+              onChange={(e) => setEditForm({ ...editForm, hook: e.target.value })}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: `1px solid ${colors.border}`,
+                borderRadius: borderRadius.sm,
+                fontSize: '0.9375rem',
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              color: colors.text,
+              marginBottom: '0.5rem',
+            }}>
+              Notes
+            </label>
+            <textarea
+              value={editForm.notes || ''}
+              onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+              style={{
+                width: '100%',
+                minHeight: '80px',
+                padding: '0.75rem',
+                border: `1px solid ${colors.border}`,
+                borderRadius: borderRadius.sm,
+                fontSize: '0.9375rem',
+                resize: 'vertical',
+              }}
+              placeholder="Add your notes..."
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <ActionButton variant="primary" onClick={handleSaveEdit}>
+              Save Changes
+            </ActionButton>
+            <ActionButton variant="secondary" onClick={handleCancelEdit}>
+              Cancel
+            </ActionButton>
+          </div>
+        </div>
+      );
+    }
+
+    // View mode
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <DetailPanelHeader
+          title={selectedConcept.title}
+          status={selectedConcept.status}
+          genre={selectedConcept.preferences?.genre || undefined}
+          date={new Date(selectedConcept.created_at).toLocaleDateString()}
+        />
+
+        <div style={{ flex: 1, padding: '1.5rem', overflowY: 'auto' }}>
+          <DetailPanelSection label="Logline">
+            <p style={{ margin: 0, fontStyle: 'italic' }}>{selectedConcept.logline}</p>
+          </DetailPanelSection>
+
+          <DetailPanelSection label="Synopsis">
+            <p style={{ margin: 0 }}>{selectedConcept.synopsis}</p>
+          </DetailPanelSection>
+
+          {selectedConcept.hook && (
+            <DetailPanelSection label="Hook" variant="highlight">
+              {selectedConcept.hook}
+            </DetailPanelSection>
+          )}
+
+          {selectedConcept.protagonist_hint && (
+            <DetailPanelSection label="Protagonist">
+              {selectedConcept.protagonist_hint}
+            </DetailPanelSection>
+          )}
+
+          {selectedConcept.conflict_type && (
+            <DetailPanelSection label="Conflict Type">
+              {selectedConcept.conflict_type}
+            </DetailPanelSection>
+          )}
+
+          {selectedConcept.preferences?.themes?.length > 0 && (
+            <div style={{ marginBottom: '1rem' }}>
+              <div style={{
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                color: colors.textTertiary,
+                marginBottom: '0.5rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.025em',
+              }}>
+                Themes
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                {selectedConcept.preferences.themes.map((theme: string, i: number) => (
+                  <span
+                    key={i}
+                    style={{
+                      padding: '0.25rem 0.75rem',
+                      background: colors.surfaceHover,
+                      color: colors.textSecondary,
+                      fontSize: '0.75rem',
+                      borderRadius: borderRadius.full,
+                    }}
+                  >
+                    {theme}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {selectedConcept.notes && (
+            <DetailPanelSection label="Your Notes" variant="warning">
+              {selectedConcept.notes}
+            </DetailPanelSection>
+          )}
+
+          {showOriginalityCheck && (
+            <div style={{ marginTop: '1rem' }}>
+              <OriginalityChecker
+                contentId={selectedConcept.id}
+                contentType="concept"
+                title={selectedConcept.title}
+              />
+            </div>
+          )}
+        </div>
+
+        <DetailPanelActions>
+          <ActionButton
+            variant="primary"
+            onClick={() => handleUseConcept(selectedConcept)}
+            disabled={isCreatingProject}
+          >
+            {isCreatingProject ? 'Creating Project...' : 'Use Concept'}
+          </ActionButton>
+          <ActionButton
+            variant="secondary"
+            onClick={() => setShowOriginalityCheck(!showOriginalityCheck)}
+          >
+            {showOriginalityCheck ? 'Hide Originality Check' : 'Check Originality'}
+          </ActionButton>
+          <ActionButton variant="secondary" onClick={() => handleStartEdit(selectedConcept)}>
+            Edit
+          </ActionButton>
+          <select
+            value={selectedConcept.status}
+            onChange={(e) => handleChangeStatus(selectedConcept.id, e.target.value as 'saved' | 'used' | 'archived')}
+            style={{
+              padding: '0.625rem 0.75rem',
+              background: colors.surface,
+              border: `1px solid ${colors.border}`,
+              borderRadius: borderRadius.sm,
+              color: colors.text,
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+            }}
+          >
+            <option value="saved">Saved</option>
+            <option value="used">Used</option>
+            <option value="archived">Archived</option>
+          </select>
+          <ActionButton variant="danger" onClick={() => handleDelete(selectedConcept.id)}>
+            Delete
+          </ActionButton>
+        </DetailPanelActions>
+      </div>
+    );
+  };
+
   return (
     <DashboardLayout
       header={{
@@ -355,7 +708,7 @@ function SavedConceptsContent() {
 
       {/* Filters */}
       {concepts.length > 0 && (
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
           <select
             value={filterGenre}
             onChange={(e) => setFilterGenre(e.target.value)}
@@ -390,371 +743,36 @@ function SavedConceptsContent() {
             <option value="used">Used</option>
             <option value="archived">Archived</option>
           </select>
+          <div style={{
+            marginLeft: 'auto',
+            fontSize: '0.875rem',
+            color: colors.textSecondary,
+            alignSelf: 'center',
+          }}>
+            {filteredConcepts.length} {filteredConcepts.length === 1 ? 'concept' : 'concepts'}
+          </div>
         </div>
       )}
 
-      <div>
-          {error && (
-            <div style={{
-              background: colors.errorLight,
-              border: `1px solid ${colors.errorBorder}`,
-              borderRadius: borderRadius.lg,
-              padding: '1rem 1.5rem',
-              marginBottom: '1.5rem',
-              color: colors.error,
-            }}>
-              {error}
-            </div>
-          )}
+      {error && (
+        <div style={{
+          background: colors.errorLight,
+          border: `1px solid ${colors.errorBorder}`,
+          borderRadius: borderRadius.lg,
+          padding: '1rem 1.5rem',
+          marginBottom: '1rem',
+          color: colors.error,
+        }}>
+          {error}
+        </div>
+      )}
 
-          {filteredConcepts.length === 0 ? (
-            <div style={{
-              textAlign: 'center',
-              padding: '4rem 2rem',
-              background: colors.surface,
-              borderRadius: borderRadius.lg,
-              border: `2px dashed ${colors.border}`,
-            }}>
-              <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>📝</div>
-              <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: colors.text }}>
-                {concepts.length === 0 ? 'No Saved Concepts Yet' : 'No Matching Concepts'}
-              </h2>
-              <p style={{ fontSize: '1rem', color: colors.textSecondary }}>
-                {concepts.length === 0
-                  ? 'Generate concepts from Quick Start or Full Customization, then save your favorites here.'
-                  : 'Try adjusting your filters to see more concepts.'}
-              </p>
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gap: '1rem' }}>
-              {filteredConcepts.map(concept => (
-                <div
-                  key={concept.id}
-                  style={{
-                    background: colors.surface,
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: borderRadius.lg,
-                    padding: '1.5rem',
-                    boxShadow: shadows.sm,
-                  }}
-                >
-                  {editingConcept === concept.id ? (
-                    // Edit Mode
-                    <div>
-                      <div style={{ marginBottom: '1rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: colors.text, marginBottom: '0.5rem' }}>
-                          Title
-                        </label>
-                        <input
-                          type="text"
-                          value={editForm.title || ''}
-                          onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                          style={{
-                            width: '100%',
-                            padding: '0.75rem',
-                            border: `1px solid ${colors.border}`,
-                            borderRadius: borderRadius.sm,
-                            fontSize: '0.9375rem',
-                          }}
-                        />
-                      </div>
-                      <div style={{ marginBottom: '1rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: colors.text, marginBottom: '0.5rem' }}>
-                          Logline
-                        </label>
-                        <input
-                          type="text"
-                          value={editForm.logline || ''}
-                          onChange={(e) => setEditForm({ ...editForm, logline: e.target.value })}
-                          style={{
-                            width: '100%',
-                            padding: '0.75rem',
-                            border: `1px solid ${colors.border}`,
-                            borderRadius: borderRadius.sm,
-                            fontSize: '0.9375rem',
-                          }}
-                        />
-                      </div>
-                      <div style={{ marginBottom: '1rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: colors.text, marginBottom: '0.5rem' }}>
-                          Synopsis
-                        </label>
-                        <textarea
-                          value={editForm.synopsis || ''}
-                          onChange={(e) => setEditForm({ ...editForm, synopsis: e.target.value })}
-                          style={{
-                            width: '100%',
-                            minHeight: '120px',
-                            padding: '0.75rem',
-                            border: `1px solid ${colors.border}`,
-                            borderRadius: borderRadius.sm,
-                            fontSize: '0.9375rem',
-                            resize: 'vertical',
-                          }}
-                        />
-                      </div>
-                      <div style={{ marginBottom: '1rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: colors.text, marginBottom: '0.5rem' }}>
-                          Hook
-                        </label>
-                        <input
-                          type="text"
-                          value={editForm.hook || ''}
-                          onChange={(e) => setEditForm({ ...editForm, hook: e.target.value })}
-                          style={{
-                            width: '100%',
-                            padding: '0.75rem',
-                            border: `1px solid ${colors.border}`,
-                            borderRadius: borderRadius.sm,
-                            fontSize: '0.9375rem',
-                          }}
-                        />
-                      </div>
-                      <div style={{ marginBottom: '1rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: colors.text, marginBottom: '0.5rem' }}>
-                          Notes
-                        </label>
-                        <textarea
-                          value={editForm.notes || ''}
-                          onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-                          style={{
-                            width: '100%',
-                            minHeight: '60px',
-                            padding: '0.75rem',
-                            border: `1px solid ${colors.border}`,
-                            borderRadius: borderRadius.sm,
-                            fontSize: '0.9375rem',
-                            resize: 'vertical',
-                          }}
-                          placeholder="Add your notes..."
-                        />
-                      </div>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button
-                          onClick={handleSaveEdit}
-                          style={{
-                            padding: '0.5rem 1rem',
-                            background: colors.success,
-                            border: 'none',
-                            borderRadius: borderRadius.sm,
-                            color: 'white',
-                            fontSize: '0.875rem',
-                            fontWeight: 500,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={handleCancelEdit}
-                          style={{
-                            padding: '0.5rem 1rem',
-                            background: colors.surface,
-                            border: `1px solid ${colors.border}`,
-                            borderRadius: borderRadius.sm,
-                            color: colors.textSecondary,
-                            fontSize: '0.875rem',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    // View Mode
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                          <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: colors.text, margin: 0 }}>
-                            {concept.title}
-                          </h3>
-                          {concept.status !== 'saved' && (
-                            <span style={{
-                              padding: '0.25rem 0.75rem',
-                              background: concept.status === 'used' ? colors.successLight : colors.surfaceHover,
-                              color: concept.status === 'used' ? colors.success : colors.textTertiary,
-                              fontSize: '0.75rem',
-                              fontWeight: 500,
-                              borderRadius: borderRadius.full,
-                            }}>
-                              {concept.status}
-                            </span>
-                          )}
-                        </div>
-                        <p style={{ fontSize: '0.9375rem', color: colors.textSecondary, fontStyle: 'italic', marginBottom: '0.5rem' }}>
-                          {concept.logline}
-                        </p>
-
-                        {/* Save date and genre - always visible */}
-                        <div style={{
-                          fontSize: '0.75rem',
-                          color: colors.textTertiary,
-                          display: 'flex',
-                          gap: '1.5rem',
-                          marginBottom: expandedConcept === concept.id ? '1rem' : 0,
-                        }}>
-                          <span>Genre: {concept.preferences?.genre || 'Not specified'}</span>
-                          <span>Saved: {new Date(concept.created_at).toLocaleDateString()}</span>
-                        </div>
-
-                        {expandedConcept === concept.id && (
-                          <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: `1px solid ${colors.border}` }}>
-                            <p style={{ fontSize: '0.9375rem', color: colors.text, marginBottom: '1rem', lineHeight: 1.6 }}>
-                              {concept.synopsis}
-                            </p>
-                            {concept.hook && (
-                              <div style={{
-                                background: colors.brandLight,
-                                border: `1px solid ${colors.brandBorder}`,
-                                borderRadius: borderRadius.sm,
-                                padding: '0.75rem',
-                                marginBottom: '0.75rem',
-                              }}>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: colors.brandText, marginBottom: '0.25rem' }}>
-                                  HOOK
-                                </div>
-                                <div style={{ fontSize: '0.875rem', color: colors.text }}>
-                                  {concept.hook}
-                                </div>
-                              </div>
-                            )}
-                            {concept.notes && (
-                              <div style={{
-                                background: colors.warningLight,
-                                border: `1px solid ${colors.warningBorder}`,
-                                borderRadius: borderRadius.sm,
-                                padding: '0.75rem',
-                                marginTop: '0.75rem',
-                              }}>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: colors.warning, marginBottom: '0.25rem' }}>
-                                  YOUR NOTES
-                                </div>
-                                <div style={{ fontSize: '0.875rem', color: colors.text }}>
-                                  {concept.notes}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      <div style={{ marginLeft: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        <button
-                          onClick={() => setExpandedConcept(expandedConcept === concept.id ? null : concept.id)}
-                          style={{
-                            padding: '0.5rem 1rem',
-                            background: colors.surface,
-                            border: `1px solid ${colors.border}`,
-                            borderRadius: borderRadius.sm,
-                            color: colors.text,
-                            fontSize: '0.875rem',
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {expandedConcept === concept.id ? 'Show Less' : 'Show More'}
-                        </button>
-                        <button
-                          onClick={() => handleUseConcept(concept)}
-                          disabled={isCreatingProject}
-                          style={{
-                            padding: '0.5rem 1rem',
-                            background: isCreatingProject ? colors.textTertiary : `linear-gradient(135deg, ${colors.brandStart} 0%, ${colors.brandEnd} 100%)`,
-                            border: 'none',
-                            borderRadius: borderRadius.sm,
-                            color: 'white',
-                            fontSize: '0.875rem',
-                            fontWeight: 600,
-                            cursor: isCreatingProject ? 'wait' : 'pointer',
-                            whiteSpace: 'nowrap',
-                            opacity: isCreatingProject ? 0.7 : 1,
-                          }}
-                        >
-                          {isCreatingProject ? 'Creating Project...' : 'Use Concept'}
-                        </button>
-                        <button
-                          onClick={() => setShowOriginalityCheck(
-                            showOriginalityCheck === concept.id ? null : concept.id
-                          )}
-                          style={{
-                            padding: '0.5rem 1rem',
-                            background: showOriginalityCheck === concept.id ? colors.brandLight : colors.surface,
-                            border: `1px solid ${showOriginalityCheck === concept.id ? colors.brandStart : colors.border}`,
-                            borderRadius: borderRadius.sm,
-                            color: showOriginalityCheck === concept.id ? colors.brandText : colors.text,
-                            fontSize: '0.875rem',
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          Check Originality
-                        </button>
-                        <button
-                          onClick={() => handleStartEdit(concept)}
-                          style={{
-                            padding: '0.5rem 1rem',
-                            background: colors.surface,
-                            border: `1px solid ${colors.border}`,
-                            borderRadius: borderRadius.sm,
-                            color: colors.text,
-                            fontSize: '0.875rem',
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          Edit
-                        </button>
-                        <select
-                          value={concept.status}
-                          onChange={(e) => handleChangeStatus(concept.id, e.target.value as 'saved' | 'used' | 'archived')}
-                          style={{
-                            padding: '0.5rem 0.75rem',
-                            background: colors.surface,
-                            border: `1px solid ${colors.border}`,
-                            borderRadius: borderRadius.sm,
-                            color: colors.text,
-                            fontSize: '0.875rem',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          <option value="saved">Saved</option>
-                          <option value="used">Used</option>
-                          <option value="archived">Archived</option>
-                        </select>
-                        <button
-                          onClick={() => handleDelete(concept.id)}
-                          style={{
-                            padding: '0.5rem 1rem',
-                            background: colors.surface,
-                            border: `1px solid ${colors.errorBorder}`,
-                            borderRadius: borderRadius.sm,
-                            color: colors.error,
-                            fontSize: '0.875rem',
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {showOriginalityCheck === concept.id && (
-                    <div style={{ marginTop: '1rem' }}>
-                      <OriginalityChecker
-                        contentId={concept.id}
-                        contentType="concept"
-                        title={concept.title}
-                      />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-      </div>
+      <SplitView
+        leftWidth={30}
+        leftPane={renderLeftPane()}
+        rightPane={renderRightPane()}
+        minHeight="calc(100vh - 240px)"
+      />
 
       <style jsx>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </DashboardLayout>

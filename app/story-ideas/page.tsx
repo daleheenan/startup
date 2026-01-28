@@ -1,11 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { colors, borderRadius, shadows } from '@/app/lib/constants';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
 import GenerationProgress from '@/app/components/GenerationProgress';
+import SplitView, {
+  SplitViewListItem,
+  SplitViewEmptyState,
+  DetailPanelHeader,
+  DetailPanelSection,
+  DetailPanelActions,
+  ActionButton,
+} from '@/app/components/SplitView';
 import {
   useStoryIdeas,
   useDeleteStoryIdea,
@@ -21,7 +29,7 @@ export default function StoryIdeasPage() {
   const updateIdeaMutation = useUpdateStoryIdea();
   const expandIdeaMutation = useExpandStoryIdea();
 
-  const [expandedIdea, setExpandedIdea] = useState<string | null>(null);
+  const [selectedIdeaId, setSelectedIdeaId] = useState<string | null>(null);
   const [editingIdea, setEditingIdea] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<SavedStoryIdea>>({});
   const [filterGenre, setFilterGenre] = useState<string>('all');
@@ -31,20 +39,47 @@ export default function StoryIdeasPage() {
   const [expandError, setExpandError] = useState<string | null>(null);
 
   // Get unique genres from ideas
-  const genres = Array.from(new Set(ideas?.map(i => i.genre).filter(Boolean) || []));
+  const genres = useMemo(() =>
+    Array.from(new Set(ideas?.map(i => i.genre).filter(Boolean) || [])),
+    [ideas]
+  );
 
   // Filter ideas
-  const filteredIdeas = ideas?.filter(idea => {
-    if (filterGenre !== 'all' && idea.genre !== filterGenre) return false;
-    if (filterStatus !== 'all' && idea.status !== filterStatus) return false;
-    return true;
-  });
+  const filteredIdeas = useMemo(() =>
+    ideas?.filter(idea => {
+      if (filterGenre !== 'all' && idea.genre !== filterGenre) return false;
+      if (filterStatus !== 'all' && idea.status !== filterStatus) return false;
+      return true;
+    }) || [],
+    [ideas, filterGenre, filterStatus]
+  );
+
+  // Selected idea details
+  const selectedIdea = useMemo(() =>
+    filteredIdeas.find(idea => idea.id === selectedIdeaId) || null,
+    [filteredIdeas, selectedIdeaId]
+  );
+
+  // Auto-select first item when filtered list changes
+  useMemo(() => {
+    if (filteredIdeas.length > 0 && (!selectedIdeaId || !filteredIdeas.find(i => i.id === selectedIdeaId))) {
+      setSelectedIdeaId(filteredIdeas[0].id);
+    } else if (filteredIdeas.length === 0) {
+      setSelectedIdeaId(null);
+    }
+  }, [filteredIdeas, selectedIdeaId]);
 
   const handleDelete = async (ideaId: string) => {
     if (!confirm('Are you sure you want to delete this story idea?')) {
       return;
     }
     deleteIdeaMutation.mutate(ideaId);
+    // Select next item if current is deleted
+    if (selectedIdeaId === ideaId) {
+      const currentIndex = filteredIdeas.findIndex(i => i.id === ideaId);
+      const nextIdea = filteredIdeas[currentIndex + 1] || filteredIdeas[currentIndex - 1];
+      setSelectedIdeaId(nextIdea?.id || null);
+    }
   };
 
   const handleStartEdit = (idea: SavedStoryIdea) => {
@@ -76,8 +111,6 @@ export default function StoryIdeasPage() {
     setExpandError(null);
     try {
       const result = await expandIdeaMutation.mutateAsync({ id: ideaId, mode });
-      // Redirect to saved concepts page with the newly generated concept IDs
-      // This allows the concepts page to highlight/filter just the new concepts
       const conceptIds = result.concepts?.map((c: any) => c.id).join(',') || '';
       router.push(`/saved-concepts?new=${conceptIds}&from=idea`);
     } catch (err: any) {
@@ -124,6 +157,285 @@ export default function StoryIdeasPage() {
     );
   }
 
+  // Render the left pane list items
+  const renderLeftPane = () => {
+    if (!ideas || ideas.length === 0) {
+      return (
+        <SplitViewEmptyState
+          icon="💡"
+          title="No Story Ideas Yet"
+          message="Generate quick story ideas to save and develop later into full concepts."
+          action={
+            <Link
+              href="/new?mode=quick"
+              style={{
+                display: 'inline-block',
+                padding: '0.75rem 1.5rem',
+                background: `linear-gradient(135deg, ${colors.brandStart} 0%, ${colors.brandEnd} 100%)`,
+                borderRadius: borderRadius.md,
+                color: 'white',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
+            >
+              Generate Ideas
+            </Link>
+          }
+        />
+      );
+    }
+
+    if (filteredIdeas.length === 0) {
+      return (
+        <SplitViewEmptyState
+          icon="🔍"
+          title="No Matching Ideas"
+          message="Try adjusting your filters to see more ideas."
+        />
+      );
+    }
+
+    return (
+      <div>
+        {filteredIdeas.map(idea => (
+          <SplitViewListItem
+            key={idea.id}
+            id={idea.id}
+            title={idea.genre || 'Story Idea'}
+            date={new Date(idea.created_at).toLocaleDateString()}
+            genre={idea.subgenre || undefined}
+            premise={idea.story_idea}
+            isSelected={selectedIdeaId === idea.id}
+            status={idea.status}
+            onClick={setSelectedIdeaId}
+          />
+        ))}
+      </div>
+    );
+  };
+
+  // Render the right pane detail view
+  const renderRightPane = () => {
+    if (!selectedIdea) {
+      return (
+        <SplitViewEmptyState
+          icon="👈"
+          title="Select a Story Idea"
+          message="Click on a story idea from the list to view its details and take action."
+        />
+      );
+    }
+
+    // Edit mode
+    if (editingIdea === selectedIdea.id) {
+      return (
+        <div style={{ padding: '1.5rem' }}>
+          <h3 style={{
+            fontSize: '1.125rem',
+            fontWeight: 600,
+            color: colors.text,
+            marginBottom: '1.5rem',
+          }}>
+            Edit Story Idea
+          </h3>
+
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              color: colors.text,
+              marginBottom: '0.5rem',
+            }}>
+              Story Idea
+            </label>
+            <textarea
+              value={editForm.story_idea || ''}
+              onChange={(e) => setEditForm({ ...editForm, story_idea: e.target.value })}
+              style={{
+                width: '100%',
+                minHeight: '120px',
+                padding: '0.75rem',
+                border: `1px solid ${colors.border}`,
+                borderRadius: borderRadius.sm,
+                fontSize: '0.9375rem',
+                resize: 'vertical',
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              color: colors.text,
+              marginBottom: '0.5rem',
+            }}>
+              Notes
+            </label>
+            <textarea
+              value={editForm.notes || ''}
+              onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+              style={{
+                width: '100%',
+                minHeight: '80px',
+                padding: '0.75rem',
+                border: `1px solid ${colors.border}`,
+                borderRadius: borderRadius.sm,
+                fontSize: '0.9375rem',
+                resize: 'vertical',
+              }}
+              placeholder="Add your notes..."
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <ActionButton
+              variant="primary"
+              onClick={handleSaveEdit}
+              disabled={updateIdeaMutation.isPending}
+            >
+              {updateIdeaMutation.isPending ? 'Saving...' : 'Save Changes'}
+            </ActionButton>
+            <ActionButton variant="secondary" onClick={handleCancelEdit}>
+              Cancel
+            </ActionButton>
+          </div>
+        </div>
+      );
+    }
+
+    // View mode
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <DetailPanelHeader
+          title={selectedIdea.genre || 'Story Idea'}
+          status={selectedIdea.status}
+          genre={selectedIdea.subgenre || undefined}
+          date={new Date(selectedIdea.created_at).toLocaleDateString()}
+        />
+
+        <div style={{ flex: 1, padding: '1.5rem', overflowY: 'auto' }}>
+          <DetailPanelSection label="Premise">
+            <p style={{ margin: 0 }}>{selectedIdea.story_idea}</p>
+          </DetailPanelSection>
+
+          {selectedIdea.character_concepts?.length > 0 && (
+            <DetailPanelSection label="Character Concepts">
+              <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+                {selectedIdea.character_concepts.map((char, i) => (
+                  <li key={i}>{char}</li>
+                ))}
+              </ul>
+            </DetailPanelSection>
+          )}
+
+          {selectedIdea.plot_elements?.length > 0 && (
+            <DetailPanelSection label="Plot Elements">
+              <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+                {selectedIdea.plot_elements.map((elem, i) => (
+                  <li key={i}>{elem}</li>
+                ))}
+              </ul>
+            </DetailPanelSection>
+          )}
+
+          {selectedIdea.unique_twists?.length > 0 && (
+            <DetailPanelSection label="Unique Twists">
+              <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+                {selectedIdea.unique_twists.map((twist, i) => (
+                  <li key={i}>{twist}</li>
+                ))}
+              </ul>
+            </DetailPanelSection>
+          )}
+
+          {selectedIdea.themes?.length > 0 && (
+            <div style={{ marginBottom: '1rem' }}>
+              <div style={{
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                color: colors.textTertiary,
+                marginBottom: '0.5rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.025em',
+              }}>
+                Themes
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                {selectedIdea.themes.map((theme, i) => (
+                  <span
+                    key={i}
+                    style={{
+                      padding: '0.25rem 0.75rem',
+                      background: colors.surfaceHover,
+                      color: colors.textSecondary,
+                      fontSize: '0.75rem',
+                      borderRadius: borderRadius.full,
+                    }}
+                  >
+                    {theme}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {selectedIdea.notes && (
+            <DetailPanelSection label="Your Notes" variant="warning">
+              {selectedIdea.notes}
+            </DetailPanelSection>
+          )}
+        </div>
+
+        <DetailPanelActions>
+          <ActionButton
+            variant="primary"
+            onClick={() => handleExpand(selectedIdea.id, 'concepts_5')}
+            disabled={expandIdeaMutation.isPending}
+          >
+            {expandIdeaMutation.isPending ? 'Generating...' : 'Generate 5 Concepts'}
+          </ActionButton>
+          <ActionButton
+            variant="secondary"
+            onClick={() => handleExpand(selectedIdea.id, 'concepts_10')}
+            disabled={expandIdeaMutation.isPending}
+          >
+            Generate 10 Concepts
+          </ActionButton>
+          <ActionButton variant="secondary" onClick={() => handleStartEdit(selectedIdea)}>
+            Edit
+          </ActionButton>
+          <select
+            value={selectedIdea.status}
+            onChange={(e) => updateIdeaMutation.mutate({
+              id: selectedIdea.id,
+              updates: { status: e.target.value as 'saved' | 'used' | 'archived' }
+            })}
+            style={{
+              padding: '0.625rem 0.75rem',
+              background: colors.surface,
+              border: `1px solid ${colors.border}`,
+              borderRadius: borderRadius.sm,
+              color: colors.text,
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+            }}
+          >
+            <option value="saved">Saved</option>
+            <option value="used">Used</option>
+            <option value="archived">Archived</option>
+          </select>
+          <ActionButton variant="danger" onClick={() => handleDelete(selectedIdea.id)}>
+            Delete
+          </ActionButton>
+        </DetailPanelActions>
+      </div>
+    );
+  };
+
   return (
     <DashboardLayout
       header={{
@@ -136,7 +448,7 @@ export default function StoryIdeasPage() {
         <div style={{
           display: 'flex',
           gap: '1rem',
-          marginBottom: '1.5rem',
+          marginBottom: '1rem',
         }}>
           <select
             value={filterGenre}
@@ -172,368 +484,36 @@ export default function StoryIdeasPage() {
             <option value="used">Used</option>
             <option value="archived">Archived</option>
           </select>
+          <div style={{
+            marginLeft: 'auto',
+            fontSize: '0.875rem',
+            color: colors.textSecondary,
+            alignSelf: 'center',
+          }}>
+            {filteredIdeas.length} {filteredIdeas.length === 1 ? 'idea' : 'ideas'}
+          </div>
         </div>
       )}
 
-      <div>
-          {error && (
-            <div style={{
-              background: colors.errorLight,
-              border: `1px solid ${colors.errorBorder}`,
-              borderRadius: borderRadius.lg,
-              padding: '1rem 1.5rem',
-              marginBottom: '1.5rem',
-              color: colors.error,
-            }}>
-              Failed to load story ideas. Please try again.
-            </div>
-          )}
+      {error && (
+        <div style={{
+          background: colors.errorLight,
+          border: `1px solid ${colors.errorBorder}`,
+          borderRadius: borderRadius.lg,
+          padding: '1rem 1.5rem',
+          marginBottom: '1rem',
+          color: colors.error,
+        }}>
+          Failed to load story ideas. Please try again.
+        </div>
+      )}
 
-          {(!filteredIdeas || filteredIdeas.length === 0) ? (
-            <div style={{
-              textAlign: 'center',
-              padding: '4rem 2rem',
-              background: colors.surface,
-              borderRadius: borderRadius.lg,
-              border: `2px dashed ${colors.border}`,
-            }}>
-              <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>💡</div>
-              <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: colors.text }}>
-                {ideas?.length === 0 ? 'No Story Ideas Yet' : 'No Matching Ideas'}
-              </h2>
-              <p style={{ fontSize: '1rem', color: colors.textSecondary, marginBottom: '2rem' }}>
-                {ideas?.length === 0
-                  ? 'Generate quick story ideas to save and develop later into full concepts.'
-                  : 'Try adjusting your filters to see more ideas.'}
-              </p>
-              {ideas?.length === 0 && (
-                <Link
-                  href="/new?mode=quick"
-                  style={{
-                    display: 'inline-block',
-                    padding: '1rem 2rem',
-                    background: `linear-gradient(135deg, ${colors.brandStart} 0%, ${colors.brandEnd} 100%)`,
-                    borderRadius: borderRadius.md,
-                    color: 'white',
-                    fontSize: '1rem',
-                    fontWeight: 600,
-                    textDecoration: 'none',
-                    boxShadow: shadows.md,
-                  }}
-                >
-                  Generate Quick Story Ideas
-                </Link>
-              )}
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gap: '1rem' }}>
-              {filteredIdeas.map(idea => (
-                <div
-                  key={idea.id}
-                  style={{
-                    background: colors.surface,
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: borderRadius.lg,
-                    padding: '1.5rem',
-                    boxShadow: shadows.sm,
-                  }}
-                >
-                  {editingIdea === idea.id ? (
-                    // Edit Mode
-                    <div>
-                      <div style={{ marginBottom: '1rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: colors.text, marginBottom: '0.5rem' }}>
-                          Story Idea
-                        </label>
-                        <textarea
-                          value={editForm.story_idea || ''}
-                          onChange={(e) => setEditForm({ ...editForm, story_idea: e.target.value })}
-                          style={{
-                            width: '100%',
-                            minHeight: '80px',
-                            padding: '0.75rem',
-                            border: `1px solid ${colors.border}`,
-                            borderRadius: borderRadius.sm,
-                            fontSize: '0.9375rem',
-                            resize: 'vertical',
-                          }}
-                        />
-                      </div>
-                      <div style={{ marginBottom: '1rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: colors.text, marginBottom: '0.5rem' }}>
-                          Notes
-                        </label>
-                        <textarea
-                          value={editForm.notes || ''}
-                          onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-                          style={{
-                            width: '100%',
-                            minHeight: '60px',
-                            padding: '0.75rem',
-                            border: `1px solid ${colors.border}`,
-                            borderRadius: borderRadius.sm,
-                            fontSize: '0.9375rem',
-                            resize: 'vertical',
-                          }}
-                          placeholder="Add your notes..."
-                        />
-                      </div>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button
-                          onClick={handleSaveEdit}
-                          disabled={updateIdeaMutation.isPending}
-                          style={{
-                            padding: '0.5rem 1rem',
-                            background: colors.success,
-                            border: 'none',
-                            borderRadius: borderRadius.sm,
-                            color: 'white',
-                            fontSize: '0.875rem',
-                            fontWeight: 500,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {updateIdeaMutation.isPending ? 'Saving...' : 'Save'}
-                        </button>
-                        <button
-                          onClick={handleCancelEdit}
-                          style={{
-                            padding: '0.5rem 1rem',
-                            background: colors.surface,
-                            border: `1px solid ${colors.border}`,
-                            borderRadius: borderRadius.sm,
-                            color: colors.textSecondary,
-                            fontSize: '0.875rem',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    // View Mode
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                          <span style={{
-                            padding: '0.25rem 0.75rem',
-                            background: colors.brandLight,
-                            color: colors.brandText,
-                            fontSize: '0.75rem',
-                            fontWeight: 500,
-                            borderRadius: borderRadius.full,
-                          }}>
-                            {idea.genre}
-                          </span>
-                          {idea.status !== 'saved' && (
-                            <span style={{
-                              padding: '0.25rem 0.75rem',
-                              background: idea.status === 'used' ? colors.successLight : colors.surfaceHover,
-                              color: idea.status === 'used' ? colors.success : colors.textTertiary,
-                              fontSize: '0.75rem',
-                              fontWeight: 500,
-                              borderRadius: borderRadius.full,
-                            }}>
-                              {idea.status}
-                            </span>
-                          )}
-                        </div>
-
-                        <p style={{
-                          fontSize: '1rem',
-                          color: colors.text,
-                          lineHeight: 1.6,
-                          marginBottom: '0.5rem',
-                        }}>
-                          {idea.story_idea}
-                        </p>
-
-                        {/* Save date - always visible */}
-                        <div style={{
-                          fontSize: '0.75rem',
-                          color: colors.textTertiary,
-                          marginBottom: expandedIdea === idea.id ? '1rem' : 0,
-                        }}>
-                          Saved: {new Date(idea.created_at).toLocaleDateString()}
-                        </div>
-
-                        {expandedIdea === idea.id && (
-                          <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: `1px solid ${colors.border}` }}>
-                            {idea.character_concepts?.length > 0 && (
-                              <div style={{ marginBottom: '0.75rem' }}>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: colors.textTertiary, marginBottom: '0.25rem' }}>
-                                  CHARACTER CONCEPTS
-                                </div>
-                                <ul style={{ margin: 0, paddingLeft: '1.25rem', color: colors.textSecondary, fontSize: '0.875rem' }}>
-                                  {idea.character_concepts.map((char, i) => (
-                                    <li key={i}>{char}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                            {idea.plot_elements?.length > 0 && (
-                              <div style={{ marginBottom: '0.75rem' }}>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: colors.textTertiary, marginBottom: '0.25rem' }}>
-                                  PLOT ELEMENTS
-                                </div>
-                                <ul style={{ margin: 0, paddingLeft: '1.25rem', color: colors.textSecondary, fontSize: '0.875rem' }}>
-                                  {idea.plot_elements.map((elem, i) => (
-                                    <li key={i}>{elem}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                            {idea.unique_twists?.length > 0 && (
-                              <div style={{ marginBottom: '0.75rem' }}>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: colors.textTertiary, marginBottom: '0.25rem' }}>
-                                  UNIQUE TWISTS
-                                </div>
-                                <ul style={{ margin: 0, paddingLeft: '1.25rem', color: colors.textSecondary, fontSize: '0.875rem' }}>
-                                  {idea.unique_twists.map((twist, i) => (
-                                    <li key={i}>{twist}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                            {idea.notes && (
-                              <div style={{
-                                background: colors.warningLight,
-                                border: `1px solid ${colors.warningBorder}`,
-                                borderRadius: borderRadius.sm,
-                                padding: '0.75rem',
-                                marginTop: '0.75rem',
-                              }}>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: colors.warning, marginBottom: '0.25rem' }}>
-                                  YOUR NOTES
-                                </div>
-                                <div style={{ fontSize: '0.875rem', color: colors.text }}>
-                                  {idea.notes}
-                                </div>
-                              </div>
-                            )}
-                            <div style={{
-                              fontSize: '0.75rem',
-                              color: colors.textTertiary,
-                              marginTop: '1rem',
-                            }}>
-                              Saved: {new Date(idea.created_at).toLocaleDateString()}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      <div style={{ marginLeft: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        <button
-                          onClick={() => setExpandedIdea(expandedIdea === idea.id ? null : idea.id)}
-                          style={{
-                            padding: '0.5rem 1rem',
-                            background: colors.surface,
-                            border: `1px solid ${colors.border}`,
-                            borderRadius: borderRadius.sm,
-                            color: colors.text,
-                            fontSize: '0.875rem',
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {expandedIdea === idea.id ? 'Show Less' : 'Show More'}
-                        </button>
-                        <button
-                          onClick={() => handleExpand(idea.id, 'concepts_5')}
-                          disabled={expandIdeaMutation.isPending}
-                          style={{
-                            padding: '0.5rem 1rem',
-                            background: `linear-gradient(135deg, ${colors.brandStart} 0%, ${colors.brandEnd} 100%)`,
-                            border: 'none',
-                            borderRadius: borderRadius.sm,
-                            color: 'white',
-                            fontSize: '0.875rem',
-                            fontWeight: 600,
-                            cursor: expandIdeaMutation.isPending ? 'wait' : 'pointer',
-                            whiteSpace: 'nowrap',
-                            opacity: expandIdeaMutation.isPending ? 0.7 : 1,
-                          }}
-                        >
-                          {expandIdeaMutation.isPending ? 'Generating...' : 'Generate 5 Concepts'}
-                        </button>
-                        <button
-                          onClick={() => handleExpand(idea.id, 'concepts_10')}
-                          disabled={expandIdeaMutation.isPending}
-                          style={{
-                            padding: '0.5rem 1rem',
-                            background: colors.surface,
-                            border: `2px solid ${colors.brandBorder}`,
-                            borderRadius: borderRadius.sm,
-                            color: colors.brandText,
-                            fontSize: '0.875rem',
-                            fontWeight: 600,
-                            cursor: expandIdeaMutation.isPending ? 'wait' : 'pointer',
-                            whiteSpace: 'nowrap',
-                            opacity: expandIdeaMutation.isPending ? 0.7 : 1,
-                          }}
-                        >
-                          {expandIdeaMutation.isPending ? 'Generating...' : 'Generate 10 Concepts'}
-                        </button>
-                        <button
-                          onClick={() => handleStartEdit(idea)}
-                          style={{
-                            padding: '0.5rem 1rem',
-                            background: colors.surface,
-                            border: `1px solid ${colors.border}`,
-                            borderRadius: borderRadius.sm,
-                            color: colors.text,
-                            fontSize: '0.875rem',
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          Edit
-                        </button>
-                        <select
-                          value={idea.status}
-                          onChange={(e) => updateIdeaMutation.mutate({
-                            id: idea.id,
-                            updates: { status: e.target.value as 'saved' | 'used' | 'archived' }
-                          })}
-                          style={{
-                            padding: '0.5rem 0.75rem',
-                            background: colors.surface,
-                            border: `1px solid ${colors.border}`,
-                            borderRadius: borderRadius.sm,
-                            color: colors.text,
-                            fontSize: '0.875rem',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          <option value="saved">Saved</option>
-                          <option value="used">Used</option>
-                          <option value="archived">Archived</option>
-                        </select>
-                        <button
-                          onClick={() => handleDelete(idea.id)}
-                          disabled={deleteIdeaMutation.isPending}
-                          style={{
-                            padding: '0.5rem 1rem',
-                            background: colors.surface,
-                            border: `1px solid ${colors.errorBorder}`,
-                            borderRadius: borderRadius.sm,
-                            color: colors.error,
-                            fontSize: '0.875rem',
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-      </div>
+      <SplitView
+        leftWidth={30}
+        leftPane={renderLeftPane()}
+        rightPane={renderRightPane()}
+        minHeight="calc(100vh - 240px)"
+      />
 
       {/* Progress Modal for Concept Generation */}
       <GenerationProgress
