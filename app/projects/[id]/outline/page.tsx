@@ -9,6 +9,8 @@ import ProjectNavigation from '../../../components/shared/ProjectNavigation';
 import { useProjectNavigation } from '@/app/hooks';
 import ConfirmDialog from '../../../components/shared/ConfirmDialog';
 import VersionPromptDialog from '../../../components/VersionPromptDialog';
+import CollapsibleSection from '../../../components/CollapsibleSection';
+import AgentWorkflowVisualization from '../../../components/AgentWorkflowVisualization';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -894,6 +896,24 @@ export default function OutlinePage() {
                   <p style={{ color: '#64748B', fontSize: '0.875rem', margin: 0, marginBottom: '1rem' }}>
                     {outline.structure_type.replace(/_/g, ' ')} • {outline.structure.acts.length} acts • {outline.total_chapters} chapters planned
                   </p>
+
+                  {/* Agent Workflow Visualization - show when jobs are queued or chapters exist */}
+                  {(hasQueuedJobs || chaptersExist) && (
+                    <div style={{ marginTop: '1rem' }}>
+                      <CollapsibleSection
+                        sectionId={`agent-workflow-${projectId}`}
+                        title="Agent Workflow Progress"
+                        description="Real-time visualisation of the 15-agent chapter generation pipeline"
+                        defaultOpen={hasQueuedJobs}
+                      >
+                        <AgentWorkflowVisualization
+                          projectId={projectId}
+                          bookId={book?.id}
+                          showMultipleChapters={true}
+                        />
+                      </CollapsibleSection>
+                    </div>
+                  )}
 
                   {/* Show generation button only if no chapters exist and no jobs are queued */}
                   {!chaptersExist && !hasQueuedJobs ? (
