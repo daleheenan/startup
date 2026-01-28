@@ -156,11 +156,12 @@ router.post('/projects/:projectId/outline-editorial/submit', async (req, res) =>
     const result = await outlineEditorialService.submitOutlineForReview(projectId);
 
     // Queue the three analysis modules as jobs
+    // Note: outline_editorial_finalize is NOT queued here - it will be queued automatically
+    // by the last module to complete (see worker.ts maybeQueueOutlineEditorialFinalize)
     const { QueueWorker } = await import('../queue/worker.js');
     QueueWorker.createJob('outline_structure_analyst', result.reportId);
     QueueWorker.createJob('outline_character_arc', result.reportId);
     QueueWorker.createJob('outline_market_fit', result.reportId);
-    QueueWorker.createJob('outline_editorial_finalize', result.reportId);
 
     // Update report status to processing
     db.prepare(`

@@ -1720,6 +1720,9 @@ Return ONLY a JSON object:
       }, 'outline_structure_analyst: Completed');
 
       checkpointManager.saveCheckpoint(job.id, 'completed', { reportId });
+
+      // Check if all modules are complete and queue finalize if so
+      this.maybeQueueOutlineEditorialFinalize(reportId);
     } catch (error) {
       logger.error({ error, reportId }, 'outline_structure_analyst: Error');
       throw error;
@@ -1747,6 +1750,9 @@ Return ONLY a JSON object:
       }, 'outline_character_arc: Completed');
 
       checkpointManager.saveCheckpoint(job.id, 'completed', { reportId });
+
+      // Check if all modules are complete and queue finalize if so
+      this.maybeQueueOutlineEditorialFinalize(reportId);
     } catch (error) {
       logger.error({ error, reportId }, 'outline_character_arc: Error');
       throw error;
@@ -1774,9 +1780,64 @@ Return ONLY a JSON object:
       }, 'outline_market_fit: Completed');
 
       checkpointManager.saveCheckpoint(job.id, 'completed', { reportId });
+
+      // Check if all modules are complete and queue finalize if so
+      this.maybeQueueOutlineEditorialFinalize(reportId);
     } catch (error) {
       logger.error({ error, reportId }, 'outline_market_fit: Error');
       throw error;
+    }
+  }
+
+  /**
+   * Check if all Outline Editorial modules are complete and queue the finalize job if so.
+   * This is called after each module completes to ensure finalize runs only
+   * after all 3 modules have finished.
+   */
+  private maybeQueueOutlineEditorialFinalize(reportId: string): void {
+    try {
+      // Check if all 3 modules are complete
+      const report = db.prepare(`
+        SELECT structure_analyst_status, character_arc_status, market_fit_status, status
+        FROM outline_editorial_reports WHERE id = ?
+      `).get(reportId) as any;
+
+      if (!report) {
+        logger.warn({ reportId }, 'maybeQueueOutlineEditorialFinalize: Report not found');
+        return;
+      }
+
+      const allComplete =
+        report.structure_analyst_status === 'completed' &&
+        report.character_arc_status === 'completed' &&
+        report.market_fit_status === 'completed';
+
+      if (!allComplete) {
+        logger.debug({
+          reportId,
+          structure: report.structure_analyst_status,
+          character: report.character_arc_status,
+          market: report.market_fit_status
+        }, 'maybeQueueOutlineEditorialFinalize: Not all modules complete yet');
+        return;
+      }
+
+      // Check if finalize job already exists for this report
+      const existingJob = db.prepare(`
+        SELECT id FROM jobs
+        WHERE type = 'outline_editorial_finalize' AND target_id = ? AND status IN ('pending', 'running')
+      `).get(reportId);
+
+      if (existingJob) {
+        logger.debug({ reportId }, 'maybeQueueOutlineEditorialFinalize: Finalize job already exists');
+        return;
+      }
+
+      // Queue the finalize job
+      logger.info({ reportId }, 'maybeQueueOutlineEditorialFinalize: All modules complete, queuing finalize job');
+      QueueWorker.createJob('outline_editorial_finalize', reportId);
+    } catch (error) {
+      logger.error({ error, reportId }, 'maybeQueueOutlineEditorialFinalize: Error checking/queuing finalize');
     }
   }
 

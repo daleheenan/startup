@@ -222,11 +222,12 @@ describe('VEB Routes', () => {
 
       expect(mockSubmitToVEB).toHaveBeenCalledWith(projectId);
 
-      // Verify jobs were queued
+      // Verify 3 module jobs were queued (finalize is queued later by worker)
       expect(mockCreateJob).toHaveBeenCalledWith('veb_beta_swarm', 'report-456');
       expect(mockCreateJob).toHaveBeenCalledWith('veb_ruthless_editor', 'report-456');
       expect(mockCreateJob).toHaveBeenCalledWith('veb_market_analyst', 'report-456');
-      expect(mockCreateJob).toHaveBeenCalledWith('veb_finalize', 'report-456');
+      // Note: veb_finalize is NOT queued here - it's queued by the last module to complete
+      expect(mockCreateJob).not.toHaveBeenCalledWith('veb_finalize', 'report-456');
 
       // Verify report status was updated to processing
       expect(mockRun).toHaveBeenCalled();

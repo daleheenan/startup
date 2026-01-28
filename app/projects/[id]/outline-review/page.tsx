@@ -645,6 +645,14 @@ export default function OutlineReviewPage() {
     return '#EF4444';
   };
 
+  // Helper to format underscore text for display (e.g., 'positive_change' -> 'Positive Change')
+  const formatDisplayText = (text: string | undefined | null): string => {
+    if (!text) return 'N/A';
+    return text
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase()); // Capitalise first letter of each word
+  };
+
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case 'major':
@@ -738,7 +746,7 @@ export default function OutlineReviewPage() {
               <span style={{ color: '#64748B' }}>/10</span>
             </div>
             <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.875rem', color: '#64748B' }}>
-              {report.characterArc?.results?.protagonistArc?.arcType || 'Pending'}
+              {formatDisplayText(report.characterArc?.results?.protagonistArc?.arcType) || 'Pending'}
             </p>
           </div>
 
@@ -822,7 +830,7 @@ export default function OutlineReviewPage() {
           padding: '1.5rem',
           border: '1px solid #E2E8F0',
         }}>
-          <h4 style={{ margin: '0 0 1rem 0' }}>Plot Structure: {results.plotStructureAnalysis.structureType}</h4>
+          <h4 style={{ margin: '0 0 1rem 0' }}>Plot Structure: {formatDisplayText(results.plotStructureAnalysis.structureType)}</h4>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div>
@@ -902,18 +910,18 @@ export default function OutlineReviewPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div>
               <p style={{ margin: 0, fontSize: '0.875rem' }}>
-                <strong>Tension Curve:</strong> {results.storyArcAnalysis.tensionCurve.replace(/_/g, ' ')}
+                <strong>Tension Curve:</strong> {formatDisplayText(results.storyArcAnalysis.tensionCurve)}
               </p>
               <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.875rem' }}>
-                <strong>Climax:</strong> {results.storyArcAnalysis.climaxPlacement}
+                <strong>Climax:</strong> {formatDisplayText(results.storyArcAnalysis.climaxPlacement)}
               </p>
             </div>
             <div>
               <p style={{ margin: 0, fontSize: '0.875rem' }}>
-                <strong>Resolution:</strong> {results.storyArcAnalysis.resolutionAssessment}
+                <strong>Resolution:</strong> {formatDisplayText(results.storyArcAnalysis.resolutionAssessment)}
               </p>
               <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.875rem' }}>
-                <strong>Emotional Journey:</strong> {results.storyArcAnalysis.emotionalJourney}
+                <strong>Emotional Journey:</strong> {formatDisplayText(results.storyArcAnalysis.emotionalJourney)}
               </p>
             </div>
           </div>
@@ -956,7 +964,7 @@ export default function OutlineReviewPage() {
               borderRadius: '12px',
               fontSize: '0.75rem',
             }}>
-              {results.protagonistArc.arcType}
+              {formatDisplayText(results.protagonistArc.arcType)}
             </span>
           </h4>
 

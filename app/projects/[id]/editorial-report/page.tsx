@@ -915,6 +915,44 @@ export default function EditorialReportPage() {
           })()}
         </div>
 
+        {/* Action Plan Link */}
+        <div style={{
+          background: '#EDE9FE',
+          borderRadius: '8px',
+          padding: '1.25rem',
+          border: '1px solid #C4B5FD',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '1rem',
+        }}>
+          <div>
+            <h4 style={{ margin: '0 0 0.25rem 0', color: '#5B21B6', fontSize: '1rem' }}>
+              📋 Editorial Action Plan
+            </h4>
+            <p style={{ margin: 0, fontSize: '0.875rem', color: '#7C3AED' }}>
+              Track and manage all findings from the editorial board. Accept, reject, or mark items as implemented.
+            </p>
+          </div>
+          <Link
+            href={`/projects/${projectId}/editorial-action-plan`}
+            style={{
+              padding: '10px 20px',
+              background: '#7C3AED',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              textDecoration: 'none',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            View Action Plan →
+          </Link>
+        </div>
+
         {/* Recommendations */}
         {report.recommendations && report.recommendations.length > 0 && (
           <VEBRecommendationsSection
