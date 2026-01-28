@@ -1113,6 +1113,9 @@ Output only valid JSON, no commentary:`;
       }, 'veb_beta_swarm: Completed Beta Swarm analysis');
 
       checkpointManager.saveCheckpoint(job.id, 'completed', { reportId });
+
+      // Check if all modules are complete and queue finalize if so
+      this.maybeQueueVebFinalize(reportId);
     } catch (error) {
       logger.error({ error, reportId }, 'veb_beta_swarm: Error in Beta Swarm analysis');
       throw error;
@@ -1141,6 +1144,9 @@ Output only valid JSON, no commentary:`;
       }, 'veb_ruthless_editor: Completed Ruthless Editor analysis');
 
       checkpointManager.saveCheckpoint(job.id, 'completed', { reportId });
+
+      // Check if all modules are complete and queue finalize if so
+      this.maybeQueueVebFinalize(reportId);
     } catch (error) {
       logger.error({ error, reportId }, 'veb_ruthless_editor: Error in Ruthless Editor analysis');
       throw error;
@@ -1169,9 +1175,64 @@ Output only valid JSON, no commentary:`;
       }, 'veb_market_analyst: Completed Market Analyst analysis');
 
       checkpointManager.saveCheckpoint(job.id, 'completed', { reportId });
+
+      // Check if all modules are complete and queue finalize if so
+      this.maybeQueueVebFinalize(reportId);
     } catch (error) {
       logger.error({ error, reportId }, 'veb_market_analyst: Error in Market Analyst analysis');
       throw error;
+    }
+  }
+
+  /**
+   * Check if all VEB modules are complete and queue the finalize job if so.
+   * This is called after each module completes to ensure finalize runs only
+   * after all 3 modules have finished.
+   */
+  private maybeQueueVebFinalize(reportId: string): void {
+    try {
+      // Check if all 3 modules are complete
+      const report = db.prepare(`
+        SELECT beta_swarm_status, ruthless_editor_status, market_analyst_status, status
+        FROM editorial_reports WHERE id = ?
+      `).get(reportId) as any;
+
+      if (!report) {
+        logger.warn({ reportId }, 'maybeQueueVebFinalize: Report not found');
+        return;
+      }
+
+      const allComplete =
+        report.beta_swarm_status === 'completed' &&
+        report.ruthless_editor_status === 'completed' &&
+        report.market_analyst_status === 'completed';
+
+      if (!allComplete) {
+        logger.debug({
+          reportId,
+          beta: report.beta_swarm_status,
+          editor: report.ruthless_editor_status,
+          market: report.market_analyst_status
+        }, 'maybeQueueVebFinalize: Not all modules complete yet');
+        return;
+      }
+
+      // Check if finalize job already exists for this report
+      const existingJob = db.prepare(`
+        SELECT id FROM jobs
+        WHERE type = 'veb_finalize' AND target_id = ? AND status IN ('pending', 'running')
+      `).get(reportId);
+
+      if (existingJob) {
+        logger.debug({ reportId }, 'maybeQueueVebFinalize: Finalize job already exists');
+        return;
+      }
+
+      // Queue the finalize job
+      logger.info({ reportId }, 'maybeQueueVebFinalize: All modules complete, queuing finalize job');
+      QueueWorker.createJob('veb_finalize', reportId);
+    } catch (error) {
+      logger.error({ error, reportId }, 'maybeQueueVebFinalize: Error checking/queuing finalize');
     }
   }
 
@@ -1888,6 +1949,95 @@ Return ONLY a JSON object:
    */
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Recover stale jobs on server startup.
+   * Jobs that were 'running' when the server crashed/restarted are reset to 'pending'.
+   * Also marks VEB modules as 'failed' if their jobs were interrupted.
+   *
+   * This should be called before starting the queue worker.
+   */
+  static recoverStaleJobs(): void {
+    try {
+      // Find jobs that were running (likely from before a crash/restart)
+      const staleJobs = db.prepare(`
+        SELECT id, type, target_id, started_at FROM jobs
+        WHERE status = 'running'
+      `).all() as any[];
+
+      if (staleJobs.length === 0) {
+        logger.info('[QueueWorker] No stale running jobs found on startup');
+        return;
+      }
+
+      logger.warn({ count: staleJobs.length }, '[QueueWorker] Found stale running jobs from previous session - resetting to pending');
+
+      // Reset stale jobs to pending and increment attempts
+      const resetStmt = db.prepare(`
+        UPDATE jobs
+        SET status = 'pending',
+            error = 'Reset after server restart - job was running when server stopped',
+            started_at = NULL
+        WHERE id = ?
+      `);
+
+      for (const job of staleJobs) {
+        logger.info({
+          jobId: job.id,
+          type: job.type,
+          targetId: job.target_id,
+          startedAt: job.started_at
+        }, '[QueueWorker] Resetting stale job to pending');
+
+        resetStmt.run(job.id);
+
+        // For VEB jobs, mark the corresponding module as failed so UI shows correctly
+        if (job.type === 'veb_beta_swarm') {
+          db.prepare(`
+            UPDATE editorial_reports
+            SET beta_swarm_status = 'pending'
+            WHERE id = ? AND beta_swarm_status = 'processing'
+          `).run(job.target_id);
+        } else if (job.type === 'veb_ruthless_editor') {
+          db.prepare(`
+            UPDATE editorial_reports
+            SET ruthless_editor_status = 'pending'
+            WHERE id = ? AND ruthless_editor_status = 'processing'
+          `).run(job.target_id);
+        } else if (job.type === 'veb_market_analyst') {
+          db.prepare(`
+            UPDATE editorial_reports
+            SET market_analyst_status = 'pending'
+            WHERE id = ? AND market_analyst_status = 'processing'
+          `).run(job.target_id);
+        }
+        // Similar for outline editorial jobs
+        else if (job.type === 'outline_structure_analyst') {
+          db.prepare(`
+            UPDATE outline_editorial_reports
+            SET structure_analyst_status = 'pending'
+            WHERE id = ? AND structure_analyst_status = 'processing'
+          `).run(job.target_id);
+        } else if (job.type === 'outline_character_arc') {
+          db.prepare(`
+            UPDATE outline_editorial_reports
+            SET character_arc_status = 'pending'
+            WHERE id = ? AND character_arc_status = 'processing'
+          `).run(job.target_id);
+        } else if (job.type === 'outline_market_fit') {
+          db.prepare(`
+            UPDATE outline_editorial_reports
+            SET market_fit_status = 'pending'
+            WHERE id = ? AND market_fit_status = 'processing'
+          `).run(job.target_id);
+        }
+      }
+
+      logger.info({ count: staleJobs.length }, '[QueueWorker] Stale jobs recovered and reset to pending');
+    } catch (error) {
+      logger.error({ error }, '[QueueWorker] Error recovering stale jobs');
+    }
   }
 }
 

@@ -99,7 +99,7 @@ if (process.env.NODE_ENV !== 'test') {
 
 // Import database and migrations after env is loaded
 import { runMigrations } from './db/migrate.js';
-import { queueWorker } from './queue/worker.js';
+import { queueWorker, QueueWorker } from './queue/worker.js';
 import { requireAuth } from './middleware/auth.js';
 import { setServerReady, setQueueWorkerReady } from './services/server-state.service.js';
 import { logger, requestLogger } from './services/logger.service.js';
@@ -292,6 +292,11 @@ const server = app.listen(PORT, () => {
   // Start queue worker after server is listening
   // Use setImmediate to ensure server is fully bound before starting worker
   setImmediate(() => {
+    // Recover any stale jobs that were running when the server last stopped
+    // This ensures VEB and other jobs don't get stuck in 'running' state forever
+    logger.info('Recovering stale jobs from previous session...');
+    QueueWorker.recoverStaleJobs();
+
     logger.info('Starting queue worker');
     queueWorker.start()
       .then(() => {

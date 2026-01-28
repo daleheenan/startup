@@ -237,11 +237,12 @@ router.post('/projects/:projectId/veb/submit', async (req, res) => {
     const result = await vebService.submitToVEB(projectId);
 
     // Queue the three analysis modules as jobs
+    // Note: veb_finalize is NOT queued here - it will be queued automatically
+    // by the last module to complete (see worker.ts maybeQueueVebFinalize)
     const { QueueWorker } = await import('../queue/worker.js');
     QueueWorker.createJob('veb_beta_swarm', result.reportId);
     QueueWorker.createJob('veb_ruthless_editor', result.reportId);
     QueueWorker.createJob('veb_market_analyst', result.reportId);
-    QueueWorker.createJob('veb_finalize', result.reportId);
 
     // Update report status to processing
     db.prepare(`
