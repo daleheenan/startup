@@ -205,8 +205,8 @@ const navigationGroups = [
     isStandalone: false,
     href: undefined,
     items: [
-      { id: 'quick-start', label: 'Quick Start', href: 'https://novelforge.daleheenan.com/quick-start', icon: <QuickStartIcon /> },
-      { id: 'full-customization', label: 'Full Customisation', href: 'https://novelforge.daleheenan.com/full-customization', icon: <FullCustomisationIcon /> },
+      { id: 'quick-start', label: 'Quick Start', href: '/quick-start', icon: <QuickStartIcon /> },
+      { id: 'full-customization', label: 'Full Customisation', href: '/full-customization', icon: <FullCustomisationIcon /> },
       { id: 'ideas', label: 'Ideas', href: '/story-ideas', icon: <IdeasIcon /> },
       { id: 'concepts', label: 'Concepts', href: '/saved-concepts', icon: <ConceptsIcon /> },
     ],
