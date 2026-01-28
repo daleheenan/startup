@@ -71,6 +71,9 @@ export default function SeriesManagementPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'characters' | 'timeline' | 'mysteries'>('overview');
   const [project, setProject] = useState<any>(null);
+  const [showAddBookForm, setShowAddBookForm] = useState(false);
+  const [newBookTitle, setNewBookTitle] = useState('');
+  const [addingBook, setAddingBook] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -119,6 +122,48 @@ export default function SeriesManagementPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const handleAddBook = async () => {
+    if (!newBookTitle.trim()) {
+      setError('Please enter a book title');
+      return;
+    }
+
+    setAddingBook(true);
+    setError(null);
+
+    try {
+      const token = getToken();
+      const nextBookNumber = books.length + 1;
+
+      const res = await fetch(`${API_BASE_URL}/api/books`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          projectId,
+          title: newBookTitle.trim(),
+          bookNumber: nextBookNumber,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error?.message || 'Failed to create book');
+      }
+
+      // Refresh data
+      await fetchData();
+      setNewBookTitle('');
+      setShowAddBookForm(false);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setAddingBook(false);
+    }
+  };
 
   const handleGenerateSeriesBible = async () => {
     setGenerating(true);
@@ -257,15 +302,131 @@ export default function SeriesManagementPage() {
       >
         <div style={cardStyle}>
           <h3 style={{ fontSize: '1.25rem', marginBottom: '1rem', color: colors.text }}>
-            Not a Series Project
+            {books.length === 0 ? 'No Books Yet' : 'Add More Books to Create a Series'}
           </h3>
           <p style={{ color: colors.textSecondary, marginBottom: '1.5rem' }}>
             Series management is available for projects with 2 or more books.
-            This project currently has {books.length} book(s).
+            This project currently has {books.length} book{books.length !== 1 ? 's' : ''}.
           </p>
-          <p style={{ color: colors.textSecondary }}>
-            To convert this to a series, create additional books from the project page.
-          </p>
+
+          {/* Current books list */}
+          {books.length > 0 && (
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h4 style={{ fontSize: '1rem', marginBottom: '0.75rem', color: colors.text }}>
+                Current Books:
+              </h4>
+              {books.map((book) => (
+                <div key={book.id} style={{
+                  padding: '0.75rem 1rem',
+                  background: colors.surface,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: '8px',
+                  marginBottom: '0.5rem',
+                }}>
+                  <strong>Book {book.book_number}:</strong> {book.title}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {error && (
+            <div style={{
+              padding: '0.75rem 1rem',
+              background: colors.errorLight,
+              borderRadius: '8px',
+              color: colors.error,
+              marginBottom: '1rem',
+            }}>
+              {error}
+            </div>
+          )}
+
+          {/* Add Book Form */}
+          {showAddBookForm ? (
+            <div style={{
+              padding: '1rem',
+              background: colors.surface,
+              border: `1px solid ${colors.brandBorder}`,
+              borderRadius: '8px',
+            }}>
+              <label style={{
+                display: 'block',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                color: colors.text,
+                marginBottom: '0.5rem',
+              }}>
+                Book {books.length + 1} Title
+              </label>
+              <input
+                type="text"
+                value={newBookTitle}
+                onChange={(e) => setNewBookTitle(e.target.value)}
+                placeholder="Enter book title..."
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: '6px',
+                  fontSize: '1rem',
+                  marginBottom: '1rem',
+                }}
+                autoFocus
+                disabled={addingBook}
+              />
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  onClick={handleAddBook}
+                  disabled={addingBook || !newBookTitle.trim()}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    background: addingBook ? colors.textSecondary : gradients.brand,
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    cursor: addingBook ? 'not-allowed' : 'pointer',
+                    opacity: addingBook || !newBookTitle.trim() ? 0.7 : 1,
+                  }}
+                >
+                  {addingBook ? 'Creating...' : 'Create Book'}
+                </button>
+                <button
+                  onClick={() => { setShowAddBookForm(false); setNewBookTitle(''); setError(null); }}
+                  disabled={addingBook}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    background: colors.surface,
+                    color: colors.textSecondary,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    cursor: addingBook ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowAddBookForm(true)}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: gradients.brand,
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '1rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              + Add Book {books.length + 1}
+            </button>
+          )}
         </div>
       </PageLayout>
     );
@@ -417,6 +578,96 @@ export default function SeriesManagementPage() {
                 )}
               </div>
             ))}
+
+            {/* Add Book Button */}
+            {showAddBookForm ? (
+              <div style={{
+                ...cardStyle,
+                borderColor: colors.brandBorder,
+              }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: colors.text,
+                  marginBottom: '0.5rem',
+                }}>
+                  Book {books.length + 1} Title
+                </label>
+                <input
+                  type="text"
+                  value={newBookTitle}
+                  onChange={(e) => setNewBookTitle(e.target.value)}
+                  placeholder="Enter title for the new book..."
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '6px',
+                    fontSize: '1rem',
+                    marginBottom: '1rem',
+                  }}
+                  autoFocus
+                  disabled={addingBook}
+                />
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    onClick={handleAddBook}
+                    disabled={addingBook || !newBookTitle.trim()}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      background: addingBook ? colors.textSecondary : gradients.brand,
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      cursor: addingBook ? 'not-allowed' : 'pointer',
+                      opacity: addingBook || !newBookTitle.trim() ? 0.7 : 1,
+                    }}
+                  >
+                    {addingBook ? 'Creating...' : 'Create Book'}
+                  </button>
+                  <button
+                    onClick={() => { setShowAddBookForm(false); setNewBookTitle(''); setError(null); }}
+                    disabled={addingBook}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      background: colors.surface,
+                      color: colors.textSecondary,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      cursor: addingBook ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowAddBookForm(true)}
+                style={{
+                  ...cardStyle,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  padding: '1.5rem',
+                  border: `2px dashed ${colors.brandBorder}`,
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  color: colors.brandText,
+                  transition: 'all 0.2s',
+                }}
+              >
+                + Add Book {books.length + 1}
+              </button>
+            )}
           </div>
 
           {/* Series Bible */}

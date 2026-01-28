@@ -48,6 +48,27 @@ router.get('/pdf/:projectId', async (req: Request, res: Response) => {
 });
 
 /**
+ * Export project as publish-ready PDF with cover image
+ */
+router.get('/pdf-publish/:projectId', async (req: Request, res: Response) => {
+  try {
+    const { projectId } = req.params;
+
+    const buffer = await exportService.generatePDFWithCover(projectId);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="publish-ready-${projectId}.pdf"`);
+    res.send(buffer);
+  } catch (error) {
+    logger.error({ error: error instanceof Error ? error.message : error, projectId: req.params.projectId }, 'Error generating publish-ready PDF');
+    res.status(500).json({
+      error: 'Failed to generate publish-ready PDF',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
  * Export story bible as DOCX
  */
 router.get('/story-bible/:projectId', async (req: Request, res: Response) => {

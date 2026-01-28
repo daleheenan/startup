@@ -54,12 +54,70 @@ export default function FollowUpPage() {
     }
   }, [projectId]);
 
+  // Track if we've triggered auto-generation to avoid multiple triggers
+  const [autoGenerateTriggered, setAutoGenerateTriggered] = useState(false);
+
   useEffect(() => {
     if (selectedBookId) {
       fetchCompletionStatus();
-      fetchRecommendations();
+      fetchRecommendationsAndAutoGenerate();
     }
   }, [selectedBookId]);
+
+  // Fetch recommendations and auto-trigger generation if book is complete and no recommendations exist
+  const fetchRecommendationsAndAutoGenerate = async () => {
+    if (!selectedBookId) return;
+
+    try {
+      const token = getToken();
+
+      // First check completion status
+      const statusResponse = await fetch(`${API_BASE_URL}/api/completion/book/${selectedBookId}/status`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      let isBookComplete = false;
+      if (statusResponse.ok) {
+        const statusData = await statusResponse.json();
+        isBookComplete = statusData.isComplete;
+        setCompletionStatus(statusData);
+      }
+
+      // Now fetch recommendations
+      const response = await fetch(`${API_BASE_URL}/api/completion/book/${selectedBookId}/follow-up`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setRecommendations(data);
+
+        // If currently generating, start polling
+        if (data.status === 'generating') {
+          setGenerating(true);
+          pollForRecommendations();
+        }
+      } else if (response.status === 404) {
+        // No recommendations exist - auto-trigger if book is complete and we haven't already triggered
+        setRecommendations(null);
+        if (isBookComplete && !autoGenerateTriggered) {
+          setAutoGenerateTriggered(true);
+          // Delay slightly to let UI render first
+          setTimeout(() => {
+            handleGenerateRecommendations();
+          }, 500);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching recommendations:', error);
+    }
+  };
 
   const fetchProject = async () => {
     try {
@@ -174,14 +232,12 @@ export default function FollowUpPage() {
       });
 
       if (response.ok) {
-        // Poll for results
-        setTimeout(() => {
-          fetchRecommendations();
-          setGenerating(false);
-        }, 5000);
+        // Start polling for results
+        pollForRecommendations();
       } else {
         const error = await response.json();
-        alert(`Error: ${error.error?.message || 'Failed to generate recommendations'}`);
+        console.error('Error response from follow-up generate:', error);
+        alert(`Error: ${error.error || error.message || 'Failed to generate recommendations'}`);
         setGenerating(false);
       }
     } catch (error) {
@@ -189,6 +245,39 @@ export default function FollowUpPage() {
       alert('Failed to generate recommendations');
       setGenerating(false);
     }
+  };
+
+  const pollForRecommendations = () => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const token = getToken();
+        const response = await fetch(`${API_BASE_URL}/api/completion/book/${selectedBookId}/follow-up`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setRecommendations(data);
+
+          // Stop polling when generation is complete or failed
+          if (data.status === 'completed' || data.status === 'failed') {
+            clearInterval(pollInterval);
+            setGenerating(false);
+          }
+        }
+      } catch (error) {
+        console.error('Error polling for recommendations:', error);
+      }
+    }, 3000); // Poll every 3 seconds
+
+    // Stop polling after 5 minutes maximum
+    setTimeout(() => {
+      clearInterval(pollInterval);
+      setGenerating(false);
+    }, 300000);
   };
 
   const sections = [

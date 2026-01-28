@@ -222,6 +222,18 @@ export default function EditorialReportPage() {
           window.location.href = '/login';
           return;
         }
+        // Handle 503 - VEB tables missing
+        if (response.status === 503) {
+          const error = await response.json();
+          if (error.code === 'VEB_TABLES_MISSING') {
+            setStatus({
+              hasReport: false,
+              status: 'unavailable',
+              error: 'The Virtual Editorial Board feature requires database setup. Please contact the administrator to run database migrations (migration 027).',
+            } as VEBStatus);
+            return;
+          }
+        }
         throw new Error('Failed to fetch VEB status');
       }
 
@@ -272,6 +284,15 @@ export default function EditorialReportPage() {
 
       if (!response.ok) {
         const error = await response.json();
+        // Handle database migration not applied error
+        if (error.code === 'VEB_TABLES_MISSING') {
+          setStatus({
+            hasReport: false,
+            status: 'unavailable',
+            error: 'The Virtual Editorial Board feature requires database setup. Please contact the administrator to run database migrations (migration 027).',
+          } as VEBStatus);
+          return;
+        }
         alert(error.error || 'Failed to submit to VEB');
         return;
       }
@@ -1143,6 +1164,23 @@ export default function EditorialReportPage() {
           {loading ? (
             <div style={{ textAlign: 'center', padding: '3rem', color: '#64748B' }}>
               Loading...
+            </div>
+          ) : status?.status === 'unavailable' ? (
+            <div style={{
+              background: '#FEF3C7',
+              borderRadius: '8px',
+              padding: '2rem',
+              border: '1px solid #FCD34D',
+              textAlign: 'center',
+            }}>
+              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚙️</div>
+              <h3 style={{ margin: '0 0 0.5rem 0', color: '#92400E' }}>Feature Setup Required</h3>
+              <p style={{ margin: '0 0 1rem 0', color: '#A16207', maxWidth: '500px', marginLeft: 'auto', marginRight: 'auto' }}>
+                {status.error || 'The Virtual Editorial Board feature requires database setup. Please contact the administrator.'}
+              </p>
+              <p style={{ margin: 0, fontSize: '0.875rem', color: '#B45309' }}>
+                Administrator: Run database migration 027_editorial_reports.sql
+              </p>
             </div>
           ) : !status?.hasReport ? (
             renderNoReport()

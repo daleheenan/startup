@@ -360,6 +360,152 @@ export class ExportService {
   }
 
   /**
+   * Generate PDF file with cover image as first page (publish-ready)
+   * Sprint 21: Include cover image if available
+   */
+  async generatePDFWithCover(projectId: string): Promise<Buffer> {
+    return new Promise<Buffer>(async (resolve, reject) => {
+      try {
+        // Get project with cover image
+        const project = db.prepare(`
+          SELECT id, title, type, genre, story_dna, story_bible, author_name, cover_image, cover_image_type
+          FROM projects WHERE id = ?
+        `).get(projectId) as Project & { cover_image?: string; cover_image_type?: string };
+
+        if (!project) {
+          throw new Error('Project not found');
+        }
+
+        // Get chapters with edited versions if available
+        // Only get chapters from the active version (or legacy chapters without version)
+        const chapters = db.prepare(`
+          SELECT
+            c.id,
+            c.chapter_number,
+            c.title,
+            COALESCE(ce.edited_content, c.content) as content,
+            COALESCE(ce.word_count, c.word_count) as word_count
+          FROM chapters c
+          JOIN books b ON c.book_id = b.id
+          LEFT JOIN chapter_edits ce ON ce.chapter_id = c.id
+          LEFT JOIN book_versions bv ON c.version_id = bv.id
+          WHERE b.project_id = ?
+            AND (
+              c.version_id IS NULL
+              OR bv.is_active = 1
+            )
+          ORDER BY b.book_number, c.chapter_number
+        `).all(projectId) as Chapter[];
+
+        if (chapters.length === 0) {
+          throw new Error('No chapters found for project');
+        }
+
+        // Create PDF document
+        const doc = new PDFDocument({
+          size: 'LETTER',
+          margins: {
+            top: 72, // 1 inch
+            bottom: 72,
+            left: 72,
+            right: 72,
+          },
+        });
+
+        const buffers: Buffer[] = [];
+        doc.on('data', buffers.push.bind(buffers));
+        doc.on('end', () => resolve(Buffer.concat(buffers)));
+        doc.on('error', reject);
+
+        // Cover page (if cover image exists)
+        if (project.cover_image && project.cover_image_type) {
+          // Cover image is stored as base64 in database
+          const coverBuffer = Buffer.from(project.cover_image, 'base64');
+
+          // Full bleed cover image - fill the entire page
+          const pageWidth = 612; // Letter width in points
+          const pageHeight = 792; // Letter height in points
+
+          doc.image(coverBuffer, 0, 0, {
+            width: pageWidth,
+            height: pageHeight,
+            fit: [pageWidth, pageHeight],
+            align: 'center',
+            valign: 'center',
+          });
+
+          doc.addPage();
+        }
+
+        // Title page
+        doc.fontSize(24).font('Times-Roman').text(project.title, {
+          align: 'center',
+        });
+        doc.moveDown();
+        if (project.author_name) {
+          doc.fontSize(14).text(`by ${project.author_name}`, {
+            align: 'center',
+          });
+          doc.moveDown();
+        }
+        doc.fontSize(12).text(`Genre: ${project.genre}`, {
+          align: 'center',
+        });
+        doc.addPage();
+
+        // Chapters
+        for (const chapter of chapters) {
+          // Chapter heading
+          doc.fontSize(18).font('Times-Bold').text(`Chapter ${chapter.chapter_number}`, {
+            align: 'center',
+          });
+
+          if (chapter.title) {
+            doc.moveDown(0.5);
+            doc.fontSize(14).text(chapter.title, {
+              align: 'center',
+            });
+          }
+
+          doc.moveDown(1);
+
+          // Chapter content - clean and split
+          const cleanedContent = this.cleanContent(chapter.content);
+          const contentParagraphs = cleanedContent.split('\n\n');
+          for (const para of contentParagraphs) {
+            const trimmed = para.trim();
+            if (trimmed === '' || trimmed === '* * *') {
+              // Scene break
+              doc.moveDown(0.5);
+              doc.fontSize(12).font('Times-Roman').text('* * *', {
+                align: 'center',
+              });
+              doc.moveDown(0.5);
+            } else {
+              // Regular paragraph
+              doc.fontSize(12).font('Times-Roman').text(trimmed, {
+                align: 'left',
+                lineGap: 6,
+                indent: 36, // First line indent (0.5 inch)
+              });
+              doc.moveDown(0.5);
+            }
+          }
+
+          // Add page for next chapter
+          if (chapter !== chapters[chapters.length - 1]) {
+            doc.addPage();
+          }
+        }
+
+        doc.end();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  /**
    * Generate Story Bible export as DOCX
    */
   async generateStoryBibleDOCX(projectId: string): Promise<Buffer> {

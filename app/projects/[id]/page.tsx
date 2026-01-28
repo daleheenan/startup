@@ -105,8 +105,10 @@ export default function ProjectDetailPage() {
   // Editing state for book details
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingAuthor, setEditingAuthor] = useState(false);
+  const [editingType, setEditingType] = useState(false);
   const [titleValue, setTitleValue] = useState('');
   const [authorValue, setAuthorValue] = useState('');
+  const [typeValue, setTypeValue] = useState<'standalone' | 'trilogy' | 'series'>('standalone');
   const [saving, setSaving] = useState(false);
 
   // Editing state for Story Concept
@@ -145,6 +147,7 @@ export default function ProjectDetailPage() {
     if (project) {
       setTitleValue(project.title || '');
       setAuthorValue(project.author_name || '');
+      setTypeValue((project.type as 'standalone' | 'trilogy' | 'series') || 'standalone');
       // Initialize Story Concept values
       if (project.story_concept) {
         setConceptValues({
@@ -247,7 +250,7 @@ export default function ProjectDetailPage() {
   }, [projectId]);
 
   // Save project details
-  const saveProjectDetails = async (field: 'title' | 'authorName', value: string) => {
+  const saveProjectDetails = async (field: 'title' | 'authorName' | 'type', value: string) => {
     setSaving(true);
     try {
       const token = getToken();
@@ -265,14 +268,20 @@ export default function ProjectDetailPage() {
       }
 
       // Update local state
+      const fieldMapping: Record<string, string> = {
+        'authorName': 'author_name',
+        'title': 'title',
+        'type': 'type',
+      };
       setProject((prev: any) => ({
         ...prev,
-        [field === 'authorName' ? 'author_name' : field]: value,
+        [fieldMapping[field]]: value,
       }));
 
       // Close edit mode
       if (field === 'title') setEditingTitle(false);
       if (field === 'authorName') setEditingAuthor(false);
+      if (field === 'type') setEditingType(false);
     } catch (err) {
       console.error('Error saving:', err);
       alert('Failed to save changes');
@@ -928,6 +937,98 @@ export default function ProjectDetailPage() {
               )}
               <p style={{ fontSize: '0.75rem', color: colors.textSecondary, margin: '0.375rem 0 0 0' }}>
                 This name will be used in all exports (EPUB, PDF, DOCX)
+              </p>
+            </div>
+
+            {/* Project Type Field */}
+            <div>
+              <label style={{
+                fontSize: '0.75rem',
+                color: colors.textSecondary,
+                fontWeight: 600,
+                display: 'block',
+                marginBottom: '0.375rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+              }}>
+                Project Type
+              </label>
+              {editingType ? (
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <select
+                    value={typeValue}
+                    onChange={(e) => setTypeValue(e.target.value as 'standalone' | 'trilogy' | 'series')}
+                    style={{
+                      flex: 1,
+                      padding: '0.625rem 0.75rem',
+                      border: `1px solid ${colors.brandBorder}`,
+                      borderRadius: borderRadius.md,
+                      fontSize: '0.9375rem',
+                      outline: 'none',
+                      background: colors.surface,
+                    }}
+                  >
+                    <option value="standalone">Standalone</option>
+                    <option value="trilogy">Trilogy</option>
+                    <option value="series">Series</option>
+                  </select>
+                  <button
+                    onClick={() => saveProjectDetails('type', typeValue)}
+                    disabled={saving}
+                    style={{
+                      padding: '0.625rem 1rem',
+                      background: gradients.brand,
+                      color: colors.surface,
+                      border: 'none',
+                      borderRadius: borderRadius.md,
+                      cursor: saving ? 'not-allowed' : 'pointer',
+                      fontSize: '0.8125rem',
+                      fontWeight: 600,
+                      opacity: saving ? 0.7 : 1,
+                    }}
+                  >
+                    {saving ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    onClick={() => { setEditingType(false); setTypeValue((project?.type as 'standalone' | 'trilogy' | 'series') || 'standalone'); }}
+                    style={{
+                      padding: '0.625rem 1rem',
+                      background: colors.surface,
+                      color: colors.textSecondary,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: borderRadius.md,
+                      cursor: 'pointer',
+                      fontSize: '0.8125rem',
+                      fontWeight: 500,
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <span style={{ fontSize: '1rem', color: colors.text, fontWeight: 500, textTransform: 'capitalize' }}>
+                    {project?.type || 'Standalone'}
+                  </span>
+                  <button
+                    onClick={() => setEditingType(true)}
+                    style={{
+                      padding: '0.25rem 0.625rem',
+                      background: 'transparent',
+                      color: colors.brandText,
+                      border: `1px solid ${colors.brandBorder}`,
+                      borderRadius: borderRadius.sm,
+                      cursor: 'pointer',
+                      fontSize: '0.75rem',
+                      fontWeight: 500,
+                    }}
+                  >
+                    Edit
+                  </button>
+                </div>
+              )}
+              <p style={{ fontSize: '0.75rem', color: colors.textSecondary, margin: '0.375rem 0 0 0' }}>
+                Standalone = 1 book, Trilogy = 3 books, Series = multiple books
               </p>
             </div>
 

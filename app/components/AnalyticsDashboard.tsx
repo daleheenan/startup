@@ -6,15 +6,122 @@ import { getToken } from '../lib/auth';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-interface AnalyticsDashboardProps {
-  bookId: string;
+// Genre-adaptive benchmarks for RAG indicators
+interface GenreTargets {
+  pacing: { green: [number, number]; amber: [number, number][] };
+  pacingConsistency: { green: number; amber: number };
+  dialogueRatio: { green: [number, number]; amber: [number, number][] };
+  readability: { green: [number, number]; amber: [number, number][] };
 }
 
-export default function AnalyticsDashboard({ bookId }: AnalyticsDashboardProps) {
+const genreTargets: Record<string, GenreTargets> = {
+  // Thriller/Mystery: Fast pacing expected, higher tension
+  thriller: {
+    pacing: { green: [65, 90], amber: [[50, 65], [90, 100]] },
+    pacingConsistency: { green: 70, amber: 50 },
+    dialogueRatio: { green: [30, 50], amber: [[20, 30], [50, 60]] },
+    readability: { green: [60, 80], amber: [[50, 60], [80, 90]] },
+  },
+  mystery: {
+    pacing: { green: [60, 85], amber: [[45, 60], [85, 100]] },
+    pacingConsistency: { green: 65, amber: 45 },
+    dialogueRatio: { green: [35, 55], amber: [[25, 35], [55, 65]] },
+    readability: { green: [60, 80], amber: [[50, 60], [80, 90]] },
+  },
+  // Fantasy/Sci-Fi: Slower pacing OK, more exposition acceptable
+  fantasy: {
+    pacing: { green: [50, 75], amber: [[35, 50], [75, 90]] },
+    pacingConsistency: { green: 60, amber: 40 },
+    dialogueRatio: { green: [25, 45], amber: [[15, 25], [45, 60]] },
+    readability: { green: [55, 75], amber: [[45, 55], [75, 85]] },
+  },
+  'sci-fi': {
+    pacing: { green: [50, 75], amber: [[35, 50], [75, 90]] },
+    pacingConsistency: { green: 60, amber: 40 },
+    dialogueRatio: { green: [25, 45], amber: [[15, 25], [45, 60]] },
+    readability: { green: [55, 75], amber: [[45, 55], [75, 85]] },
+  },
+  // Romance: Higher dialogue ratio, moderate pacing
+  romance: {
+    pacing: { green: [55, 75], amber: [[40, 55], [75, 90]] },
+    pacingConsistency: { green: 65, amber: 45 },
+    dialogueRatio: { green: [40, 60], amber: [[30, 40], [60, 70]] },
+    readability: { green: [60, 80], amber: [[50, 60], [80, 90]] },
+  },
+  // Literary Fiction: More varied, focus on readability
+  literary: {
+    pacing: { green: [40, 70], amber: [[25, 40], [70, 85]] },
+    pacingConsistency: { green: 55, amber: 35 },
+    dialogueRatio: { green: [30, 55], amber: [[20, 30], [55, 65]] },
+    readability: { green: [65, 85], amber: [[55, 65], [85, 95]] },
+  },
+  // Default targets
+  default: {
+    pacing: { green: [55, 80], amber: [[40, 55], [80, 90]] },
+    pacingConsistency: { green: 65, amber: 45 },
+    dialogueRatio: { green: [30, 50], amber: [[20, 30], [50, 60]] },
+    readability: { green: [60, 80], amber: [[50, 60], [80, 90]] },
+  },
+};
+
+// Get RAG status based on value and targets
+type RAGStatus = 'green' | 'amber' | 'red';
+
+function getRagStatus(value: number | undefined, targets: { green: [number, number]; amber: [number, number][] }): RAGStatus {
+  if (value === undefined || isNaN(value)) return 'amber';
+
+  // Check if in green range
+  if (value >= targets.green[0] && value <= targets.green[1]) return 'green';
+
+  // Check if in amber ranges
+  for (const [min, max] of targets.amber) {
+    if (value >= min && value <= max) return 'amber';
+  }
+
+  // Otherwise red
+  return 'red';
+}
+
+function getConsistencyRagStatus(value: number | undefined, targets: { green: number; amber: number }): RAGStatus {
+  if (value === undefined || isNaN(value)) return 'amber';
+
+  if (value >= targets.green) return 'green';
+  if (value >= targets.amber) return 'amber';
+  return 'red';
+}
+
+// Get RAG colour
+function getRagColor(status: RAGStatus): string {
+  switch (status) {
+    case 'green': return '#16a34a';
+    case 'amber': return '#d97706';
+    case 'red': return '#dc2626';
+    default: return '#666';
+  }
+}
+
+// Metric explanations
+const metricExplanations: Record<string, string> = {
+  'Average Pacing': 'Measures the speed and energy of the narrative. Higher values indicate faster-paced, action-driven scenes; lower values suggest slower, more contemplative passages.',
+  'Pacing Consistency': 'How evenly paced the story is across chapters. Higher values mean consistent energy; lower values indicate more variation (which may be intentional).',
+  'Dialogue Ratio': 'The percentage of text that is dialogue vs. prose. Different genres have different ideal ratios.',
+  'Readability': 'How easy the text is to read (Flesch-Kincaid scale). 60-70 is ideal for most fiction; lower for literary, higher for young adult.',
+};
+
+interface AnalyticsDashboardProps {
+  bookId: string;
+  genre?: string;
+}
+
+export default function AnalyticsDashboard({ bookId, genre = 'default' }: AnalyticsDashboardProps) {
   const [bookAnalytics, setBookAnalytics] = useState<BookAnalytics | null>(null);
   const [chapterAnalytics, setChapterAnalytics] = useState<ChapterAnalytics[]>([]);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
+
+  // Get genre-specific targets (normalise genre name)
+  const normalizedGenre = genre?.toLowerCase().replace(/[^a-z]/g, '') || 'default';
+  const targets = genreTargets[normalizedGenre] || genreTargets.default;
 
   // BUG-010 FIX: Add try/catch to async useEffect
   useEffect(() => {
@@ -139,25 +246,29 @@ export default function AnalyticsDashboard({ bookId }: AnalyticsDashboardProps) 
           title="Average Pacing"
           value={bookAnalytics?.avg_pacing_score?.toFixed(0) || 'N/A'}
           suffix="/100"
-          color="#4CAF50"
+          ragStatus={getRagStatus(bookAnalytics?.avg_pacing_score, targets.pacing)}
+          explanation={metricExplanations['Average Pacing']}
         />
         <MetricCard
           title="Pacing Consistency"
           value={bookAnalytics?.pacing_consistency?.toFixed(0) || 'N/A'}
           suffix="/100"
-          color="#2196F3"
+          ragStatus={getConsistencyRagStatus(bookAnalytics?.pacing_consistency, targets.pacingConsistency)}
+          explanation={metricExplanations['Pacing Consistency']}
         />
         <MetricCard
           title="Dialogue Ratio"
           value={bookAnalytics?.avg_dialogue_percentage?.toFixed(0) || 'N/A'}
           suffix="%"
-          color="#FF9800"
+          ragStatus={getRagStatus(bookAnalytics?.avg_dialogue_percentage, targets.dialogueRatio)}
+          explanation={metricExplanations['Dialogue Ratio']}
         />
         <MetricCard
           title="Readability"
           value={bookAnalytics?.avg_readability_score?.toFixed(0) || 'N/A'}
           suffix="/100"
-          color="#9C27B0"
+          ragStatus={getRagStatus(bookAnalytics?.avg_readability_score, targets.readability)}
+          explanation={metricExplanations['Readability']}
         />
       </div>
 
@@ -186,12 +297,19 @@ export default function AnalyticsDashboard({ bookId }: AnalyticsDashboardProps) 
       )}
 
       {/* Tension Arc Graph */}
-      {bookAnalytics?.overall_tension_arc && (
-        <div style={{ marginBottom: '24px', padding: '16px', background: '#f9f9f9', borderRadius: '8px' }}>
-          <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px' }}>Tension Arc</h3>
+      <div style={{ marginBottom: '24px', padding: '16px', background: '#f9f9f9', borderRadius: '8px' }}>
+        <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px' }}>Tension Arc</h3>
+        {bookAnalytics?.overall_tension_arc?.chapters && bookAnalytics.overall_tension_arc.chapters.length > 0 ? (
           <TensionGraph chapters={bookAnalytics.overall_tension_arc.chapters} />
-        </div>
-      )}
+        ) : (
+          <div style={{ textAlign: 'center', padding: '24px', color: '#666' }}>
+            <p style={{ marginBottom: '8px' }}>No tension data available yet.</p>
+            <p style={{ fontSize: '14px', color: '#999' }}>
+              Click "Refresh Analytics" to analyse your chapters and generate tension data.
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* Character Screen Time */}
       {bookAnalytics?.character_balance && (
@@ -212,12 +330,89 @@ export default function AnalyticsDashboard({ bookId }: AnalyticsDashboardProps) 
   );
 }
 
-function MetricCard({ title, value, suffix, color }: { title: string; value: string; suffix: string; color: string }) {
+function MetricCard({
+  title,
+  value,
+  suffix,
+  ragStatus,
+  explanation,
+}: {
+  title: string;
+  value: string;
+  suffix: string;
+  ragStatus: RAGStatus;
+  explanation?: string;
+}) {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const ragColor = getRagColor(ragStatus);
+
+  // RAG status label
+  const ragLabel = ragStatus === 'green' ? 'Good' : ragStatus === 'amber' ? 'Acceptable' : 'Needs Attention';
+
   return (
-    <div style={{ padding: '16px', background: 'white', borderRadius: '8px', border: '1px solid #ddd' }}>
-      <div style={{ fontSize: '14px', color: '#666', marginBottom: '8px' }}>{title}</div>
-      <div style={{ fontSize: '32px', fontWeight: 'bold', color }}>
+    <div style={{
+      padding: '16px',
+      background: 'white',
+      borderRadius: '8px',
+      border: `2px solid ${ragColor}`,
+      position: 'relative',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+        <div style={{ fontSize: '14px', color: '#666' }}>{title}</div>
+        {explanation && (
+          <div
+            style={{ position: 'relative', cursor: 'help' }}
+            onMouseEnter={() => setShowTooltip(true)}
+            onMouseLeave={() => setShowTooltip(false)}
+          >
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '16px',
+              height: '16px',
+              borderRadius: '50%',
+              background: '#e5e7eb',
+              fontSize: '10px',
+              fontWeight: 'bold',
+              color: '#6b7280',
+            }}>
+              ?
+            </span>
+            {showTooltip && (
+              <div style={{
+                position: 'absolute',
+                left: '0',
+                bottom: '100%',
+                marginBottom: '8px',
+                padding: '10px 12px',
+                background: '#1f2937',
+                color: 'white',
+                borderRadius: '6px',
+                fontSize: '12px',
+                lineHeight: '1.4',
+                width: '250px',
+                zIndex: 1000,
+                boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+              }}>
+                {explanation}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      <div style={{ fontSize: '32px', fontWeight: 'bold', color: ragColor }}>
         {value}<span style={{ fontSize: '18px', color: '#999' }}>{suffix}</span>
+      </div>
+      <div style={{
+        marginTop: '8px',
+        fontSize: '11px',
+        fontWeight: 600,
+        color: ragColor,
+        textTransform: 'uppercase',
+        letterSpacing: '0.5px',
+      }}>
+        {ragLabel}
       </div>
     </div>
   );

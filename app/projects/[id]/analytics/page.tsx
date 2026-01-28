@@ -209,7 +209,7 @@ export default function AnalyticsPage() {
           <p>No books found for this project.</p>
         </div>
           ) : (
-            <AnalyticsDashboard key={selectedBookId} bookId={selectedBookId} />
+            <AnalyticsDashboard key={selectedBookId} bookId={selectedBookId} genre={project?.genre} />
           )}
         </div>
       </main>

@@ -72,6 +72,17 @@ interface Chapter {
   word_count: number;
 }
 
+interface Job {
+  id: string;
+  type: string;
+  target_id: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'paused';
+  attempts: number;
+  error: string | null;
+  chapter_number: number;
+  chapter_title: string | null;
+}
+
 interface Book {
   id: string;
   book_number: number;
@@ -86,9 +97,12 @@ export default function ProgressPage() {
 
   const [progress, setProgress] = useState<ProgressData | null>(null);
   const [books, setBooks] = useState<Book[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [project, setProject] = useState<any>(null);
+  const [jobActionLoading, setJobActionLoading] = useState<string | null>(null);
+  const [cancellingAll, setCancellingAll] = useState(false);
 
   // Editing state for book details
   const [editingTitle, setEditingTitle] = useState(false);
@@ -205,6 +219,13 @@ export default function ProgressPage() {
         setBooks(booksWithChapters);
       }
 
+      // Fetch jobs for this project
+      const jobsRes = await fetch(`${API_BASE_URL}/api/queue/jobs?projectId=${projectId}`, { headers });
+      if (jobsRes.ok) {
+        const jobsData = await jobsRes.json();
+        setJobs(jobsData.jobs || []);
+      }
+
       setError(null);
     } catch (err: any) {
       console.error('Error fetching progress:', err);
@@ -256,6 +277,97 @@ export default function ProgressPage() {
     }
   };
 
+  // Get the job for a specific chapter
+  const getChapterJob = (chapterId: string): Job | undefined => {
+    return jobs.find(j => j.target_id === chapterId && (j.status === 'pending' || j.status === 'running' || j.status === 'paused'));
+  };
+
+  // Get failed jobs for a chapter
+  const getFailedJob = (chapterId: string): Job | undefined => {
+    return jobs.find(j => j.target_id === chapterId && j.status === 'failed');
+  };
+
+  // Delete/cancel a pending or running job
+  const handleDeleteJob = async (jobId: string) => {
+    setJobActionLoading(jobId);
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/queue/jobs/${jobId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete job');
+      }
+
+      // Refresh data
+      await fetchProgressAndChapters();
+    } catch (err) {
+      console.error('Error deleting job:', err);
+      alert('Failed to delete job');
+    } finally {
+      setJobActionLoading(null);
+    }
+  };
+
+  // Regenerate a chapter
+  const handleRegenerateChapter = async (chapterId: string) => {
+    setJobActionLoading(chapterId);
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/chapters/${chapterId}/regenerate`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to queue regeneration');
+      }
+
+      // Refresh data
+      await fetchProgressAndChapters();
+    } catch (err) {
+      console.error('Error regenerating chapter:', err);
+      alert('Failed to queue chapter for regeneration');
+    } finally {
+      setJobActionLoading(null);
+    }
+  };
+
+  // Cancel all pending jobs
+  const handleCancelAllPending = async () => {
+    if (!confirm('Are you sure you want to cancel all pending jobs?')) return;
+
+    setCancellingAll(true);
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/queue/jobs?status=pending`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to cancel pending jobs');
+      }
+
+      // Refresh data
+      await fetchProgressAndChapters();
+    } catch (err) {
+      console.error('Error cancelling jobs:', err);
+      alert('Failed to cancel pending jobs');
+    } finally {
+      setCancellingAll(false);
+    }
+  };
+
   // Use progress API data directly - backend now correctly counts chapters with word_count > 0 as completed
   const effectiveTotalChapters = progress?.chapters.total || 0;
   const effectiveCompletedChapters = progress?.chapters.completed || 0;
@@ -290,15 +402,44 @@ export default function ProgressPage() {
     return 'none';
   };
 
-  const getChapterStatus = (chapter: Chapter) => {
+  const getChapterStatus = (chapter: Chapter, job?: Job) => {
     // Any chapter with content is considered completed/readable
     if (chapter.word_count > 0) return 'completed';
     if (chapter.status === 'completed') return 'completed';
+
+    // Check job status
+    if (job) {
+      if (job.status === 'running') return 'in-progress';
+      if (job.status === 'pending') return 'queued';
+      if (job.status === 'failed') return 'failed';
+      if (job.status === 'paused') return 'paused';
+    }
+
     if (chapter.status === 'writing' || chapter.status === 'editing' || chapter.status === 'processing') return 'in-progress';
     return 'pending';
   };
 
-  const getChapterStatusBadge = (status: string) => {
+  const getChapterStatusBadge = (status: string, job?: Job) => {
+    // If there's a failed job, show failed status
+    if (job?.status === 'failed') {
+      return {
+        background: '#FEE2E2',
+        color: '#DC2626',
+        text: job.error ? `Failed: ${job.error.substring(0, 30)}${job.error.length > 30 ? '...' : ''}` : 'Failed',
+        icon: '✗',
+      };
+    }
+
+    // If there's a paused job
+    if (job?.status === 'paused') {
+      return {
+        background: '#FEF3C7',
+        color: '#D97706',
+        text: 'Paused',
+        icon: '⏸',
+      };
+    }
+
     switch (status) {
       case 'completed':
         return {
@@ -313,6 +454,13 @@ export default function ProgressPage() {
           color: '#1D4ED8',
           text: 'Generating...',
           icon: '⟳',
+        };
+      case 'queued':
+        return {
+          background: '#E0E7FF',
+          color: '#4F46E5',
+          text: 'Queued',
+          icon: '⏳',
         };
       default:
         return {
@@ -754,8 +902,12 @@ export default function ProgressPage() {
                         gap: '0.5rem',
                       }}>
                         {book.chapters.map((chapter) => {
-                          const status = getChapterStatus(chapter);
-                          const badge = getChapterStatusBadge(status);
+                          const chapterJob = getChapterJob(chapter.id);
+                          const failedJob = getFailedJob(chapter.id);
+                          const activeJob = chapterJob || failedJob;
+                          const status = getChapterStatus(chapter, activeJob);
+                          const badge = getChapterStatusBadge(status, activeJob);
+                          const isLoading = jobActionLoading === (chapterJob?.id || chapter.id);
 
                           return (
                             <div
@@ -765,8 +917,8 @@ export default function ProgressPage() {
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
                                 padding: '1rem',
-                                background: '#F8FAFC',
-                                border: '1px solid #E2E8F0',
+                                background: failedJob ? '#FEF2F2' : '#F8FAFC',
+                                border: failedJob ? '1px solid #FECACA' : '1px solid #E2E8F0',
                                 borderRadius: '8px',
                               }}
                             >
@@ -776,6 +928,7 @@ export default function ProgressPage() {
                                   alignItems: 'center',
                                   gap: '0.75rem',
                                   marginBottom: '0.25rem',
+                                  flexWrap: 'wrap',
                                 }}>
                                   <span style={{
                                     fontSize: '1.25rem',
@@ -798,6 +951,22 @@ export default function ProgressPage() {
                                       {chapter.title}
                                     </span>
                                   )}
+                                  {failedJob && (
+                                    <span style={{
+                                      padding: '0.25rem 0.5rem',
+                                      borderRadius: '4px',
+                                      fontSize: '0.75rem',
+                                      background: badge.background,
+                                      color: badge.color,
+                                      fontWeight: 600,
+                                      maxWidth: '200px',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap',
+                                    }}>
+                                      {badge.text}
+                                    </span>
+                                  )}
                                 </div>
                                 <div style={{
                                   fontSize: '0.75rem',
@@ -806,22 +975,44 @@ export default function ProgressPage() {
                                   {chapter.word_count.toLocaleString()} words
                                 </div>
                               </div>
-                              <Link
-                                href={`/projects/${projectId}/chapters/${chapter.id}`}
-                                style={{
-                                  padding: '0.5rem 1rem',
-                                  background: 'rgba(16, 185, 129, 0.2)',
-                                  border: '1px solid rgba(16, 185, 129, 0.3)',
-                                  borderRadius: '6px',
-                                  color: '#10B981',
-                                  fontSize: '0.875rem',
-                                  fontWeight: 600,
-                                  textDecoration: 'none',
-                                  transition: 'all 0.2s',
-                                }}
-                              >
-                                Read
-                              </Link>
+                              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                {failedJob && (
+                                  <button
+                                    onClick={() => handleRegenerateChapter(chapter.id)}
+                                    disabled={isLoading}
+                                    title="Retry failed generation"
+                                    style={{
+                                      padding: '0.5rem 0.75rem',
+                                      background: '#DBEAFE',
+                                      border: '1px solid #3B82F6',
+                                      borderRadius: '6px',
+                                      color: '#1D4ED8',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 600,
+                                      cursor: isLoading ? 'not-allowed' : 'pointer',
+                                      opacity: isLoading ? 0.5 : 1,
+                                    }}
+                                  >
+                                    {isLoading ? '...' : 'Retry'}
+                                  </button>
+                                )}
+                                <Link
+                                  href={`/projects/${projectId}/chapters/${chapter.id}`}
+                                  style={{
+                                    padding: '0.5rem 1rem',
+                                    background: 'rgba(16, 185, 129, 0.2)',
+                                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                                    borderRadius: '6px',
+                                    color: '#10B981',
+                                    fontSize: '0.875rem',
+                                    fontWeight: 600,
+                                    textDecoration: 'none',
+                                    transition: 'all 0.2s',
+                                  }}
+                                >
+                                  Read
+                                </Link>
+                              </div>
                             </div>
                           );
                         })}
@@ -845,6 +1036,33 @@ export default function ProgressPage() {
                   estimatedTimeRemaining={progress.timeEstimates.estimatedRemaining}
                   currentActivity={progress.currentActivity}
                 />
+
+                {/* Cancel All Pending Button */}
+                {progress.queue.pending > 0 && (
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    marginBottom: '1rem',
+                  }}>
+                    <button
+                      onClick={handleCancelAllPending}
+                      disabled={cancellingAll}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: '#FEE2E2',
+                        border: '1px solid #EF4444',
+                        borderRadius: '6px',
+                        color: '#DC2626',
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        cursor: cancellingAll ? 'not-allowed' : 'pointer',
+                        opacity: cancellingAll ? 0.5 : 1,
+                      }}
+                    >
+                      {cancellingAll ? 'Cancelling...' : `Cancel All Pending (${progress.queue.pending})`}
+                    </button>
+                  </div>
+                )}
 
                 {/* Chapter List */}
                 <div style={{
@@ -880,9 +1098,13 @@ export default function ProgressPage() {
                         gap: '0.5rem',
                       }}>
                         {book.chapters.map((chapter) => {
-                          const status = getChapterStatus(chapter);
-                          const badge = getChapterStatusBadge(status);
+                          const chapterJob = getChapterJob(chapter.id);
+                          const failedJob = getFailedJob(chapter.id);
+                          const activeJob = chapterJob || failedJob;
+                          const status = getChapterStatus(chapter, activeJob);
+                          const badge = getChapterStatusBadge(status, activeJob);
                           const isCurrentlyGenerating = progress.currentActivity?.chapterId === chapter.id;
+                          const isLoading = jobActionLoading === (chapterJob?.id || chapter.id);
 
                           return (
                             <div
@@ -892,8 +1114,8 @@ export default function ProgressPage() {
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
                                 padding: '1rem',
-                                background: isCurrentlyGenerating ? '#EEF2FF' : '#F8FAFC',
-                                border: isCurrentlyGenerating ? '1px solid #C7D2FE' : '1px solid #E2E8F0',
+                                background: isCurrentlyGenerating ? '#EEF2FF' : failedJob ? '#FEF2F2' : '#F8FAFC',
+                                border: isCurrentlyGenerating ? '1px solid #C7D2FE' : failedJob ? '1px solid #FECACA' : '1px solid #E2E8F0',
                                 borderRadius: '8px',
                               }}
                             >
@@ -903,6 +1125,7 @@ export default function ProgressPage() {
                                   alignItems: 'center',
                                   gap: '0.75rem',
                                   marginBottom: '0.25rem',
+                                  flexWrap: 'wrap',
                                 }}>
                                   <span style={{
                                     fontSize: '1.25rem',
@@ -932,6 +1155,10 @@ export default function ProgressPage() {
                                     background: badge.background,
                                     color: badge.color,
                                     fontWeight: 600,
+                                    maxWidth: '200px',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
                                   }}>
                                     {badge.text}
                                   </span>
@@ -946,24 +1173,108 @@ export default function ProgressPage() {
                                   }
                                 </div>
                               </div>
-                              {status === 'completed' && (
-                                <Link
-                                  href={`/projects/${projectId}/chapters/${chapter.id}`}
-                                  style={{
-                                    padding: '0.5rem 1rem',
-                                    background: 'rgba(16, 185, 129, 0.2)',
-                                    border: '1px solid rgba(16, 185, 129, 0.3)',
-                                    borderRadius: '6px',
-                                    color: '#10B981',
-                                    fontSize: '0.875rem',
-                                    fontWeight: 600,
-                                    textDecoration: 'none',
-                                    transition: 'all 0.2s',
-                                  }}
-                                >
-                                  Read
-                                </Link>
-                              )}
+                              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                {/* Job control buttons */}
+                                {chapterJob && chapterJob.status === 'pending' && (
+                                  <button
+                                    onClick={() => handleDeleteJob(chapterJob.id)}
+                                    disabled={isLoading}
+                                    title="Cancel queued job"
+                                    style={{
+                                      padding: '0.5rem 0.75rem',
+                                      background: '#FEF3C7',
+                                      border: '1px solid #F59E0B',
+                                      borderRadius: '6px',
+                                      color: '#B45309',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 600,
+                                      cursor: isLoading ? 'not-allowed' : 'pointer',
+                                      opacity: isLoading ? 0.5 : 1,
+                                    }}
+                                  >
+                                    {isLoading ? '...' : 'Cancel'}
+                                  </button>
+                                )}
+                                {chapterJob && chapterJob.status === 'running' && (
+                                  <button
+                                    onClick={() => handleDeleteJob(chapterJob.id)}
+                                    disabled={isLoading}
+                                    title="Stop running job"
+                                    style={{
+                                      padding: '0.5rem 0.75rem',
+                                      background: '#FEE2E2',
+                                      border: '1px solid #EF4444',
+                                      borderRadius: '6px',
+                                      color: '#DC2626',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 600,
+                                      cursor: isLoading ? 'not-allowed' : 'pointer',
+                                      opacity: isLoading ? 0.5 : 1,
+                                    }}
+                                  >
+                                    {isLoading ? '...' : 'Stop'}
+                                  </button>
+                                )}
+                                {failedJob && (
+                                  <button
+                                    onClick={() => handleRegenerateChapter(chapter.id)}
+                                    disabled={isLoading}
+                                    title="Retry failed generation"
+                                    style={{
+                                      padding: '0.5rem 0.75rem',
+                                      background: '#DBEAFE',
+                                      border: '1px solid #3B82F6',
+                                      borderRadius: '6px',
+                                      color: '#1D4ED8',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 600,
+                                      cursor: isLoading ? 'not-allowed' : 'pointer',
+                                      opacity: isLoading ? 0.5 : 1,
+                                    }}
+                                  >
+                                    {isLoading ? '...' : 'Retry'}
+                                  </button>
+                                )}
+                                {/* Show regenerate for stuck chapters (no job, no content) */}
+                                {!chapterJob && !failedJob && chapter.word_count === 0 && status === 'pending' && (
+                                  <button
+                                    onClick={() => handleRegenerateChapter(chapter.id)}
+                                    disabled={isLoading}
+                                    title="Queue for generation"
+                                    style={{
+                                      padding: '0.5rem 0.75rem',
+                                      background: '#E0E7FF',
+                                      border: '1px solid #6366F1',
+                                      borderRadius: '6px',
+                                      color: '#4F46E5',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 600,
+                                      cursor: isLoading ? 'not-allowed' : 'pointer',
+                                      opacity: isLoading ? 0.5 : 1,
+                                    }}
+                                  >
+                                    {isLoading ? '...' : 'Generate'}
+                                  </button>
+                                )}
+                                {status === 'completed' && (
+                                  <Link
+                                    href={`/projects/${projectId}/chapters/${chapter.id}`}
+                                    style={{
+                                      padding: '0.5rem 1rem',
+                                      background: 'rgba(16, 185, 129, 0.2)',
+                                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                                      borderRadius: '6px',
+                                      color: '#10B981',
+                                      fontSize: '0.875rem',
+                                      fontWeight: 600,
+                                      textDecoration: 'none',
+                                      transition: 'all 0.2s',
+                                    }}
+                                  >
+                                    Read
+                                  </Link>
+                                )}
+                              </div>
                             </div>
                           );
                         })}

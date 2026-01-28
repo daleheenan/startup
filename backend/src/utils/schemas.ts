@@ -59,6 +59,8 @@ export const updateProjectSchema = z.object({
   status: z.enum(['setup', 'planning', 'writing', 'editing', 'complete']).optional(),
   title: z.string().min(1, 'Title is required').max(500, 'Title too long').optional(),
   authorName: z.string().max(200, 'Author name too long').optional().nullable(),
+  type: z.enum(['standalone', 'trilogy', 'series']).optional(),
+  bookCount: z.number().int().positive().optional(),
 }).refine(data => Object.keys(data).length > 0, {
   message: 'At least one field must be provided for update',
 });

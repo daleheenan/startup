@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { getToken } from '../lib/auth';
+import { useToast } from './shared/Toast';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -14,7 +15,9 @@ interface ExportButtonsProps {
 export default function ExportButtons({ projectId, hasContent = true }: ExportButtonsProps) {
   const [exportingDocx, setExportingDocx] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingPdfPublish, setExportingPdfPublish] = useState(false);
   const [exportingBible, setExportingBible] = useState(false);
+  const { showError, showSuccess } = useToast(); // Issue #31
 
   const handleExportDocx = async () => {
     setExportingDocx(true);
@@ -38,9 +41,10 @@ export default function ExportButtons({ projectId, hasContent = true }: ExportBu
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+      showSuccess('DOCX exported successfully');
     } catch (error) {
       console.error('Error exporting DOCX:', error);
-      alert('Failed to export DOCX');
+      showError('Failed to export DOCX. Please try again.');
     } finally {
       setExportingDocx(false);
     }
@@ -68,11 +72,43 @@ export default function ExportButtons({ projectId, hasContent = true }: ExportBu
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+      showSuccess('PDF exported successfully');
     } catch (error) {
       console.error('Error exporting PDF:', error);
-      alert('Failed to export PDF');
+      showError('Failed to export PDF. Please try again.');
     } finally {
       setExportingPdf(false);
+    }
+  };
+
+  const handleExportPdfPublish = async () => {
+    setExportingPdfPublish(true);
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/export/pdf-publish/${projectId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error('Export failed');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `publish-ready-${projectId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      showSuccess('Publish-ready PDF exported successfully');
+    } catch (error) {
+      console.error('Error exporting publish-ready PDF:', error);
+      showError('Failed to export publish-ready PDF. Please try again.');
+    } finally {
+      setExportingPdfPublish(false);
     }
   };
 
@@ -98,9 +134,10 @@ export default function ExportButtons({ projectId, hasContent = true }: ExportBu
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+      showSuccess('Story Bible exported successfully');
     } catch (error) {
       console.error('Error exporting Story Bible:', error);
-      alert('Failed to export Story Bible');
+      showError('Failed to export Story Bible. Please try again.');
     } finally {
       setExportingBible(false);
     }
@@ -209,6 +246,39 @@ export default function ExportButtons({ projectId, hasContent = true }: ExportBu
           }}
         >
           {exportingPdf ? 'Generating PDF...' : 'Export as PDF (Print-Ready)'}
+        </button>
+
+        <button
+          onClick={handleExportPdfPublish}
+          disabled={exportingPdfPublish}
+          aria-label={exportingPdfPublish ? 'Generating publish-ready PDF, please wait' : 'Export publish-ready PDF with cover image'}
+          aria-busy={exportingPdfPublish}
+          style={{
+            padding: '1rem',
+            minHeight: '44px',
+            background: exportingPdfPublish
+              ? 'rgba(234, 88, 12, 0.5)'
+              : 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
+            border: 'none',
+            borderRadius: '8px',
+            color: '#FFFFFF',
+            fontSize: '1rem',
+            fontWeight: 600,
+            cursor: exportingPdfPublish ? 'not-allowed' : 'pointer',
+            opacity: exportingPdfPublish ? 0.7 : 1,
+            transition: 'all 0.2s',
+          }}
+          onFocus={(e) => {
+            if (!exportingPdfPublish) {
+              e.currentTarget.style.outline = '2px solid #FFFFFF';
+              e.currentTarget.style.outlineOffset = '2px';
+            }
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.outline = 'none';
+          }}
+        >
+          {exportingPdfPublish ? 'Generating PDF...' : 'Export PDF (Publish-Ready with Cover)'}
         </button>
 
         <button

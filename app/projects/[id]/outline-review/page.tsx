@@ -230,6 +230,19 @@ export default function OutlineReviewPage() {
           window.location.href = '/login';
           return;
         }
+        // Handle 503 - Outline Editorial tables missing
+        if (response.status === 503) {
+          const error = await response.json();
+          if (error.code === 'OUTLINE_EDITORIAL_TABLES_MISSING') {
+            setStatus({
+              hasReport: false,
+              projectReviewStatus: 'unavailable',
+              status: 'unavailable',
+              error: 'The Outline Editorial Review feature requires database setup. Please contact the administrator to run database migrations (migration 031).',
+            } as OutlineEditorialStatus);
+            return;
+          }
+        }
         throw new Error('Failed to fetch status');
       }
 
@@ -280,6 +293,16 @@ export default function OutlineReviewPage() {
 
       if (!response.ok) {
         const error = await response.json();
+        // Handle database migration not applied error
+        if (error.code === 'OUTLINE_EDITORIAL_TABLES_MISSING') {
+          setStatus({
+            hasReport: false,
+            projectReviewStatus: 'unavailable',
+            status: 'unavailable',
+            error: 'The Outline Editorial Review feature requires database setup. Please contact the administrator to run database migrations (migration 031).',
+          } as OutlineEditorialStatus);
+          return;
+        }
         alert(error.error || 'Failed to submit for review');
         return;
       }
@@ -1190,6 +1213,23 @@ export default function OutlineReviewPage() {
           {loading ? (
             <div style={{ textAlign: 'center', padding: '3rem', color: '#64748B' }}>
               Loading...
+            </div>
+          ) : status?.status === 'unavailable' ? (
+            <div style={{
+              background: '#FEF3C7',
+              borderRadius: '8px',
+              padding: '2rem',
+              border: '1px solid #FCD34D',
+              textAlign: 'center',
+            }}>
+              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚙️</div>
+              <h3 style={{ margin: '0 0 0.5rem 0', color: '#92400E' }}>Feature Setup Required</h3>
+              <p style={{ margin: '0 0 1rem 0', color: '#A16207', maxWidth: '500px', marginLeft: 'auto', marginRight: 'auto' }}>
+                {status.error || 'The Outline Editorial Review feature requires database setup. Please contact the administrator.'}
+              </p>
+              <p style={{ margin: 0, fontSize: '0.875rem', color: '#B45309' }}>
+                Administrator: Run database migration 031_outline_editorial_board.sql
+              </p>
             </div>
           ) : status?.projectReviewStatus === 'skipped' && !status?.hasReport ? (
             renderSkipped()

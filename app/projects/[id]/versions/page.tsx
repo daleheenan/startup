@@ -57,8 +57,32 @@ export default function VersionHistoryPage() {
   const [isMigrating, setIsMigrating] = useState(false);
   const [legacyChapterCount, setLegacyChapterCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [rateLimitError, setRateLimitError] = useState<{ message: string; retryAfter: number } | null>(null);
+  const [rateLimitCountdown, setRateLimitCountdown] = useState(0);
 
   const navigation = useProjectNavigation(projectId, project, null, []);
+
+  // Handle rate limit countdown timer
+  useEffect(() => {
+    if (rateLimitCountdown <= 0) {
+      if (rateLimitError) {
+        setRateLimitError(null);
+      }
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setRateLimitCountdown(prev => {
+        if (prev <= 1) {
+          setRateLimitError(null);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [rateLimitCountdown, rateLimitError]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -222,7 +246,10 @@ export default function VersionHistoryPage() {
   const handleMigrateChapters = async () => {
     if (!selectedBookId || isMigrating) return;
 
+    // Clear any previous rate limit error
+    setRateLimitError(null);
     setIsMigrating(true);
+
     try {
       const token = getToken();
       const response = await fetch(`${API_BASE_URL}/api/books/${selectedBookId}/migrate-chapters`, {
@@ -232,6 +259,20 @@ export default function VersionHistoryPage() {
           'Content-Type': 'application/json',
         },
       });
+
+      // Handle rate limiting
+      if (response.status === 429) {
+        const retryAfter = response.headers.get('RateLimit-Reset');
+        const retrySeconds = retryAfter ? Math.ceil((parseInt(retryAfter) * 1000 - Date.now()) / 1000) : 60;
+        const waitTime = Math.max(retrySeconds, 5); // At least 5 seconds
+
+        setRateLimitError({
+          message: 'Too many requests. Please wait before trying again.',
+          retryAfter: waitTime,
+        });
+        setRateLimitCountdown(waitTime);
+        return;
+      }
 
       if (!response.ok) {
         const data = await response.json();
@@ -368,22 +409,48 @@ export default function VersionHistoryPage() {
                   You have <strong>{legacyChapterCount} chapters</strong> that were created before versioning was added.
                   Migrate them to Version 1 to enable version management.
                 </p>
+
+                {/* Rate limit warning */}
+                {rateLimitError && (
+                  <div style={{
+                    padding: '1rem',
+                    background: '#FEF3C7',
+                    border: '1px solid #F59E0B',
+                    borderRadius: borderRadius.md,
+                    marginBottom: '1rem',
+                  }}>
+                    <p style={{ color: '#B45309', fontSize: '0.875rem', margin: 0 }}>
+                      {rateLimitError.message}
+                      {rateLimitCountdown > 0 && (
+                        <span style={{ fontWeight: 600 }}> Retry in {rateLimitCountdown}s</span>
+                      )}
+                    </p>
+                  </div>
+                )}
+
                 <button
                   onClick={handleMigrateChapters}
-                  disabled={isMigrating}
+                  disabled={isMigrating || rateLimitCountdown > 0}
                   style={{
                     padding: '0.75rem 1.5rem',
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    background: rateLimitCountdown > 0
+                      ? '#9CA3AF'
+                      : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                     border: 'none',
                     borderRadius: borderRadius.md,
                     color: '#FFFFFF',
                     fontSize: '0.9375rem',
                     fontWeight: 600,
-                    cursor: isMigrating ? 'not-allowed' : 'pointer',
-                    opacity: isMigrating ? 0.7 : 1,
+                    cursor: (isMigrating || rateLimitCountdown > 0) ? 'not-allowed' : 'pointer',
+                    opacity: (isMigrating || rateLimitCountdown > 0) ? 0.7 : 1,
                   }}
                 >
-                  {isMigrating ? 'Migrating...' : `Migrate ${legacyChapterCount} Chapters to Version 1`}
+                  {isMigrating
+                    ? 'Migrating...'
+                    : rateLimitCountdown > 0
+                      ? `Wait ${rateLimitCountdown}s`
+                      : `Migrate ${legacyChapterCount} Chapters to Version 1`
+                  }
                 </button>
               </>
             ) : (
