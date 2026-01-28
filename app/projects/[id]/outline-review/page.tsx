@@ -292,9 +292,9 @@ export default function OutlineReviewPage() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const errorData = await response.json();
         // Handle database migration not applied error
-        if (error.code === 'OUTLINE_EDITORIAL_TABLES_MISSING') {
+        if (errorData.code === 'OUTLINE_EDITORIAL_TABLES_MISSING') {
           setStatus({
             hasReport: false,
             projectReviewStatus: 'unavailable',
@@ -303,7 +303,9 @@ export default function OutlineReviewPage() {
           } as OutlineEditorialStatus);
           return;
         }
-        alert(error.error || 'Failed to submit for review');
+        // Extract error message - API returns { error: { code, message } }
+        const errorMessage = errorData.error?.message || errorData.message || 'Failed to submit for review';
+        alert(errorMessage);
         return;
       }
 
@@ -333,8 +335,9 @@ export default function OutlineReviewPage() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        alert(error.error || 'Failed to skip review');
+        const errorData = await response.json();
+        const errorMessage = errorData.error?.message || errorData.message || 'Failed to skip review';
+        alert(errorMessage);
         return;
       }
 
