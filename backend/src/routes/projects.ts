@@ -676,7 +676,12 @@ router.put('/:id', (req, res) => {
       return res.status(400).json({ error: validation.error });
     }
 
-    const { storyDNA, storyBible, storyConcept, status, title, authorName, type, bookCount } = validation.data;
+    const {
+      storyDNA, storyBible, storyConcept, status, title, authorName, type, bookCount,
+      // Publishing fields
+      dedication, epigraph, epigraphAttribution, isbn, publisher, edition,
+      copyrightYear, includeDramatisPersonae, includeAboutAuthor
+    } = validation.data;
 
     // Whitelist of allowed update fields (prevents SQL injection)
     const updates: string[] = [];
@@ -721,6 +726,52 @@ router.put('/:id', (req, res) => {
     if (bookCount !== undefined) {
       updates.push('book_count = ?');
       params.push(bookCount);
+    }
+
+    // Publishing fields
+    if (dedication !== undefined) {
+      updates.push('dedication = ?');
+      params.push(dedication);
+    }
+
+    if (epigraph !== undefined) {
+      updates.push('epigraph = ?');
+      params.push(epigraph);
+    }
+
+    if (epigraphAttribution !== undefined) {
+      updates.push('epigraph_attribution = ?');
+      params.push(epigraphAttribution);
+    }
+
+    if (isbn !== undefined) {
+      updates.push('isbn = ?');
+      params.push(isbn);
+    }
+
+    if (publisher !== undefined) {
+      updates.push('publisher = ?');
+      params.push(publisher);
+    }
+
+    if (edition !== undefined) {
+      updates.push('edition = ?');
+      params.push(edition);
+    }
+
+    if (copyrightYear !== undefined) {
+      updates.push('copyright_year = ?');
+      params.push(copyrightYear);
+    }
+
+    if (includeDramatisPersonae !== undefined) {
+      updates.push('include_dramatis_personae = ?');
+      params.push(includeDramatisPersonae ? 1 : 0);
+    }
+
+    if (includeAboutAuthor !== undefined) {
+      updates.push('include_about_author = ?');
+      params.push(includeAboutAuthor ? 1 : 0);
     }
 
     if (updates.length === 0) {

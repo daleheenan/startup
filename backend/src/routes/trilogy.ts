@@ -8,9 +8,11 @@ import { createLogger } from '../services/logger.service.js';
 import {
   createTransitionSchema,
   convertToTrilogySchema,
+  createSeriesFromProjectSchema,
   validateRequest,
   type CreateTransitionInput,
   type ConvertToTrilogyInput,
+  type CreateSeriesFromProjectInput,
 } from '../utils/schemas.js';
 
 const router = Router();
@@ -303,6 +305,167 @@ router.post('/projects/:projectId/convert-to-trilogy', (req, res) => {
     });
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack }, 'Error converting to trilogy');
+    res.status(500).json({
+      error: { code: 'INTERNAL_ERROR', message: error.message },
+    });
+  }
+});
+
+/**
+ * POST /api/trilogy/projects/:projectId/create-series
+ * Create a new series from an existing standalone project
+ * The existing project's book becomes Book 1, inheriting genre and other details
+ */
+router.post('/projects/:projectId/create-series', (req, res) => {
+  try {
+    const { projectId } = req.params;
+
+    const validation = validateRequest(createSeriesFromProjectSchema, req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error });
+    }
+
+    const { seriesName } = validation.data;
+
+    // Get the source project
+    const projectStmt = db.prepare<[string], any>(`
+      SELECT * FROM projects WHERE id = ?
+    `);
+    const sourceProject = projectStmt.get(projectId);
+
+    if (!sourceProject) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project not found' },
+      });
+    }
+
+    // Update the project to be a series (store series name as project title)
+    const now = new Date().toISOString();
+    const originalTitle = sourceProject.title;
+    const updateProjectStmt = db.prepare(`
+      UPDATE projects
+      SET type = 'series', title = ?, book_count = 1, updated_at = ?
+      WHERE id = ?
+    `);
+    updateProjectStmt.run(seriesName, now, projectId);
+
+    // Get existing book or create one if none exists
+    const existingBookStmt = db.prepare<[string], any>(`
+      SELECT * FROM books WHERE project_id = ? ORDER BY book_number ASC LIMIT 1
+    `);
+    let book = existingBookStmt.get(projectId);
+
+    if (!book) {
+      // Create Book 1 using the original project title
+      const bookId = `book-${Date.now()}-1`;
+      const createBookStmt = db.prepare(`
+        INSERT INTO books (id, project_id, book_number, title, status, word_count, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      createBookStmt.run(
+        bookId,
+        projectId,
+        1,
+        originalTitle,
+        sourceProject.status || 'setup',
+        0,
+        now,
+        now
+      );
+      book = { id: bookId, book_number: 1, title: originalTitle, status: sourceProject.status || 'setup' };
+    }
+
+    res.json({
+      success: true,
+      series: {
+        id: projectId,
+        seriesName,
+        genre: sourceProject.genre,
+        type: 'series',
+      },
+      book,
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error creating series from project');
+    res.status(500).json({
+      error: { code: 'INTERNAL_ERROR', message: error.message },
+    });
+  }
+});
+
+/**
+ * DELETE /api/trilogy/books/:bookId
+ * Remove a book from a series (only if not the last book)
+ */
+router.delete('/books/:bookId', (req, res) => {
+  try {
+    const { bookId } = req.params;
+
+    // Get the book and its project
+    const bookStmt = db.prepare<[string], any>(`
+      SELECT b.*, p.type as project_type FROM books b
+      JOIN projects p ON b.project_id = p.id
+      WHERE b.id = ?
+    `);
+    const book = bookStmt.get(bookId);
+
+    if (!book) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Book not found' },
+      });
+    }
+
+    // Check if this is the only book
+    const countStmt = db.prepare<[string], { count: number }>(`
+      SELECT COUNT(*) as count FROM books WHERE project_id = ?
+    `);
+    const { count } = countStmt.get(book.project_id)!;
+
+    if (count <= 1) {
+      return res.status(400).json({
+        error: { code: 'CANNOT_DELETE', message: 'Cannot remove the last book from a series' },
+      });
+    }
+
+    // Delete associated chapters first
+    const deleteChaptersStmt = db.prepare(`DELETE FROM chapters WHERE book_id = ?`);
+    deleteChaptersStmt.run(bookId);
+
+    // Delete associated outlines
+    const deleteOutlinesStmt = db.prepare(`DELETE FROM outlines WHERE book_id = ?`);
+    deleteOutlinesStmt.run(bookId);
+
+    // Delete the book
+    const deleteBookStmt = db.prepare(`DELETE FROM books WHERE id = ?`);
+    deleteBookStmt.run(bookId);
+
+    // Renumber remaining books
+    const now = new Date().toISOString();
+    const remainingBooksStmt = db.prepare<[string], any>(`
+      SELECT id, book_number FROM books WHERE project_id = ? ORDER BY book_number ASC
+    `);
+    const remainingBooks = remainingBooksStmt.all(book.project_id);
+
+    const updateBookNumberStmt = db.prepare(`
+      UPDATE books SET book_number = ?, updated_at = ? WHERE id = ?
+    `);
+
+    remainingBooks.forEach((b: any, index: number) => {
+      updateBookNumberStmt.run(index + 1, now, b.id);
+    });
+
+    // Update project book count
+    const updateProjectStmt = db.prepare(`
+      UPDATE projects SET book_count = ?, updated_at = ? WHERE id = ?
+    `);
+    updateProjectStmt.run(remainingBooks.length, now, book.project_id);
+
+    res.json({
+      success: true,
+      remainingBooks: remainingBooks.length,
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error removing book from series');
     res.status(500).json({
       error: { code: 'INTERNAL_ERROR', message: error.message },
     });

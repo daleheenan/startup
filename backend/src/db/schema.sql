@@ -18,6 +18,16 @@ CREATE TABLE IF NOT EXISTS projects (
     source_concept_id TEXT,      -- Link to saved_concepts table
     time_period_type TEXT DEFAULT 'present',  -- past, present, future, unknown, custom
     specific_year INTEGER,       -- Specific year for custom time periods
+    -- Publishing fields
+    dedication TEXT,             -- Optional dedication text
+    epigraph TEXT,               -- Optional epigraph quote
+    epigraph_attribution TEXT,   -- Attribution for epigraph (e.g., "— William Shakespeare")
+    isbn TEXT,                   -- ISBN number
+    publisher TEXT,              -- Publisher name
+    edition TEXT DEFAULT 'First Edition',
+    copyright_year INTEGER,      -- Copyright year (defaults to current year)
+    include_dramatis_personae INTEGER DEFAULT 1,  -- Include character list in back matter
+    include_about_author INTEGER DEFAULT 1,       -- Include about author in back matter
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -210,3 +220,18 @@ CREATE TABLE IF NOT EXISTS user_preferences (
 -- Create default entry for owner user
 INSERT OR IGNORE INTO user_preferences (user_id)
 VALUES ('owner');
+
+-- Author Profile table (shared user-level settings for all books)
+CREATE TABLE IF NOT EXISTS author_profile (
+    id TEXT PRIMARY KEY DEFAULT 'owner',
+    author_bio TEXT,
+    author_photo TEXT,              -- base64-encoded image
+    author_photo_type TEXT,         -- MIME type (image/jpeg, image/png, etc.)
+    author_website TEXT,
+    author_social_media TEXT,       -- JSON: { twitter, instagram, facebook, etc. }
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Insert default row for owner
+INSERT OR IGNORE INTO author_profile (id) VALUES ('owner');

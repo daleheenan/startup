@@ -175,13 +175,22 @@ export default function SeriesManagementPage() {
   const [error, setError] = useState<string | null>(null);
   const [characterSearch, setCharacterSearch] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showConvertModal, setShowConvertModal] = useState(false);
+  const [selectedStandalone, setSelectedStandalone] = useState<Project | null>(null);
   const [newSeriesTitle, setNewSeriesTitle] = useState('');
   const [newSeriesGenre, setNewSeriesGenre] = useState('fantasy');
   const [creating, setCreating] = useState(false);
+  const [converting, setConverting] = useState(false);
 
   // Filter to only series/trilogy projects
   const seriesProjects = useMemo(() =>
     projects.filter(p => p.type === 'trilogy' || p.type === 'series'),
+    [projects]
+  );
+
+  // Filter standalone projects (can be converted to series)
+  const standaloneProjects = useMemo(() =>
+    projects.filter(p => p.type === 'standalone'),
     [projects]
   );
 
@@ -417,6 +426,58 @@ export default function SeriesManagementPage() {
     } finally {
       setCreating(false);
     }
+  };
+
+  // Convert standalone to series
+  const handleConvertToSeries = async () => {
+    if (!selectedStandalone || !newSeriesTitle.trim()) {
+      setError('Please select a book and enter a series name');
+      return;
+    }
+
+    setConverting(true);
+    setError(null);
+
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE_URL}/api/trilogy/projects/${selectedStandalone.id}/create-series`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          seriesName: newSeriesTitle.trim(),
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error?.message || 'Failed to convert to series');
+      }
+
+      // Refresh projects
+      await fetchProjects();
+
+      setNewSeriesTitle('');
+      setSelectedStandalone(null);
+      setShowConvertModal(false);
+
+      // Navigate to the new series
+      router.push(`/projects/${selectedStandalone.id}/series`);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setConverting(false);
+    }
+  };
+
+  // Open convert modal with pre-populated data
+  const openConvertModal = (project: Project) => {
+    setSelectedStandalone(project);
+    setNewSeriesTitle(`${project.title} Series`);
+    setNewSeriesGenre(project.genre || 'fantasy');
+    setShowConvertModal(true);
   };
 
   // ==================== STYLES ====================
@@ -728,6 +789,72 @@ export default function SeriesManagementPage() {
               </Link>
             );
           })}
+        </div>
+      )}
+
+      {/* Standalone Projects Section - Can be converted to series */}
+      {standaloneProjects.length > 0 && (
+        <div style={{ marginTop: spacing[8] }}>
+          <h2 style={{
+            fontSize: typography.fontSize.xl,
+            fontWeight: typography.fontWeight.semibold,
+            color: colors.text.primary,
+            marginBottom: spacing[4],
+          }}>
+            Standalone Books
+          </h2>
+          <p style={{
+            fontSize: typography.fontSize.sm,
+            color: colors.text.secondary,
+            marginBottom: spacing[4],
+          }}>
+            Convert any standalone book into a series to add more books and track continuity.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[3] }}>
+            {standaloneProjects.map((project) => (
+              <div
+                key={project.id}
+                style={{
+                  ...cardStyle,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 0,
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: spacing[3], marginBottom: spacing[1] }}>
+                    <h3 style={{
+                      fontSize: typography.fontSize.base,
+                      fontWeight: typography.fontWeight.medium,
+                      color: colors.text.primary,
+                      margin: 0,
+                    }}>
+                      {project.title}
+                    </h3>
+                    <span style={badgeStyle('info')}>Standalone</span>
+                  </div>
+                  <p style={{
+                    fontSize: typography.fontSize.sm,
+                    color: colors.text.secondary,
+                    margin: 0,
+                  }}>
+                    {project.genre} • {project.status}
+                  </p>
+                </div>
+                <button
+                  onClick={() => openConvertModal(project)}
+                  style={{
+                    ...secondaryButtonStyle,
+                    padding: `${spacing[2]} ${spacing[4]}`,
+                    fontSize: typography.fontSize.sm,
+                  }}
+                >
+                  Convert to Series
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </>
@@ -1289,6 +1416,117 @@ export default function SeriesManagementPage() {
                 disabled={creating || !newSeriesTitle.trim()}
               >
                 {creating ? 'Creating...' : 'Create Series'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Convert to Series Modal */}
+      {showConvertModal && selectedStandalone && (
+        <div
+          style={modalOverlayStyle}
+          onClick={() => {
+            setShowConvertModal(false);
+            setSelectedStandalone(null);
+            setNewSeriesTitle('');
+          }}
+        >
+          <div
+            style={modalStyle}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{
+              fontSize: typography.fontSize.xl,
+              fontWeight: typography.fontWeight.semibold,
+              color: colors.text.primary,
+              marginBottom: spacing[4],
+            }}>
+              Convert to Series
+            </h2>
+
+            <div style={{
+              padding: spacing[4],
+              background: colors.background.surfaceHover,
+              borderRadius: borderRadius.md,
+              marginBottom: spacing[4],
+            }}>
+              <p style={{
+                fontSize: typography.fontSize.sm,
+                color: colors.text.secondary,
+                margin: 0,
+                marginBottom: spacing[2],
+              }}>
+                Converting:
+              </p>
+              <p style={{
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.medium,
+                color: colors.text.primary,
+                margin: 0,
+              }}>
+                {selectedStandalone.title}
+              </p>
+              <p style={{
+                fontSize: typography.fontSize.sm,
+                color: colors.text.tertiary,
+                margin: 0,
+                marginTop: spacing[1],
+              }}>
+                Genre: {selectedStandalone.genre}
+              </p>
+            </div>
+
+            <p style={{
+              fontSize: typography.fontSize.sm,
+              color: colors.text.secondary,
+              marginBottom: spacing[4],
+            }}>
+              This book will become Book 1 of the new series. You can add more books afterwards.
+            </p>
+
+            <label style={{
+              display: 'block',
+              fontSize: typography.fontSize.sm,
+              fontWeight: typography.fontWeight.medium,
+              color: colors.text.primary,
+              marginBottom: spacing[2],
+            }}>
+              Series Name
+            </label>
+            <input
+              type="text"
+              value={newSeriesTitle}
+              onChange={(e) => setNewSeriesTitle(e.target.value)}
+              placeholder="Enter series name..."
+              style={inputStyle}
+              autoFocus
+              disabled={converting}
+            />
+
+            <div style={{ display: 'flex', gap: spacing[3], justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => {
+                  setShowConvertModal(false);
+                  setSelectedStandalone(null);
+                  setNewSeriesTitle('');
+                  setError(null);
+                }}
+                style={secondaryButtonStyle}
+                disabled={converting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConvertToSeries}
+                style={{
+                  ...primaryButtonStyle,
+                  opacity: converting || !newSeriesTitle.trim() ? 0.7 : 1,
+                  cursor: converting || !newSeriesTitle.trim() ? 'not-allowed' : 'pointer',
+                }}
+                disabled={converting || !newSeriesTitle.trim()}
+              >
+                {converting ? 'Converting...' : 'Convert to Series'}
               </button>
             </div>
           </div>

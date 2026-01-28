@@ -82,7 +82,8 @@ export type WorkflowStep =
   | 'analytics'
   | 'editorial-report'
   | 'follow-up'
-  | 'series';
+  | 'series'
+  | 'publishing';
 
 /**
  * Navigation tab configuration
@@ -229,6 +230,15 @@ export const PROJECT_NAV_GROUPS: NavGroup[] = [
     isStandalone: true,
     route: '/series',
     workflowStep: 'series',
+    tabs: [],
+  },
+  {
+    id: 'publishing',
+    label: 'Publishing',
+    icon: '📄',
+    isStandalone: true,
+    route: '/publishing',
+    workflowStep: 'publishing',
     tabs: [],
   },
 ];

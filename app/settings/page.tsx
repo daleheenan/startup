@@ -30,6 +30,15 @@ interface SettingsSection {
 
 const settingsSections: SettingsSection[] = [
   {
+    title: 'Author Profile',
+    description: 'Set up your author biography, photo, and social links for the "About the Author" section in your books.',
+    href: '/settings/author-profile',
+    icon: 'A',
+    iconBg: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+    count: null,
+    countLabel: '',
+  },
+  {
     title: 'Custom Genres',
     description: 'Create and manage your own genre categories to use when creating new projects.',
     href: '/settings/genres',
@@ -58,7 +67,7 @@ const settingsSections: SettingsSection[] = [
   },
   {
     title: 'Genre Recipes',
-    description: 'Save your favorite genre combinations as presets for quick project creation.',
+    description: 'Save your favourite genre combinations as presets for quick project creation.',
     href: '/settings/recipes',
     icon: 'R',
     iconBg: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
@@ -80,8 +89,12 @@ const settingsSections: SettingsSection[] = [
 
 const quickTips = [
   {
+    title: 'Author Profile',
+    description: 'Set up your bio and photo once, and it will be included in all your published books automatically.',
+  },
+  {
     title: 'Custom Genres',
-    description: 'Create niche genres like "Cozy Cat Mystery" or "Space Western Romance" to match your writing style.',
+    description: 'Create niche genres like "Cosy Cat Mystery" or "Space Western Romance" to match your writing style.',
   },
   {
     title: 'Prose Style',
@@ -90,10 +103,6 @@ const quickTips = [
   {
     title: 'Exclusions',
     description: 'Add overused tropes or names you want to avoid. These will be filtered out during generation.',
-  },
-  {
-    title: 'Genre Recipes',
-    description: 'Save your favorite genre combinations for quick access when starting new projects.',
   },
 ];
 

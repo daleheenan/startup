@@ -10,9 +10,8 @@ import {
   getActiveGroupFromPath,
   type NavGroup,
   type NavTab,
-  type WorkflowStep,
 } from '@/app/lib/navigation-constants';
-import { useWorkflowPrerequisites, type WorkflowProjectData } from '@/app/hooks/useWorkflowPrerequisites';
+import { useWorkflowPrerequisites, type WorkflowProjectData, type WorkflowStep } from '@/app/hooks/useWorkflowPrerequisites';
 import type { TabStatus } from '@/shared/types';
 
 // Flexible outline type that works with various page-specific interfaces

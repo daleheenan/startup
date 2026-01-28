@@ -132,10 +132,12 @@ import universesRouter from './routes/universes.js';
 import userSettingsRouter from './routes/user-settings.js';
 import storyIdeasRouter from './routes/story-ideas.js';
 import authorsRouter from './routes/authors.js';
+import authorProfileRouter from './routes/author-profile.js';
 import plagiarismRouter from './routes/plagiarism.js';
 import vebRouter from './routes/veb.js';
 import completionRouter from './routes/completion.js';
 import outlineEditorialRouter from './routes/outline-editorial.js';
+import editorialBoardRouter from './routes/editorial-board.js';
 
 // Run database migrations
 try {
@@ -253,10 +255,12 @@ app.use('/api/universes', apiLimiter, requireAuth, universesRouter);
 app.use('/api/user-settings', apiLimiter, requireAuth, userSettingsRouter);
 app.use('/api/story-ideas', apiLimiter, requireAuth, storyIdeasRouter);
 app.use('/api/authors', apiLimiter, requireAuth, authorsRouter);
+app.use('/api/author-profile', apiLimiter, requireAuth, authorProfileRouter);
 app.use('/api/plagiarism', apiLimiter, requireAuth, plagiarismRouter);
 app.use('/api/completion', apiLimiter, requireAuth, completionRouter);
 app.use('/api', apiLimiter, requireAuth, vebRouter); // VEB routes use /api/projects/:id/veb/* and /api/veb/*
 app.use('/api', apiLimiter, requireAuth, outlineEditorialRouter); // Outline Editorial routes
+app.use('/api/editorial', apiLimiter, requireAuth, editorialBoardRouter); // Editorial Board aggregation routes
 
 // Sentry error handler - must be BEFORE custom error handlers
 app.use(sentryErrorHandler());

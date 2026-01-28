@@ -26,7 +26,9 @@
       "Skill(project:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nFix [object Object] error in editorial board submit\n\nThe API returns errors as { error: { code, message } } but the frontend\nwas alerting error.error directly \\(an object\\). Now correctly extracts\nthe message string from errorData.error?.message with fallbacks.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git push)",
-      "Bash(timeout 60 tail:*)"
+      "Bash(timeout 60 tail:*)",
+      "Skill(deploy-workflow)",
+      "Skill(deploy-workflow:*)"
     ]
   }
 }

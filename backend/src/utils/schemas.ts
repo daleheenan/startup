@@ -61,6 +61,16 @@ export const updateProjectSchema = z.object({
   authorName: z.string().max(200, 'Author name too long').optional().nullable(),
   type: z.enum(['standalone', 'trilogy', 'series']).optional(),
   bookCount: z.number().int().positive().optional(),
+  // Publishing fields
+  dedication: z.string().max(2000, 'Dedication too long').optional().nullable(),
+  epigraph: z.string().max(1000, 'Epigraph too long').optional().nullable(),
+  epigraphAttribution: z.string().max(200, 'Attribution too long').optional().nullable(),
+  isbn: z.string().max(50, 'ISBN too long').optional().nullable(),
+  publisher: z.string().max(200, 'Publisher name too long').optional().nullable(),
+  edition: z.string().max(100, 'Edition too long').optional().nullable(),
+  copyrightYear: z.number().int().min(1900).max(2100).optional().nullable(),
+  includeDramatisPersonae: z.boolean().optional(),
+  includeAboutAuthor: z.boolean().optional(),
 }).refine(data => Object.keys(data).length > 0, {
   message: 'At least one field must be provided for update',
 });
@@ -275,6 +285,10 @@ export const createTransitionSchema = z.object({
 
 export const convertToTrilogySchema = z.object({
   bookTitles: z.array(z.string().min(1)).min(2, 'Provide at least 2 book titles'),
+});
+
+export const createSeriesFromProjectSchema = z.object({
+  seriesName: z.string().min(1, 'Series name is required').max(500, 'Series name too long'),
 });
 
 // ============================================================================
@@ -527,6 +541,7 @@ export type EditChapterContentInput = z.infer<typeof editChapterContentSchema>;
 export type ChapterLockInput = z.infer<typeof chapterLockSchema>;
 export type CreateTransitionInput = z.infer<typeof createTransitionSchema>;
 export type ConvertToTrilogyInput = z.infer<typeof convertToTrilogySchema>;
+export type CreateSeriesFromProjectInput = z.infer<typeof createSeriesFromProjectSchema>;
 export type GenerateOutlineInput = z.infer<typeof generateOutlineSchema>;
 export type UpdateOutlineInput = z.infer<typeof updateOutlineSchema>;
 export type CreateQueueJobInput = z.infer<typeof createQueueJobSchema>;
