@@ -43,9 +43,6 @@ export class WordCountRevisionService {
   ): Promise<WordCountRevision> {
     logger.info({ bookId, targetWordCount, tolerancePercent }, 'Starting word count revision');
 
-    // Get current book word count and chapter count
-    const bookStats = this.getBookStats(bookId);
-
     // Check if there's already an active revision
     const existingRevision = this.getActiveRevision(bookId);
     if (existingRevision) {
@@ -57,8 +54,12 @@ export class WordCountRevisionService {
     const reportId = this.getLatestEditorialReportId(bookId);
 
     // Get the current active version (source version for the revision)
+    // IMPORTANT: Get version first, then get stats for that specific version
     const sourceVersion = await bookVersioningService.getActiveVersion(bookId);
     const sourceVersionId = sourceVersion?.id || null;
+
+    // Get current book word count and chapter count from the source version
+    const bookStats = this.getBookStats(bookId, sourceVersionId);
 
     // Calculate targets
     const minAcceptable = Math.round(targetWordCount * (1 - tolerancePercent / 100));
@@ -118,15 +119,27 @@ export class WordCountRevisionService {
   async calculateChapterTargets(revisionId: string): Promise<ChapterTarget[]> {
     const revision = this.getRevisionInternal(revisionId);
 
-    // Get all chapters for the book
-    const chaptersStmt = db.prepare<[string], any>(`
-      SELECT c.id, c.chapter_number, c.title, c.word_count, c.content
-      FROM chapters c
-      JOIN books b ON c.book_id = b.id
-      WHERE c.book_id = ? AND c.status = 'completed'
-      ORDER BY c.chapter_number ASC
-    `);
-    const chapters = chaptersStmt.all(revision.book_id);
+    // Get all chapters for the book, filtered by source version if available
+    // This ensures we work with the correct version's chapters when multiple versions exist
+    let chapters: any[];
+    if (revision.source_version_id) {
+      const chaptersStmt = db.prepare<[string, string], any>(`
+        SELECT c.id, c.chapter_number, c.title, c.word_count, c.content
+        FROM chapters c
+        WHERE c.book_id = ? AND c.version_id = ? AND c.status = 'completed'
+        ORDER BY c.chapter_number ASC
+      `);
+      chapters = chaptersStmt.all(revision.book_id, revision.source_version_id);
+    } else {
+      // Fallback for revisions without source_version_id (legacy or no versions)
+      const chaptersStmt = db.prepare<[string], any>(`
+        SELECT c.id, c.chapter_number, c.title, c.word_count, c.content
+        FROM chapters c
+        WHERE c.book_id = ? AND c.status = 'completed'
+        ORDER BY c.chapter_number ASC
+      `);
+      chapters = chaptersStmt.all(revision.book_id);
+    }
 
     // Get Ruthless Editor results if available
     let ruthlessEditorResults: any = null;
@@ -843,15 +856,31 @@ Return ONLY valid JSON with the condensed chapter and explanation:`;
   // Private helpers
   // ============================================================================
 
-  private getBookStats(bookId: string): { totalWordCount: number; chapterCount: number } {
-    const stmt = db.prepare<[string], { total_words: number; chapter_count: number }>(`
-      SELECT
-        COALESCE(SUM(word_count), 0) as total_words,
-        COUNT(*) as chapter_count
-      FROM chapters
-      WHERE book_id = ? AND status = 'completed'
-    `);
-    const result = stmt.get(bookId);
+  private getBookStats(bookId: string, versionId?: string | null): { totalWordCount: number; chapterCount: number } {
+    let result: { total_words: number; chapter_count: number } | undefined;
+
+    if (versionId) {
+      // Get stats for specific version
+      const stmt = db.prepare<[string, string], { total_words: number; chapter_count: number }>(`
+        SELECT
+          COALESCE(SUM(word_count), 0) as total_words,
+          COUNT(*) as chapter_count
+        FROM chapters
+        WHERE book_id = ? AND version_id = ? AND status = 'completed'
+      `);
+      result = stmt.get(bookId, versionId);
+    } else {
+      // Fallback: get all chapters (legacy or no versions)
+      const stmt = db.prepare<[string], { total_words: number; chapter_count: number }>(`
+        SELECT
+          COALESCE(SUM(word_count), 0) as total_words,
+          COUNT(*) as chapter_count
+        FROM chapters
+        WHERE book_id = ? AND status = 'completed'
+      `);
+      result = stmt.get(bookId);
+    }
+
     return {
       totalWordCount: result?.total_words || 0,
       chapterCount: result?.chapter_count || 0,
