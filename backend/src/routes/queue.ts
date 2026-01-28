@@ -9,6 +9,7 @@ import {
   validateRequest,
   type CreateQueueJobInput,
 } from '../utils/schemas.js';
+import { progressEmitter } from './progress.js';
 
 const router = Router();
 const logger = createLogger('routes:queue');
@@ -128,11 +129,26 @@ router.delete('/jobs/:id', (req, res) => {
   try {
     const { id } = req.params;
 
+    // Get job details before deleting for SSE notification
+    const jobStmt = db.prepare(`SELECT id, type, target_id FROM jobs WHERE id = ?`);
+    const job = jobStmt.get(id) as { id: string; type: string; target_id: string } | undefined;
+
     const stmt = db.prepare(`DELETE FROM jobs WHERE id = ?`);
     const result = stmt.run(id);
 
     if (result.changes === 0) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Job not found' } });
+    }
+
+    // Emit job deleted event so frontend can clear the state
+    if (job) {
+      progressEmitter.emit('job:update', {
+        id: job.id,
+        type: job.type,
+        target_id: job.target_id,
+        status: 'deleted',
+        timestamp: new Date().toISOString(),
+      });
     }
 
     logger.info({ jobId: id }, 'Job deleted');

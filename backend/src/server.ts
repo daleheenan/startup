@@ -206,6 +206,20 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Routes that should be exempt from rate limiting (admin/migration operations)
+const rateLimitExemptPaths = [
+  /\/api\/books\/[^/]+\/migrate-chapters$/,  // Version migration
+];
+
+// Conditional rate limiter that skips certain paths
+const conditionalApiLimiter = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const isExempt = rateLimitExemptPaths.some(pattern => pattern.test(req.path));
+  if (isExempt) {
+    return next();
+  }
+  return apiLimiter(req, res, next);
+};
+
 // Public Routes (no auth required, no rate limiting)
 app.use('/api/health', healthRouter);
 
@@ -220,7 +234,7 @@ app.use('/api/projects', apiLimiter, requireAuth, projectsRouter);
 app.use('/api/queue', apiLimiter, requireAuth, queueRouter);
 app.use('/api/concepts', apiLimiter, requireAuth, conceptsRouter);
 app.use('/api/outlines', apiLimiter, requireAuth, outlinesRouter);
-app.use('/api/books', apiLimiter, requireAuth, booksRouter);
+app.use('/api/books', conditionalApiLimiter, requireAuth, booksRouter);
 app.use('/api/chapters', apiLimiter, requireAuth, chaptersRouter);
 app.use('/api/generation', apiLimiter, requireAuth, generationRouter);
 app.use('/api/editing', apiLimiter, requireAuth, editingRouter);

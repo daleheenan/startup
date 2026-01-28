@@ -49,15 +49,88 @@ function checkVEBTablesExist(): { exists: boolean; missing: string[] } {
 }
 
 /**
+ * Create VEB tables if they don't exist
+ * This is a fallback for when migration 027 failed or was skipped
+ */
+function ensureVEBTables(): boolean {
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS editorial_reports (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'processing', 'completed', 'failed')),
+        beta_swarm_status TEXT DEFAULT 'pending' CHECK(beta_swarm_status IN ('pending', 'processing', 'completed', 'failed', 'skipped')),
+        beta_swarm_results TEXT,
+        beta_swarm_completed_at TEXT,
+        ruthless_editor_status TEXT DEFAULT 'pending' CHECK(ruthless_editor_status IN ('pending', 'processing', 'completed', 'failed', 'skipped')),
+        ruthless_editor_results TEXT,
+        ruthless_editor_completed_at TEXT,
+        market_analyst_status TEXT DEFAULT 'pending' CHECK(market_analyst_status IN ('pending', 'processing', 'completed', 'failed', 'skipped')),
+        market_analyst_results TEXT,
+        market_analyst_completed_at TEXT,
+        overall_score INTEGER,
+        summary TEXT,
+        recommendations TEXT,
+        total_input_tokens INTEGER DEFAULT 0,
+        total_output_tokens INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now')),
+        completed_at TEXT,
+        error TEXT
+      )
+    `);
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS veb_feedback (
+        id TEXT PRIMARY KEY,
+        report_id TEXT NOT NULL REFERENCES editorial_reports(id) ON DELETE CASCADE,
+        chapter_id TEXT REFERENCES chapters(id),
+        module TEXT NOT NULL CHECK(module IN ('beta_swarm', 'ruthless_editor', 'market_analyst')),
+        finding_index INTEGER,
+        feedback_type TEXT NOT NULL CHECK(feedback_type IN ('accept', 'reject', 'rewrite_queued', 'rewrite_completed')),
+        notes TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+
+    // Create indexes if they don't exist
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_editorial_reports_project ON editorial_reports(project_id)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_editorial_reports_status ON editorial_reports(status)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_veb_feedback_report ON veb_feedback(report_id)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_veb_feedback_chapter ON veb_feedback(chapter_id)`);
+
+    logger.info('VEB tables created/verified successfully');
+    return true;
+  } catch (error) {
+    logger.error({ error }, 'Failed to create VEB tables');
+    return false;
+  }
+}
+
+/**
  * Middleware to ensure VEB tables exist before processing requests
+ * If tables are missing, attempts to create them automatically
  */
 function requireVEBTables(req: express.Request, res: express.Response, next: express.NextFunction) {
   const tableCheck = checkVEBTablesExist();
   if (!tableCheck.exists) {
-    logger.error({ missing: tableCheck.missing }, 'VEB tables not found - migration may not have run');
+    logger.warn({ missing: tableCheck.missing }, 'VEB tables not found - attempting to create them');
+
+    // Try to create the tables automatically
+    const created = ensureVEBTables();
+    if (created) {
+      // Verify they were created
+      const recheck = checkVEBTablesExist();
+      if (recheck.exists) {
+        logger.info('VEB tables created successfully on demand');
+        return next();
+      }
+    }
+
+    logger.error({ missing: tableCheck.missing }, 'VEB tables could not be created');
     return res.status(503).json({
       error: 'VEB feature unavailable',
-      message: 'Database tables for Virtual Editorial Board are not initialized. Please contact support.',
+      message: 'Database tables for Virtual Editorial Board could not be initialized. Please contact support.',
       code: 'VEB_TABLES_MISSING',
       missingTables: tableCheck.missing,
     });

@@ -19,11 +19,6 @@ interface ProjectMetrics {
     gbp: string;
     display: string;
   };
-  chapterCost?: {
-    usd: string;
-    gbp: string;
-    display: string;
-  };
   content: {
     chapters: number;
     words: number;
@@ -58,19 +53,19 @@ interface Project {
   progress?: ProjectProgress | null;
 }
 
-interface ProjectsTableProps {
+interface CompletedNovelsTableProps {
   projects: Project[];
   sortConfig: SortConfig;
   onSort: (column: SortColumn) => void;
   onDelete: (projectId: string) => Promise<void>;
 }
 
-export default function ProjectsTable({
+export default function CompletedNovelsTable({
   projects,
   sortConfig,
   onSort,
   onDelete,
-}: ProjectsTableProps) {
+}: CompletedNovelsTableProps) {
   const [exportingState, setExportingState] = useState<Record<string, boolean>>({});
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; title: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -203,6 +198,13 @@ export default function ProjectsTable({
     }
   };
 
+  const getStatusBadge = (status: string) => {
+    if (status === 'published') {
+      return { bg: colors.semantic.successLight, text: colors.semantic.successDark, label: 'Published' };
+    }
+    return { bg: colors.semantic.infoLight, text: colors.semantic.info, label: 'Completed' };
+  };
+
   const actionButtonStyle: React.CSSProperties = {
     padding: `${spacing[1]} ${spacing[2]}`,
     background: colors.background.secondary,
@@ -255,7 +257,7 @@ export default function ProjectsTable({
     return (
       <div
         role="status"
-        aria-label="No projects found"
+        aria-label="No completed novels found"
         style={{
           textAlign: 'center',
           padding: `${spacing[12]} ${spacing[8]}`,
@@ -279,7 +281,7 @@ export default function ProjectsTable({
             fontSize: '2rem',
           }}
         >
-          📖
+          📚
         </div>
         <h3
           style={{
@@ -289,17 +291,17 @@ export default function ProjectsTable({
             marginBottom: spacing[2],
           }}
         >
-          No Projects Yet
+          No Completed Novels Yet
         </h3>
         <p
           style={{
             fontSize: typography.fontSize.sm,
             color: colors.text.secondary,
-            maxWidth: '300px',
+            maxWidth: '400px',
             margin: '0 auto',
           }}
         >
-          Start by creating your first novel using one of the options above.
+          Complete writing all chapters in a novel to see it here. Novels appear once all planned chapters have been generated.
         </p>
       </div>
     );
@@ -322,11 +324,11 @@ export default function ProjectsTable({
       >
         <table
           role="grid"
-          aria-label="Your novel projects"
+          aria-label="Completed novel projects"
           style={{
             width: '100%',
             borderCollapse: 'collapse',
-            minWidth: '1100px',
+            minWidth: '900px',
           }}
         >
           <thead>
@@ -338,7 +340,7 @@ export default function ProjectsTable({
                 onSort={onSort}
               />
               <SortableTableHeader
-                label="Last Modified"
+                label="Completed"
                 column="updated_at"
                 currentSort={sortConfig}
                 onSort={onSort}
@@ -367,12 +369,21 @@ export default function ProjectsTable({
                 currentSort={sortConfig}
                 onSort={onSort}
               />
-              <SortableTableHeader
-                label="Versions"
-                column="versions"
-                currentSort={sortConfig}
-                onSort={onSort}
-              />
+              <th
+                scope="col"
+                style={{
+                  padding: `${spacing[3]} ${spacing[4]}`,
+                  textAlign: 'center',
+                  fontWeight: typography.fontWeight.semibold,
+                  fontSize: typography.fontSize.sm,
+                  color: colors.text.secondary,
+                  background: colors.background.secondary,
+                  borderBottom: `2px solid ${colors.border.default}`,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Status
+              </th>
               <th
                 scope="col"
                 style={{
@@ -393,6 +404,7 @@ export default function ProjectsTable({
           <tbody>
             {projects.map((project) => {
               const typeColors = getTypeColor(project.type);
+              const statusBadge = getStatusBadge(project.status);
               const isPdfExporting = exportingState[`pdf-${project.id}`];
               const isDocxExporting = exportingState[`docx-${project.id}`];
 
@@ -435,7 +447,7 @@ export default function ProjectsTable({
                     </Link>
                   </td>
 
-                  {/* Last Modified */}
+                  {/* Completed Date */}
                   <td
                     style={{
                       padding: `${spacing[4]}`,
@@ -500,16 +512,21 @@ export default function ProjectsTable({
                     {project.progress?.chaptersWritten ?? '—'}
                   </td>
 
-                  {/* Versions */}
-                  <td
-                    style={{
-                      padding: `${spacing[4]}`,
-                      fontSize: typography.fontSize.sm,
-                      color: colors.text.secondary,
-                      textAlign: 'right',
-                    }}
-                  >
-                    —
+                  {/* Status */}
+                  <td style={{ padding: `${spacing[4]}`, textAlign: 'center' }}>
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        padding: `${spacing[1]} ${spacing[2]}`,
+                        background: statusBadge.bg,
+                        color: statusBadge.text,
+                        borderRadius: borderRadius.sm,
+                        fontSize: typography.fontSize.xs,
+                        fontWeight: typography.fontWeight.medium,
+                      }}
+                    >
+                      {statusBadge.label}
+                    </span>
                   </td>
 
                   {/* Actions */}
@@ -569,17 +586,6 @@ export default function ProjectsTable({
                       >
                         {isDocxExporting ? '...' : '📝 DOCX'}
                       </button>
-
-                      {/* Edit */}
-                      <Link
-                        href={`/projects/${project.id}`}
-                        aria-label={`Edit ${project.title}`}
-                        style={actionButtonStyle as React.CSSProperties}
-                        onMouseEnter={actionButtonHoverStyle}
-                        onMouseLeave={actionButtonLeaveStyle}
-                      >
-                        ✏️ Edit
-                      </Link>
 
                       {/* Delete */}
                       <button
@@ -641,7 +647,7 @@ export default function ProjectsTable({
                 marginBottom: spacing[4],
               }}
             >
-              Delete Project?
+              Delete Completed Novel?
             </h3>
             <p
               style={{

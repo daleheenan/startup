@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { createLogger } from '../services/logger.service.js';
 import db from '../db/connection.js';
 import { isServerReady, isQueueWorkerReady } from '../services/server-state.service.js';
+import { getMigrationStatus } from '../db/migrate.js';
 
 const router = express.Router();
 const log = createLogger('HealthRouter');
@@ -412,6 +413,56 @@ router.get('/diagnostics', async (req, res) => {
 
   const statusCode = diagnostics.overallStatus === 'healthy' ? 200 : 503;
   res.status(statusCode).json(diagnostics);
+});
+
+/**
+ * GET /api/health/migrations
+ *
+ * Check database migration status
+ * Helps diagnose issues where features require specific migrations to be applied
+ */
+router.get('/migrations', (req, res) => {
+  try {
+    const status = getMigrationStatus();
+
+    // Check for specific feature tables
+    const featureTables = {
+      editorial_reports: false,
+      veb_feedback: false,
+      outline_editorial_reviews: false,
+      book_versions: false,
+    };
+
+    for (const table of Object.keys(featureTables)) {
+      try {
+        const result = db.prepare(
+          `SELECT name FROM sqlite_master WHERE type='table' AND name = ?`
+        ).get(table);
+        featureTables[table as keyof typeof featureTables] = !!result;
+      } catch {
+        // Table check failed
+      }
+    }
+
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      migration: status,
+      features: {
+        virtualEditorialBoard: featureTables.editorial_reports && featureTables.veb_feedback,
+        outlineEditorialBoard: featureTables.outline_editorial_reviews,
+        bookVersioning: featureTables.book_versions,
+      },
+      tables: featureTables,
+    });
+  } catch (error: any) {
+    log.error({ error: error.message }, 'Migration status check failed');
+    res.status(500).json({
+      status: 'error',
+      timestamp: new Date().toISOString(),
+      error: error.message,
+    });
+  }
 });
 
 export default router;

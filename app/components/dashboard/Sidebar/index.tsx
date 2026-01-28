@@ -125,10 +125,10 @@ const navigationGroups = [
     isStandalone: false,
     href: undefined,
     items: [
-      { id: 'quick-start', label: 'Quick Start', href: '/new?mode=quick' },
-      { id: 'full-customization', label: 'Full Customisation', href: '/new?mode=full' },
-      { id: 'ideas', label: 'Ideas', href: '/new?mode=ideas' },
-      { id: 'concepts', label: 'Concepts', href: '/new?mode=concepts' },
+      { id: 'quick-start', label: 'Quick Start', href: 'https://novelforge.daleheenan.com/quick-start' },
+      { id: 'full-customization', label: 'Full Customisation', href: 'https://novelforge.daleheenan.com/full-customization' },
+      { id: 'ideas', label: 'Ideas', href: '/story-ideas' },
+      { id: 'concepts', label: 'Concepts', href: '/saved-concepts' },
     ],
   },
   {
@@ -138,7 +138,8 @@ const navigationGroups = [
     isStandalone: false,
     href: undefined,
     items: [
-      { id: 'novels', label: 'Novels', href: '/projects' },
+      { id: 'draft-novels', label: 'Draft Novels', href: '/projects' },
+      { id: 'completed-novels', label: 'Completed Novels', href: '/completed' },
       { id: 'series', label: 'Series Management', href: '/series' },
       { id: 'editorial', label: 'Editorial Board', href: '/editorial' },
     ],

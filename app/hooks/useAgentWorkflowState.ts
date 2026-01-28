@@ -22,7 +22,7 @@ export type ChapterJobType =
   | 'generate_summary'
   | 'update_states';
 
-export type JobStatus = 'pending' | 'running' | 'completed' | 'paused' | 'failed';
+export type JobStatus = 'pending' | 'running' | 'completed' | 'paused' | 'failed' | 'deleted';
 
 export interface AgentNode {
   id: string;
@@ -127,6 +127,37 @@ export function useAgentWorkflowState(
 
         const targetId = job.target_id;
 
+        // Handle job deletion - clear the chapter state
+        if (job.status === 'deleted') {
+          const chapterState = updated.get(targetId);
+          if (chapterState) {
+            // Remove this specific agent from the chapter state
+            chapterState.agents.delete(job.type);
+
+            // If current agent was deleted, clear it
+            if (chapterState.currentAgent === job.type) {
+              chapterState.currentAgent = null;
+            }
+
+            // Recalculate progress
+            const completedCount = Array.from(chapterState.agents.values()).filter(
+              (a) => a.status === 'completed'
+            ).length;
+            chapterState.overallProgress = Math.round((completedCount / AGENT_PIPELINE.length) * 100);
+
+            // If no agents remain, remove the chapter from state
+            if (chapterState.agents.size === 0) {
+              updated.delete(targetId);
+              if (activeChapterId === targetId) {
+                setActiveChapterId(null);
+              }
+            } else {
+              updated.set(targetId, chapterState);
+            }
+          }
+          continue;
+        }
+
         // Get or create chapter state
         let chapterState = updated.get(targetId);
         if (!chapterState) {
@@ -166,7 +197,7 @@ export function useAgentWorkflowState(
 
       return updated;
     });
-  }, [jobUpdates]);
+  }, [jobUpdates, activeChapterId]);
 
   // Update active chapter from current progress
   useEffect(() => {

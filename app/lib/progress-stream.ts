@@ -10,7 +10,7 @@ const MAX_CHAPTER_COMPLETIONS = 100;
 export interface JobUpdate {
   id: string;
   type: string;
-  status: 'pending' | 'running' | 'completed' | 'paused' | 'failed';
+  status: 'pending' | 'running' | 'completed' | 'paused' | 'failed' | 'deleted';
   target_id: string;
   timestamp: string;
 }
