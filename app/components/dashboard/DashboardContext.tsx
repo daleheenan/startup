@@ -161,8 +161,8 @@ export function DashboardProvider({
   useEffect(() => {
     const persistedGroups = loadExpandedGroups();
     if (persistedGroups !== null) {
-      dispatch({ type: 'SET_ACTIVE_NAV_ITEM', payload: null }); // Preserve as-is
       // Expand each persisted group individually to build the correct Set
+      // Note: Do NOT reset activeNavItem here - Sidebar's useEffect sets it based on pathname
       persistedGroups.forEach(groupId => {
         dispatch({ type: 'EXPAND_NAV_GROUP', payload: groupId });
       });
