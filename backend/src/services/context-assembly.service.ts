@@ -7,6 +7,7 @@ import type {
   Book,
   Project,
 } from '../shared/types/index.js';
+import { editorialLessonsService } from './editorial-lessons.service.js';
 
 /**
  * ContextAssemblyService builds minimal, targeted prompts for chapter generation.
@@ -96,8 +97,15 @@ export class ContextAssemblyService {
     // Get previous chapter summary for context
     const lastChapterSummary = this.getLastChapterSummary(chapter.book_id, chapter.chapter_number);
 
+    // Get lessons learned from editorial reviews
+    const lessonsSummary = editorialLessonsService.getLessonsSummaryForPrompt(
+      project.id,
+      storyDNA.genre,
+      storyDNA.tone
+    );
+
     // Build system prompt (Author Agent persona)
-    const systemPrompt = this.buildAuthorAgentPrompt(storyDNA, povCharacter);
+    const systemPrompt = this.buildAuthorAgentPrompt(storyDNA, povCharacter, lessonsSummary);
 
     // Build user prompt (context + instructions)
     const userPrompt = this.buildUserPrompt(
@@ -123,10 +131,10 @@ export class ContextAssemblyService {
   /**
    * Build Author Agent system prompt with genre-specific persona
    */
-  private buildAuthorAgentPrompt(storyDNA: StoryDNA, povCharacter: Character): string {
+  private buildAuthorAgentPrompt(storyDNA: StoryDNA, povCharacter: Character, lessonsSummary?: string): string {
     const { genre, subgenre, tone, themes, proseStyle, timeframe } = storyDNA;
 
-    return `AUTHOR AGENT - ${genre.toUpperCase()} SPECIALIST
+    let prompt = `AUTHOR AGENT - ${genre.toUpperCase()} SPECIALIST
 
 You are a bestselling ${genre} author specializing in ${subgenre}. Your mission is to write compelling, immersive chapters that bring this story to life.
 
@@ -137,6 +145,17 @@ GENRE & STYLE:
 ${timeframe ? `- Time Period/Era: ${timeframe} - Ensure historical accuracy, appropriate technology level, and cultural context for this era` : ''}
 - Prose Style: ${proseStyle}
 
+MASS MARKET READING LEVEL (CRITICAL):
+Your writing MUST be accessible to a broad mass market audience:
+- TARGET READING LEVEL: Grade 7-8 (age 12-14 equivalent) - this is standard for bestselling commercial fiction
+- VOCABULARY: Use common, everyday words. Avoid jargon, technical terms, obscure vocabulary, or specialist knowledge unless essential to the story
+- SENTENCE LENGTH: Mix short punchy sentences with medium-length ones. Avoid overly complex, multi-clause sentences
+- CONCEPT DENSITY: Don't overload paragraphs with too many ideas. One main concept per paragraph
+- AVOID: Academic language, philosophical abstractions, dense exposition, info-dumps disguised as dialogue
+- PREFER: Clear, direct prose that flows easily. If a simpler word works, use it
+- DIALOGUE: Natural speech patterns, not lectures or monologues. Characters speak like real people
+- EXPLANATIONS: When explaining anything, do so through action and experience, not narration
+
 WRITING PRINCIPLES:
 1. Show, don't tell - Use vivid sensory details and character actions
 2. Deep POV - Write from inside ${povCharacter.name}'s perspective, using their unique voice
@@ -145,9 +164,11 @@ WRITING PRINCIPLES:
 5. Emotional authenticity - Make readers feel what the POV character feels
 6. Genre conventions - Honor ${genre} reader expectations while surprising them
 7. Strong endings - End with a hook that propels the reader forward
+8. Accessibility - Keep prose readable and engaging for the widest possible audience
 
 VOICE GUIDELINES:
 Your prose should match this style: ${proseStyle}
+Remember: Clarity and accessibility are essential. Bestselling authors like James Patterson, Lee Child, and Nora Roberts write at a 7th-grade reading level.
 
 You write with precision, clarity, and emotional depth. Every sentence serves the story.
 
@@ -173,6 +194,13 @@ AVOID AI WRITING TELLS (CRITICAL):
 - USE varied sentence structures - not every sentence should be complex
 - USE contractions naturally in dialogue and close POV narration
 - PREFER simple, direct prose over elaborate constructions`;
+
+    // Append lessons learned from editorial reviews if available
+    if (lessonsSummary && lessonsSummary.trim().length > 0) {
+      prompt += `\n\n${lessonsSummary}`;
+    }
+
+    return prompt;
   }
 
   /**

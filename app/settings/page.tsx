@@ -83,6 +83,15 @@ const settingsSections: SettingsSection[] = [
     count: null,
     countLabel: '',
   },
+  {
+    title: 'Lessons Learned',
+    description: 'View insights and lessons learned from editorial reviews that improve future book generation.',
+    href: '/settings/lessons',
+    icon: 'L',
+    iconBg: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)',
+    count: null,
+    countLabel: 'lessons',
+  },
 ];
 
 // ==================== QUICK TIPS DATA ====================

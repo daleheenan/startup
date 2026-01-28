@@ -363,17 +363,22 @@ class EditorialLessonsService {
         pacingIssues?: Array<{ issue: string; suggestion: string; severity: string }>;
         scenePurpose?: { earned: boolean; reasoning: string; recommendation?: string };
       }>;
+      summaryVerdict?: string;
     };
     betaSwarm?: {
       chapterResults?: Array<{
         chapterNumber: number;
         dnfRiskPoints?: Array<{ reason: string; severity: string }>;
       }>;
+      summaryReaction?: string;
     };
     marketAnalyst?: {
       hookAnalysis?: { weaknesses?: string[] };
       marketPositioning?: { potentialChallenges?: string[] };
+      agentNotes?: string;
     };
+    recommendations?: string[];
+    summary?: string;
   }): EditorialLesson[] {
     const lessons: EditorialLesson[] = [];
 
@@ -494,6 +499,74 @@ class EditorialLessonsService {
           severityLevel: 'moderate',
         }));
       }
+
+      // Extract agent notes as a lesson
+      if (vebReport.marketAnalyst?.agentNotes) {
+        lessons.push(this.createLesson({
+          projectId,
+          bookId,
+          category: 'market',
+          title: 'Agent feedback on manuscript',
+          description: vebReport.marketAnalyst.agentNotes,
+          sourceModule: 'market_analyst',
+          severityLevel: 'major',
+        }));
+      }
+    }
+
+    // Extract key recommendations as individual lessons
+    // These are the prioritised action items from the full VEB report
+    if (vebReport.recommendations && vebReport.recommendations.length > 0) {
+      for (const rec of vebReport.recommendations) {
+        // Parse the recommendation to determine category
+        const recLower = rec.toLowerCase();
+        let category: LessonCategory = 'other';
+        let sourceModule: SourceModule = 'ruthless_editor';
+
+        if (recLower.includes('pacing') || recLower.includes('slow') || recLower.includes('drag')) {
+          category = 'pacing';
+        } else if (recLower.includes('exposition') || recLower.includes('info dump') || recLower.includes('telling')) {
+          category = 'exposition';
+        } else if (recLower.includes('dialogue') || recLower.includes('conversation')) {
+          category = 'dialogue';
+        } else if (recLower.includes('character') || recLower.includes('motivation') || recLower.includes('arc')) {
+          category = 'character';
+        } else if (recLower.includes('plot') || recLower.includes('story') || recLower.includes('twist')) {
+          category = 'plot';
+        } else if (recLower.includes('scene') || recLower.includes('chapter')) {
+          category = 'scene_structure';
+        } else if (recLower.includes('word') || recLower.includes('cut') || recLower.includes('trim')) {
+          category = 'word_economy';
+        } else if (recLower.includes('style') || recLower.includes('voice') || recLower.includes('prose')) {
+          category = 'style';
+        } else if (recLower.includes('market') || recLower.includes('hook') || recLower.includes('commercial') || recLower.includes('agent')) {
+          category = 'market';
+          sourceModule = 'market_analyst';
+        } else if (recLower.includes('engagement') || recLower.includes('reader') || recLower.includes('dnf')) {
+          sourceModule = 'beta_swarm';
+        }
+
+        // Extract title from recommendation (first part before colon or first sentence)
+        let title = rec;
+        const colonIdx = rec.indexOf(':');
+        if (colonIdx > 0 && colonIdx < 60) {
+          title = rec.substring(0, colonIdx).trim();
+        } else if (title.length > 60) {
+          title = title.substring(0, 57) + '...';
+        }
+
+        lessons.push(this.createLesson({
+          projectId,
+          bookId,
+          category,
+          title,
+          description: rec,
+          sourceModule,
+          severityLevel: 'moderate',
+        }));
+      }
+
+      logger.info({ projectId, bookId, keyRecommendations: vebReport.recommendations.length }, 'Extracted key recommendations from VEB');
     }
 
     logger.info({ projectId, bookId, lessonsCreated: lessons.length }, 'Extracted lessons from VEB');

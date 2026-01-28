@@ -5,6 +5,9 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { getToken, logout } from '@/app/lib/auth';
 import { fetchWithAuth } from '@/app/lib/fetch-utils';
+import ProjectNavigation from '@/app/components/shared/ProjectNavigation';
+import { useProjectNavigation } from '@/app/hooks';
+import RevisionWorkflowDisplay from '@/app/components/RevisionWorkflowDisplay';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -111,6 +114,9 @@ export default function WordCountRevisionPage() {
   const [progress, setProgress] = useState<RevisionProgress | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [project, setProject] = useState<any>(null);
+
+  const navigation = useProjectNavigation(projectId, project);
 
   // Form state for starting a new revision
   const [targetWordCount, setTargetWordCount] = useState<number>(80000);
@@ -120,12 +126,34 @@ export default function WordCountRevisionPage() {
   // Comprehensive mode state
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0 });
+  const [currentProcessingChapter, setCurrentProcessingChapter] = useState<number | null>(null);
+  const [chapterStatuses, setChapterStatuses] = useState<Map<string, 'pending' | 'generating' | 'ready' | 'approving' | 'applied' | 'rejected' | 'failed'>>(new Map());
+  const [workflowMode, setWorkflowMode] = useState<'generate' | 'approve'>('generate');
 
   // Chapter detail view
   const [selectedProposal, setSelectedProposal] = useState<ChapterProposal | null>(null);
   const [chapterContent, setChapterContent] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState<string | null>(null);
   const [isApproving, setIsApproving] = useState<string | null>(null);
+
+  // Fetch project data
+  useEffect(() => {
+    const fetchProject = async () => {
+      try {
+        const token = getToken();
+        const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setProject(data);
+        }
+      } catch (error) {
+        console.error('Error fetching project:', error);
+      }
+    };
+    fetchProject();
+  }, [projectId]);
 
   // Fetch books for the project
   useEffect(() => {
@@ -409,33 +437,88 @@ export default function WordCountRevisionPage() {
     if (pendingProposals.length === 0) return;
 
     setIsGeneratingAll(true);
+    setWorkflowMode('generate');
     setGenerationProgress({ current: 0, total: pendingProposals.length });
+
+    // Initialise chapter statuses
+    const initialStatuses = new Map<string, 'pending' | 'generating' | 'ready' | 'approving' | 'applied' | 'rejected' | 'failed'>();
+    proposals.forEach(p => {
+      initialStatuses.set(p.chapterId, p.status === 'pending' ? 'pending' : p.status as any);
+    });
+    setChapterStatuses(initialStatuses);
 
     try {
       const token = getToken();
 
       for (let i = 0; i < pendingProposals.length; i++) {
         const proposal = pendingProposals[i];
+        const chapterNum = proposals.indexOf(proposal) + 1;
+
+        setCurrentProcessingChapter(chapterNum);
         setGenerationProgress({ current: i + 1, total: pendingProposals.length });
 
+        // Update status to generating
+        setChapterStatuses(prev => new Map(prev).set(proposal.chapterId, 'generating'));
+
         try {
-          await fetch(
+          const res = await fetch(
             `${API_BASE_URL}/api/word-count-revision/${revision.id}/chapters/${proposal.chapterId}/generate`,
             {
               method: 'POST',
               headers: { 'Authorization': `Bearer ${token}` },
             }
           );
+
+          if (res.ok) {
+            setChapterStatuses(prev => new Map(prev).set(proposal.chapterId, 'ready'));
+          } else {
+            setChapterStatuses(prev => new Map(prev).set(proposal.chapterId, 'failed'));
+          }
         } catch (err) {
           console.error(`Error generating proposal for chapter ${proposal.chapterId}:`, err);
-          // Continue with next chapter even if one fails
+          setChapterStatuses(prev => new Map(prev).set(proposal.chapterId, 'failed'));
         }
       }
 
       await fetchRevision();
     } finally {
       setIsGeneratingAll(false);
+      setCurrentProcessingChapter(null);
       setGenerationProgress({ current: 0, total: 0 });
+    }
+  };
+
+  // Restart a single chapter generation
+  const handleRestartChapter = async (chapterId: string) => {
+    if (!revision) return;
+
+    const token = getToken();
+    const chapterNum = proposals.findIndex(p => p.chapterId === chapterId) + 1;
+
+    setCurrentProcessingChapter(chapterNum);
+    setChapterStatuses(prev => new Map(prev).set(chapterId, 'generating'));
+
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/api/word-count-revision/${revision.id}/chapters/${chapterId}/regenerate`,
+        {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+        }
+      );
+
+      if (res.ok) {
+        setChapterStatuses(prev => new Map(prev).set(chapterId, 'ready'));
+      } else {
+        setChapterStatuses(prev => new Map(prev).set(chapterId, 'failed'));
+      }
+
+      await fetchRevision();
+    } catch (err) {
+      console.error(`Error restarting chapter ${chapterId}:`, err);
+      setChapterStatuses(prev => new Map(prev).set(chapterId, 'failed'));
+    } finally {
+      setCurrentProcessingChapter(null);
     }
   };
 
@@ -447,40 +530,105 @@ export default function WordCountRevisionPage() {
     if (readyProposals.length === 0) return;
 
     setIsGeneratingAll(true);
+    setWorkflowMode('approve');
     setGenerationProgress({ current: 0, total: readyProposals.length });
+
+    // Initialise chapter statuses
+    const initialStatuses = new Map<string, 'pending' | 'generating' | 'ready' | 'approving' | 'applied' | 'rejected' | 'failed'>();
+    proposals.forEach(p => {
+      initialStatuses.set(p.chapterId, p.status as any);
+    });
+    setChapterStatuses(initialStatuses);
 
     try {
       const token = getToken();
 
       for (let i = 0; i < readyProposals.length; i++) {
         const proposal = readyProposals[i];
+        const chapterNum = proposals.indexOf(proposal) + 1;
+
+        setCurrentProcessingChapter(chapterNum);
         setGenerationProgress({ current: i + 1, total: readyProposals.length });
 
+        // Update status to approving
+        setChapterStatuses(prev => new Map(prev).set(proposal.chapterId, 'approving'));
+
         try {
-          await fetch(
+          const res = await fetch(
             `${API_BASE_URL}/api/word-count-revision/${revision.id}/chapters/${proposal.chapterId}/approve`,
             {
               method: 'POST',
               headers: { 'Authorization': `Bearer ${token}` },
             }
           );
+
+          if (res.ok) {
+            setChapterStatuses(prev => new Map(prev).set(proposal.chapterId, 'applied'));
+          } else {
+            setChapterStatuses(prev => new Map(prev).set(proposal.chapterId, 'failed'));
+          }
         } catch (err) {
           console.error(`Error approving proposal for chapter ${proposal.chapterId}:`, err);
+          setChapterStatuses(prev => new Map(prev).set(proposal.chapterId, 'failed'));
         }
       }
 
       await fetchRevision();
     } finally {
       setIsGeneratingAll(false);
+      setCurrentProcessingChapter(null);
       setGenerationProgress({ current: 0, total: 0 });
     }
   };
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#F8FAFC' }}>
-        <main style={{ padding: '2rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh' }}>
+      <div style={{ display: 'flex', minHeight: '100vh', background: '#F8FAFC' }}>
+        <aside style={{
+          width: '72px',
+          background: '#FFFFFF',
+          borderRight: '1px solid #E2E8F0',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          padding: '1.5rem 0',
+        }}>
+          <Link
+            href="/projects"
+            style={{
+              width: '40px',
+              height: '40px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#FFFFFF',
+              fontWeight: '700',
+              fontSize: '1.25rem',
+              textDecoration: 'none',
+            }}
+          >
+            N
+          </Link>
+        </aside>
+        <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <header style={{
+            padding: '1rem 2rem',
+            background: '#FFFFFF',
+            borderBottom: '1px solid #E2E8F0',
+          }}>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1A1A2E', margin: 0 }}>
+              {isComprehensiveMode ? 'Comprehensive Rewrite' : 'Word Count Revision'}
+            </h1>
+          </header>
+          <ProjectNavigation
+            projectId={projectId}
+            project={navigation.project}
+            outline={navigation.outline}
+            chapters={navigation.chapters}
+          />
+          <div style={{ flex: 1, padding: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div>Loading...</div>
           </div>
         </main>
@@ -489,21 +637,51 @@ export default function WordCountRevisionPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFC' }}>
-      <main style={{ padding: '2rem' }}>
-        <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-          {/* Header */}
-          <div style={{ marginBottom: '2rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-              <Link
-                href={`/projects/${projectId}/editorial-action-plan`}
-                style={{ color: '#64748B', textDecoration: 'none', fontSize: '0.875rem' }}
-              >
-                ← Back to Editorial Action Plan
-              </Link>
-            </div>
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#F8FAFC' }}>
+      {/* Left Sidebar */}
+      <aside style={{
+        width: '72px',
+        background: '#FFFFFF',
+        borderRight: '1px solid #E2E8F0',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: '1.5rem 0',
+      }}>
+        <Link
+          href="/projects"
+          style={{
+            width: '40px',
+            height: '40px',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            borderRadius: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#FFFFFF',
+            fontWeight: '700',
+            fontSize: '1.25rem',
+            textDecoration: 'none',
+          }}
+        >
+          N
+        </Link>
+      </aside>
+
+      {/* Main Content */}
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        {/* Top Bar */}
+        <header style={{
+          padding: '1rem 2rem',
+          background: '#FFFFFF',
+          borderBottom: '1px solid #E2E8F0',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}>
+          <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <h1 style={{ margin: '0 0 0.5rem 0', color: '#1A1A2E', fontSize: '1.75rem' }}>
+              <h1 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1A1A2E', margin: 0 }}>
                 {isComprehensiveMode ? 'Comprehensive Rewrite' : 'Word Count Revision'}
               </h1>
               {isComprehensiveMode && (
@@ -519,12 +697,34 @@ export default function WordCountRevisionPage() {
                 </span>
               )}
             </div>
-            <p style={{ margin: 0, color: '#64748B' }}>
-              {isComprehensiveMode
-                ? 'Bulk processing all chapters to address 100+ editorial issues and reduce word count'
-                : 'AI-assisted word count reduction with VEB-informed prioritisation'}
+            <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
+              {project?.title || 'Loading...'}
             </p>
           </div>
+          <Link
+            href={`/projects/${projectId}`}
+            style={{
+              padding: '0.5rem 1rem',
+              color: '#64748B',
+              textDecoration: 'none',
+              fontSize: '0.875rem',
+            }}
+          >
+            ← Back to Project
+          </Link>
+        </header>
+
+        {/* Project Navigation */}
+        <ProjectNavigation
+          projectId={projectId}
+          project={navigation.project}
+          outline={navigation.outline}
+          chapters={navigation.chapters}
+        />
+
+        {/* Content Area */}
+        <div style={{ flex: 1, padding: '2rem', overflow: 'auto' }}>
+          <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
 
           {/* Comprehensive Mode Banner */}
           {isComprehensiveMode && !revision && (
@@ -843,6 +1043,21 @@ export default function WordCountRevisionPage() {
                     }
                   </p>
                 </div>
+              )}
+
+              {/* Comprehensive mode workflow display */}
+              {isComprehensiveMode && proposals.length > 0 && (
+                <RevisionWorkflowDisplay
+                  chapters={proposals.map((p, idx) => ({
+                    chapterId: p.chapterId,
+                    chapterNumber: idx + 1,
+                    status: chapterStatuses.get(p.chapterId) || (p.status as any) || 'pending',
+                  }))}
+                  isProcessing={isGeneratingAll}
+                  currentChapter={currentProcessingChapter}
+                  onRestartChapter={handleRestartChapter}
+                  mode={workflowMode}
+                />
               )}
 
               {/* Comprehensive mode bulk actions */}
@@ -1367,6 +1582,7 @@ export default function WordCountRevisionPage() {
               </div>
             </div>
           )}
+          </div>
         </div>
       </main>
     </div>

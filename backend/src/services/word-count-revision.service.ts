@@ -430,6 +430,15 @@ Your task is to condense this chapter by approximately ${reductionPercent.toFixe
 - Essential dialogue and voice
 - Narrative momentum and hooks
 
+MASS MARKET READING LEVEL (CRITICAL):
+The condensed version MUST maintain accessibility for a broad mass market audience:
+- TARGET READING LEVEL: Grade 7-8 (standard for bestselling commercial fiction)
+- Use common, everyday vocabulary - no jargon or specialist knowledge
+- Keep sentences clear and direct - avoid overly complex constructions
+- One main concept per paragraph - don't overload with dense ideas
+- Natural dialogue - not lectures or monologues
+- If simplifying language helps cut words AND improve readability, do both
+
 ${vebContext}
 
 Focus cuts on:
@@ -440,6 +449,7 @@ Focus cuts on:
 5. Scenes not earning their place - trim or cut
 6. Redundant descriptions and excessive modifiers
 7. On-the-nose dialogue - let subtext do the work
+8. Overly complex or academic language - simplify for accessibility
 
 CRITICAL FORMATTING REQUIREMENTS:
 - Output PURE PROSE only - like a professionally published novel
@@ -1267,6 +1277,15 @@ Your task is to condense this chapter by approximately ${reductionPercent.toFixe
 - Narrative momentum and hooks
 - Commercial beat requirements
 
+MASS MARKET READING LEVEL (CRITICAL):
+The condensed version MUST maintain accessibility for a broad mass market audience:
+- TARGET READING LEVEL: Grade 7-8 (standard for bestselling commercial fiction)
+- Use common, everyday vocabulary - no jargon or specialist knowledge
+- Keep sentences clear and direct - avoid overly complex constructions
+- One main concept per paragraph - don't overload with dense ideas
+- Natural dialogue - not lectures or monologues
+- If simplifying language helps cut words AND improve readability, do both
+
 ${vebContext}
 
 CHAPTER BRIEF (Critical context for this revision):
@@ -1280,6 +1299,7 @@ Focus cuts on:
 5. Scenes not earning their place - trim or cut
 6. Redundant descriptions and excessive modifiers
 7. On-the-nose dialogue - let subtext do the work
+8. Overly complex or academic language - simplify for accessibility
 
 CRITICAL FORMATTING REQUIREMENTS:
 - Output PURE PROSE only - like a professionally published novel
@@ -1297,7 +1317,7 @@ OUTPUT FORMAT (JSON):
   "wordCount": ${targetWordCount}
 }`;
 
-    const userPrompt = `Condense this chapter to approximately ${targetWordCount} words whilst maintaining all commercial beat requirements from the brief.
+    const userPrompt = `Condense this chapter to approximately ${targetWordCount} words whilst maintaining all commercial beat requirements from the brief and mass market reading level.
 
 CHAPTER ${chapterNumber}${chapterTitle ? `: ${chapterTitle}` : ''}
 CURRENT WORD COUNT: ${content.trim().split(/\s+/).length}

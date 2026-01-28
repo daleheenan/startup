@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getToken, logout } from '@/app/lib/auth';
 import { fetchWithAuth } from '@/app/lib/fetch-utils';
+import ProjectNavigation from '@/app/components/shared/ProjectNavigation';
+import { useProjectNavigation } from '@/app/hooks';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -133,6 +135,9 @@ export default function EditorialActionPlanPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [bulkUpdating, setBulkUpdating] = useState(false);
   const [showTooltip, setShowTooltip] = useState<string | null>(null);
+  const [project, setProject] = useState<any>(null);
+
+  const navigation = useProjectNavigation(projectId, project);
 
   // Helper to format underscore text
   const formatText = (text: string | undefined | null): string => {
@@ -342,6 +347,25 @@ export default function EditorialActionPlanPage() {
     return extracted;
   }, []);
 
+  // Fetch project data
+  useEffect(() => {
+    const fetchProject = async () => {
+      try {
+        const token = getToken();
+        const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setProject(data);
+        }
+      } catch (error) {
+        console.error('Error fetching project:', error);
+      }
+    };
+    fetchProject();
+  }, [projectId]);
+
   // Fetch report and feedback
   useEffect(() => {
     const fetchData = async () => {
@@ -541,9 +565,52 @@ export default function EditorialActionPlanPage() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#F8FAFC' }}>
-        <main style={{ padding: '2rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh' }}>
+      <div style={{ display: 'flex', minHeight: '100vh', background: '#F8FAFC' }}>
+        <aside style={{
+          width: '72px',
+          background: '#FFFFFF',
+          borderRight: '1px solid #E2E8F0',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          padding: '1.5rem 0',
+        }}>
+          <Link
+            href="/projects"
+            style={{
+              width: '40px',
+              height: '40px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#FFFFFF',
+              fontWeight: '700',
+              fontSize: '1.25rem',
+              textDecoration: 'none',
+            }}
+          >
+            N
+          </Link>
+        </aside>
+        <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <header style={{
+            padding: '1rem 2rem',
+            background: '#FFFFFF',
+            borderBottom: '1px solid #E2E8F0',
+          }}>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1A1A2E', margin: 0 }}>
+              Editorial Action Plan
+            </h1>
+          </header>
+          <ProjectNavigation
+            projectId={projectId}
+            project={navigation.project}
+            outline={navigation.outline}
+            chapters={navigation.chapters}
+          />
+          <div style={{ flex: 1, padding: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div>Loading editorial action plan...</div>
           </div>
         </main>
@@ -553,33 +620,78 @@ export default function EditorialActionPlanPage() {
 
   if (error) {
     return (
-      <div style={{ minHeight: '100vh', background: '#F8FAFC' }}>
-        <main style={{ padding: '2rem' }}>
-          <div style={{
-            background: '#FEF2F2',
-            border: '1px solid #FECACA',
-            borderRadius: '8px',
-            padding: '2rem',
-            textAlign: 'center',
-            maxWidth: '600px',
-            margin: '0 auto',
+      <div style={{ display: 'flex', minHeight: '100vh', background: '#F8FAFC' }}>
+        <aside style={{
+          width: '72px',
+          background: '#FFFFFF',
+          borderRight: '1px solid #E2E8F0',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          padding: '1.5rem 0',
+        }}>
+          <Link
+            href="/projects"
+            style={{
+              width: '40px',
+              height: '40px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#FFFFFF',
+              fontWeight: '700',
+              fontSize: '1.25rem',
+              textDecoration: 'none',
+            }}
+          >
+            N
+          </Link>
+        </aside>
+        <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <header style={{
+            padding: '1rem 2rem',
+            background: '#FFFFFF',
+            borderBottom: '1px solid #E2E8F0',
           }}>
-            <h2 style={{ color: '#991B1B', margin: '0 0 1rem 0' }}>No Report Available</h2>
-            <p style={{ color: '#B91C1C', margin: '0 0 1.5rem 0' }}>{error}</p>
-            <Link
-              href={`/projects/${projectId}/editorial-report`}
-              style={{
-                display: 'inline-block',
-                padding: '10px 20px',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                color: 'white',
-                borderRadius: '6px',
-                textDecoration: 'none',
-                fontWeight: '500',
-              }}
-            >
-              Go to Editorial Report
-            </Link>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1A1A2E', margin: 0 }}>
+              Editorial Action Plan
+            </h1>
+          </header>
+          <ProjectNavigation
+            projectId={projectId}
+            project={navigation.project}
+            outline={navigation.outline}
+            chapters={navigation.chapters}
+          />
+          <div style={{ flex: 1, padding: '2rem' }}>
+            <div style={{
+              background: '#FEF2F2',
+              border: '1px solid #FECACA',
+              borderRadius: '8px',
+              padding: '2rem',
+              textAlign: 'center',
+              maxWidth: '600px',
+              margin: '0 auto',
+            }}>
+              <h2 style={{ color: '#991B1B', margin: '0 0 1rem 0' }}>No Report Available</h2>
+              <p style={{ color: '#B91C1C', margin: '0 0 1.5rem 0' }}>{error}</p>
+              <Link
+                href={`/projects/${projectId}/editorial-report`}
+                style={{
+                  display: 'inline-block',
+                  padding: '10px 20px',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white',
+                  borderRadius: '6px',
+                  textDecoration: 'none',
+                  fontWeight: '500',
+                }}
+              >
+                Go to Editorial Report
+              </Link>
+            </div>
           </div>
         </main>
       </div>
@@ -587,26 +699,80 @@ export default function EditorialActionPlanPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFC' }}>
-      <main style={{ padding: '2rem' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-          {/* Header */}
-          <div style={{ marginBottom: '2rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-              <Link
-                href={`/projects/${projectId}/editorial-report`}
-                style={{ color: '#64748B', textDecoration: 'none', fontSize: '0.875rem' }}
-              >
-                ← Back to Editorial Report
-              </Link>
-            </div>
-            <h1 style={{ margin: '0 0 0.5rem 0', color: '#1A1A2E', fontSize: '1.75rem' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#F8FAFC' }}>
+      {/* Left Sidebar */}
+      <aside style={{
+        width: '72px',
+        background: '#FFFFFF',
+        borderRight: '1px solid #E2E8F0',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: '1.5rem 0',
+      }}>
+        <Link
+          href="/projects"
+          style={{
+            width: '40px',
+            height: '40px',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            borderRadius: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#FFFFFF',
+            fontWeight: '700',
+            fontSize: '1.25rem',
+            textDecoration: 'none',
+          }}
+        >
+          N
+        </Link>
+      </aside>
+
+      {/* Main Content */}
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        {/* Top Bar */}
+        <header style={{
+          padding: '1rem 2rem',
+          background: '#FFFFFF',
+          borderBottom: '1px solid #E2E8F0',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}>
+          <div>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1A1A2E', margin: 0 }}>
               Editorial Action Plan
             </h1>
-            <p style={{ margin: 0, color: '#64748B' }}>
-              Review and track all editorial findings. Mark items as accepted, implemented, or rejected.
+            <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
+              {project?.title || 'Loading...'}
             </p>
           </div>
+          <Link
+            href={`/projects/${projectId}`}
+            style={{
+              padding: '0.5rem 1rem',
+              color: '#64748B',
+              textDecoration: 'none',
+              fontSize: '0.875rem',
+            }}
+          >
+            ← Back to Project
+          </Link>
+        </header>
+
+        {/* Project Navigation */}
+        <ProjectNavigation
+          projectId={projectId}
+          project={navigation.project}
+          outline={navigation.outline}
+          chapters={navigation.chapters}
+        />
+
+        {/* Content Area */}
+        <div style={{ flex: 1, padding: '2rem', overflow: 'auto' }}>
+          <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
 
           {/* Progress Overview */}
           <div style={{
@@ -1446,6 +1612,7 @@ export default function EditorialActionPlanPage() {
               </span>
             </div>
           )}
+          </div>
         </div>
       </main>
     </div>
