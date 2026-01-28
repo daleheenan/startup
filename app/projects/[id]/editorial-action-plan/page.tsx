@@ -498,6 +498,17 @@ export default function EditorialActionPlanPage() {
     pending: findings.filter(f => f.status === 'pending').length,
     accepted: findings.filter(f => f.status === 'accepted').length,
     implemented: findings.filter(f => f.status === 'implemented').length,
+    // Category breakdown
+    byModule: {
+      beta_swarm: findings.filter(f => f.module === 'beta_swarm').length,
+      ruthless_editor: findings.filter(f => f.module === 'ruthless_editor').length,
+      market_analyst: findings.filter(f => f.module === 'market_analyst').length,
+    },
+    bySeverity: {
+      major: findings.filter(f => f.severity === 'major').length,
+      moderate: findings.filter(f => f.severity === 'moderate').length,
+      minor: findings.filter(f => f.severity === 'minor').length,
+    },
     rejected: findings.filter(f => f.status === 'rejected').length,
     major: findings.filter(f => f.severity === 'major' && f.status === 'pending').length,
   };
@@ -661,6 +672,102 @@ export default function EditorialActionPlanPage() {
                 ⚠️ {stats.major} major issue{stats.major > 1 ? 's' : ''} require{stats.major === 1 ? 's' : ''} attention
               </div>
             )}
+          </div>
+
+          {/* Category Breakdown */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: '1rem',
+            marginBottom: '1.5rem',
+          }}>
+            {/* By Module */}
+            <div style={{
+              background: 'white',
+              borderRadius: '8px',
+              padding: '1.25rem',
+              border: '1px solid #E2E8F0',
+            }}>
+              <h4 style={{ margin: '0 0 1rem 0', color: '#64748B', fontSize: '0.875rem', fontWeight: 600 }}>
+                By Analysis Module
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}
+                  onClick={() => setModuleFilter(moduleFilter === 'beta_swarm' ? 'all' : 'beta_swarm')}
+                >
+                  <div style={{ width: '10px', height: '10px', background: '#3B82F6', borderRadius: '2px' }} />
+                  <span style={{ flex: 1, fontSize: '0.875rem', color: moduleFilter === 'beta_swarm' ? '#1E40AF' : '#374151' }}>
+                    Beta Swarm (Reader Engagement)
+                  </span>
+                  <span style={{ fontWeight: 600, color: '#1E40AF' }}>{stats.byModule.beta_swarm}</span>
+                </div>
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}
+                  onClick={() => setModuleFilter(moduleFilter === 'ruthless_editor' ? 'all' : 'ruthless_editor')}
+                >
+                  <div style={{ width: '10px', height: '10px', background: '#EF4444', borderRadius: '2px' }} />
+                  <span style={{ flex: 1, fontSize: '0.875rem', color: moduleFilter === 'ruthless_editor' ? '#991B1B' : '#374151' }}>
+                    Ruthless Editor (Structure)
+                  </span>
+                  <span style={{ fontWeight: 600, color: '#991B1B' }}>{stats.byModule.ruthless_editor}</span>
+                </div>
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}
+                  onClick={() => setModuleFilter(moduleFilter === 'market_analyst' ? 'all' : 'market_analyst')}
+                >
+                  <div style={{ width: '10px', height: '10px', background: '#10B981', borderRadius: '2px' }} />
+                  <span style={{ flex: 1, fontSize: '0.875rem', color: moduleFilter === 'market_analyst' ? '#065F46' : '#374151' }}>
+                    Market Analyst (Marketability)
+                  </span>
+                  <span style={{ fontWeight: 600, color: '#065F46' }}>{stats.byModule.market_analyst}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* By Severity */}
+            <div style={{
+              background: 'white',
+              borderRadius: '8px',
+              padding: '1.25rem',
+              border: '1px solid #E2E8F0',
+            }}>
+              <h4 style={{ margin: '0 0 1rem 0', color: '#64748B', fontSize: '0.875rem', fontWeight: 600 }}>
+                By Severity
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}
+                  onClick={() => setSeverityFilter(severityFilter === 'major' ? 'all' : 'major')}
+                >
+                  <div style={{ width: '10px', height: '10px', background: '#EF4444', borderRadius: '2px' }} />
+                  <span style={{ flex: 1, fontSize: '0.875rem', color: severityFilter === 'major' ? '#991B1B' : '#374151' }}>
+                    Major (Address First)
+                  </span>
+                  <span style={{ fontWeight: 600, color: '#991B1B' }}>{stats.bySeverity.major}</span>
+                </div>
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}
+                  onClick={() => setSeverityFilter(severityFilter === 'moderate' ? 'all' : 'moderate')}
+                >
+                  <div style={{ width: '10px', height: '10px', background: '#F59E0B', borderRadius: '2px' }} />
+                  <span style={{ flex: 1, fontSize: '0.875rem', color: severityFilter === 'moderate' ? '#92400E' : '#374151' }}>
+                    Moderate (Consider)
+                  </span>
+                  <span style={{ fontWeight: 600, color: '#92400E' }}>{stats.bySeverity.moderate}</span>
+                </div>
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}
+                  onClick={() => setSeverityFilter(severityFilter === 'minor' ? 'all' : 'minor')}
+                >
+                  <div style={{ width: '10px', height: '10px', background: '#9CA3AF', borderRadius: '2px' }} />
+                  <span style={{ flex: 1, fontSize: '0.875rem', color: severityFilter === 'minor' ? '#4B5563' : '#374151' }}>
+                    Minor (Optional)
+                  </span>
+                  <span style={{ fontWeight: 600, color: '#4B5563' }}>{stats.bySeverity.minor}</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Comprehensive Rewrite Section - Shows when 100+ issues */}

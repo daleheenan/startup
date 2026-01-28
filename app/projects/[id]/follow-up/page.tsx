@@ -42,6 +42,7 @@ export default function FollowUpPage() {
   const [completionStatus, setCompletionStatus] = useState<CompletionStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<string>('sequel-ideas');
   const [project, setProject] = useState<any>(null);
 
@@ -221,6 +222,7 @@ export default function FollowUpPage() {
     if (!selectedBookId) return;
 
     setGenerating(true);
+    setGenerateError(null);
     try {
       const token = getToken();
       const response = await fetch(`${API_BASE_URL}/api/completion/book/${selectedBookId}/follow-up/generate`, {
@@ -237,12 +239,13 @@ export default function FollowUpPage() {
       } else {
         const error = await response.json();
         console.error('Error response from follow-up generate:', error);
-        alert(`Error: ${error.error || error.message || 'Failed to generate recommendations'}`);
+        const errorMsg = error.error || error.message || 'Failed to generate recommendations';
+        setGenerateError(errorMsg);
         setGenerating(false);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating recommendations:', error);
-      alert('Failed to generate recommendations');
+      setGenerateError(error.message || 'Failed to generate recommendations. Please try again.');
       setGenerating(false);
     }
   };
@@ -263,20 +266,29 @@ export default function FollowUpPage() {
           setRecommendations(data);
 
           // Stop polling when generation is complete or failed
-          if (data.status === 'completed' || data.status === 'failed') {
+          if (data.status === 'completed') {
             clearInterval(pollInterval);
             setGenerating(false);
+            setGenerateError(null);
+          } else if (data.status === 'failed') {
+            clearInterval(pollInterval);
+            setGenerating(false);
+            setGenerateError(data.error || 'Generation failed. Please try again.');
           }
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error polling for recommendations:', error);
+        // Don't set error on polling failure - it will retry
       }
     }, 3000); // Poll every 3 seconds
 
     // Stop polling after 5 minutes maximum
     setTimeout(() => {
       clearInterval(pollInterval);
-      setGenerating(false);
+      if (generating) {
+        setGenerating(false);
+        setGenerateError('Generation timed out. Please try again.');
+      }
     }, 300000);
   };
 
@@ -480,13 +492,97 @@ export default function FollowUpPage() {
 
               {/* Main Content */}
               <div style={{ flex: 1, overflow: 'auto', padding: '1.5rem' }}>
+                {/* Error Display */}
+                {generateError && (
+                  <div style={{
+                    background: '#FEF2F2',
+                    border: '1px solid #FECACA',
+                    borderRadius: '8px',
+                    padding: '1rem 1.5rem',
+                    marginBottom: '1.5rem',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '0.75rem',
+                  }}>
+                    <span style={{ fontSize: '1.25rem' }}>⚠️</span>
+                    <div>
+                      <h4 style={{ margin: '0 0 0.25rem 0', color: '#991B1B', fontSize: '0.875rem', fontWeight: 600 }}>
+                        Generation Failed
+                      </h4>
+                      <p style={{ margin: 0, color: '#B91C1C', fontSize: '0.875rem' }}>
+                        {generateError}
+                      </p>
+                      <button
+                        onClick={() => setGenerateError(null)}
+                        style={{
+                          marginTop: '0.5rem',
+                          padding: '0.25rem 0.75rem',
+                          background: 'transparent',
+                          border: '1px solid #FECACA',
+                          borderRadius: '4px',
+                          color: '#B91C1C',
+                          fontSize: '0.75rem',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {!recommendations || recommendations.status !== 'completed' ? (
                   <div style={{ textAlign: 'center', padding: '3rem' }}>
-                    <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🚀</div>
-                    <h3>No Recommendations Yet</h3>
-                    <p style={{ color: '#64748B' }}>
-                      Click "Generate Ideas" to create sequel concepts, series arcs, and more.
-                    </p>
+                    {generating ? (
+                      <>
+                        <div style={{
+                          display: 'inline-block',
+                          width: '48px',
+                          height: '48px',
+                          border: '3px solid #E2E8F0',
+                          borderTopColor: '#667eea',
+                          borderRadius: '50%',
+                          animation: 'spin 1s linear infinite',
+                          marginBottom: '1rem',
+                        }} />
+                        <h3>Generating Recommendations...</h3>
+                        <p style={{ color: '#64748B' }}>
+                          Analysing your completed book and generating follow-up ideas.
+                          This may take a few moments.
+                        </p>
+                      </>
+                    ) : recommendations?.status === 'failed' ? (
+                      <>
+                        <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>❌</div>
+                        <h3>Generation Failed</h3>
+                        <p style={{ color: '#64748B', marginBottom: '1rem' }}>
+                          {recommendations.error || 'Something went wrong while generating recommendations.'}
+                        </p>
+                        <button
+                          onClick={handleGenerateRecommendations}
+                          style={{
+                            padding: '0.75rem 1.5rem',
+                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Try Again
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🚀</div>
+                        <h3>No Recommendations Yet</h3>
+                        <p style={{ color: '#64748B' }}>
+                          Click "Generate Ideas" to create sequel concepts, series arcs, and more.
+                        </p>
+                      </>
+                    )}
+                    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
                   </div>
                 ) : (
                   <>

@@ -10,6 +10,62 @@ import { useProjectNavigation } from '@/app/hooks';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+// Sanitise AI-generated text to remove common AI writing signals
+function sanitiseAIText(text: string): string {
+  if (!text) return text;
+
+  return text
+    // Replace em-dashes with commas or reword
+    .replace(/—/g, ', ')
+    // Replace en-dashes between words with commas
+    .replace(/(\w)\s*–\s*(\w)/g, '$1, $2')
+    // Replace hyphenated compound modifiers that are AI signals
+    .replace(/(\w+)-(\w+)-(\w+)/g, (match, a, b, c) => {
+      // Keep common compound words, reword others
+      const common = ['day-to-day', 'face-to-face', 'up-to-date', 'state-of-the-art'];
+      if (common.includes(match.toLowerCase())) return match;
+      return `${a} ${b} ${c}`;
+    })
+    // Clean up double spaces
+    .replace(/\s{2,}/g, ' ')
+    // Clean up comma-comma patterns
+    .replace(/,\s*,/g, ',')
+    .trim();
+}
+
+// Format long text into readable paragraphs (author standards)
+function formatIntoReadableParagraphs(text: string): string[] {
+  if (!text) return [];
+
+  // First sanitise the text
+  const sanitised = sanitiseAIText(text);
+
+  // Split into sentences
+  const sentences = sanitised.split(/(?<=[.!?])\s+/);
+
+  // Group sentences into paragraphs (3-4 sentences each for readability)
+  const paragraphs: string[] = [];
+  let currentParagraph: string[] = [];
+
+  for (const sentence of sentences) {
+    currentParagraph.push(sentence);
+
+    // Start a new paragraph after 3-4 sentences or if sentence ends a thought
+    if (currentParagraph.length >= 3 ||
+        (currentParagraph.length >= 2 && /however|therefore|moreover|furthermore|additionally|in conclusion/i.test(sentence))) {
+      paragraphs.push(currentParagraph.join(' '));
+      currentParagraph = [];
+    }
+  }
+
+  // Add remaining sentences
+  if (currentParagraph.length > 0) {
+    paragraphs.push(currentParagraph.join(' '));
+  }
+
+  return paragraphs;
+}
+
 // Types for Outline Editorial Report
 interface StructureAnalystResult {
   plotStructureScore: number;
@@ -173,6 +229,7 @@ function RecommendationsSection({ reportId, recommendations }: { reportId: strin
   const [implementingIdx, setImplementingIdx] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [loadingFeedback, setLoadingFeedback] = useState(true);
+  const [previewRec, setPreviewRec] = useState<{ idx: number; rec: string } | null>(null);
   const ITEMS_PER_PAGE = 5;
 
   // Load existing feedback on mount
@@ -334,7 +391,7 @@ function RecommendationsSection({ reportId, recommendations }: { reportId: strin
 
               {!isImplemented ? (
                 <button
-                  onClick={() => handleImplement(globalIdx, rec)}
+                  onClick={() => setPreviewRec({ idx: globalIdx, rec })}
                   disabled={implementingIdx === globalIdx}
                   style={{
                     padding: '0.5rem 1rem',
@@ -367,9 +424,10 @@ function RecommendationsSection({ reportId, recommendations }: { reportId: strin
                   ) : (
                     <>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M12 5v14M5 12h14" />
+                        <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                       </svg>
-                      Implement
+                      Preview
                     </>
                   )}
                 </button>
@@ -435,6 +493,114 @@ function RecommendationsSection({ reportId, recommendations }: { reportId: strin
           >
             Next
           </button>
+        </div>
+      )}
+
+      {/* Preview Modal */}
+      {previewRec && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+        }} onClick={() => setPreviewRec(null)}>
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            padding: '1.5rem',
+            maxWidth: '600px',
+            width: '90%',
+            maxHeight: '80vh',
+            overflow: 'auto',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+          }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 1rem 0', color: '#1A1A2E', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#667eea" strokeWidth="2">
+                <path d="M9 11l3 3L22 4" />
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+              </svg>
+              Implement Recommendation
+            </h3>
+
+            <div style={{
+              background: '#F8FAFC',
+              borderRadius: '8px',
+              padding: '1rem',
+              marginBottom: '1.5rem',
+            }}>
+              <div style={{ fontSize: '0.75rem', color: '#64748B', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
+                Recommendation
+              </div>
+              <p style={{ margin: 0, color: '#1A1A2E', lineHeight: 1.6 }}>
+                {sanitiseAIText(previewRec.rec)}
+              </p>
+            </div>
+
+            <div style={{
+              background: '#EFF6FF',
+              borderRadius: '8px',
+              padding: '1rem',
+              marginBottom: '1.5rem',
+              border: '1px solid #BFDBFE',
+            }}>
+              <div style={{ fontSize: '0.75rem', color: '#1E40AF', marginBottom: '0.5rem', fontWeight: 600 }}>
+                What happens when you implement:
+              </div>
+              <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#1E3A8A', fontSize: '0.875rem' }}>
+                <li style={{ marginBottom: '0.25rem' }}>This recommendation will be marked as completed</li>
+                <li style={{ marginBottom: '0.25rem' }}>You should manually update your outline to address this feedback</li>
+                <li style={{ marginBottom: '0.25rem' }}>The change will be tracked in your editorial feedback history</li>
+                <li>You can re-submit for editorial review after making changes</li>
+              </ul>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setPreviewRec(null)}
+                style={{
+                  padding: '0.625rem 1.25rem',
+                  background: 'white',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '6px',
+                  color: '#64748B',
+                  fontSize: '0.875rem',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  handleImplement(previewRec.idx, previewRec.rec);
+                  setPreviewRec(null);
+                }}
+                style={{
+                  padding: '0.625rem 1.25rem',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: 'white',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                Mark as Implemented
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -681,7 +847,11 @@ export default function OutlineReviewPage() {
             <span style={{ fontSize: '4rem', fontWeight: '700' }}>{report.overallScore || 0}</span>
             <span style={{ fontSize: '1.5rem', opacity: 0.8 }}>/100</span>
           </div>
-          <p style={{ margin: '1rem 0 0 0', opacity: 0.9 }}>{report.summary}</p>
+          <div style={{ margin: '1rem 0 0 0', opacity: 0.9 }}>
+            {formatIntoReadableParagraphs(report.summary || '').map((para, i) => (
+              <p key={i} style={{ margin: i === 0 ? 0 : '0.75rem 0 0 0', lineHeight: 1.6 }}>{para}</p>
+            ))}
+          </div>
           {report.readyForGeneration && (
             <div style={{
               marginTop: '1rem',
@@ -820,7 +990,11 @@ export default function OutlineReviewPage() {
           border: '1px solid #BFDBFE',
         }}>
           <h4 style={{ margin: '0 0 0.5rem 0', color: '#1E40AF' }}>Structure Verdict</h4>
-          <p style={{ margin: 0, color: '#1E3A8A' }}>{results.summaryVerdict}</p>
+          <div style={{ color: '#1E3A8A' }}>
+            {formatIntoReadableParagraphs(results.summaryVerdict || '').map((para, i) => (
+              <p key={i} style={{ margin: i === 0 ? 0 : '0.75rem 0 0 0', lineHeight: 1.6 }}>{para}</p>
+            ))}
+          </div>
         </div>
 
         {/* Plot Structure Analysis */}

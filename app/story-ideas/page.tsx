@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { getToken } from '@/app/lib/auth';
 import { colors, borderRadius, shadows } from '@/app/lib/constants';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
 import GenerationProgress from '@/app/components/GenerationProgress';
@@ -46,6 +47,51 @@ export default function StoryIdeasPage() {
   const [activeTab, setActiveTab] = useState<string>('details');
   const [originalityResults, setOriginalityResults] = useState<Record<string, any>>({});
   const [isCheckingOriginality, setIsCheckingOriginality] = useState(false);
+  const [loadingOriginalityIds, setLoadingOriginalityIds] = useState<Set<string>>(new Set());
+
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+  // Load existing originality results from API for the selected idea
+  const loadExistingOriginalityResult = useCallback(async (ideaId: string) => {
+    // Skip if already loaded or currently loading
+    if (originalityResults[ideaId] || loadingOriginalityIds.has(ideaId)) {
+      return;
+    }
+
+    setLoadingOriginalityIds(prev => new Set(prev).add(ideaId));
+
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/plagiarism/results/${ideaId}/latest`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.results) {
+          setOriginalityResults(prev => ({ ...prev, [ideaId]: data.results }));
+        }
+      }
+    } catch (error) {
+      console.error('Error loading existing originality result:', error);
+    } finally {
+      setLoadingOriginalityIds(prev => {
+        const next = new Set(prev);
+        next.delete(ideaId);
+        return next;
+      });
+    }
+  }, [originalityResults, loadingOriginalityIds, API_BASE_URL]);
+
+  // Load originality result when selected idea changes
+  useEffect(() => {
+    if (selectedIdeaId) {
+      loadExistingOriginalityResult(selectedIdeaId);
+    }
+  }, [selectedIdeaId, loadExistingOriginalityResult]);
 
   // Get unique genres from ideas
   const genres = useMemo(() =>
@@ -156,10 +202,13 @@ export default function StoryIdeasPage() {
     setIsCheckingOriginality(false);
   };
 
-  // Reset tab when selected idea changes
+  // Reset tab when selected idea changes - keep on details unless user was on originality
   const handleSelectIdea = (ideaId: string) => {
     if (ideaId !== selectedIdeaId) {
-      setActiveTab('details');
+      // Only stay on originality tab if the new idea also has results
+      if (activeTab === 'originality' && !originalityResults[ideaId]) {
+        setActiveTab('details');
+      }
     }
     setSelectedIdeaId(ideaId);
   };
@@ -491,12 +540,14 @@ export default function StoryIdeasPage() {
       );
     }
 
-    // Determine available tabs
+    // Determine available tabs - always show originality tab if results exist or user is checking
     const hasOriginalityResult = !!originalityResults[selectedIdea.id];
+    const isLoadingOriginality = loadingOriginalityIds.has(selectedIdea.id);
+    const showOriginalityTab = hasOriginalityResult || activeTab === 'originality' || isLoadingOriginality;
     const tabs = [
       { id: 'details', label: 'Details', icon: '📋' },
-      ...(hasOriginalityResult || activeTab === 'originality'
-        ? [{ id: 'originality', label: 'Originality', icon: '✨' }]
+      ...(showOriginalityTab
+        ? [{ id: 'originality', label: hasOriginalityResult ? 'Originality ✓' : 'Originality', icon: '✨' }]
         : []),
     ];
 

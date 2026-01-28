@@ -10,6 +10,29 @@ import { useProjectNavigation } from '@/app/hooks';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+// Sanitise AI-generated text to remove common AI writing signals
+function sanitiseAIText(text: string): string {
+  if (!text) return text;
+
+  return text
+    // Replace em-dashes with commas or reword
+    .replace(/—/g, ', ')
+    // Replace en-dashes between words with commas
+    .replace(/(\w)\s*–\s*(\w)/g, '$1, $2')
+    // Replace hyphenated compound modifiers that are AI signals
+    .replace(/(\w+)-(\w+)-(\w+)/g, (match, a, b, c) => {
+      // Keep common compound words, reword others
+      const common = ['day-to-day', 'face-to-face', 'up-to-date', 'state-of-the-art'];
+      if (common.includes(match.toLowerCase())) return match;
+      return `${a} ${b} ${c}`;
+    })
+    // Clean up double spaces
+    .replace(/\s{2,}/g, ' ')
+    // Clean up comma-comma patterns
+    .replace(/,\s*,/g, ',')
+    .trim();
+}
+
 // Types for VEB Report
 interface BetaSwarmReaction {
   paragraphIndex: number;
@@ -1281,7 +1304,7 @@ export default function EditorialReportPage() {
             color: results.agentRecommendation === 'request_full' ? '#047857' :
               results.agentRecommendation === 'revise_resubmit' ? '#A16207' : '#B91C1C',
           }}>
-            {results.agentNotes}
+            {sanitiseAIText(results.agentNotes)}
           </p>
         </div>
 
@@ -1335,7 +1358,7 @@ export default function EditorialReportPage() {
             color: '#475569',
             marginBottom: '1rem',
           }}>
-            "{results.hookAnalysis.openingLine}"
+            "{sanitiseAIText(results.hookAnalysis.openingLine)}"
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -1343,7 +1366,7 @@ export default function EditorialReportPage() {
               <h5 style={{ margin: '0 0 0.5rem 0', color: '#10B981', fontSize: '0.875rem' }}>Strengths</h5>
               <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
                 {results.hookAnalysis.strengths.map((s, i) => (
-                  <li key={i} style={{ color: '#475569', fontSize: '0.875rem' }}>{s}</li>
+                  <li key={i} style={{ color: '#475569', fontSize: '0.875rem' }}>{sanitiseAIText(s)}</li>
                 ))}
               </ul>
             </div>
@@ -1351,7 +1374,7 @@ export default function EditorialReportPage() {
               <h5 style={{ margin: '0 0 0.5rem 0', color: '#EF4444', fontSize: '0.875rem' }}>Weaknesses</h5>
               <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
                 {results.hookAnalysis.weaknesses.map((w, i) => (
-                  <li key={i} style={{ color: '#475569', fontSize: '0.875rem' }}>{w}</li>
+                  <li key={i} style={{ color: '#475569', fontSize: '0.875rem' }}>{sanitiseAIText(w)}</li>
                 ))}
               </ul>
             </div>
@@ -1361,7 +1384,7 @@ export default function EditorialReportPage() {
             <div style={{ marginTop: '1rem', padding: '1rem', background: '#EFF6FF', borderRadius: '4px' }}>
               <h5 style={{ margin: '0 0 0.5rem 0', color: '#1E40AF', fontSize: '0.875rem' }}>Suggested Rewrite</h5>
               <p style={{ margin: 0, color: '#1E3A8A', fontStyle: 'italic' }}>
-                "{results.hookAnalysis.suggestedRewrite}"
+                "{sanitiseAIText(results.hookAnalysis.suggestedRewrite)}"
               </p>
             </div>
           )}
@@ -1411,7 +1434,7 @@ export default function EditorialReportPage() {
                 background: `${getFreshnessColor(trope.freshness)}15`,
                 border: `1px solid ${getFreshnessColor(trope.freshness)}40`,
                 borderRadius: '20px',
-              }} title={trope.execution}>
+              }} title={sanitiseAIText(trope.execution)}>
                 <span style={{ fontWeight: '500', color: '#1A1A2E' }}>{trope.trope}</span>
                 <span style={{
                   marginLeft: '0.5rem',
@@ -1437,11 +1460,11 @@ export default function EditorialReportPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div>
               <h5 style={{ margin: '0 0 0.5rem 0', color: '#64748B', fontSize: '0.875rem' }}>Target Audience</h5>
-              <p style={{ margin: 0, color: '#1A1A2E' }}>{results.marketPositioning.targetAudience}</p>
+              <p style={{ margin: 0, color: '#1A1A2E' }}>{sanitiseAIText(results.marketPositioning.targetAudience)}</p>
             </div>
             <div>
               <h5 style={{ margin: '0 0 0.5rem 0', color: '#64748B', fontSize: '0.875rem' }}>Marketing Angle</h5>
-              <p style={{ margin: 0, color: '#1A1A2E' }}>{results.marketPositioning.marketingAngle}</p>
+              <p style={{ margin: 0, color: '#1A1A2E' }}>{sanitiseAIText(results.marketPositioning.marketingAngle)}</p>
             </div>
           </div>
           {results.marketPositioning.potentialChallenges.length > 0 && (
@@ -1449,7 +1472,7 @@ export default function EditorialReportPage() {
               <h5 style={{ margin: '0 0 0.5rem 0', color: '#EF4444', fontSize: '0.875rem' }}>Potential Challenges</h5>
               <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
                 {results.marketPositioning.potentialChallenges.map((c, i) => (
-                  <li key={i} style={{ color: '#475569', fontSize: '0.875rem' }}>{c}</li>
+                  <li key={i} style={{ color: '#475569', fontSize: '0.875rem' }}>{sanitiseAIText(c)}</li>
                 ))}
               </ul>
             </div>

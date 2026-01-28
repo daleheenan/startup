@@ -1074,6 +1074,7 @@ export interface FollowUpRecommendations {
   projectId: string;
   bookId: string;
   status: 'pending' | 'generating' | 'completed' | 'failed';
+  error?: string | null;
   generatedAt: string | null;
   sequelIdeas: SequelIdea[];
   unresolvedThreads: UnresolvedThread[];
