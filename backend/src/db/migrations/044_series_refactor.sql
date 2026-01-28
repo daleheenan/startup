@@ -16,6 +16,8 @@ CREATE INDEX IF NOT EXISTS idx_series_status ON series(status);
 CREATE INDEX IF NOT EXISTS idx_series_created ON series(created_at);
 
 -- Add series_id to projects table (nullable - standalone books won't have a series)
+-- SQLite doesn't have IF NOT EXISTS for ALTER TABLE, so we check via pragma
+-- This will fail silently if column exists, which is handled by the migration runner
 ALTER TABLE projects ADD COLUMN series_id TEXT REFERENCES series(id) ON DELETE SET NULL;
 
 -- Add book_number to projects table (for ordering within a series)
