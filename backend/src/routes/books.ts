@@ -15,20 +15,37 @@ const logger = createLogger('routes:books');
  * GET /api/books/project/:projectId
  * Get all books for a project
  *
- * Note: word_count is calculated from completed chapters to ensure accuracy,
- * as the stored word_count field may be stale when book versions exist.
+ * Note: word_count is calculated from the active version's completed chapters.
+ * If no versions exist, falls back to all chapters (legacy behaviour).
  */
 router.get('/project/:projectId', (req, res) => {
   try {
-    // Fetch books with calculated word count from completed chapters
-    // This is more accurate than the stored word_count field when versions exist
+    // Fetch books with calculated word count from the version with the most chapters
+    // This ensures we show the correct word count even when the active version is empty
+    // (e.g., during a rewrite where version 2 is active but has no chapters yet)
     const stmt = db.prepare<[string], Book & { calculated_word_count: number }>(`
       SELECT
         b.*,
         COALESCE((
           SELECT SUM(c.word_count)
           FROM chapters c
-          WHERE c.book_id = b.id AND c.status = 'completed'
+          WHERE c.book_id = b.id
+            AND c.status = 'completed'
+            AND (
+              -- Find the version with the most chapters and use that
+              c.version_id = (
+                SELECT bv.id
+                FROM book_versions bv
+                LEFT JOIN chapters ch ON ch.version_id = bv.id AND ch.status = 'completed'
+                WHERE bv.book_id = b.id
+                GROUP BY bv.id
+                ORDER BY COUNT(ch.id) DESC, COALESCE(SUM(ch.word_count), 0) DESC
+                LIMIT 1
+              )
+              OR
+              -- If no versions exist, count all chapters with null version_id
+              (c.version_id IS NULL AND NOT EXISTS (SELECT 1 FROM book_versions WHERE book_id = b.id))
+            )
         ), 0) as calculated_word_count
       FROM books b
       WHERE b.project_id = ?
@@ -37,10 +54,10 @@ router.get('/project/:projectId', (req, res) => {
 
     const booksRaw = stmt.all(req.params.projectId);
 
-    // Use calculated word count if it's greater than stored (handles version scenarios)
+    // Use calculated word count (from version with most chapters) as the authoritative count
     const books = booksRaw.map(book => ({
       ...book,
-      word_count: Math.max(book.word_count || 0, book.calculated_word_count || 0),
+      word_count: book.calculated_word_count || 0,
     }));
 
     res.json({ books });
@@ -55,7 +72,8 @@ router.get('/project/:projectId', (req, res) => {
  * GET /api/books/:id
  * Get a specific book
  *
- * Note: word_count is calculated from completed chapters to ensure accuracy.
+ * Note: word_count is calculated from the active version's completed chapters.
+ * If no versions exist, falls back to all chapters (legacy behaviour).
  */
 router.get('/:id', (req, res) => {
   try {
@@ -65,7 +83,23 @@ router.get('/:id', (req, res) => {
         COALESCE((
           SELECT SUM(c.word_count)
           FROM chapters c
-          WHERE c.book_id = b.id AND c.status = 'completed'
+          WHERE c.book_id = b.id
+            AND c.status = 'completed'
+            AND (
+              -- Find the version with the most chapters and use that
+              c.version_id = (
+                SELECT bv.id
+                FROM book_versions bv
+                LEFT JOIN chapters ch ON ch.version_id = bv.id AND ch.status = 'completed'
+                WHERE bv.book_id = b.id
+                GROUP BY bv.id
+                ORDER BY COUNT(ch.id) DESC, COALESCE(SUM(ch.word_count), 0) DESC
+                LIMIT 1
+              )
+              OR
+              -- If no versions exist, count all chapters with null version_id
+              (c.version_id IS NULL AND NOT EXISTS (SELECT 1 FROM book_versions WHERE book_id = b.id))
+            )
         ), 0) as calculated_word_count
       FROM books b
       WHERE b.id = ?
@@ -79,10 +113,10 @@ router.get('/:id', (req, res) => {
       });
     }
 
-    // Use calculated word count if it's greater than stored
+    // Use calculated word count (from version with most chapters) as the authoritative count
     const book = {
       ...bookRaw,
-      word_count: Math.max(bookRaw.word_count || 0, bookRaw.calculated_word_count || 0),
+      word_count: bookRaw.calculated_word_count || 0,
     };
 
     res.json(book);

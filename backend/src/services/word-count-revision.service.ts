@@ -53,9 +53,10 @@ export class WordCountRevisionService {
     // Get editorial report ID if available
     const reportId = this.getLatestEditorialReportId(bookId);
 
-    // Get the current active version (source version for the revision)
-    // IMPORTANT: Get version first, then get stats for that specific version
-    const sourceVersion = await bookVersioningService.getActiveVersion(bookId);
+    // Get the source version for the revision - this should be the version with actual chapters
+    // IMPORTANT: When a new version is created for rewrite (and is now active but empty),
+    // we need to use the previous version with chapters as the source
+    const sourceVersion = await bookVersioningService.getSourceVersionForRewrite(bookId);
     const sourceVersionId = sourceVersion?.id || null;
 
     // Get current book word count and chapter count from the source version

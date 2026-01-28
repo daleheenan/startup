@@ -154,6 +154,40 @@ export class BookVersioningService {
   }
 
   /**
+   * Get the version with actual chapters to use as source for rewrites.
+   * This is needed when the active version is empty (e.g., a new rewrite target)
+   * but we need to reference the previous version's content.
+   *
+   * Returns the version with the most completed chapters, falling back to active version.
+   */
+  async getSourceVersionForRewrite(bookId: string): Promise<BookVersion | null> {
+    // Find the version with the most completed chapters
+    const versionWithChapters = db.prepare(`
+      SELECT bv.*, COUNT(c.id) as chapter_count, COALESCE(SUM(c.word_count), 0) as total_words
+      FROM book_versions bv
+      LEFT JOIN chapters c ON c.version_id = bv.id AND c.status = 'completed'
+      WHERE bv.book_id = ?
+      GROUP BY bv.id
+      ORDER BY chapter_count DESC, total_words DESC
+      LIMIT 1
+    `).get(bookId) as (BookVersion & { chapter_count: number; total_words: number }) | undefined;
+
+    if (versionWithChapters && versionWithChapters.chapter_count > 0) {
+      logger.info({
+        bookId,
+        versionId: versionWithChapters.id,
+        versionNumber: versionWithChapters.version_number,
+        chapterCount: versionWithChapters.chapter_count,
+        totalWords: versionWithChapters.total_words,
+      }, 'Found source version with chapters for rewrite');
+      return versionWithChapters;
+    }
+
+    // Fallback to active version if no version has chapters
+    return this.getActiveVersion(bookId);
+  }
+
+  /**
    * Switch to a different version (make it active)
    */
   async activateVersion(bookId: string, versionId: string): Promise<void> {
