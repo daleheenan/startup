@@ -87,11 +87,12 @@ export default function PlotLayersVisualization({
 
   // Calculate intensity at each chapter for a layer (for the line graph)
   const getLayerIntensity = (layer: PlotLayer, chapter: number): number => {
-    const point = layer.points.find(p => p.chapter_number === chapter);
+    const points = layer.points || [];
+    const point = points.find(p => p.chapter_number === chapter);
     if (point) return point.impact_level;
 
     // Interpolate between points
-    const sortedPoints = [...layer.points].sort((a, b) => a.chapter_number - b.chapter_number);
+    const sortedPoints = [...points].sort((a, b) => a.chapter_number - b.chapter_number);
     const before = sortedPoints.filter(p => p.chapter_number < chapter).pop();
     const after = sortedPoints.find(p => p.chapter_number > chapter);
 
@@ -351,7 +352,7 @@ export default function PlotLayersVisualization({
         {plotLayers.map(layer => {
           if (selectedLayer && selectedLayer !== layer.id) return null;
 
-          return layer.points.map(point => {
+          return (layer.points || []).map(point => {
             const x = ((point.chapter_number - 1) / (totalChapters - 1)) * 100;
             const y = 100 - (point.impact_level / 5) * 100;
 
@@ -471,10 +472,10 @@ export default function PlotLayersVisualization({
                 </p>
                 <div>
                   <div style={{ fontSize: '0.75rem', fontWeight: 600, color: colors.text, marginBottom: '0.5rem' }}>
-                    Key Points ({layer.points.length}):
+                    Key Points ({(layer.points || []).length}):
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    {layer.points.sort((a, b) => a.chapter_number - b.chapter_number).map(point => (
+                    {(layer.points || []).sort((a, b) => a.chapter_number - b.chapter_number).map(point => (
                       <div
                         key={point.id}
                         style={{

@@ -1173,7 +1173,7 @@ export default function PlotStructurePage() {
                         {layer.description || 'No description'}
                       </p>
                       <div style={{ marginTop: '0.5rem', fontSize: '0.813rem', color: colors.textSecondary }}>
-                        {layer.points.length} plot point{layer.points.length !== 1 ? 's' : ''}
+                        {(layer.points?.length || 0)} plot point{(layer.points?.length || 0) !== 1 ? 's' : ''}
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -1254,10 +1254,10 @@ export default function PlotStructurePage() {
                   </div>
 
                   {/* Plot Points List */}
-                  {layer.points.length > 0 && (
+                  {(layer.points?.length || 0) > 0 && (
                     <div style={{ marginTop: '1rem', borderTop: '1px solid #E2E8F0', paddingTop: '1rem' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        {layer.points
+                        {(layer.points || [])
                           .sort((a, b) => a.chapter_number - b.chapter_number)
                           .map(point => (
                           <div
