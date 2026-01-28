@@ -334,7 +334,7 @@ export default function StoryIdeasPage() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <DetailPanelHeader
-          title="Story Idea"
+          title={selectedIdea.story_idea.slice(0, 80) + (selectedIdea.story_idea.length > 80 ? '...' : '')}
           status={selectedIdea.status}
           genre={selectedIdea.genre}
           date={new Date(selectedIdea.created_at).toLocaleDateString()}
