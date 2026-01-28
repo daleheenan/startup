@@ -420,8 +420,8 @@ export default function MobileNavigation({ children }: MobileNavigationProps) {
           }
         }
 
-        /* Tablet and desktop - hide mobile nav */
-        @media (min-width: 769px) {
+        /* Desktop only - hide mobile nav (show mobile nav on tablet) */
+        @media (min-width: 1025px) {
           .mobile-header {
             display: none !important;
           }

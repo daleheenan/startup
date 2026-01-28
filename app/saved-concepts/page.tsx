@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getToken, logout } from '../lib/auth';
 import { colors, borderRadius, shadows } from '../lib/constants';
-import PrimaryNavigationBar from '../components/shared/PrimaryNavigationBar';
+import DashboardLayout from '../components/dashboard/DashboardLayout';
 import OriginalityChecker from '../components/OriginalityChecker';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -28,13 +28,17 @@ interface SavedConcept {
 export default function SavedConceptsPage() {
   return (
     <Suspense fallback={
-      <div style={{ minHeight: '100vh', background: colors.background }}>
-        <PrimaryNavigationBar activeSection="story-concepts" />
+      <DashboardLayout
+        header={{
+          title: 'Story Concepts',
+          subtitle: 'Detailed story concepts ready to become your next book',
+        }}
+      >
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          height: 'calc(100vh - 60px)',
+          height: 'calc(100vh - 200px)',
         }}>
           <div style={{ textAlign: 'center' }}>
             <div style={{
@@ -50,7 +54,7 @@ export default function SavedConceptsPage() {
           </div>
           <style jsx>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
-      </div>
+      </DashboardLayout>
     }>
       <SavedConceptsContent />
     </Suspense>
@@ -291,13 +295,17 @@ function SavedConceptsContent() {
 
   if (isLoading) {
     return (
-      <div style={{ minHeight: '100vh', background: colors.background }}>
-        <PrimaryNavigationBar activeSection="story-concepts" />
+      <DashboardLayout
+        header={{
+          title: 'Story Concepts',
+          subtitle: 'Detailed story concepts ready to become your next book',
+        }}
+      >
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          height: 'calc(100vh - 60px)',
+          height: 'calc(100vh - 200px)',
         }}>
           <div style={{ textAlign: 'center' }}>
             <div style={{
@@ -313,101 +321,79 @@ function SavedConceptsContent() {
           </div>
           <style jsx>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: colors.background }}>
-      <PrimaryNavigationBar activeSection="story-concepts" />
+    <DashboardLayout
+      header={{
+        title: showingNewOnly ? `${newConceptIds.length} New Concepts Generated` : 'Story Concepts',
+        subtitle: showingNewOnly
+          ? 'Choose a concept to save for later or select one to start your project'
+          : 'Detailed story concepts ready to become your next book',
+      }}
+    >
+      {/* Show "View All" button when filtering to new concepts */}
+      {showingNewOnly && (
+        <button
+          onClick={handleShowAllConcepts}
+          style={{
+            marginBottom: '1rem',
+            padding: '0.5rem 1rem',
+            background: colors.surface,
+            border: `1px solid ${colors.border}`,
+            borderRadius: borderRadius.sm,
+            color: colors.text,
+            fontSize: '0.875rem',
+            cursor: 'pointer',
+          }}
+        >
+          ← View All Saved Concepts
+        </button>
+      )}
 
-      {/* Header */}
-      <header style={{
-        padding: '1.5rem 2rem',
-        background: colors.surface,
-        borderBottom: `1px solid ${colors.border}`,
-      }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-          <div>
-            <h1 style={{
-              fontSize: '1.75rem',
-              fontWeight: 700,
+      {/* Filters */}
+      {concepts.length > 0 && (
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+          <select
+            value={filterGenre}
+            onChange={(e) => setFilterGenre(e.target.value)}
+            style={{
+              padding: '0.5rem 1rem',
+              border: `1px solid ${colors.border}`,
+              borderRadius: borderRadius.sm,
+              fontSize: '0.875rem',
+              background: colors.surface,
               color: colors.text,
-              margin: 0,
-            }}>
-              {showingNewOnly ? `${newConceptIds.length} New Concepts Generated` : 'Story Concepts'}
-            </h1>
-            <p style={{ fontSize: '0.9375rem', color: colors.textSecondary, margin: '0.25rem 0 0' }}>
-              {showingNewOnly
-                ? 'Choose a concept to save for later or select one to start your project'
-                : 'Detailed story concepts ready to become your next book'}
-            </p>
-          </div>
-
-          {/* Show "View All" button when filtering to new concepts */}
-          {showingNewOnly && (
-            <button
-              onClick={handleShowAllConcepts}
-              style={{
-                marginTop: '1rem',
-                padding: '0.5rem 1rem',
-                background: colors.surface,
-                border: `1px solid ${colors.border}`,
-                borderRadius: borderRadius.sm,
-                color: colors.text,
-                fontSize: '0.875rem',
-                cursor: 'pointer',
-              }}
-            >
-              ← View All Saved Concepts
-            </button>
-          )}
-
-          {/* Filters */}
-          {concepts.length > 0 && (
-            <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-              <select
-                value={filterGenre}
-                onChange={(e) => setFilterGenre(e.target.value)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: borderRadius.sm,
-                  fontSize: '0.875rem',
-                  background: colors.surface,
-                  color: colors.text,
-                }}
-              >
-                <option value="all">All Genres</option>
-                {genres.map(genre => (
-                  <option key={genre} value={genre}>{genre}</option>
-                ))}
-              </select>
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: borderRadius.sm,
-                  fontSize: '0.875rem',
-                  background: colors.surface,
-                  color: colors.text,
-                }}
-              >
-                <option value="all">All Status</option>
-                <option value="saved">Saved</option>
-                <option value="used">Used</option>
-                <option value="archived">Archived</option>
-              </select>
-            </div>
-          )}
+            }}
+          >
+            <option value="all">All Genres</option>
+            {genres.map(genre => (
+              <option key={genre} value={genre}>{genre}</option>
+            ))}
+          </select>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            style={{
+              padding: '0.5rem 1rem',
+              border: `1px solid ${colors.border}`,
+              borderRadius: borderRadius.sm,
+              fontSize: '0.875rem',
+              background: colors.surface,
+              color: colors.text,
+            }}
+          >
+            <option value="all">All Status</option>
+            <option value="saved">Saved</option>
+            <option value="used">Used</option>
+            <option value="archived">Archived</option>
+          </select>
         </div>
-      </header>
+      )}
 
-      {/* Main Content */}
-      <main style={{ padding: '2rem' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+      <div>
           {error && (
             <div style={{
               background: colors.errorLight,
@@ -768,10 +754,9 @@ function SavedConceptsContent() {
               ))}
             </div>
           )}
-        </div>
-      </main>
+      </div>
 
       <style jsx>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
+    </DashboardLayout>
   );
 }

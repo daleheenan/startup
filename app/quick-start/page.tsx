@@ -6,7 +6,7 @@ import GenerationProgress from '../components/GenerationProgress';
 import { TimePeriodSelector, getTimeframeDescription } from '../components/TimePeriodSelector';
 import type { TimePeriod } from '../../shared/types';
 import { getToken } from '../lib/auth';
-import PrimaryNavigationBar from '../components/shared/PrimaryNavigationBar';
+import DashboardLayout from '../components/dashboard/DashboardLayout';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -332,50 +332,17 @@ export default function QuickStartPage() {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#F8FAFC',
-      display: 'flex',
-      flexDirection: 'column',
-    }}>
-      {/* Primary Navigation Bar */}
-      <PrimaryNavigationBar activeSection="quick-start" />
-
-      {/* Main Content */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        {/* Top Bar */}
-        <header style={{
-          padding: '1rem 2rem',
-          background: '#FFFFFF',
-          borderBottom: '1px solid #E2E8F0',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}>
-          <div>
-            <h1 style={{
-              fontSize: '1.5rem',
-              fontWeight: '700',
-              color: '#1A1A2E',
-              margin: 0,
-            }}>
-              Quick Start
-            </h1>
-            <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
-              Pick a genre and generate concepts in seconds
-            </p>
-          </div>
-        </header>
-
-        {/* Content Area */}
-        <div style={{
-          flex: 1,
-          padding: '2rem',
-          overflow: 'auto',
-          display: 'flex',
-          justifyContent: 'center',
-        }}>
-          <div style={{ maxWidth: '700px', width: '100%' }}>
+    <DashboardLayout
+      header={{
+        title: 'Quick Start',
+        subtitle: 'Pick a genre and generate concepts in seconds',
+      }}
+    >
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+      }}>
+        <div style={{ maxWidth: '700px', width: '100%' }}>
             <div style={{
               background: '#FFFFFF',
               border: '1px solid #E2E8F0',
@@ -683,9 +650,8 @@ export default function QuickStartPage() {
               error={error}
               onCancel={handleCancel}
             />
-          </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

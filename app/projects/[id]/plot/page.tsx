@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import PageLayout from '../../../components/shared/PageLayout';
+import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
+import ProjectNavigation from '@/app/components/shared/ProjectNavigation';
 import PlotLayersVisualization from '../../../components/PlotLayersVisualization';
 import PlotWizard from '../../../components/plot/PlotWizard';
 import { getToken } from '../../../lib/auth';
@@ -69,6 +70,20 @@ const LAYER_COLORS = [
   '#667eea', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6',
   '#3B82F6', '#14B8A6', '#F97316', '#D946EF', '#6366F1',
 ];
+
+// Colour names for accessibility (Issue #20)
+const COLOR_NAMES: Record<string, string> = {
+  '#667eea': 'Purple',
+  '#10B981': 'Green',
+  '#F59E0B': 'Amber',
+  '#EC4899': 'Pink',
+  '#8B5CF6': 'Violet',
+  '#3B82F6': 'Blue',
+  '#14B8A6': 'Teal',
+  '#F97316': 'Orange',
+  '#D946EF': 'Fuchsia',
+  '#6366F1': 'Indigo',
+};
 
 const PHASES: Array<{ value: PlotPoint['phase']; label: string }> = [
   { value: 'setup', label: 'Setup' },
@@ -572,12 +587,36 @@ export default function PlotStructurePage() {
   };
 
   const handleActStructureChange = (field: keyof StoryStructure['act_structure'], value: number) => {
+    // Issue #19: Validate act structure sequence
+    const currentActs = structure.act_structure;
+    const newActs = { ...currentActs, [field]: value };
+
+    // Validate logical sequence
+    const validationErrors: string[] = [];
+
+    if (newActs.act_two_midpoint <= newActs.act_one_end) {
+      validationErrors.push('Midpoint must be after Act I ends');
+    }
+    if (newActs.act_two_end <= newActs.act_two_midpoint) {
+      validationErrors.push('Act II end must be after Midpoint');
+    }
+    if (newActs.act_three_climax <= newActs.act_two_end) {
+      validationErrors.push('Climax must be after Act II ends');
+    }
+    if (newActs.act_three_climax > totalChapters) {
+      validationErrors.push('Climax cannot exceed total chapter count');
+    }
+
+    // Show validation errors as visible feedback (Issue #19)
+    if (validationErrors.length > 0) {
+      setError(validationErrors.join('. ') + '. Please adjust chapter numbers.');
+    } else {
+      setError(null); // Clear error if validation passes
+    }
+
     const newStructure = {
       ...structure,
-      act_structure: {
-        ...structure.act_structure,
-        [field]: value,
-      },
+      act_structure: newActs,
     };
     saveStructure(newStructure);
   };
@@ -758,17 +797,13 @@ export default function PlotStructurePage() {
 
   if (loading) {
     return (
-      <PageLayout
-        title="Plot Structure & Timeline"
-        subtitle="Loading..."
-        backLink={`/projects/${projectId}`}
-        backText="← Back to Project"
-        projectNavigation={navigation}
+      <DashboardLayout
+        header={{ title: project?.title || 'Loading...', subtitle: 'Plot Structure & Timeline' }}
       >
         <div style={{ padding: '2rem', textAlign: 'center', color: colors.textSecondary }}>
           {extractingFromConcept ? 'Extracting plots from story concept...' : 'Loading plot structure...'}
         </div>
-      </PageLayout>
+      </DashboardLayout>
     );
   }
 
@@ -776,13 +811,15 @@ export default function PlotStructurePage() {
   const bookWordCount = totalChapters * 3000; // Rough estimate: 3000 words per chapter
 
   return (
-    <PageLayout
-      title="Plot Structure & Timeline"
-      subtitle="Visualize and plan your story's plot layers"
-      backLink={`/projects/${projectId}`}
-      backText="← Back to Project"
-      projectNavigation={navigation}
+    <DashboardLayout
+      header={{ title: project?.title || 'Loading...', subtitle: 'Plot Structure & Timeline' }}
     >
+      <ProjectNavigation
+        projectId={projectId}
+        project={navigation.project}
+        outline={navigation.outline}
+        chapters={navigation.chapters}
+      />
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
         {error && (
           <div style={{
@@ -985,58 +1022,66 @@ export default function PlotStructurePage() {
           </h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
             <div>
-              <label style={labelStyle}>Act I Ends (Chapter)</label>
+              <label htmlFor="act-one-end" style={labelStyle}>Act I Ends (Chapter)</label>
               <input
+                id="act-one-end"
                 type="number"
                 min={1}
                 max={totalChapters}
                 value={structure.act_structure.act_one_end}
                 onChange={(e) => handleActStructureChange('act_one_end', parseInt(e.target.value) || 1)}
                 style={inputStyle}
+                aria-describedby="act-one-end-help"
               />
-              <span style={{ fontSize: '0.75rem', color: colors.textSecondary }}>
+              <span id="act-one-end-help" style={{ fontSize: '0.75rem', color: colors.textSecondary }}>
                 Inciting incident, hero commits
               </span>
             </div>
             <div>
-              <label style={labelStyle}>Midpoint (Chapter)</label>
+              <label htmlFor="act-two-midpoint" style={labelStyle}>Midpoint (Chapter)</label>
               <input
+                id="act-two-midpoint"
                 type="number"
                 min={1}
                 max={totalChapters}
                 value={structure.act_structure.act_two_midpoint}
                 onChange={(e) => handleActStructureChange('act_two_midpoint', parseInt(e.target.value) || 1)}
                 style={inputStyle}
+                aria-describedby="act-two-midpoint-help"
               />
-              <span style={{ fontSize: '0.75rem', color: colors.textSecondary }}>
+              <span id="act-two-midpoint-help" style={{ fontSize: '0.75rem', color: colors.textSecondary }}>
                 Major revelation or reversal
               </span>
             </div>
             <div>
-              <label style={labelStyle}>Act II Ends (Chapter)</label>
+              <label htmlFor="act-two-end" style={labelStyle}>Act II Ends (Chapter)</label>
               <input
+                id="act-two-end"
                 type="number"
                 min={1}
                 max={totalChapters}
                 value={structure.act_structure.act_two_end}
                 onChange={(e) => handleActStructureChange('act_two_end', parseInt(e.target.value) || 1)}
                 style={inputStyle}
+                aria-describedby="act-two-end-help"
               />
-              <span style={{ fontSize: '0.75rem', color: colors.textSecondary }}>
+              <span id="act-two-end-help" style={{ fontSize: '0.75rem', color: colors.textSecondary }}>
                 All is lost moment, darkest hour
               </span>
             </div>
             <div>
-              <label style={labelStyle}>Climax (Chapter)</label>
+              <label htmlFor="act-three-climax" style={labelStyle}>Climax (Chapter)</label>
               <input
+                id="act-three-climax"
                 type="number"
                 min={1}
                 max={totalChapters}
                 value={structure.act_structure.act_three_climax}
                 onChange={(e) => handleActStructureChange('act_three_climax', parseInt(e.target.value) || 1)}
                 style={inputStyle}
+                aria-describedby="act-three-climax-help"
               />
-              <span style={{ fontSize: '0.75rem', color: colors.textSecondary }}>
+              <span id="act-three-climax-help" style={{ fontSize: '0.75rem', color: colors.textSecondary }}>
                 Final confrontation
               </span>
             </div>
@@ -1533,23 +1578,30 @@ export default function PlotStructurePage() {
                   </select>
                 </div>
                 <div>
-                  <label style={labelStyle}>Color</label>
+                  <label style={labelStyle}>Colour</label>
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    {LAYER_COLORS.map(color => (
-                      <button
-                        key={color}
-                        type="button"
-                        onClick={() => setLayerForm({ ...layerForm, color })}
-                        style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '6px',
-                          background: color,
-                          border: layerForm.color === color ? '3px solid #1A1A2E' : '2px solid transparent',
-                          cursor: 'pointer',
-                        }}
-                      />
-                    ))}
+                    {LAYER_COLORS.map(color => {
+                      const colorName = COLOR_NAMES[color] || 'Unknown';
+                      const isSelected = layerForm.color === color;
+                      return (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() => setLayerForm({ ...layerForm, color })}
+                          aria-label={`Select ${colorName} for plot layer${isSelected ? ' (selected)' : ''}`}
+                          aria-pressed={isSelected}
+                          title={colorName}
+                          style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '6px',
+                            background: color,
+                            border: isSelected ? '3px solid #1A1A2E' : '2px solid transparent',
+                            cursor: 'pointer',
+                          }}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -1721,6 +1773,6 @@ export default function PlotStructurePage() {
           </>
         )}
       </div>
-    </PageLayout>
+    </DashboardLayout>
   );
 }

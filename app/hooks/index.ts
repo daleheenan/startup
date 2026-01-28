@@ -4,6 +4,8 @@
  * Provides organised imports for all custom hooks in NovelForge
  */
 
+export { useKeyboardShortcut } from './useKeyboardShortcut';
+export type { ShortcutConfig } from './useKeyboardShortcut';
 export { useNavigationCounts } from './useNavigationCounts';
 export { useOfflineChapter } from './useOfflineChapter';
 export { useProjectNavigation } from './useProjectNavigation';

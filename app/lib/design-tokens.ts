@@ -30,12 +30,12 @@ export const colors = {
     focus: '#667eea',        // Focus indicators (brand color)
   },
 
-  // Text colors (WCAG AA compliant)
+  // Text colours (WCAG AA compliant)
   text: {
     primary: '#1A1A2E',      // Main text (contrast: 14.8:1 on white) ✓
     secondary: '#475569',    // Secondary text (contrast: 8.6:1 on white) ✓
     tertiary: '#64748B',     // Tertiary text (contrast: 5.8:1 on white) ✓
-    disabled: '#94A3B8',     // Disabled text (contrast: 3.5:1 on white) ⚠️ Large text only
+    disabled: '#64748B',     // Disabled text (contrast: 5.8:1 on white) ✓ Issue #36 - improved from #94A3B8
     inverse: '#FFFFFF',      // Text on dark backgrounds
   },
 
@@ -72,6 +72,30 @@ export const colors = {
     infoDark: '#1E40AF',     // Darker variant (contrast: 7.3:1 on white) ✓
     infoLight: '#DBEAFE',
     infoBorder: '#93C5FD',
+  },
+
+  // Sidebar colours (dark theme)
+  sidebar: {
+    background: '#1E1E2F',           // Base dark surface
+    backgroundHover: '#2A2A3F',      // Hover state
+    backgroundActive: '#667eea',     // Active pill (uses brand.primary)
+    text: '#C8D6E5',                 // Default nav text (WCAG AA compliant)
+    textActive: '#FFFFFF',           // Active item text
+    textMuted: '#8A9BB5',            // Muted text, secondary labels
+    border: '#2E2E42',               // Subtle dividers
+    logoBg: '#667eea',               // Logo area background
+  },
+
+  // Metrics card colours
+  metrics: {
+    blue: '#3B82F6',                 // Info variant
+    red: '#EF4444',                  // Error variant
+    green: '#10B981',                // Success variant
+    orange: '#F59E0B',               // Warning variant
+    blueShade: '#EFF6FF',            // Icon circle background
+    redShade: '#FEF2F2',
+    greenShade: '#ECFDF5',
+    orangeShade: '#FFFBEB',
   },
 
   // Status colors (for project states)
@@ -158,6 +182,17 @@ export const spacing = {
   xl: '2rem',
   '2xl': '3rem',
   '3xl': '4rem',
+};
+
+// ==================== DASHBOARD SPACING TOKENS ====================
+
+export const dashboardSpacing = {
+  sidebarWidth: '260px',
+  sidebarCollapsedWidth: '72px',
+  headerHeight: '64px',
+  contentPadding: '1.5rem',          // 24px
+  navItemPadding: '0.75rem 1rem',
+  navGroupPadding: '0.5rem 1rem',
 };
 
 // ==================== BORDER RADIUS TOKENS ====================
@@ -276,4 +311,105 @@ export const components = {
     padding: spacing[8],
     borderRadius: borderRadius.xl,
   },
+};
+
+// ==================== DESIGN SYSTEM ADDITIONS (UX Review #9.1) ====================
+
+/**
+ * Status indicator patterns (Issue #5, #46)
+ * Provides consistent status visualisation with icons and colours
+ */
+export const statusIndicators = {
+  completed: {
+    icon: '✓',
+    color: colors.semantic.successDark,
+    bg: colors.semantic.successLight,
+    label: 'Completed',
+  },
+  required: {
+    icon: '!',
+    color: colors.semantic.error,
+    bg: colors.semantic.errorLight,
+    label: 'Required',
+  },
+  locked: {
+    icon: '🔒',
+    color: colors.text.disabled,
+    bg: colors.background.surfaceHover,
+    label: 'Locked',
+  },
+  active: {
+    icon: '►',
+    color: colors.brand.primary,
+    bg: colors.brand.primaryLight,
+    label: 'Active',
+  },
+  inProgress: {
+    icon: '◐',
+    color: colors.semantic.info,
+    bg: colors.semantic.infoLight,
+    label: 'In Progress',
+  },
+  draft: {
+    icon: '○',
+    color: colors.semantic.warning,
+    bg: colors.semantic.warningLight,
+    label: 'Draft',
+  },
+};
+
+/**
+ * Button size variants (Issue #43)
+ * Standardised button sizing across the application
+ */
+export const buttonSizes = {
+  sm: {
+    padding: `${spacing[2]} ${spacing[4]}`,
+    fontSize: typography.fontSize.sm,
+    minHeight: '36px',
+  },
+  md: {
+    padding: `${spacing[3]} ${spacing[6]}`,
+    fontSize: typography.fontSize.base,
+    minHeight: a11y.minTouchTarget,
+  },
+  lg: {
+    padding: `${spacing[4]} ${spacing[8]}`,
+    fontSize: typography.fontSize.lg,
+    minHeight: '52px',
+  },
+};
+
+/**
+ * Modal breakpoints (Issue #58)
+ * Responsive modal sizing for different screen sizes
+ */
+export const modalSizes = {
+  sm: {
+    mobile: { maxWidth: '100%', width: '100%', margin: 0 },
+    tablet: { maxWidth: '400px', width: '90%' },
+    desktop: { maxWidth: '480px', width: '90%' },
+  },
+  md: {
+    mobile: { maxWidth: '100%', width: '100%', margin: 0 },
+    tablet: { maxWidth: '600px', width: '90%' },
+    desktop: { maxWidth: '700px', width: '90%' },
+  },
+  lg: {
+    mobile: { maxWidth: '100%', width: '100%', margin: 0 },
+    tablet: { maxWidth: '800px', width: '90%' },
+    desktop: { maxWidth: '1000px', width: '90%' },
+  },
+};
+
+/**
+ * Gradient variants (Issue #38)
+ * Standardised gradient definitions
+ */
+export const gradients = {
+  brand: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  success: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+  warning: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+  error: 'linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)',
+  info: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
 };

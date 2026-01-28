@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import GenerationProgress from '../components/GenerationProgress';
 import { getToken } from '../lib/auth';
-import PrimaryNavigationBar from '../components/shared/PrimaryNavigationBar';
+import DashboardLayout from '../components/dashboard/DashboardLayout';
 
 // Lazy load GenrePreferenceForm - form with complex validation
 const GenrePreferenceForm = dynamic(() => import('../components/GenrePreferenceForm'), {
@@ -121,50 +121,17 @@ export default function FullCustomizationPage() {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#F8FAFC',
-      display: 'flex',
-      flexDirection: 'column',
-    }}>
-      {/* Primary Navigation Bar */}
-      <PrimaryNavigationBar activeSection="fully-customized" />
-
-      {/* Main Content */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        {/* Top Bar */}
-        <header style={{
-          padding: '1rem 2rem',
-          background: '#FFFFFF',
-          borderBottom: '1px solid #E2E8F0',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}>
-          <div>
-            <h1 style={{
-              fontSize: '1.5rem',
-              fontWeight: '700',
-              color: '#1A1A2E',
-              margin: 0,
-            }}>
-              Full Customization
-            </h1>
-            <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
-              Fine-tune every aspect of your story's genre, tone, and themes
-            </p>
-          </div>
-        </header>
-
-        {/* Content Area */}
-        <div style={{
-          flex: 1,
-          padding: '2rem',
-          overflow: 'auto',
-          display: 'flex',
-          justifyContent: 'center',
-        }}>
-          <div style={{ maxWidth: '700px', width: '100%' }}>
+    <DashboardLayout
+      header={{
+        title: 'Full Customization',
+        subtitle: 'Fine-tune every aspect of your story\'s genre, tone, and themes',
+      }}
+    >
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+      }}>
+        <div style={{ maxWidth: '700px', width: '100%' }}>
             <div style={{
               background: '#FFFFFF',
               border: '1px solid #E2E8F0',
@@ -188,9 +155,8 @@ export default function FullCustomizationPage() {
               error={error}
               onCancel={handleCancel}
             />
-          </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

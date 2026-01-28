@@ -1,55 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import PrimaryNavigationBar from '../components/shared/PrimaryNavigationBar';
+import DashboardLayout from '../components/dashboard/DashboardLayout';
 
 export default function NewProjectPage() {
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#F8FAFC',
-      display: 'flex',
-      flexDirection: 'column',
-    }}>
-      {/* Primary Navigation Bar */}
-      <PrimaryNavigationBar activeSection="new-novel" />
-
-      {/* Main Content */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        {/* Top Bar */}
-        <header style={{
-          padding: '1rem 2rem',
-          background: '#FFFFFF',
-          borderBottom: '1px solid #E2E8F0',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}>
-          <div>
-            <h1 style={{
-              fontSize: '1.5rem',
-              fontWeight: '700',
-              color: '#1A1A2E',
-              margin: 0,
-            }}>
-              Create New Novel
-            </h1>
-            <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
-              Choose how you want to start your novel
-            </p>
-          </div>
-        </header>
-
-        {/* Content Area */}
-        <div style={{
-          flex: 1,
-          padding: '2rem',
-          overflow: 'auto',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}>
-          <div style={{ maxWidth: '900px', width: '100%' }}>
+    <DashboardLayout
+      header={{
+        title: 'Create New Story',
+        subtitle: 'Choose how you want to start your next novel',
+      }}
+    >
+      <div style={{ maxWidth: '900px', width: '100%', margin: '0 auto' }}>
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(2, 1fr)',
@@ -253,9 +215,7 @@ export default function NewProjectPage() {
                 <strong>Full Customization</strong> gives you complete control when you know exactly what you want.
               </p>
             </div>
-          </div>
-        </div>
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

@@ -1,14 +1,18 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import Link from 'next/link';
 import { getToken, logout } from '../lib/auth';
 import { colors, typography, spacing, borderRadius } from '../lib/design-tokens';
-import PrimaryNavigationBar from '../components/shared/PrimaryNavigationBar';
-import { ActionButtonsPanel, ConceptsSummaryPanel, ProjectsTable } from '../components/projects';
+import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
+import MetricCard from '@/app/components/dashboard/MetricCard';
+import RecentActivityFeed from '@/app/components/dashboard/RecentActivityFeed';
+import type { ActivityItem } from '@/app/components/dashboard/RecentActivityFeed';
+import { ProjectsTable } from '../components/projects';
 import type { SortColumn, SortConfig } from '../components/projects';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+// ==================== TYPES ====================
 
 interface ProjectMetrics {
   tokens: {
@@ -60,24 +64,78 @@ interface Project {
   progress?: ProjectProgress | null;
 }
 
-interface QueueStats {
-  queue: {
-    pending: number;
-    running: number;
-    completed: number;
-    failed: number;
-  };
-  session: {
-    isActive: boolean;
-    requestsThisSession: number;
-    timeRemaining: string;
-    resetTime: string | null;
-  };
+// ==================== HELPER FUNCTIONS ====================
+
+/**
+ * Derives aggregate metrics across all projects for the dashboard metric cards.
+ */
+function computeDashboardMetrics(projects: Project[]) {
+  const totalWords = projects.reduce(
+    (sum, p) => sum + (p.metrics?.content?.words ?? 0),
+    0
+  );
+
+  const totalChapters = projects.reduce(
+    (sum, p) => sum + (p.progress?.chaptersWritten ?? 0),
+    0
+  );
+
+  const outlineChaptersDue = projects.reduce(
+    (sum, p) => {
+      const written = p.progress?.chaptersWritten ?? 0;
+      const planned = p.progress?.outlineChapters ?? 0;
+      return sum + Math.max(0, planned - written);
+    },
+    0
+  );
+
+  const completedStories = projects.filter(
+    (p) => p.status === 'completed' || p.progress?.generationStatus === 'completed'
+  ).length;
+
+  // Days active approximation: count distinct days from created_at dates
+  const uniqueDays = new Set(
+    projects.map((p) => p.created_at.split('T')[0])
+  );
+
+  return { totalWords, totalChapters, outlineChaptersDue, completedStories, daysActive: uniqueDays.size };
 }
+
+/**
+ * Builds a list of recent activity items from the projects array,
+ * sorted by updated_at descending, capped at 6 entries.
+ * Maps each project's generation status to the appropriate activity type.
+ */
+function buildActivityFeed(projects: Project[]): ActivityItem[] {
+  return projects
+    .slice()
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+    .slice(0, 6)
+    .map((project) => {
+      let type: ActivityItem['type'] = 'project_created';
+
+      if (project.progress?.generationStatus === 'completed') {
+        type = 'outline_completed';
+      } else if (project.progress?.chaptersWritten && project.progress.chaptersWritten > 0) {
+        type = 'chapter_added';
+      } else if (project.progress?.hasOutline) {
+        type = 'chapter_edited';
+      }
+
+      return {
+        id: project.id,
+        type,
+        title: project.title,
+        projectName: project.title,
+        timestamp: new Date(project.updated_at),
+      };
+    });
+}
+
+// ==================== PAGE COMPONENT ====================
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [queueStats, setQueueStats] = useState<QueueStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<SortConfig>({
@@ -87,10 +145,6 @@ export default function ProjectsPage() {
 
   useEffect(() => {
     fetchProjects();
-    fetchQueueStats();
-    // Refresh stats every 30 seconds
-    const interval = setInterval(fetchQueueStats, 30000);
-    return () => clearInterval(interval);
   }, []);
 
   const fetchProjects = async () => {
@@ -113,35 +167,13 @@ export default function ProjectsPage() {
 
       const data = await response.json();
       setProjects(data.projects || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to load projects';
       console.error('Error fetching projects:', err);
-      setError(err.message || 'Failed to load projects');
+      setError(message);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const fetchQueueStats = async () => {
-    try {
-      const token = getToken();
-      const response = await fetch(`${API_BASE_URL}/api/queue/stats`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setQueueStats(data);
-      }
-    } catch (err) {
-      console.error('Error fetching queue stats:', err);
-    }
-  };
-
-  const handleLogout = () => {
-    logout();
-    window.location.href = '/';
   };
 
   const handleSort = (column: SortColumn) => {
@@ -165,14 +197,13 @@ export default function ProjectsPage() {
       throw new Error('Failed to delete project');
     }
 
-    // Remove the project from the local state
     setProjects(prev => prev.filter(p => p.id !== projectId));
   };
 
   const sortedProjects = useMemo(() => {
-    const sorted = [...projects].sort((a, b) => {
-      let aValue: any;
-      let bValue: any;
+    return [...projects].sort((a, b) => {
+      let aValue: string | number = 0;
+      let bValue: string | number = 0;
 
       switch (sortConfig.column) {
         case 'name':
@@ -184,27 +215,26 @@ export default function ProjectsPage() {
           bValue = new Date(b.updated_at).getTime();
           break;
         case 'chapterCost':
-          aValue = parseFloat((a.metrics as any)?.chapterCost?.usd?.replace(/[^0-9.-]/g, '') || '0');
-          bValue = parseFloat((b.metrics as any)?.chapterCost?.usd?.replace(/[^0-9.-]/g, '') || '0');
+          aValue = parseFloat(String(a.metrics?.chapterCost?.usd ?? '0').replace(/[^0-9.-]/g, ''));
+          bValue = parseFloat(String(b.metrics?.chapterCost?.usd ?? '0').replace(/[^0-9.-]/g, ''));
           break;
         case 'totalCost':
-          aValue = parseFloat(a.metrics?.cost?.usd?.replace(/[^0-9.-]/g, '') || '0');
-          bValue = parseFloat(b.metrics?.cost?.usd?.replace(/[^0-9.-]/g, '') || '0');
+          aValue = parseFloat(String(a.metrics?.cost?.usd ?? '0').replace(/[^0-9.-]/g, ''));
+          bValue = parseFloat(String(b.metrics?.cost?.usd ?? '0').replace(/[^0-9.-]/g, ''));
           break;
         case 'type':
           aValue = a.type;
           bValue = b.type;
           break;
         case 'words':
-          aValue = a.metrics?.content?.words || 0;
-          bValue = b.metrics?.content?.words || 0;
+          aValue = a.metrics?.content?.words ?? 0;
+          bValue = b.metrics?.content?.words ?? 0;
           break;
         case 'chapters':
-          aValue = a.progress?.chaptersWritten || 0;
-          bValue = b.progress?.chaptersWritten || 0;
+          aValue = a.progress?.chaptersWritten ?? 0;
+          bValue = b.progress?.chaptersWritten ?? 0;
           break;
         case 'versions':
-          // Versions not yet available from API
           aValue = 0;
           bValue = 0;
           break;
@@ -216,10 +246,13 @@ export default function ProjectsPage() {
       if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
-
-    return sorted;
   }, [projects, sortConfig]);
 
+  // Derive dashboard metrics and activity feed from fetched data
+  const metrics = useMemo(() => computeDashboardMetrics(projects), [projects]);
+  const activityItems = useMemo(() => buildActivityFeed(projects), [projects]);
+
+  // ---- Loading state ----
   if (isLoading) {
     return (
       <div style={{
@@ -241,7 +274,7 @@ export default function ProjectsPage() {
           }} />
           <p style={{ marginTop: spacing[4], color: colors.text.tertiary }}>Loading...</p>
         </div>
-        <style jsx>{`
+        <style>{`
           @keyframes spin {
             to { transform: rotate(360deg); }
           }
@@ -250,219 +283,140 @@ export default function ProjectsPage() {
     );
   }
 
+  // ---- Main render wrapped in DashboardLayout ----
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: colors.background.primary,
-      display: 'flex',
-      flexDirection: 'column',
-    }}>
-      {/* Primary Navigation Bar */}
-      <PrimaryNavigationBar activeSection="projects" />
-
-      {/* Main Content */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        {/* Top Bar */}
-        <header
-          role="banner"
+    <DashboardLayout
+      header={{
+        title: 'Overview',
+        subtitle: 'Welcome back! Here\'s what\'s happening with your stories.',
+        showDatePicker: true,
+      }}
+    >
+      {/* Error banner */}
+      {error && (
+        <div
+          role="alert"
+          aria-live="assertive"
           style={{
-            padding: `${spacing[4]} ${spacing[8]}`,
-            background: colors.background.surface,
-            borderBottom: `1px solid ${colors.border.default}`,
+            background: colors.semantic.errorLight,
+            border: `1px solid ${colors.semantic.errorBorder}`,
+            borderRadius: borderRadius.lg,
+            padding: `${spacing[4]} ${spacing[6]}`,
+            marginBottom: spacing[6],
+            color: colors.semantic.error,
+            display: 'flex',
+            alignItems: 'center',
+            gap: spacing[3],
+          }}
+        >
+          <span aria-hidden="true">⚠️</span>
+          {error}
+        </div>
+      )}
+
+      {/* Metric cards row */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: spacing[4],
+        marginBottom: spacing[8],
+      }}>
+        <MetricCard
+          title="Total Words"
+          value={metrics.totalWords.toLocaleString()}
+          variant="blue"
+          icon={
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.metrics.blue} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+              <line x1="8" y1="7" x2="16" y2="7" />
+              <line x1="8" y1="11" x2="16" y2="11" />
+              <line x1="8" y1="15" x2="12" y2="15" />
+            </svg>
+          }
+          items={[
+            { label: 'Chapters written', count: metrics.totalChapters },
+            { label: 'Active projects', count: projects.length },
+          ]}
+        />
+
+        <MetricCard
+          title="Chapters Due"
+          value={metrics.outlineChaptersDue}
+          variant="red"
+          icon={
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.metrics.red} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+          }
+        />
+
+        <MetricCard
+          title="Stories Completed"
+          value={metrics.completedStories}
+          variant="green"
+          icon={
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.metrics.green} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+          }
+        />
+
+        <MetricCard
+          title="Days Active"
+          value={metrics.daysActive}
+          variant="orange"
+          icon={
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.metrics.orange} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+          }
+        />
+      </div>
+
+      {/* Two-column grid: Projects table (left) + Activity feed (right) */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '4fr 1fr',
+        gap: spacing[6],
+        alignItems: 'start',
+      }}>
+        {/* Left column: Books in Progress */}
+        <section aria-labelledby="projects-heading">
+          <div style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            marginBottom: spacing[4],
           }}>
-          <div>
-            <h1 style={{
-              fontSize: typography.fontSize['2xl'],
-              fontWeight: typography.fontWeight.bold,
-              color: colors.text.primary,
-              margin: 0,
-            }}>
-              Story Architect
-            </h1>
-            <p style={{
-              fontSize: typography.fontSize.sm,
-              color: colors.text.secondary,
-              margin: 0,
-            }}>
-              Create and manage your novel projects
-            </p>
-          </div>
-
-          {/* Claude Max Status */}
-          {queueStats && (
-            <div
-              role="complementary"
-              aria-label="System status"
+            <h2
+              id="projects-heading"
               style={{
-                display: 'flex',
-                gap: spacing[4],
-                alignItems: 'center',
-              }}>
-              <div style={{
-                padding: `${spacing[3]} ${spacing[4]}`,
-                background: colors.background.secondary,
-                borderRadius: borderRadius.md,
-                display: 'flex',
-                alignItems: 'center',
-                gap: spacing[3],
-              }}>
-                <div
-                  role="progressbar"
-                  aria-label="Claude Max usage"
-                  aria-valuenow={queueStats.session.requestsThisSession}
-                  aria-valuemin={0}
-                  aria-valuemax={45}
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '50%',
-                    background: `conic-gradient(${colors.brand.primary} ${(queueStats.session.requestsThisSession / 45) * 100}%, ${colors.border.default} 0%)`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                  <div style={{
-                    width: '28px',
-                    height: '28px',
-                    borderRadius: '50%',
-                    background: colors.background.secondary,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '0.625rem',
-                    fontWeight: typography.fontWeight.semibold,
-                    color: colors.brand.primary,
-                  }}>
-                    {queueStats.session.requestsThisSession}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: typography.fontSize.xs, color: colors.text.secondary }}>Claude Max</div>
-                  <div style={{ fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.semibold, color: colors.text.primary }}>
-                    Reset in {queueStats.session.timeRemaining || '5h 0m'}
-                  </div>
-                </div>
-              </div>
-
-              <Link
-                href="/admin/queue"
-                style={{
-                  padding: `${spacing[3]} ${spacing[4]}`,
-                  background: colors.background.secondary,
-                  borderRadius: borderRadius.md,
-                  textDecoration: 'none',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                }}
-              >
-                <div style={{ fontSize: typography.fontSize.xs, color: colors.text.secondary }}>Job Queue</div>
-                <div style={{ fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.semibold, color: colors.text.primary }}>
-                  PENDING: {queueStats.queue.pending}
-                </div>
-              </Link>
-
-              <button
-                onClick={handleLogout}
-                aria-label="Logout from NovelForge"
-                style={{
-                  padding: `${spacing[3]} ${spacing[4]}`,
-                  background: colors.background.secondary,
-                  borderRadius: borderRadius.md,
-                  border: 'none',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: spacing[2],
-                  fontSize: typography.fontSize.sm,
-                  color: colors.text.tertiary,
-                  transition: 'all 0.2s',
-                }}
-              >
-                <span aria-hidden="true">🚪</span>
-                Logout
-              </button>
-            </div>
-          )}
-        </header>
-
-        {/* Content Area */}
-        <div
-          role="main"
-          style={{ flex: 1, padding: spacing[8], overflow: 'auto' }}>
-          {/* Error Message */}
-          {error && (
-            <div
-              role="alert"
-              aria-live="assertive"
-              style={{
-                background: colors.semantic.errorLight,
-                border: `1px solid ${colors.semantic.errorBorder}`,
-                borderRadius: borderRadius.lg,
-                padding: `${spacing[4]} ${spacing[6]}`,
-                marginBottom: spacing[6],
-                color: colors.semantic.error,
-                display: 'flex',
-                alignItems: 'center',
-                gap: spacing[3],
-              }}>
-              <span aria-hidden="true">⚠️</span>
-              {error}
-            </div>
-          )}
-
-          {/* Top Row - Two Columns */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
-              gap: spacing[6],
-              marginBottom: spacing[8],
-            }}
-          >
-            <ActionButtonsPanel />
-            <ConceptsSummaryPanel />
-          </div>
-
-          {/* Bottom Row - Projects Table */}
-          <section aria-labelledby="projects-heading">
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: spacing[4],
+                fontSize: typography.fontSize.lg,
+                fontWeight: typography.fontWeight.semibold,
+                color: colors.text.primary,
+                margin: 0,
               }}
             >
-              <h2
-                id="projects-heading"
-                style={{
-                  fontSize: typography.fontSize.lg,
-                  fontWeight: typography.fontWeight.semibold,
-                  color: colors.text.primary,
-                  margin: 0,
-                }}
-              >
-                Your Projects ({projects.length})
-              </h2>
-            </div>
-            <ProjectsTable
-              projects={sortedProjects}
-              sortConfig={sortConfig}
-              onSort={handleSort}
-              onDelete={handleDelete}
-            />
-          </section>
-        </div>
-      </main>
+              Books in Progress ({projects.length})
+            </h2>
+          </div>
+          <ProjectsTable
+            projects={sortedProjects}
+            sortConfig={sortConfig}
+            onSort={handleSort}
+            onDelete={handleDelete}
+          />
+        </section>
 
-      <style jsx>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
-    </div>
+        {/* Right column: Recent activity */}
+        <RecentActivityFeed activities={activityItems} maxItems={6} />
+      </div>
+    </DashboardLayout>
   );
 }

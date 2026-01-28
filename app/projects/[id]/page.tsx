@@ -7,13 +7,13 @@ import ExportButtons from '../../components/ExportButtons';
 import CloneBookDialog from '../../components/CloneBookDialog';
 import CoverImageUpload from '../../components/CoverImageUpload';
 import SearchReplace from '../../components/SearchReplace';
-import PageLayout from '../../components/shared/PageLayout';
+import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
+import ProjectNavigation from '../../components/shared/ProjectNavigation';
 import LoadingState from '../../components/shared/LoadingState';
-import ErrorMessage from '../../components/shared/ErrorMessage';
 import { fetchJson } from '../../lib/fetch-utils';
 import { getToken } from '../../lib/auth';
-import { colors, gradients, borderRadius, shadows } from '../../lib/constants';
-import { card, statusBadge } from '../../lib/styles';
+import { colors, gradients, borderRadius } from '../../lib/constants';
+import { card } from '../../lib/styles';
 import { useProjectNavigation } from '@/app/hooks';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -535,23 +535,7 @@ export default function ProjectDetailPage() {
     );
   }
 
-  const subtitle = (
-    <div style={{
-      display: 'flex',
-      gap: '0.75rem',
-      fontSize: '0.875rem',
-      color: colors.textSecondary,
-      alignItems: 'center',
-    }}>
-      <span>{project.genre}</span>
-      <span>•</span>
-      <span style={{ textTransform: 'capitalize' }}>{project.type}</span>
-      <span>•</span>
-      <span style={statusBadge(project.status)}>
-        {project.status}
-      </span>
-    </div>
-  );
+  const dashboardSubtitle = [project.genre, project.type, project.status].filter(Boolean).join(' \u2022 ');
 
   // Helper to get job type display name
   const getJobTypeName = (type: string) => {
@@ -578,13 +562,16 @@ export default function ProjectDetailPage() {
   };
 
   return (
-    <PageLayout
-      title={project.title}
-      subtitle={subtitle as any}
-      backLink="/projects"
-      backText="← Back to Projects"
-      projectNavigation={navigation}
+    <DashboardLayout
+      header={{ title: project.title, subtitle: dashboardSubtitle }}
     >
+      <ProjectNavigation
+        projectId={projectId}
+        project={navigation.project}
+        outline={navigation.outline}
+        chapters={navigation.chapters}
+      />
+
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         {/* Status Update Section */}
         <div style={{
@@ -2140,6 +2127,6 @@ export default function ProjectDetailPage() {
           </div>
         </div>
       </div>
-    </PageLayout>
+    </DashboardLayout>
   );
 }

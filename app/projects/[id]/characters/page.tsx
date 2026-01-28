@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import PageLayout from '../../../components/shared/PageLayout';
-import LoadingState from '../../../components/shared/LoadingState';
-import ErrorMessage from '../../../components/shared/ErrorMessage';
+import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
+import ProjectNavigation from '@/app/components/shared/ProjectNavigation';
+import ConfirmDialog from '../../../components/shared/ConfirmDialog';
 import { fetchJson, post } from '../../../lib/fetch-utils';
 import { getToken } from '../../../lib/auth';
 import { colors, gradients, borderRadius, shadows, API_BASE_URL } from '../../../lib/constants';
@@ -50,6 +50,7 @@ export default function CharactersPage() {
   const [project, setProject] = useState<any>(null);
   const [nationalityFilter, setNationalityFilter] = useState<string>('all');
   const [ethnicityFilter, setEthnicityFilter] = useState<string>('all');
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false); // Issue #13
 
   // IMPORTANT: All hooks must be called before any early returns
   const navigation = useProjectNavigation(projectId, project);
@@ -221,10 +222,7 @@ export default function CharactersPage() {
   };
 
   const handleRegenerateAllNames = async () => {
-    if (!confirm('Regenerate names for all characters? This will replace all existing names.')) {
-      return;
-    }
-
+    setShowRegenerateConfirm(false);
     setIsGenerating(true);
     setError(null);
 
@@ -280,18 +278,39 @@ export default function CharactersPage() {
   });
 
   if (isLoading) {
-    return <LoadingState message="Loading characters..." />;
+    return (
+      <DashboardLayout
+        header={{ title: project?.title || 'Loading...', subtitle: 'Characters' }}
+      >
+        <div style={{ textAlign: 'center', padding: '48px', color: '#64748B' }}>
+          Loading characters...
+        </div>
+      </DashboardLayout>
+    );
   }
 
   return (
-    <PageLayout
-      title="Characters"
-      subtitle="Create and edit your story's cast of characters"
-      backLink={`/projects/${projectId}`}
-      backText="← Back to Project"
-      projectNavigation={navigation}
+    <DashboardLayout
+      header={{ title: project?.title || 'Loading...', subtitle: 'Create and edit your story\'s cast of characters' }}
     >
-      {error && <ErrorMessage message={error} />}
+      <ProjectNavigation
+        projectId={projectId}
+        project={navigation.project}
+        outline={navigation.outline}
+        chapters={navigation.chapters}
+      />
+      {error && (
+        <div style={{
+          padding: '1rem',
+          background: '#FEF2F2',
+          border: '1px solid #FECACA',
+          borderRadius: '8px',
+          marginBottom: '1.5rem',
+          color: '#DC2626',
+        }}>
+          {error}
+        </div>
+      )}
 
       {successMessage && (
         <div style={{
@@ -446,7 +465,7 @@ export default function CharactersPage() {
 
                   <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                     <button
-                      onClick={handleRegenerateAllNames}
+                      onClick={() => setShowRegenerateConfirm(true)}
                       disabled={isGenerating}
                       style={{
                         width: '100%',
@@ -515,7 +534,19 @@ export default function CharactersPage() {
             )}
           </div>
         )}
-    </PageLayout>
+
+        {/* Regenerate All Names Confirmation Dialog (Issue #13) */}
+        <ConfirmDialog
+          isOpen={showRegenerateConfirm}
+          title="Regenerate All Names?"
+          message="This will replace all existing character names with newly generated ones based on their nationality and ethnicity. This action cannot be undone."
+          confirmText="Regenerate Names"
+          cancelText="Cancel"
+          confirmStyle="primary"
+          onConfirm={handleRegenerateAllNames}
+          onCancel={() => setShowRegenerateConfirm(false)}
+        />
+    </DashboardLayout>
   );
 }
 

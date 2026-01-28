@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import PageLayout from '../../../components/shared/PageLayout';
-import LoadingState from '../../../components/shared/LoadingState';
+import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
+import ProjectNavigation from '@/app/components/shared/ProjectNavigation';
 import { fetchJson } from '../../../lib/fetch-utils';
 import { getToken } from '../../../lib/auth';
 import { useProjectNavigation } from '@/app/hooks';
@@ -305,31 +305,39 @@ export default function VersionHistoryPage() {
   };
 
   if (isLoading) {
-    return <LoadingState message="Loading version history..." />;
+    return (
+      <DashboardLayout
+        header={{ title: project?.title || 'Loading...', subtitle: 'Version History' }}
+      >
+        <div style={{ textAlign: 'center', padding: '48px', color: '#64748B' }}>
+          Loading version history...
+        </div>
+      </DashboardLayout>
+    );
   }
 
   if (error || !project) {
     return (
-      <PageLayout
-        title="Error"
-        backLink={`/projects/${projectId}`}
-        backText="Back to Project"
+      <DashboardLayout
+        header={{ title: 'Error', subtitle: 'Version History' }}
       >
         <div style={{ ...card, padding: '2rem', textAlign: 'center' }}>
           <p style={{ color: colors.error }}>{error || 'Failed to load data'}</p>
         </div>
-      </PageLayout>
+      </DashboardLayout>
     );
   }
 
   return (
-    <PageLayout
-      title="Version History"
-      subtitle={`${project.title}`}
-      backLink={`/projects/${projectId}`}
-      backText="Back to Project"
-      projectNavigation={navigation}
+    <DashboardLayout
+      header={{ title: project.title, subtitle: 'Version History' }}
     >
+      <ProjectNavigation
+        projectId={projectId}
+        project={navigation.project}
+        outline={navigation.outline}
+        chapters={navigation.chapters}
+      />
       <div style={{ maxWidth: '900px', margin: '0 auto' }}>
         {/* Book Selector (for multi-book projects) */}
         {books.length > 1 && (
@@ -654,6 +662,6 @@ export default function VersionHistoryPage() {
           })}
         </div>
       </div>
-    </PageLayout>
+    </DashboardLayout>
   );
 }

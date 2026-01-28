@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import PageLayout from '../../../components/shared/PageLayout';
+import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
+import ProjectNavigation from '@/app/components/shared/ProjectNavigation';
 import { fetchWithAuth } from '../../../lib/fetch-utils';
 import { colors, borderRadius, spacing, typography, transitions } from '../../../lib/design-tokens';
 import { useProjectNavigation } from '@/app/hooks';
@@ -186,28 +187,20 @@ export default function ChaptersPage() {
 
   if (loading) {
     return (
-      <PageLayout
-        title="Chapters"
-        subtitle="Loading chapters..."
-        backLink={`/projects/${projectId}`}
-        backText="← Back to Project"
-        projectNavigation={navigation}
+      <DashboardLayout
+        header={{ title: project?.title || 'Loading...', subtitle: 'Chapters' }}
       >
         <div style={{ padding: spacing[8], textAlign: 'center' }}>
           <p style={{ color: colors.text.secondary }}>Loading chapters...</p>
         </div>
-      </PageLayout>
+      </DashboardLayout>
     );
   }
 
   if (error) {
     return (
-      <PageLayout
-        title="Chapters"
-        subtitle="Error loading chapters"
-        backLink={`/projects/${projectId}`}
-        backText="← Back to Project"
-        projectNavigation={navigation}
+      <DashboardLayout
+        header={{ title: project?.title || 'Loading...', subtitle: 'Error loading chapters' }}
       >
         <div style={{ padding: spacing[8], textAlign: 'center' }}>
           <p style={{ color: colors.semantic.error, marginBottom: spacing[4] }}>{error}</p>
@@ -226,18 +219,20 @@ export default function ChaptersPage() {
             Retry
           </button>
         </div>
-      </PageLayout>
+      </DashboardLayout>
     );
   }
 
   return (
-    <PageLayout
-      title="Chapters"
-      subtitle={`Manage and edit ${chapters.length} chapter${chapters.length !== 1 ? 's' : ''}`}
-      backLink={`/projects/${projectId}`}
-      backText="← Back to Project"
-      projectNavigation={navigation}
+    <DashboardLayout
+      header={{ title: project?.title || 'Loading...', subtitle: `Manage and edit ${chapters.length} chapter${chapters.length !== 1 ? 's' : ''}` }}
     >
+      <ProjectNavigation
+        projectId={projectId}
+        project={navigation.project}
+        outline={navigation.outline}
+        chapters={navigation.chapters}
+      />
       {/* Agent Workflow Visualization */}
       {(hasQueuedJobs || chapters.length > 0) && (
         <CollapsibleSection
@@ -589,6 +584,6 @@ export default function ChaptersPage() {
           })}
         </div>
       )}
-    </PageLayout>
+    </DashboardLayout>
   );
 }

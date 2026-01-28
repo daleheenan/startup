@@ -206,27 +206,59 @@ export default function ProjectNavigation({
       tooltipText = 'Completed';
     }
 
+    // Get status icon for accessibility (Issue #5, #46)
+    let statusIcon: string | null = null;
+    if (isActive) {
+      statusIcon = '►'; // Active indicator
+    } else if (status === 'completed') {
+      statusIcon = '✓'; // Checkmark for completed
+    } else if (status === 'required') {
+      statusIcon = '!'; // Exclamation for required
+    } else if (status === 'locked') {
+      statusIcon = '🔒'; // Lock for locked
+    }
+
     const tabContent = (
       <>
         <span aria-hidden="true" style={{ fontSize: '0.875rem' }}>
           {tab.icon}
         </span>
-        {isLocked && (
-          <span aria-hidden="true" style={{ fontSize: '0.75rem' }}>
-            🔒
+        {statusIcon && (
+          <span
+            aria-hidden="true"
+            style={{
+              fontSize: '0.75rem',
+              fontWeight: 'bold',
+              minWidth: '14px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {statusIcon}
           </span>
         )}
         <span>{tab.label}</span>
       </>
     );
 
+    // Add subtle background tint for better visibility (Issue #6)
+    let backgroundColor = 'transparent';
+    if (isActive && isNested) {
+      backgroundColor = 'rgba(102, 126, 234, 0.08)';
+    } else if (status === 'completed' && !isActive) {
+      backgroundColor = 'rgba(16, 185, 129, 0.03)';
+    } else if (status === 'required' && !isActive) {
+      backgroundColor = 'rgba(239, 68, 68, 0.03)';
+    }
+
     const tabStyle = {
       display: 'flex',
       alignItems: 'center',
       gap: '0.375rem',
       padding: isNested ? '0.5rem 1rem 0.5rem 2.5rem' : '0.625rem 1rem',
-      borderLeft: isNested ? `3px solid ${borderColor}` : 'none',
-      borderBottom: !isNested ? `2px solid ${borderColor}` : 'none',
+      borderLeft: isNested ? `4px solid ${borderColor}` : 'none', // Increased from 3px to 4px (Issue #6)
+      borderBottom: !isNested ? `4px solid ${borderColor}` : 'none', // Increased from 2px to 4px (Issue #6)
       color: isActive ? colors.brandText : colors.textSecondary,
       textDecoration: 'none',
       fontSize: '0.8125rem',
@@ -236,7 +268,7 @@ export default function ProjectNavigation({
       position: 'relative',
       opacity: isLocked ? 0.5 : 1,
       cursor: isLocked ? 'not-allowed' : 'pointer',
-      background: isActive && isNested ? 'rgba(102, 126, 234, 0.08)' : 'transparent',
+      background: backgroundColor,
     } as const;
 
     if (isLocked) {
@@ -335,6 +367,12 @@ export default function ProjectNavigation({
       <div key={group.id} style={{ display: 'flex', flexDirection: 'column' }}>
         <button
           onClick={() => toggleGroup(group.id)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              toggleGroup(group.id);
+            }
+          }}
           style={{
             display: 'flex',
             alignItems: 'center',

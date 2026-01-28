@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { colors, borderRadius, shadows } from '@/app/lib/constants';
-import PrimaryNavigationBar from '@/app/components/shared/PrimaryNavigationBar';
+import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
 import GenerationProgress from '@/app/components/GenerationProgress';
 import {
   useStoryIdeas,
@@ -94,13 +94,17 @@ export default function StoryIdeasPage() {
 
   if (isLoading) {
     return (
-      <div style={{ minHeight: '100vh', background: colors.background }}>
-        <PrimaryNavigationBar activeSection="story-ideas" />
+      <DashboardLayout
+        header={{
+          title: 'Story Ideas',
+          subtitle: 'Your saved 3-line story premises ready to expand into full concepts',
+        }}
+      >
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          height: 'calc(100vh - 60px)',
+          height: 'calc(100vh - 200px)',
         }}>
           <div style={{ textAlign: 'center' }}>
             <div style={{
@@ -116,84 +120,62 @@ export default function StoryIdeasPage() {
           </div>
           <style jsx>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: colors.background }}>
-      <PrimaryNavigationBar activeSection="story-ideas" />
-
-      {/* Header */}
-      <header style={{
-        padding: '1.5rem 2rem',
-        background: colors.surface,
-        borderBottom: `1px solid ${colors.border}`,
-      }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-          <div>
-            <h1 style={{
-              fontSize: '1.75rem',
-              fontWeight: 700,
+    <DashboardLayout
+      header={{
+        title: 'Story Ideas',
+        subtitle: 'Your saved 3-line story premises ready to expand into full concepts',
+      }}
+    >
+      {/* Filters */}
+      {ideas && ideas.length > 0 && (
+        <div style={{
+          display: 'flex',
+          gap: '1rem',
+          marginBottom: '1.5rem',
+        }}>
+          <select
+            value={filterGenre}
+            onChange={(e) => setFilterGenre(e.target.value)}
+            style={{
+              padding: '0.5rem 1rem',
+              border: `1px solid ${colors.border}`,
+              borderRadius: borderRadius.sm,
+              fontSize: '0.875rem',
+              background: colors.surface,
               color: colors.text,
-              margin: 0,
-            }}>
-              Story Ideas
-            </h1>
-            <p style={{ fontSize: '0.9375rem', color: colors.textSecondary, margin: '0.25rem 0 0' }}>
-              Your saved 3-line story premises ready to expand into full concepts
-            </p>
-          </div>
-
-          {/* Filters */}
-          {ideas && ideas.length > 0 && (
-            <div style={{
-              display: 'flex',
-              gap: '1rem',
-              marginTop: '1rem',
-            }}>
-              <select
-                value={filterGenre}
-                onChange={(e) => setFilterGenre(e.target.value)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: borderRadius.sm,
-                  fontSize: '0.875rem',
-                  background: colors.surface,
-                  color: colors.text,
-                }}
-              >
-                <option value="all">All Genres</option>
-                {genres.map(genre => (
-                  <option key={genre} value={genre}>{genre}</option>
-                ))}
-              </select>
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: borderRadius.sm,
-                  fontSize: '0.875rem',
-                  background: colors.surface,
-                  color: colors.text,
-                }}
-              >
-                <option value="all">All Status</option>
-                <option value="saved">Saved</option>
-                <option value="used">Used</option>
-                <option value="archived">Archived</option>
-              </select>
-            </div>
-          )}
+            }}
+          >
+            <option value="all">All Genres</option>
+            {genres.map(genre => (
+              <option key={genre} value={genre}>{genre}</option>
+            ))}
+          </select>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            style={{
+              padding: '0.5rem 1rem',
+              border: `1px solid ${colors.border}`,
+              borderRadius: borderRadius.sm,
+              fontSize: '0.875rem',
+              background: colors.surface,
+              color: colors.text,
+            }}
+          >
+            <option value="all">All Status</option>
+            <option value="saved">Saved</option>
+            <option value="used">Used</option>
+            <option value="archived">Archived</option>
+          </select>
         </div>
-      </header>
+      )}
 
-      {/* Main Content */}
-      <main style={{ padding: '2rem' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+      <div>
           {error && (
             <div style={{
               background: colors.errorLight,
@@ -551,8 +533,7 @@ export default function StoryIdeasPage() {
               ))}
             </div>
           )}
-        </div>
-      </main>
+      </div>
 
       {/* Progress Modal for Concept Generation */}
       <GenerationProgress
@@ -566,6 +547,6 @@ export default function StoryIdeasPage() {
       />
 
       <style jsx>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
+    </DashboardLayout>
   );
 }
