@@ -14,14 +14,34 @@ const logger = createLogger('routes:books');
 /**
  * GET /api/books/project/:projectId
  * Get all books for a project
+ *
+ * Note: word_count is calculated from completed chapters to ensure accuracy,
+ * as the stored word_count field may be stale when book versions exist.
  */
 router.get('/project/:projectId', (req, res) => {
   try {
-    const stmt = db.prepare<[string], Book>(`
-      SELECT * FROM books WHERE project_id = ? ORDER BY book_number ASC
+    // Fetch books with calculated word count from completed chapters
+    // This is more accurate than the stored word_count field when versions exist
+    const stmt = db.prepare<[string], Book & { calculated_word_count: number }>(`
+      SELECT
+        b.*,
+        COALESCE((
+          SELECT SUM(c.word_count)
+          FROM chapters c
+          WHERE c.book_id = b.id AND c.status = 'completed'
+        ), 0) as calculated_word_count
+      FROM books b
+      WHERE b.project_id = ?
+      ORDER BY b.book_number ASC
     `);
 
-    const books = stmt.all(req.params.projectId);
+    const booksRaw = stmt.all(req.params.projectId);
+
+    // Use calculated word count if it's greater than stored (handles version scenarios)
+    const books = booksRaw.map(book => ({
+      ...book,
+      word_count: Math.max(book.word_count || 0, book.calculated_word_count || 0),
+    }));
 
     res.json({ books });
   } catch (error) {
@@ -34,20 +54,36 @@ router.get('/project/:projectId', (req, res) => {
 /**
  * GET /api/books/:id
  * Get a specific book
+ *
+ * Note: word_count is calculated from completed chapters to ensure accuracy.
  */
 router.get('/:id', (req, res) => {
   try {
-    const stmt = db.prepare<[string], Book>(`
-      SELECT * FROM books WHERE id = ?
+    const stmt = db.prepare<[string], Book & { calculated_word_count: number }>(`
+      SELECT
+        b.*,
+        COALESCE((
+          SELECT SUM(c.word_count)
+          FROM chapters c
+          WHERE c.book_id = b.id AND c.status = 'completed'
+        ), 0) as calculated_word_count
+      FROM books b
+      WHERE b.id = ?
     `);
 
-    const book = stmt.get(req.params.id);
+    const bookRaw = stmt.get(req.params.id);
 
-    if (!book) {
+    if (!bookRaw) {
       return res.status(404).json({
         error: { code: 'NOT_FOUND', message: 'Book not found' },
       });
     }
+
+    // Use calculated word count if it's greater than stored
+    const book = {
+      ...bookRaw,
+      word_count: Math.max(bookRaw.word_count || 0, bookRaw.calculated_word_count || 0),
+    };
 
     res.json(book);
   } catch (error) {
