@@ -212,7 +212,7 @@ export default function WordCountRevisionPage() {
   }, [selectedBookId, fetchRevision]);
 
   // Start a new revision
-  const handleStartRevision = async () => {
+  const handleStartRevision = async (forceRestart = false) => {
     if (!selectedBookId) return;
 
     setIsStarting(true);
@@ -224,7 +224,7 @@ export default function WordCountRevisionPage() {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ targetWordCount, tolerancePercent }),
+        body: JSON.stringify({ targetWordCount, tolerancePercent, forceRestart }),
       });
 
       if (!res.ok) {
@@ -237,6 +237,33 @@ export default function WordCountRevisionPage() {
       setError(err instanceof Error ? err.message : 'Failed to start revision');
     } finally {
       setIsStarting(false);
+    }
+  };
+
+  // Abandon current revision
+  const handleAbandonRevision = async () => {
+    if (!revision) return;
+
+    if (!confirm('Are you sure you want to abandon this revision? All progress will be lost.')) {
+      return;
+    }
+
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE_URL}/api/word-count-revision/${revision.id}/abandon`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to abandon revision');
+      }
+
+      setRevision(null);
+      setProposals([]);
+      setProgress(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to abandon revision');
     }
   };
 
@@ -659,7 +686,7 @@ export default function WordCountRevisionPage() {
               </div>
 
               <button
-                onClick={handleStartRevision}
+                onClick={() => handleStartRevision(false)}
                 disabled={isStarting}
                 style={{
                   padding: '0.75rem 2rem',
@@ -746,16 +773,77 @@ export default function WordCountRevisionPage() {
                   background: progress.isWithinTolerance ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)',
                   borderRadius: '6px',
                   fontSize: '0.875rem',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '0.5rem',
                 }}>
-                  {progress.isWithinTolerance
-                    ? '✓ Within tolerance range'
-                    : `${progress.wordsRemaining > 0 ? `${progress.wordsRemaining.toLocaleString()} words over target` : `${Math.abs(progress.wordsRemaining).toLocaleString()} words under minimum`}`
-                  }
-                  <span style={{ opacity: 0.8, marginLeft: '1rem' }}>
-                    (Acceptable: {progress.minAcceptable.toLocaleString()} - {progress.maxAcceptable.toLocaleString()})
-                  </span>
+                  <div>
+                    {progress.isWithinTolerance
+                      ? '✓ Within tolerance range'
+                      : `${progress.wordsRemaining > 0 ? `${progress.wordsRemaining.toLocaleString()} words over target` : `${Math.abs(progress.wordsRemaining).toLocaleString()} words under minimum`}`
+                    }
+                    <span style={{ opacity: 0.8, marginLeft: '1rem' }}>
+                      (Acceptable: {progress.minAcceptable.toLocaleString()} - {progress.maxAcceptable.toLocaleString()})
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleAbandonRevision}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: 'rgba(255,255,255,0.2)',
+                      color: 'white',
+                      border: '1px solid rgba(255,255,255,0.3)',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Abandon & Restart
+                  </button>
                 </div>
               </div>
+
+              {/* Warning when no work to do */}
+              {revision.wordsToCut === 0 && (
+                <div style={{
+                  background: '#FEF3C7',
+                  border: '1px solid #F59E0B',
+                  borderRadius: '12px',
+                  padding: '1.5rem',
+                  marginBottom: '1.5rem',
+                }}>
+                  <h3 style={{ margin: '0 0 0.5rem 0', color: '#92400E', fontSize: '1rem' }}>
+                    ⚠️ No reduction needed
+                  </h3>
+                  <p style={{ margin: 0, color: '#B45309', fontSize: '0.875rem' }}>
+                    The book is already at or below the target word count. If you need to perform a comprehensive rewrite
+                    with a different target, click &quot;Abandon &amp; Restart&quot; above and set a new target.
+                  </p>
+                </div>
+              )}
+
+              {/* Warning when all proposals are applied */}
+              {proposals.length > 0 && proposals.every(p => p.status === 'applied' || p.status === 'rejected') && revision.wordsToCut > 0 && (
+                <div style={{
+                  background: progress.isWithinTolerance ? '#D1FAE5' : '#FEF3C7',
+                  border: `1px solid ${progress.isWithinTolerance ? '#10B981' : '#F59E0B'}`,
+                  borderRadius: '12px',
+                  padding: '1.5rem',
+                  marginBottom: '1.5rem',
+                }}>
+                  <h3 style={{ margin: '0 0 0.5rem 0', color: progress.isWithinTolerance ? '#065F46' : '#92400E', fontSize: '1rem' }}>
+                    {progress.isWithinTolerance ? '✓ Revision Complete' : '⚠️ All proposals processed'}
+                  </h3>
+                  <p style={{ margin: 0, color: progress.isWithinTolerance ? '#047857' : '#B45309', fontSize: '0.875rem' }}>
+                    {progress.isWithinTolerance
+                      ? 'All chapters have been reviewed and the book is now within the target word count tolerance.'
+                      : 'All proposals have been processed but the book is still outside the target tolerance. You may need to restart with different settings or manually edit chapters.'
+                    }
+                  </p>
+                </div>
+              )}
 
               {/* Comprehensive mode bulk actions */}
               {isComprehensiveMode && (

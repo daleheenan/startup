@@ -69,12 +69,17 @@ router.use(requireTables);
 /**
  * POST /api/word-count-revision/books/:bookId/start
  * Start a new revision session
+ *
+ * Body params:
+ * - targetWordCount: number (required, >= 1000)
+ * - tolerancePercent: number (optional, default 5)
+ * - forceRestart: boolean (optional, abandons existing revision if true)
  */
 router.post('/books/:bookId/start', async (req, res) => {
   const { bookId } = req.params;
-  const { targetWordCount, tolerancePercent } = req.body;
+  const { targetWordCount, tolerancePercent, forceRestart } = req.body;
 
-  logger.info({ bookId, targetWordCount, tolerancePercent }, 'Starting word count revision');
+  logger.info({ bookId, targetWordCount, tolerancePercent, forceRestart }, 'Starting word count revision');
 
   // Validate required fields
   if (!targetWordCount || typeof targetWordCount !== 'number' || targetWordCount < 1000) {
@@ -89,6 +94,15 @@ router.post('/books/:bookId/start', async (req, res) => {
   }
 
   try {
+    // If forceRestart is true, abandon any existing revision first
+    if (forceRestart) {
+      const existingRevision = wordCountRevisionService.getActiveRevision(bookId);
+      if (existingRevision) {
+        logger.info({ existingRevisionId: existingRevision.id }, 'Abandoning existing revision due to forceRestart');
+        wordCountRevisionService.abandonRevision(existingRevision.id);
+      }
+    }
+
     const revision = await wordCountRevisionService.startRevision(
       bookId,
       targetWordCount,

@@ -312,20 +312,21 @@ railway logs --service novelforge-backend -n 20 | grep -i "cannot find module"
 curl -s https://[backend-url]/api/health | jq
 curl -s https://[backend-url]/api/health/detailed | jq
 
-# === Railway Status ===
+# === Railway Status (Primary - deployments are via CLI) ===
 railway status
 railway logs --service novelforge-backend -n 100
 railway variables --service novelforge-backend
 
-# === GitHub Actions ===
-gh run list --limit 5
-gh run view [run-id]
+# === Re-deploy via Railway CLI ===
+cd backend && railway up
 
 # === Local Verification ===
 cd backend && npm run build
 cd backend && npx tsc --noEmit
 cd backend && npm test
 ```
+
+**Note**: Deployments are triggered via `railway up` CLI command, not GitHub Actions. Railway is disconnected from GitHub.
 
 ---
 
@@ -413,6 +414,7 @@ They fix, then deployment can retry
 4. **Don't hide symptoms** - Fixing the visible issue may mask deeper problems
 5. **Escalate when needed** - Know when an issue requires human intervention
 6. **Test locally first** - If possible, reproduce issues locally before fixing in production
+7. **Re-deploy via Railway CLI** - After fixes, deploy using `railway up`, not by pushing to GitHub
 
 ---
 

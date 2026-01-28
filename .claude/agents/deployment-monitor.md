@@ -55,20 +55,22 @@ curl -s https://[backend-url]/api/health/detailed | jq
 curl -s -w "Time: %{time_total}s\n" -o /dev/null https://[backend-url]/api/health
 ```
 
-### Phase 2: Deployment Pipeline Status
+### Phase 2: Railway Deployment Status
 
 Check if deployment succeeded:
 
 ```bash
-# Railway status
+# Railway status (primary - deployments are via Railway CLI)
 railway status
 
-# GitHub Actions status
-gh run list --limit 3
-
 # Recent deployment logs
-railway logs --service [service] -n 50
+railway logs --service novelforge-backend -n 50
+
+# Check for deployment errors
+railway logs --service novelforge-backend -n 100 | grep -i "error\|fail\|crash"
 ```
+
+**Note**: Deployments are triggered via `railway up` CLI, not GitHub Actions. GitHub is used only for version control.
 
 ### Phase 3: Error Detection
 
@@ -76,10 +78,10 @@ Scan for errors in logs:
 
 ```bash
 # Look for errors in recent logs
-railway logs --service [service] -n 200 | grep -i "error\|exception\|fatal\|crash"
+railway logs --service novelforge-backend -n 200 | grep -i "error\|exception\|fatal\|crash"
 
 # Check for specific patterns
-railway logs --service [service] -n 100 | grep -E "(500|502|503|504)"
+railway logs --service novelforge-backend -n 100 | grep -E "(500|502|503|504)"
 ```
 
 ### Phase 4: Performance Baseline
@@ -289,6 +291,7 @@ When issues are detected, you can:
 4. **Escalate appropriately** - Know when to involve humans
 5. **Document everything** - Future incidents need historical context
 6. **Fast feedback** - Report status immediately, not after investigation
+7. **Railway CLI is the source of truth** - Deployments are via `railway up`, not GitHub pushes
 
 ---
 

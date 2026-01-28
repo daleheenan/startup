@@ -1,5 +1,5 @@
 ---
-description: Execute complete deployment workflow - commit changes, deploy to production, monitor health, and handle failures with automatic remediation
+description: Execute complete deployment workflow - commit changes, deploy to production via Railway CLI, push to GitHub for version control, monitor health, and handle failures with automatic remediation
 argument-hint: [commit-message-or-sprint-name] [optional: --canary|--full|--rollback]
 allowed-tools: Bash(git:*), Bash(npm:*), Bash(railway:*), Bash(gh:*), Bash(curl:*), Read, Write, Edit, Grep, Glob
 ---
@@ -9,6 +9,10 @@ allowed-tools: Bash(git:*), Bash(npm:*), Bash(railway:*), Bash(gh:*), Bash(curl:
 Execute the complete deployment pipeline from code changes to verified production deployment.
 
 **Deployment Context**: $ARGUMENTS
+
+**IMPORTANT**: Railway is disconnected from GitHub. Deployments are triggered via `railway up` CLI command, NOT by pushing to GitHub. This workflow:
+1. Deploys via Railway CLI first (for immediate feedback)
+2. Pushes to GitHub after (for version control)
 
 ---
 
@@ -140,13 +144,15 @@ echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > .last-deploy-timestamp
 
 ---
 
-## Phase 2: Commit and Push
+## Phase 2: Commit and Deploy via Railway CLI
 
 Have the **deployer** agent (Pat Okonkwo):
 
 1. Stage the appropriate files
 2. Create a descriptive commit message
-3. Push to the remote repository
+3. **Deploy to Railway using CLI** (`railway up`)
+4. Monitor deployment status
+5. Push to GitHub for version control (after successful deploy)
 
 **Commit Message Format:**
 ```
@@ -158,7 +164,21 @@ Have the **deployer** agent (Pat Okonkwo):
 Co-Authored-By: [Agent(s)] <noreply@anthropic.com>
 ```
 
-**Wait for push to complete and verify no errors.**
+**Deployment Command:**
+```bash
+# Deploy to Railway (from backend directory)
+cd backend && railway up
+
+# Check deployment status
+railway status
+
+# After successful deployment, push to GitHub for version control
+cd .. && git push origin master
+```
+
+**CRITICAL**: Railway is disconnected from GitHub. Pushing to GitHub does NOT trigger deployment. Always use `railway up` first.
+
+**Wait for Railway deployment to complete and verify no errors.**
 
 ---
 
@@ -170,13 +190,17 @@ Have the **deployment-monitor** agent (Zara Hassan):
 2. Monitor for build/deploy failures
 3. Once deployed, perform health verification
 
-### 3a. Pipeline Monitoring
+### 3a. Railway Deployment Monitoring
 
 ```bash
-# Check GitHub Actions / Railway deployment status
-gh run list --limit 3
+# Check Railway deployment status (primary)
 railway status
+
+# Watch deployment logs
+railway logs --service novelforge-backend -n 50
 ```
+
+**Note**: GitHub Actions are no longer used for deployment triggers. Railway CLI (`railway up`) is the deployment method.
 
 ### 3b. Multi-Layer Health Verification
 
@@ -379,19 +403,22 @@ LAST_GOOD=$(cat .last-known-good-commit 2>/dev/null || git rev-parse HEAD~1)
 
 # Step 2: Create rollback commit
 git revert --no-edit HEAD
-git push origin HEAD
 
-# Step 3: (Alternative) Hard reset if revert fails
-# git reset --hard $LAST_GOOD
-# git push --force-with-lease origin HEAD
+# Step 3: Deploy rollback via Railway CLI
+cd backend && railway up
 
-# Step 4: Verify rollback deployment
-# Wait for CI/CD to deploy the reverted commit
-sleep 60
+# Step 4: Verify rollback deployment succeeded
+railway status
+railway logs --service novelforge-backend -n 20
 
-# Step 5: Verify health
+# Step 5: Push rollback commit to GitHub for version control
+cd .. && git push origin HEAD
+
+# Step 6: Verify health
 curl -s https://[backend-url]/api/health
 ```
+
+**Note**: Rollback deploys via Railway CLI, not by pushing to GitHub.
 
 ### Rollback Report
 
@@ -535,7 +562,7 @@ Next Steps:
 ```
 Task tool call:
 - subagent_type: "deployer"
-- prompt: "Commit and deploy the following changes: [description]. Create a commit message following the standard format, push to remote, and monitor the deployment pipeline."
+- prompt: "Commit and deploy the following changes: [description]. Create a commit message following the standard format, deploy via Railway CLI (railway up), monitor the deployment, then push to GitHub for version control."
 - description: "Deploy code changes"
 ```
 
@@ -656,6 +683,7 @@ The workflow can integrate with external monitoring tools. Add webhooks to `.dep
 - Full audit trail is maintained for each deployment
 - Canary deployments provide additional safety for high-risk changes
 - Automatic rollback protects production from prolonged outages
+- **Railway is disconnected from GitHub** - deployments use `railway up` CLI, GitHub is for version control only
 
 ---
 
