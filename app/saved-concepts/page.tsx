@@ -12,6 +12,7 @@ import SplitView, {
   DetailPanelHeader,
   DetailPanelSection,
   DetailPanelActions,
+  DetailPanelTabs,
   ActionButton,
   Pagination,
 } from '../components/SplitView';
@@ -78,7 +79,9 @@ function SavedConceptsContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedConceptId, setSelectedConceptId] = useState<string | null>(null);
-  const [showOriginalityCheck, setShowOriginalityCheck] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('details');
+  const [originalityResults, setOriginalityResults] = useState<Record<string, any>>({});
+  const [isCheckingOriginality, setIsCheckingOriginality] = useState(false);
   const [editingConcept, setEditingConcept] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<SavedConcept>>({});
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -333,6 +336,24 @@ function SavedConceptsContent() {
     router.replace('/saved-concepts');
   };
 
+  const handleCheckOriginality = (conceptId: string) => {
+    setIsCheckingOriginality(true);
+    setActiveTab('originality');
+  };
+
+  const handleOriginalityComplete = (conceptId: string, result: any) => {
+    setOriginalityResults(prev => ({ ...prev, [conceptId]: result }));
+    setIsCheckingOriginality(false);
+  };
+
+  // Reset tab when selected concept changes
+  const handleSelectConcept = (conceptId: string) => {
+    if (conceptId !== selectedConceptId) {
+      setActiveTab('details');
+    }
+    setSelectedConceptId(conceptId);
+  };
+
   if (isLoading) {
     return (
       <DashboardLayout
@@ -400,7 +421,7 @@ function SavedConceptsContent() {
               premise={concept.logline}
               isSelected={selectedConceptId === concept.id}
               status={concept.status}
-              onClick={setSelectedConceptId}
+              onClick={handleSelectConcept}
             />
           ))}
         </div>
@@ -573,6 +594,15 @@ function SavedConceptsContent() {
       );
     }
 
+    // Determine available tabs
+    const hasOriginalityResult = !!originalityResults[selectedConcept.id];
+    const tabs = [
+      { id: 'details', label: 'Details', icon: '📋' },
+      ...(hasOriginalityResult || activeTab === 'originality'
+        ? [{ id: 'originality', label: 'Originality', icon: '✨' }]
+        : []),
+    ];
+
     // View mode
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -593,9 +623,10 @@ function SavedConceptsContent() {
           </ActionButton>
           <ActionButton
             variant="secondary"
-            onClick={() => setShowOriginalityCheck(!showOriginalityCheck)}
+            onClick={() => handleCheckOriginality(selectedConcept.id)}
+            disabled={isCheckingOriginality}
           >
-            {showOriginalityCheck ? 'Hide Originality Check' : 'Check Originality'}
+            {isCheckingOriginality && activeTab === 'originality' ? 'Checking...' : 'Check Originality'}
           </ActionButton>
           <ActionButton variant="secondary" onClick={() => handleStartEdit(selectedConcept)}>
             Edit
@@ -622,80 +653,98 @@ function SavedConceptsContent() {
           </ActionButton>
         </DetailPanelActions>
 
-        <div style={{ flex: 1, padding: '1.5rem', overflowY: 'auto' }}>
-          <DetailPanelSection label="Logline">
-            <p style={{ margin: 0, fontStyle: 'italic' }}>{selectedConcept.logline}</p>
-          </DetailPanelSection>
+        {/* Tabs - only show if originality tab exists */}
+        {tabs.length > 1 && (
+          <DetailPanelTabs
+            tabs={tabs}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+          />
+        )}
 
-          <DetailPanelSection label="Synopsis">
-            <p style={{ margin: 0 }}>{selectedConcept.synopsis}</p>
-          </DetailPanelSection>
-
-          {selectedConcept.hook && (
-            <DetailPanelSection label="Hook" variant="highlight">
-              {selectedConcept.hook}
+        {/* Details Tab Content */}
+        {activeTab === 'details' && (
+          <div style={{ flex: 1, padding: '1.5rem', overflowY: 'auto' }}>
+            <DetailPanelSection label="Logline">
+              <p style={{ margin: 0, fontStyle: 'italic' }}>{selectedConcept.logline}</p>
             </DetailPanelSection>
-          )}
 
-          {selectedConcept.protagonist_hint && (
-            <DetailPanelSection label="Protagonist">
-              {selectedConcept.protagonist_hint}
+            <DetailPanelSection label="Synopsis">
+              <p style={{ margin: 0 }}>{selectedConcept.synopsis}</p>
             </DetailPanelSection>
-          )}
 
-          {selectedConcept.conflict_type && (
-            <DetailPanelSection label="Conflict Type">
-              {selectedConcept.conflict_type}
-            </DetailPanelSection>
-          )}
+            {selectedConcept.hook && (
+              <DetailPanelSection label="Hook" variant="highlight">
+                {selectedConcept.hook}
+              </DetailPanelSection>
+            )}
 
-          {selectedConcept.preferences?.themes?.length > 0 && (
-            <div style={{ marginBottom: '1rem' }}>
-              <div style={{
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                color: colors.textTertiary,
-                marginBottom: '0.5rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.025em',
-              }}>
-                Themes
+            {selectedConcept.protagonist_hint && (
+              <DetailPanelSection label="Protagonist">
+                {selectedConcept.protagonist_hint}
+              </DetailPanelSection>
+            )}
+
+            {selectedConcept.conflict_type && (
+              <DetailPanelSection label="Conflict Type">
+                {selectedConcept.conflict_type}
+              </DetailPanelSection>
+            )}
+
+            {selectedConcept.preferences?.themes?.length > 0 && (
+              <div style={{ marginBottom: '1rem' }}>
+                <div style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  color: colors.textTertiary,
+                  marginBottom: '0.5rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.025em',
+                }}>
+                  Themes
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {selectedConcept.preferences.themes.map((theme: string, i: number) => (
+                    <span
+                      key={i}
+                      style={{
+                        padding: '0.25rem 0.75rem',
+                        background: colors.surfaceHover,
+                        color: colors.textSecondary,
+                        fontSize: '0.75rem',
+                        borderRadius: borderRadius.full,
+                      }}
+                    >
+                      {theme}
+                    </span>
+                  ))}
+                </div>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                {selectedConcept.preferences.themes.map((theme: string, i: number) => (
-                  <span
-                    key={i}
-                    style={{
-                      padding: '0.25rem 0.75rem',
-                      background: colors.surfaceHover,
-                      color: colors.textSecondary,
-                      fontSize: '0.75rem',
-                      borderRadius: borderRadius.full,
-                    }}
-                  >
-                    {theme}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
+            )}
 
-          {selectedConcept.notes && (
-            <DetailPanelSection label="Your Notes" variant="warning">
-              {selectedConcept.notes}
-            </DetailPanelSection>
-          )}
+            {selectedConcept.notes && (
+              <DetailPanelSection label="Your Notes" variant="warning">
+                {selectedConcept.notes}
+              </DetailPanelSection>
+            )}
+          </div>
+        )}
 
-          {showOriginalityCheck && (
-            <div style={{ marginTop: '1rem' }}>
-              <OriginalityChecker
-                contentId={selectedConcept.id}
-                contentType="concept"
-                title={selectedConcept.title}
-              />
-            </div>
-          )}
-        </div>
+        {/* Originality Tab Content */}
+        {activeTab === 'originality' && (
+          <div style={{ flex: 1, padding: '1.5rem', overflowY: 'auto' }}>
+            <OriginalityChecker
+              key={selectedConcept.id}
+              contentId={selectedConcept.id}
+              contentType="concept"
+              title={selectedConcept.title}
+              autoRun={!originalityResults[selectedConcept.id]}
+              loadExisting={true}
+              existingResult={originalityResults[selectedConcept.id] || null}
+              onCheckComplete={(result) => handleOriginalityComplete(selectedConcept.id, result)}
+            />
+          </div>
+        )}
       </div>
     );
   };

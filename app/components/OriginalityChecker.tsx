@@ -95,10 +95,12 @@ export default function OriginalityChecker({
       );
 
       if (response.ok) {
-        const existingData = await response.json();
-        if (existingData) {
-          setResult(existingData);
-          onCheckComplete?.(existingData);
+        const data = await response.json();
+        // The API returns { result: ... } wrapper
+        const existingResult = data.result || data;
+        if (existingResult && existingResult.id) {
+          setResult(existingResult);
+          onCheckComplete?.(existingResult);
           return true;
         }
       }

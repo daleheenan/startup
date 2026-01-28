@@ -12,9 +12,11 @@ import SplitView, {
   DetailPanelHeader,
   DetailPanelSection,
   DetailPanelActions,
+  DetailPanelTabs,
   ActionButton,
   Pagination,
 } from '@/app/components/SplitView';
+import OriginalityChecker from '@/app/components/OriginalityChecker';
 
 const ITEMS_PER_PAGE = 5;
 import {
@@ -41,6 +43,9 @@ export default function StoryIdeasPage() {
   const [expandingMode, setExpandingMode] = useState<IdeaExpansionMode | null>(null);
   const [expandError, setExpandError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [activeTab, setActiveTab] = useState<string>('details');
+  const [originalityResults, setOriginalityResults] = useState<Record<string, any>>({});
+  const [isCheckingOriginality, setIsCheckingOriginality] = useState(false);
 
   // Get unique genres from ideas
   const genres = useMemo(() =>
@@ -141,6 +146,24 @@ export default function StoryIdeasPage() {
     setExpandError(null);
   };
 
+  const handleCheckOriginality = (ideaId: string) => {
+    setIsCheckingOriginality(true);
+    setActiveTab('originality');
+  };
+
+  const handleOriginalityComplete = (ideaId: string, result: any) => {
+    setOriginalityResults(prev => ({ ...prev, [ideaId]: result }));
+    setIsCheckingOriginality(false);
+  };
+
+  // Reset tab when selected idea changes
+  const handleSelectIdea = (ideaId: string) => {
+    if (ideaId !== selectedIdeaId) {
+      setActiveTab('details');
+    }
+    setSelectedIdeaId(ideaId);
+  };
+
   if (isLoading) {
     return (
       <DashboardLayout
@@ -225,7 +248,7 @@ export default function StoryIdeasPage() {
               premise={idea.story_idea}
               isSelected={selectedIdeaId === idea.id}
               status={idea.status}
-              onClick={setSelectedIdeaId}
+              onClick={handleSelectIdea}
             />
           ))}
         </div>
@@ -468,6 +491,15 @@ export default function StoryIdeasPage() {
       );
     }
 
+    // Determine available tabs
+    const hasOriginalityResult = !!originalityResults[selectedIdea.id];
+    const tabs = [
+      { id: 'details', label: 'Details', icon: '📋' },
+      ...(hasOriginalityResult || activeTab === 'originality'
+        ? [{ id: 'originality', label: 'Originality', icon: '✨' }]
+        : []),
+    ];
+
     // View mode
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -492,6 +524,13 @@ export default function StoryIdeasPage() {
             disabled={expandIdeaMutation.isPending}
           >
             Generate 10 Concepts
+          </ActionButton>
+          <ActionButton
+            variant="secondary"
+            onClick={() => handleCheckOriginality(selectedIdea.id)}
+            disabled={isCheckingOriginality}
+          >
+            {isCheckingOriginality && activeTab === 'originality' ? 'Checking...' : 'Check Originality'}
           </ActionButton>
           <ActionButton variant="secondary" onClick={() => handleStartEdit(selectedIdea)}>
             Edit
@@ -521,78 +560,106 @@ export default function StoryIdeasPage() {
           </ActionButton>
         </DetailPanelActions>
 
-        <div style={{ flex: 1, padding: '1.5rem', overflowY: 'auto' }}>
-          <DetailPanelSection label="Premise">
-            <p style={{ margin: 0 }}>{selectedIdea.story_idea}</p>
-          </DetailPanelSection>
+        {/* Tabs - only show if originality tab exists */}
+        {tabs.length > 1 && (
+          <DetailPanelTabs
+            tabs={tabs}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+          />
+        )}
 
-          {selectedIdea.character_concepts?.length > 0 && (
-            <DetailPanelSection label="Character Concepts">
-              <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
-                {selectedIdea.character_concepts.map((char, i) => (
-                  <li key={i}>{char}</li>
-                ))}
-              </ul>
+        {/* Details Tab Content */}
+        {activeTab === 'details' && (
+          <div style={{ flex: 1, padding: '1.5rem', overflowY: 'auto' }}>
+            <DetailPanelSection label="Premise">
+              <p style={{ margin: 0 }}>{selectedIdea.story_idea}</p>
             </DetailPanelSection>
-          )}
 
-          {selectedIdea.plot_elements?.length > 0 && (
-            <DetailPanelSection label="Plot Elements">
-              <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
-                {selectedIdea.plot_elements.map((elem, i) => (
-                  <li key={i}>{elem}</li>
-                ))}
-              </ul>
-            </DetailPanelSection>
-          )}
+            {selectedIdea.character_concepts?.length > 0 && (
+              <DetailPanelSection label="Character Concepts">
+                <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+                  {selectedIdea.character_concepts.map((char, i) => (
+                    <li key={i}>{char}</li>
+                  ))}
+                </ul>
+              </DetailPanelSection>
+            )}
 
-          {selectedIdea.unique_twists?.length > 0 && (
-            <DetailPanelSection label="Unique Twists">
-              <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
-                {selectedIdea.unique_twists.map((twist, i) => (
-                  <li key={i}>{twist}</li>
-                ))}
-              </ul>
-            </DetailPanelSection>
-          )}
+            {selectedIdea.plot_elements?.length > 0 && (
+              <DetailPanelSection label="Plot Elements">
+                <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+                  {selectedIdea.plot_elements.map((elem, i) => (
+                    <li key={i}>{elem}</li>
+                  ))}
+                </ul>
+              </DetailPanelSection>
+            )}
 
-          {selectedIdea.themes?.length > 0 && (
-            <div style={{ marginBottom: '1rem' }}>
-              <div style={{
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                color: colors.textTertiary,
-                marginBottom: '0.5rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.025em',
-              }}>
-                Themes
+            {selectedIdea.unique_twists?.length > 0 && (
+              <DetailPanelSection label="Unique Twists">
+                <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+                  {selectedIdea.unique_twists.map((twist, i) => (
+                    <li key={i}>{twist}</li>
+                  ))}
+                </ul>
+              </DetailPanelSection>
+            )}
+
+            {selectedIdea.themes?.length > 0 && (
+              <div style={{ marginBottom: '1rem' }}>
+                <div style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  color: colors.textTertiary,
+                  marginBottom: '0.5rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.025em',
+                }}>
+                  Themes
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {selectedIdea.themes.map((theme, i) => (
+                    <span
+                      key={i}
+                      style={{
+                        padding: '0.25rem 0.75rem',
+                        background: colors.surfaceHover,
+                        color: colors.textSecondary,
+                        fontSize: '0.75rem',
+                        borderRadius: borderRadius.full,
+                      }}
+                    >
+                      {theme}
+                    </span>
+                  ))}
+                </div>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                {selectedIdea.themes.map((theme, i) => (
-                  <span
-                    key={i}
-                    style={{
-                      padding: '0.25rem 0.75rem',
-                      background: colors.surfaceHover,
-                      color: colors.textSecondary,
-                      fontSize: '0.75rem',
-                      borderRadius: borderRadius.full,
-                    }}
-                  >
-                    {theme}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
+            )}
 
-          {selectedIdea.notes && (
-            <DetailPanelSection label="Your Notes" variant="warning">
-              {selectedIdea.notes}
-            </DetailPanelSection>
-          )}
-        </div>
+            {selectedIdea.notes && (
+              <DetailPanelSection label="Your Notes" variant="warning">
+                {selectedIdea.notes}
+              </DetailPanelSection>
+            )}
+          </div>
+        )}
+
+        {/* Originality Tab Content */}
+        {activeTab === 'originality' && (
+          <div style={{ flex: 1, padding: '1.5rem', overflowY: 'auto' }}>
+            <OriginalityChecker
+              key={selectedIdea.id}
+              contentId={selectedIdea.id}
+              contentType="story-idea"
+              title={selectedIdea.story_idea.slice(0, 50) + (selectedIdea.story_idea.length > 50 ? '...' : '')}
+              autoRun={!originalityResults[selectedIdea.id]}
+              loadExisting={true}
+              existingResult={originalityResults[selectedIdea.id] || null}
+              onCheckComplete={(result) => handleOriginalityComplete(selectedIdea.id, result)}
+            />
+          </div>
+        )}
       </div>
     );
   };
