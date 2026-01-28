@@ -481,6 +481,60 @@ export function Pagination({ currentPage, totalPages, onPageChange }: Pagination
 }
 
 // ============================================================================
+// Detail Panel Tabs Component
+// ============================================================================
+
+interface TabConfig {
+  id: string;
+  label: string;
+  icon?: string;
+}
+
+interface DetailPanelTabsProps {
+  tabs: TabConfig[];
+  activeTab: string;
+  onTabChange: (tabId: string) => void;
+}
+
+export function DetailPanelTabs({ tabs, activeTab, onTabChange }: DetailPanelTabsProps) {
+  return (
+    <div style={{
+      display: 'flex',
+      borderBottom: `1px solid ${colors.border}`,
+      background: colors.surface,
+      padding: '0 1.5rem',
+    }}>
+      {tabs.map((tab) => (
+        <button
+          key={tab.id}
+          onClick={() => onTabChange(tab.id)}
+          style={{
+            padding: '0.75rem 1rem',
+            background: 'transparent',
+            border: 'none',
+            borderBottom: activeTab === tab.id
+              ? `2px solid ${colors.brandStart}`
+              : '2px solid transparent',
+            color: activeTab === tab.id ? colors.brandStart : colors.textSecondary,
+            fontSize: '0.875rem',
+            fontWeight: activeTab === tab.id ? 600 : 500,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            marginBottom: '-1px',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          {tab.icon && <span>{tab.icon}</span>}
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ============================================================================
 // Action Button Presets
 // ============================================================================
 

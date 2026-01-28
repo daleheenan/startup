@@ -6,8 +6,28 @@ import Link from 'next/link';
 import { getToken, logout } from '@/app/lib/auth';
 import ProjectNavigation from '@/app/components/shared/ProjectNavigation';
 import { useProjectNavigation } from '@/app/hooks';
+import { fetchWithAuth } from '@/app/lib/fetch-utils';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+interface ProjectData {
+  id: string;
+  title?: string;
+  story_dna?: {
+    genre?: string;
+    tone?: string;
+    themes?: string[];
+  };
+  story_bible?: {
+    characters?: any[];
+    world?: any[] | {
+      locations?: any[];
+      factions?: any[];
+      systems?: any[];
+    };
+  };
+  book_count?: number;
+}
 
 interface Finding {
   id: string;
@@ -111,7 +131,9 @@ export default function EditorialActionPlanPage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.id as string;
-  const { projectTitle, bookTitle, handleLogout } = useProjectNavigation(projectId);
+
+  const [project, setProject] = useState<ProjectData | null>(null);
+  const { outline, chapters } = useProjectNavigation(projectId, project);
 
   const [report, setReport] = useState<VEBReport | null>(null);
   const [findings, setFindings] = useState<Finding[]>([]);
@@ -331,6 +353,22 @@ export default function EditorialActionPlanPage() {
     return extracted;
   }, []);
 
+  // Fetch project data for navigation
+  useEffect(() => {
+    const fetchProject = async () => {
+      try {
+        const res = await fetchWithAuth(`/api/projects/${projectId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setProject(data);
+        }
+      } catch {
+        // Project fetch failed - navigation will work without it
+      }
+    };
+    fetchProject();
+  }, [projectId]);
+
   // Fetch report and feedback
   useEffect(() => {
     const fetchData = async () => {
@@ -467,7 +505,7 @@ export default function EditorialActionPlanPage() {
   if (loading) {
     return (
       <div style={{ display: 'flex', minHeight: '100vh', background: '#F8FAFC' }}>
-        <ProjectNavigation projectId={projectId} projectTitle={projectTitle} bookTitle={bookTitle} onLogout={handleLogout} />
+        <ProjectNavigation projectId={projectId} project={project} outline={outline} chapters={chapters} />
         <main style={{ flex: 1, padding: '2rem', marginLeft: '280px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh' }}>
             <div>Loading editorial action plan...</div>
@@ -480,7 +518,7 @@ export default function EditorialActionPlanPage() {
   if (error) {
     return (
       <div style={{ display: 'flex', minHeight: '100vh', background: '#F8FAFC' }}>
-        <ProjectNavigation projectId={projectId} projectTitle={projectTitle} bookTitle={bookTitle} onLogout={handleLogout} />
+        <ProjectNavigation projectId={projectId} project={project} outline={outline} chapters={chapters} />
         <main style={{ flex: 1, padding: '2rem', marginLeft: '280px' }}>
           <div style={{
             background: '#FEF2F2',
@@ -513,7 +551,7 @@ export default function EditorialActionPlanPage() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#F8FAFC' }}>
-      <ProjectNavigation projectId={projectId} projectTitle={projectTitle} bookTitle={bookTitle} onLogout={handleLogout} />
+      <ProjectNavigation projectId={projectId} project={project} outline={outline} chapters={chapters} />
 
       <main style={{ flex: 1, padding: '2rem', marginLeft: '280px' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>

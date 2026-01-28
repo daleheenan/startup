@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getToken } from '../lib/auth';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -56,6 +56,12 @@ interface OriginalityCheckerProps {
   title?: string;
   onCheckComplete?: (result: PlagiarismCheckResult) => void;
   compact?: boolean;
+  /** If true, automatically run the check on mount */
+  autoRun?: boolean;
+  /** If true, load existing results on mount (use with autoRun for best UX) */
+  loadExisting?: boolean;
+  /** Externally provided result to display (e.g. from parent state) */
+  existingResult?: PlagiarismCheckResult | null;
 }
 
 export default function OriginalityChecker({
@@ -64,13 +70,48 @@ export default function OriginalityChecker({
   title,
   onCheckComplete,
   compact = false,
+  autoRun = false,
+  loadExisting = false,
+  existingResult = null,
 }: OriginalityCheckerProps) {
   const [isChecking, setIsChecking] = useState(false);
-  const [result, setResult] = useState<PlagiarismCheckResult | null>(null);
+  const [isLoadingExisting, setIsLoadingExisting] = useState(false);
+  const [result, setResult] = useState<PlagiarismCheckResult | null>(existingResult);
   const [error, setError] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
 
-  const runCheck = async () => {
+  const loadExistingResult = useCallback(async () => {
+    try {
+      setIsLoadingExisting(true);
+      const token = getToken();
+      const response = await fetch(
+        `${API_BASE_URL}/api/plagiarism/results/${contentId}/latest`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (response.ok) {
+        const existingData = await response.json();
+        if (existingData) {
+          setResult(existingData);
+          onCheckComplete?.(existingData);
+          return true;
+        }
+      }
+      return false;
+    } catch (err) {
+      console.error('Error loading existing result:', err);
+      return false;
+    } finally {
+      setIsLoadingExisting(false);
+    }
+  }, [contentId, onCheckComplete]);
+
+  const runCheck = useCallback(async () => {
     try {
       setIsChecking(true);
       setError(null);
@@ -100,7 +141,35 @@ export default function OriginalityChecker({
     } finally {
       setIsChecking(false);
     }
-  };
+  }, [contentId, contentType, onCheckComplete]);
+
+  // Handle autoRun and loadExisting on mount
+  useEffect(() => {
+    const init = async () => {
+      if (existingResult) {
+        // Already have a result from parent
+        return;
+      }
+
+      if (loadExisting) {
+        const hasExisting = await loadExistingResult();
+        if (hasExisting) return;
+      }
+
+      if (autoRun) {
+        runCheck();
+      }
+    };
+
+    init();
+  }, [contentId]); // Only re-run when contentId changes
+
+  // Update result if existingResult prop changes
+  useEffect(() => {
+    if (existingResult) {
+      setResult(existingResult);
+    }
+  }, [existingResult]);
 
   const getScoreColor = (score: number): string => {
     if (score >= 75) return '#10B981'; // Green
@@ -155,6 +224,34 @@ export default function OriginalityChecker({
       </div>
     </div>
   );
+
+  // Show loading spinner when autoRun or loadExisting is in progress
+  if ((autoRun || loadExisting) && (isChecking || isLoadingExisting) && !result) {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '3rem 1rem',
+        textAlign: 'center',
+      }}>
+        <div style={{
+          width: '48px',
+          height: '48px',
+          border: '3px solid #E2E8F0',
+          borderTopColor: '#667eea',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite',
+          marginBottom: '1rem',
+        }} />
+        <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
+          {isLoadingExisting ? 'Loading previous results...' : 'Analysing originality...'}
+        </p>
+        <style jsx>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
 
   if (compact && !result) {
     return (
