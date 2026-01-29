@@ -345,6 +345,7 @@ export function runMigrations() {
       '050_version_aware_reports.sql',     // DB version 50 - version-aware editorial reports
       '051_ai_request_log.sql',            // DB version 51 - AI request audit log for cost tracking
       '052_backfill_ai_request_log.sql',   // DB version 52 - backfill historical AI costs
+      '053_add_show_ai_costs_menu.sql',    // DB version 53 - add show_ai_costs_menu to user_preferences
     ];
 
     for (let i = 0; i < migrationFiles.length; i++) {
@@ -473,6 +474,7 @@ export function getMigrationStatus(): {
     '050_version_aware_reports.sql',
     '051_ai_request_log.sql',
     '052_backfill_ai_request_log.sql',
+    '053_add_show_ai_costs_menu.sql',
   ];
 
   const pendingMigrations: string[] = [];
