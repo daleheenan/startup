@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getToken, logout } from '../../../lib/auth';
+import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
 import GenerationProgress from '../../../components/GenerationProgress';
 import ProjectNavigation from '../../../components/shared/ProjectNavigation';
 import { useProjectNavigation } from '@/app/hooks';
@@ -635,93 +636,19 @@ export default function OutlinePage() {
   };
 
   return (
-    <div style={{
-      display: 'flex',
-      minHeight: '100vh',
-      background: '#F8FAFC',
-    }}>
-      {/* Left Sidebar */}
-      <aside style={{
-        width: '72px',
-        background: '#FFFFFF',
-        borderRight: '1px solid #E2E8F0',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        padding: '1.5rem 0',
-      }}>
-        <Link
-          href="/projects"
-          style={{
-            width: '40px',
-            height: '40px',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            borderRadius: '10px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#FFFFFF',
-            fontWeight: '700',
-            fontSize: '1.25rem',
-            textDecoration: 'none',
-          }}
-        >
-          N
-        </Link>
-      </aside>
+    <DashboardLayout
+      header={{ title: 'Story Outline', subtitle: project.title }}
+    >
+      <ProjectNavigation
+        projectId={projectId}
+        project={navigation.project}
+        outline={navigation.outline}
+        chapters={navigation.chapters}
+      />
 
-      {/* Main Content */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        {/* Top Bar */}
-        <header style={{
-          padding: '1rem 2rem',
-          background: '#FFFFFF',
-          borderBottom: '1px solid #E2E8F0',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}>
-          <div>
-            <h1 style={{
-              fontSize: '1.5rem',
-              fontWeight: '700',
-              color: '#1A1A2E',
-              margin: 0,
-            }}>
-              Story Outline
-            </h1>
-            <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
-              {project.title}
-            </p>
-          </div>
-          <Link
-            href={`/projects/${projectId}`}
-            style={{
-              padding: '0.5rem 1rem',
-              color: '#64748B',
-              textDecoration: 'none',
-              fontSize: '0.875rem',
-            }}
-          >
-            ← Back to Project
-          </Link>
-        </header>
-
-        {/* Project Navigation */}
-        <ProjectNavigation
-          projectId={projectId}
-          project={navigation.project}
-          outline={navigation.outline}
-          chapters={navigation.chapters}
-        />
-
-        {/* Content Area */}
-        <div style={{
-          flex: 1,
-          padding: '2rem',
-          overflow: 'auto',
-        }}>
-          <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+      {/* Content Area */}
+      <div style={{ padding: '1.5rem 0' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
             {error && (
               <div style={{
                 background: '#FEF2F2',
@@ -1427,9 +1354,8 @@ export default function OutlinePage() {
             />
           </div>
         </div>
-      </main>
 
-      <style jsx>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
+        <style jsx>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </DashboardLayout>
   );
 }

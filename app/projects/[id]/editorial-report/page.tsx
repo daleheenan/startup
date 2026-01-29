@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { getToken, logout } from '@/app/lib/auth';
+import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
 import ProjectNavigation from '@/app/components/shared/ProjectNavigation';
 import EditorialWorkflowVisualization from '@/app/components/EditorialWorkflowVisualization';
 import { useProjectNavigation } from '@/app/hooks';
@@ -1599,182 +1600,111 @@ export default function EditorialReportPage() {
   );
 
   return (
-    <div style={{
-      display: 'flex',
-      minHeight: '100vh',
-      background: '#F8FAFC',
-    }}>
-      {/* Left Sidebar */}
-      <aside style={{
-        width: '72px',
-        background: '#FFFFFF',
-        borderRight: '1px solid #E2E8F0',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        padding: '1.5rem 0',
-      }}>
-        <Link
-          href="/projects"
-          style={{
-            width: '40px',
-            height: '40px',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            borderRadius: '10px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#FFFFFF',
-            fontWeight: '700',
-            fontSize: '1.25rem',
-            textDecoration: 'none',
-          }}
-        >
-          N
-        </Link>
-      </aside>
+    <DashboardLayout
+      header={{ title: 'Editorial Report', subtitle: project?.title || 'Loading...' }}
+    >
+      <ProjectNavigation
+        projectId={projectId}
+        project={navigation.project}
+        outline={navigation.outline}
+        chapters={navigation.chapters}
+      />
 
-      {/* Main Content */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        {/* Top Bar */}
-        <header style={{
-          padding: '1rem 2rem',
-          background: '#FFFFFF',
-          borderBottom: '1px solid #E2E8F0',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}>
-          <div>
-            <h1 style={{
-              fontSize: '1.5rem',
-              fontWeight: '700',
-              color: '#1A1A2E',
-              margin: 0,
-            }}>
-              Editorial Report
-            </h1>
-            <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
-              {project?.title || 'Loading...'}
+      {/* Content Area */}
+      <div style={{ padding: '1.5rem 0' }}>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '3rem', color: '#64748B' }}>
+            Loading...
+          </div>
+        ) : showSubmitSuccess ? (
+          renderSubmitSuccess()
+        ) : status?.status === 'unavailable' ? (
+          <div style={{
+            background: '#FEF3C7',
+            borderRadius: '8px',
+            padding: '2rem',
+            border: '1px solid #FCD34D',
+            textAlign: 'center',
+          }}>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚙️</div>
+            <h3 style={{ margin: '0 0 0.5rem 0', color: '#92400E' }}>Feature Setup Required</h3>
+            <p style={{ margin: '0 0 1rem 0', color: '#A16207', maxWidth: '500px', marginLeft: 'auto', marginRight: 'auto' }}>
+              {status.error || 'The Virtual Editorial Board feature requires database setup. Please contact the administrator.'}
+            </p>
+            <p style={{ margin: 0, fontSize: '0.875rem', color: '#B45309' }}>
+              Administrator: Run database migration 027_editorial_reports.sql
             </p>
           </div>
-          <Link
-            href={`/projects/${projectId}`}
-            style={{
-              padding: '0.5rem 1rem',
-              color: '#64748B',
-              textDecoration: 'none',
-              fontSize: '0.875rem',
-            }}
-          >
-            ← Back to Project
-          </Link>
-        </header>
-
-        {/* Project Navigation */}
-        <ProjectNavigation
-          projectId={projectId}
-          project={navigation.project}
-          outline={navigation.outline}
-          chapters={navigation.chapters}
-        />
-
-        {/* Content Area */}
-        <div style={{ flex: 1, padding: '2rem', overflow: 'auto' }}>
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: '3rem', color: '#64748B' }}>
-              Loading...
-            </div>
-          ) : showSubmitSuccess ? (
-            renderSubmitSuccess()
-          ) : status?.status === 'unavailable' ? (
+        ) : !status?.hasReport ? (
+          renderNoReport()
+        ) : status.status === 'processing' ? (
+          renderProcessingStatus()
+        ) : status.status === 'failed' ? (
+          <div style={{
+            background: '#FEF2F2',
+            borderRadius: '8px',
+            padding: '2rem',
+            border: '1px solid #FECACA',
+            textAlign: 'center',
+          }}>
+            <h3 style={{ margin: '0 0 0.5rem 0', color: '#991B1B' }}>Analysis Failed</h3>
+            <p style={{ margin: '0 0 1rem 0', color: '#B91C1C' }}>{status.error}</p>
+            <button
+              onClick={handleSubmit}
+              disabled={submitting}
+              style={{
+                padding: '8px 16px',
+                background: '#EF4444',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+              }}
+            >
+              Retry Analysis
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Tabs */}
             <div style={{
-              background: '#FEF3C7',
-              borderRadius: '8px',
-              padding: '2rem',
-              border: '1px solid #FCD34D',
-              textAlign: 'center',
+              display: 'flex',
+              gap: '0.5rem',
+              marginBottom: '1.5rem',
+              borderBottom: '1px solid #E2E8F0',
+              paddingBottom: '0.5rem',
             }}>
-              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚙️</div>
-              <h3 style={{ margin: '0 0 0.5rem 0', color: '#92400E' }}>Feature Setup Required</h3>
-              <p style={{ margin: '0 0 1rem 0', color: '#A16207', maxWidth: '500px', marginLeft: 'auto', marginRight: 'auto' }}>
-                {status.error || 'The Virtual Editorial Board feature requires database setup. Please contact the administrator.'}
-              </p>
-              <p style={{ margin: 0, fontSize: '0.875rem', color: '#B45309' }}>
-                Administrator: Run database migration 027_editorial_reports.sql
-              </p>
+              {(['overview', 'beta-swarm', 'ruthless-editor', 'market-analyst'] as TabType[]).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => {
+                    setActiveTab(tab);
+                    setSelectedChapter(null);
+                  }}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    background: activeTab === tab ? '#667eea' : 'transparent',
+                    color: activeTab === tab ? 'white' : '#64748B',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: activeTab === tab ? '600' : '400',
+                    textTransform: 'capitalize',
+                  }}
+                >
+                  {tab.replace(/-/g, ' ')}
+                </button>
+              ))}
             </div>
-          ) : !status?.hasReport ? (
-            renderNoReport()
-          ) : status.status === 'processing' ? (
-            renderProcessingStatus()
-          ) : status.status === 'failed' ? (
-            <div style={{
-              background: '#FEF2F2',
-              borderRadius: '8px',
-              padding: '2rem',
-              border: '1px solid #FECACA',
-              textAlign: 'center',
-            }}>
-              <h3 style={{ margin: '0 0 0.5rem 0', color: '#991B1B' }}>Analysis Failed</h3>
-              <p style={{ margin: '0 0 1rem 0', color: '#B91C1C' }}>{status.error}</p>
-              <button
-                onClick={handleSubmit}
-                disabled={submitting}
-                style={{
-                  padding: '8px 16px',
-                  background: '#EF4444',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                }}
-              >
-                Retry Analysis
-              </button>
-            </div>
-          ) : (
-            <>
-              {/* Tabs */}
-              <div style={{
-                display: 'flex',
-                gap: '0.5rem',
-                marginBottom: '1.5rem',
-                borderBottom: '1px solid #E2E8F0',
-                paddingBottom: '0.5rem',
-              }}>
-                {(['overview', 'beta-swarm', 'ruthless-editor', 'market-analyst'] as TabType[]).map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => {
-                      setActiveTab(tab);
-                      setSelectedChapter(null);
-                    }}
-                    style={{
-                      padding: '0.75rem 1.5rem',
-                      background: activeTab === tab ? '#667eea' : 'transparent',
-                      color: activeTab === tab ? 'white' : '#64748B',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontWeight: activeTab === tab ? '600' : '400',
-                      textTransform: 'capitalize',
-                    }}
-                  >
-                    {tab.replace(/-/g, ' ')}
-                  </button>
-                ))}
-              </div>
 
-              {/* Tab Content */}
-              {activeTab === 'overview' && renderOverview()}
-              {activeTab === 'beta-swarm' && renderBetaSwarm()}
-              {activeTab === 'ruthless-editor' && renderRuthlessEditor()}
-              {activeTab === 'market-analyst' && renderMarketAnalyst()}
-            </>
-          )}
-        </div>
-      </main>
-    </div>
+            {/* Tab Content */}
+            {activeTab === 'overview' && renderOverview()}
+            {activeTab === 'beta-swarm' && renderBetaSwarm()}
+            {activeTab === 'ruthless-editor' && renderRuthlessEditor()}
+            {activeTab === 'market-analyst' && renderMarketAnalyst()}
+          </>
+        )}
+      </div>
+    </DashboardLayout>
   );
 }
