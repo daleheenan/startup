@@ -71,6 +71,7 @@ export const PRIMARY_NAV_ITEMS: PrimaryNavigationItem[] = [
  */
 export type WorkflowStep =
   | 'concept'
+  | 'edit-story'
   | 'characters'
   | 'world'
   | 'plots'
@@ -131,6 +132,15 @@ export const PROJECT_NAV_GROUPS: NavGroup[] = [
     isStandalone: true,
     route: '',
     workflowStep: 'concept',
+    tabs: [],
+  },
+  {
+    id: 'edit-story',
+    label: 'Edit Story',
+    icon: '✏️',
+    isStandalone: true,
+    route: '/edit-story',
+    workflowStep: 'edit-story',
     tabs: [],
   },
   {

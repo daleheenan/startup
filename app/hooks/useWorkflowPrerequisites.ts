@@ -23,6 +23,7 @@ interface ChapterData {
 // Workflow step identifiers (updated for new navigation)
 export type WorkflowStep =
   | 'concept'
+  | 'edit-story'  // Edit story concept and DNA with AI feedback
   | 'characters'
   | 'world'
   | 'plots'
@@ -163,6 +164,11 @@ function getMissingItemsForStep(
       }
       break;
 
+    case 'edit-story':
+      // Edit story page is always accessible once a project exists
+      // No prerequisites - it's for editing existing concept/DNA
+      break;
+
     case 'characters':
       const characters = project.story_bible?.characters || [];
       if (characters.length === 0) {
@@ -284,6 +290,7 @@ const WORKFLOW_STEPS: WorkflowStep[] = [
  */
 const STEP_NAMES: Record<WorkflowStep, string> = {
   concept: 'Story Concept',
+  'edit-story': 'Edit Story',
   characters: 'Characters',
   world: 'World Building',
   plots: 'Plot Structure',
@@ -322,6 +329,12 @@ export function useWorkflowPrerequisites(
       concept: {
         isComplete: false,
         isRequired: true,
+        requiresPrevious: null,
+        missingItems: [],
+      },
+      'edit-story': {
+        isComplete: false,
+        isRequired: false,  // Edit story is optional - always accessible
         requiresPrevious: null,
         missingItems: [],
       },
