@@ -81,12 +81,45 @@ export default function SidebarNavGroup({
   const childrenRef = useRef<HTMLDivElement>(null);
   const [childrenHeight, setChildrenHeight] = useState<number>(0);
 
-  // Measure the natural scrollHeight whenever expansion state or items change
+  // Measure the natural scrollHeight whenever items change
+  // We need to measure independently of expanded state to get the true height
   useEffect(() => {
     if (childrenRef.current) {
-      setChildrenHeight(childrenRef.current.scrollHeight);
+      // Temporarily remove maxHeight to measure true scrollHeight
+      const element = childrenRef.current;
+      const originalMaxHeight = element.style.maxHeight;
+      const originalOverflow = element.style.overflow;
+
+      element.style.maxHeight = 'none';
+      element.style.overflow = 'visible';
+
+      const height = element.scrollHeight;
+
+      element.style.maxHeight = originalMaxHeight;
+      element.style.overflow = originalOverflow;
+
+      setChildrenHeight(height);
     }
-  }, [expanded, items]);
+  }, [items]);
+
+  // Also re-measure when expanded changes to ensure we have the correct height
+  useEffect(() => {
+    if (expanded && childrenRef.current) {
+      // Use requestAnimationFrame to ensure DOM has updated
+      requestAnimationFrame(() => {
+        if (childrenRef.current) {
+          const element = childrenRef.current;
+          const originalMaxHeight = element.style.maxHeight;
+          element.style.maxHeight = 'none';
+          const height = element.scrollHeight;
+          element.style.maxHeight = originalMaxHeight;
+          if (height > 0) {
+            setChildrenHeight(height);
+          }
+        }
+      });
+    }
+  }, [expanded]);
 
   // ---- Styles ----
 
@@ -143,9 +176,12 @@ export default function SidebarNavGroup({
     transition: `transform ${transitions.base}`,
   };
 
+  // Use measured height when available, or a generous fallback for initial expansion
+  const expandedMaxHeight = childrenHeight > 0 ? `${childrenHeight}px` : '500px';
+
   const childrenContainerStyle: CSSProperties = {
     overflow: 'hidden',
-    maxHeight: expanded ? `${childrenHeight}px` : '0px',
+    maxHeight: expanded ? expandedMaxHeight : '0px',
     transition: `max-height ${transitions.slow}`,
     display: 'flex',
     flexDirection: 'column' as const,
