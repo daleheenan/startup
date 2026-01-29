@@ -166,14 +166,15 @@ Co-Authored-By: [Agent(s)] <noreply@anthropic.com>
 
 **Deployment Command:**
 ```bash
-# Deploy to Railway (from backend directory)
-cd backend && railway up
+# Deploy to Railway (MUST run from project root, NOT backend directory)
+# Railway expects /backend as root directory in monorepo settings
+railway up --service novelforge-backend
 
 # Check deployment status
 railway status
 
 # After successful deployment, push to GitHub for version control
-cd .. && git push origin master
+git push origin master
 ```
 
 **CRITICAL**: Railway is disconnected from GitHub. Pushing to GitHub does NOT trigger deployment. Always use `railway up` first.
@@ -404,15 +405,15 @@ LAST_GOOD=$(cat .last-known-good-commit 2>/dev/null || git rev-parse HEAD~1)
 # Step 2: Create rollback commit
 git revert --no-edit HEAD
 
-# Step 3: Deploy rollback via Railway CLI
-cd backend && railway up
+# Step 3: Deploy rollback via Railway CLI (from project root)
+railway up --service novelforge-backend
 
 # Step 4: Verify rollback deployment succeeded
 railway status
 railway logs --service novelforge-backend -n 20
 
 # Step 5: Push rollback commit to GitHub for version control
-cd .. && git push origin HEAD
+git push origin HEAD
 
 # Step 6: Verify health
 curl -s https://[backend-url]/api/health

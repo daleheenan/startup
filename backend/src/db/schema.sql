@@ -213,6 +213,7 @@ CREATE INDEX IF NOT EXISTS idx_agent_lessons_active ON agent_lessons(is_active);
 CREATE TABLE IF NOT EXISTS user_preferences (
   user_id TEXT PRIMARY KEY DEFAULT 'owner',
   prose_style TEXT,  -- JSON: Default prose style settings for new projects
+  show_ai_costs_menu INTEGER DEFAULT 0,  -- Toggle for displaying AI Costs menu item
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );

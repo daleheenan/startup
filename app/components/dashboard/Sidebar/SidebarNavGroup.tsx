@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, type CSSProperties } from 'react';
+import Link from 'next/link';
 
 import SidebarNavItem from './SidebarNavItem';
 import {
@@ -166,12 +167,12 @@ export default function SidebarNavGroup({
     };
 
     return (
-      <a href={href} style={standaloneStyle}>
+      <Link href={href} style={standaloneStyle}>
         <span style={iconWrapperStyle}>{icon}</span>
         <span style={{ ...labelStyle, textTransform: 'none', fontSize: '0.875rem', letterSpacing: 'normal' }}>
           {label}
         </span>
-      </a>
+      </Link>
     );
   }
 
