@@ -157,8 +157,11 @@ describe('fetch-utils', () => {
       abortError.name = 'AbortError';
       vi.mocked(global.fetch).mockRejectedValue(abortError);
 
-      // The code transforms AbortError into a timeout message
-      await expect(fetchWithAuth(mockEndpoint)).rejects.toThrow('Request timeout after 30000ms');
+      // The code transforms AbortError into a user-friendly timeout message
+      // With retries enabled (default 2), it will retry before finally throwing
+      await expect(fetchWithAuth(mockEndpoint, { retries: 0 })).rejects.toThrow(
+        'Request timed out. The server is taking too long to respond. Please try again.'
+      );
     });
 
     it('should clear timeout on successful response', async () => {

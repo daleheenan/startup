@@ -870,6 +870,29 @@ router.put('/:id', (req, res) => {
       });
     }
 
+    // Sync book title with project title for standalone projects
+    // When project title changes, update the first book's title to match
+    if (title !== undefined) {
+      try {
+        const projectStmt = db.prepare<[string], { type: string }>(`
+          SELECT type FROM projects WHERE id = ?
+        `);
+        const project = projectStmt.get(req.params.id);
+
+        if (project && project.type === 'standalone') {
+          const updateBookStmt = db.prepare(`
+            UPDATE books SET title = ?, updated_at = ?
+            WHERE project_id = ? AND book_number = 1
+          `);
+          updateBookStmt.run(title, new Date().toISOString(), req.params.id);
+          logger.debug({ projectId: req.params.id, title }, 'Synced book title with project title');
+        }
+      } catch (syncError: any) {
+        // Log but don't fail - title sync is secondary
+        logger.warn({ error: syncError.message, projectId: req.params.id }, 'Failed to sync book title with project title');
+      }
+    }
+
     res.json({ success: true });
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack }, 'Error updating project');

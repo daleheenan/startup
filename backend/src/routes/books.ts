@@ -219,10 +219,33 @@ router.put('/:id', (req, res) => {
 
     // Invalidate series bible cache when book is updated
     // Get book's project_id to invalidate the right cache
-    const bookStmt = db.prepare<[string], Book>(`SELECT project_id FROM books WHERE id = ?`);
+    const bookStmt = db.prepare<[string], Book & { book_number: number }>(`SELECT project_id, book_number FROM books WHERE id = ?`);
     const book = bookStmt.get(req.params.id);
     if (book) {
       cache.invalidate(`series-bible:${book.project_id}`);
+
+      // Sync project title with book title for standalone projects
+      // When first book's title changes, update the project title to match
+      if (title && book.book_number === 1) {
+        try {
+          const projectStmt = db.prepare<[string], { type: string }>(`
+            SELECT type FROM projects WHERE id = ?
+          `);
+          const project = projectStmt.get(book.project_id);
+
+          if (project && project.type === 'standalone') {
+            const updateProjectStmt = db.prepare(`
+              UPDATE projects SET title = ?, updated_at = ?
+              WHERE id = ?
+            `);
+            updateProjectStmt.run(title, new Date().toISOString(), book.project_id);
+            logger.debug({ projectId: book.project_id, title }, 'Synced project title with book title');
+          }
+        } catch (syncError: any) {
+          // Log but don't fail - title sync is secondary
+          logger.warn({ error: syncError.message, bookId: req.params.id }, 'Failed to sync project title with book title');
+        }
+      }
     }
 
     res.json({ success: true });

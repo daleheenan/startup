@@ -1,6 +1,10 @@
 /**
  * Tests for useNavigationCounts hook
- * Tests navigation badge count fetching and filtering logic
+ * Tests navigation badge count fetching from the optimised single endpoint
+ *
+ * SINGLE-USER FIX: The hook now uses a single optimised endpoint instead of
+ * 3 separate endpoints, and gracefully handles errors by returning default
+ * counts instead of throwing.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -8,8 +12,6 @@ import { waitFor } from '@testing-library/react';
 import {
   renderHookWithProviders,
   createMockResponse,
-  storyIdeaFactory,
-  projectFactory,
 } from '../../test/test-utils';
 import { useNavigationCounts } from '../useNavigationCounts';
 
@@ -31,200 +33,219 @@ describe('useNavigationCounts', () => {
     vi.restoreAllMocks();
   });
 
-  it('should fetch and calculate navigation counts correctly', async () => {
-    // Setup mock data
-    const mockIdeas = [
-      { id: '1', status: 'saved' },
-      { id: '2', status: 'saved' },
-      { id: '3', status: 'expanded' }, // Should not count
-    ];
-    const mockConcepts = [
-      { id: '1', status: 'saved' },
-      { id: '2', status: 'used' }, // Should not count
-    ];
-    const mockProjects = [
-      { id: '1', status: 'active' },
-      { id: '2', status: 'active' },
-      { id: '3', status: 'completed' }, // Should not count
-    ];
-
-    // Setup sequential mock responses
-    mockFetchWithAuth
-      .mockResolvedValueOnce(createMockResponse(mockIdeas))
-      .mockResolvedValueOnce(createMockResponse(mockConcepts))
-      .mockResolvedValueOnce(createMockResponse(mockProjects));
+  it('should fetch navigation counts from the optimised endpoint', async () => {
+    // Mock the optimised endpoint response
+    mockFetchWithAuth.mockResolvedValueOnce(
+      createMockResponse({
+        success: true,
+        counts: {
+          storyIdeas: 5,
+          savedConcepts: 3,
+          activeProjects: 2,
+        },
+      })
+    );
 
     const { result } = renderHookWithProviders(() => useNavigationCounts());
 
-    // Initially loading
-    expect(result.current.isLoading).toBe(true);
-
+    // Wait for the actual fetched data (not placeholder)
+    // With placeholderData, isSuccess is true immediately, so we need to
+    // wait for the actual data values
     await waitFor(() => {
-      expect(result.current.isSuccess).toBe(true);
+      expect(result.current.data?.storyIdeas).toBe(5);
     });
 
-    // Verify counts
+    // Verify full counts
     expect(result.current.data).toEqual({
-      storyIdeas: 2,      // 2 with status 'saved'
-      savedConcepts: 1,   // 1 with status 'saved'
-      activeProjects: 2,  // 2 not completed
+      storyIdeas: 5,
+      savedConcepts: 3,
+      activeProjects: 2,
     });
   });
 
-  it('should return zero counts when arrays are empty', async () => {
-    mockFetchWithAuth
-      .mockResolvedValueOnce(createMockResponse([]))
-      .mockResolvedValueOnce(createMockResponse([]))
-      .mockResolvedValueOnce(createMockResponse([]));
-
-    const { result } = renderHookWithProviders(() => useNavigationCounts());
-
-    await waitFor(() => {
-      expect(result.current.isSuccess).toBe(true);
-    });
-
-    expect(result.current.data).toEqual({
-      storyIdeas: 0,
-      savedConcepts: 0,
-      activeProjects: 0,
-    });
-  });
-
-  it('should handle non-array responses gracefully', async () => {
-    // API returns unexpected format
-    mockFetchWithAuth
-      .mockResolvedValueOnce(createMockResponse(null))
-      .mockResolvedValueOnce(createMockResponse({ error: 'Not found' }))
-      .mockResolvedValueOnce(createMockResponse('invalid'));
-
-    const { result } = renderHookWithProviders(() => useNavigationCounts());
-
-    await waitFor(() => {
-      expect(result.current.isSuccess).toBe(true);
-    });
-
-    // Should default to 0 for non-array responses
-    expect(result.current.data).toEqual({
-      storyIdeas: 0,
-      savedConcepts: 0,
-      activeProjects: 0,
-    });
-  });
-
-  it('should make parallel API calls to all three endpoints', async () => {
-    mockFetchWithAuth
-      .mockResolvedValueOnce(createMockResponse([]))
-      .mockResolvedValueOnce(createMockResponse([]))
-      .mockResolvedValueOnce(createMockResponse([]));
+  it('should call the single optimised endpoint', async () => {
+    mockFetchWithAuth.mockResolvedValueOnce(
+      createMockResponse({
+        success: true,
+        counts: {
+          storyIdeas: 0,
+          savedConcepts: 0,
+          activeProjects: 0,
+        },
+      })
+    );
 
     renderHookWithProviders(() => useNavigationCounts());
 
     await waitFor(() => {
-      expect(mockFetchWithAuth).toHaveBeenCalledTimes(3);
+      expect(mockFetchWithAuth).toHaveBeenCalledTimes(1);
     });
 
-    // Verify correct endpoints called
-    expect(mockFetchWithAuth).toHaveBeenCalledWith('/api/story-ideas/saved');
-    expect(mockFetchWithAuth).toHaveBeenCalledWith('/api/saved-concepts');
-    expect(mockFetchWithAuth).toHaveBeenCalledWith('/api/projects');
+    // Verify the correct endpoint is called with timeout options
+    expect(mockFetchWithAuth).toHaveBeenCalledWith(
+      '/api/navigation/counts',
+      expect.objectContaining({
+        retries: 1,
+        timeout: 10000,
+      })
+    );
   });
 
-  it('should handle API error gracefully', async () => {
-    // Mock all retries to fail
-    mockFetchWithAuth.mockRejectedValue(new Error('Network error'));
-
-    const { result } = renderHookWithProviders(() => useNavigationCounts());
-
-    // Hook has retry: 1, so wait for both attempts to fail
-    await waitFor(
-      () => {
-        expect(result.current.isError).toBe(true);
-      },
-      { timeout: 5000 }
+  it('should return zero counts when response has no counts', async () => {
+    mockFetchWithAuth.mockResolvedValueOnce(
+      createMockResponse({
+        success: true,
+        // No counts property - should default to zeros
+      })
     );
 
-    expect(result.current.error).toBeDefined();
-  });
-
-  it('should only count saved story ideas', async () => {
-    const mockIdeas = [
-      { id: '1', status: 'saved' },
-      { id: '2', status: 'saved' },
-      { id: '3', status: 'expanded' },
-      { id: '4', status: 'draft' },
-      { id: '5', status: 'archived' },
-    ];
-
-    mockFetchWithAuth
-      .mockResolvedValueOnce(createMockResponse(mockIdeas))
-      .mockResolvedValueOnce(createMockResponse([]))
-      .mockResolvedValueOnce(createMockResponse([]));
-
     const { result } = renderHookWithProviders(() => useNavigationCounts());
 
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(result.current.data?.storyIdeas).toBe(2);
+    expect(result.current.data).toEqual({
+      storyIdeas: 0,
+      savedConcepts: 0,
+      activeProjects: 0,
+    });
   });
 
-  it('should only count saved concepts', async () => {
-    const mockConcepts = [
-      { id: '1', status: 'saved' },
-      { id: '2', status: 'saved' },
-      { id: '3', status: 'saved' },
-      { id: '4', status: 'used' },
-      { id: '5', status: 'archived' },
-    ];
+  it('should return default counts on API error instead of throwing', async () => {
+    // Suppress console.warn for this test
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    mockFetchWithAuth
-      .mockResolvedValueOnce(createMockResponse([]))
-      .mockResolvedValueOnce(createMockResponse(mockConcepts))
-      .mockResolvedValueOnce(createMockResponse([]));
+    // Mock API error
+    mockFetchWithAuth.mockRejectedValueOnce(new Error('Network error'));
 
     const { result } = renderHookWithProviders(() => useNavigationCounts());
 
+    // The hook should succeed with default values, not error
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(result.current.data?.savedConcepts).toBe(3);
+    // Should return default counts instead of throwing
+    expect(result.current.data).toEqual({
+      storyIdeas: 0,
+      savedConcepts: 0,
+      activeProjects: 0,
+    });
+    expect(result.current.isError).toBe(false);
+
+    warnSpy.mockRestore();
   });
 
-  it('should count all non-completed projects as active', async () => {
-    const mockProjects = [
-      { id: '1', status: 'active' },
-      { id: '2', status: 'in_progress' },
-      { id: '3', status: 'draft' },
-      { id: '4', status: 'completed' }, // Should not count
-      { id: '5', status: 'completed' }, // Should not count
-    ];
+  it('should return default counts on non-ok response instead of throwing', async () => {
+    // Suppress console.warn for this test
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    mockFetchWithAuth
-      .mockResolvedValueOnce(createMockResponse([]))
-      .mockResolvedValueOnce(createMockResponse([]))
-      .mockResolvedValueOnce(createMockResponse(mockProjects));
+    // Mock non-ok response
+    mockFetchWithAuth.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: async () => ({ error: 'Server error' }),
+    });
 
     const { result } = renderHookWithProviders(() => useNavigationCounts());
 
+    // The hook should succeed with default values
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(result.current.data?.activeProjects).toBe(3);
+    expect(result.current.data).toEqual({
+      storyIdeas: 0,
+      savedConcepts: 0,
+      activeProjects: 0,
+    });
+    expect(result.current.isError).toBe(false);
+
+    warnSpy.mockRestore();
+  });
+
+  it('should provide placeholder data while loading', async () => {
+    // Set up a delayed response
+    mockFetchWithAuth.mockImplementation(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(
+            () =>
+              resolve(
+                createMockResponse({
+                  success: true,
+                  counts: {
+                    storyIdeas: 5,
+                    savedConcepts: 3,
+                    activeProjects: 2,
+                  },
+                })
+              ),
+            100
+          )
+        )
+    );
+
+    const { result } = renderHookWithProviders(() => useNavigationCounts());
+
+    // While loading, should have placeholder data (default counts)
+    expect(result.current.data).toEqual({
+      storyIdeas: 0,
+      savedConcepts: 0,
+      activeProjects: 0,
+    });
+
+    // Wait for actual data
+    await waitFor(() => {
+      expect(result.current.data?.storyIdeas).toBe(5);
+    });
   });
 
   it('should use query key navigation-counts', async () => {
-    mockFetchWithAuth
-      .mockResolvedValueOnce(createMockResponse([]))
-      .mockResolvedValueOnce(createMockResponse([]))
-      .mockResolvedValueOnce(createMockResponse([]));
+    mockFetchWithAuth.mockResolvedValueOnce(
+      createMockResponse({
+        success: true,
+        counts: {
+          storyIdeas: 0,
+          savedConcepts: 0,
+          activeProjects: 0,
+        },
+      })
+    );
 
     const { queryClient } = renderHookWithProviders(() => useNavigationCounts());
 
     await waitFor(() => {
       expect(queryClient.getQueryData(['navigation-counts'])).toBeDefined();
     });
+  });
+
+  it('should have appropriate caching settings', async () => {
+    mockFetchWithAuth.mockResolvedValue(
+      createMockResponse({
+        success: true,
+        counts: {
+          storyIdeas: 1,
+          savedConcepts: 1,
+          activeProjects: 1,
+        },
+      })
+    );
+
+    const { result } = renderHookWithProviders(() => useNavigationCounts());
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    // First call made
+    expect(mockFetchWithAuth).toHaveBeenCalledTimes(1);
+
+    // Render hook again - should use cached data, not refetch
+    const { result: result2 } = renderHookWithProviders(() => useNavigationCounts());
+
+    // Data should be immediately available from cache
+    expect(result2.current.data).toBeDefined();
   });
 });

@@ -195,37 +195,53 @@ app.use(express.json({ limit: '10mb' }));
 // Request logging with correlation IDs
 app.use(requestLogger());
 
-// Rate limiting for auth endpoints
-const authLimiter = rateLimit({
-  windowMs: RateLimitConfig.AUTH.WINDOW_MS,
-  max: RateLimitConfig.AUTH.MAX_REQUESTS,
-  message: { error: { code: 'RATE_LIMITED', message: 'Too many login attempts, please try again later' } },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+// Rate limiting configuration
+// NOTE: Rate limiting is DISABLED by default for single-user sites to prevent
+// "Failed to fetch" errors during normal navigation. Enable via ENABLE_RATE_LIMITING=true
 
-// General API rate limiting
-const apiLimiter = rateLimit({
-  windowMs: RateLimitConfig.API.WINDOW_MS,
-  max: RateLimitConfig.API.MAX_REQUESTS,
-  message: { error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down' } },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+// Auth rate limiter - only active when rate limiting is enabled
+const authLimiter = RateLimitConfig.ENABLED
+  ? rateLimit({
+      windowMs: RateLimitConfig.AUTH.WINDOW_MS,
+      max: RateLimitConfig.AUTH.MAX_REQUESTS,
+      message: { error: { code: 'RATE_LIMITED', message: 'Too many login attempts, please try again later' } },
+      standardHeaders: true,
+      legacyHeaders: false,
+    })
+  : (_req: express.Request, _res: express.Response, next: express.NextFunction) => next();
+
+// General API rate limiter - only active when rate limiting is enabled
+const apiLimiter = RateLimitConfig.ENABLED
+  ? rateLimit({
+      windowMs: RateLimitConfig.API.WINDOW_MS,
+      max: RateLimitConfig.API.MAX_REQUESTS,
+      message: { error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down' } },
+      standardHeaders: true,
+      legacyHeaders: false,
+    })
+  : (_req: express.Request, _res: express.Response, next: express.NextFunction) => next();
 
 // Routes that should be exempt from rate limiting (admin/migration operations)
 const rateLimitExemptPaths = [
   /\/api\/books\/[^/]+\/migrate-chapters$/,  // Version migration
 ];
 
-// Conditional rate limiter that skips certain paths
+// Conditional rate limiter that skips certain paths (or all paths if rate limiting disabled)
 const conditionalApiLimiter = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (!RateLimitConfig.ENABLED) {
+    return next();
+  }
   const isExempt = rateLimitExemptPaths.some(pattern => pattern.test(req.path));
   if (isExempt) {
     return next();
   }
   return apiLimiter(req, res, next);
 };
+
+// Log rate limiting status at startup
+if (process.env.NODE_ENV !== 'test') {
+  console.log(`[Server] Rate limiting: ${RateLimitConfig.ENABLED ? 'ENABLED' : 'DISABLED (single-user mode)'}`);
+}
 
 // Public Routes (no auth required, no rate limiting)
 app.use('/api/health', healthRouter);
