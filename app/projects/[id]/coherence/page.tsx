@@ -12,10 +12,15 @@ import { useProjectNavigation } from '@/app/hooks';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+interface Suggestion {
+  issue: string;
+  remediation: string;
+}
+
 interface CoherenceResult {
   isCoherent: boolean;
   warnings: string[];
-  suggestions: string[];
+  suggestions: Array<string | Suggestion>; // Support both old (string) and new (object) formats
   plotAnalysis: Array<{
     plotName: string;
     isCoherent: boolean;
@@ -24,6 +29,14 @@ interface CoherenceResult {
   checkedAt?: string;
   status?: string;
   error?: string;
+}
+
+// Helper to normalise suggestions to the new format
+function normaliseSuggestion(suggestion: string | Suggestion): Suggestion {
+  if (typeof suggestion === 'string') {
+    return { issue: suggestion, remediation: '' };
+  }
+  return suggestion;
 }
 
 interface PlotLayer {
@@ -650,89 +663,107 @@ export default function CoherencePage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {coherenceResult.suggestions
                 .slice(suggestionPage * SUGGESTIONS_PER_PAGE, (suggestionPage + 1) * SUGGESTIONS_PER_PAGE)
-                .map((suggestion, localIndex) => {
+                .map((rawSuggestion, localIndex) => {
                   const globalIndex = suggestionPage * SUGGESTIONS_PER_PAGE + localIndex;
                   const isImplemented = implementedSuggestions.has(globalIndex);
+                  const suggestion = normaliseSuggestion(rawSuggestion);
                   return (
                 <div
                   key={globalIndex}
                   style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: '1rem',
                     padding: '1rem',
                     background: isImplemented ? '#ECFDF5' : 'white',
                     borderRadius: borderRadius.md,
                     border: `1px solid ${isImplemented ? '#A7F3D0' : '#E0E7FF'}`,
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', flex: 1 }}>
-                    <span style={{ fontSize: '1.25rem' }}>
-                      {isImplemented ? '✓' : '💡'}
-                    </span>
-                    <p style={{
-                      margin: 0,
-                      color: isImplemented ? '#047857' : '#374151',
-                      fontSize: '0.9375rem',
-                      textDecoration: isImplemented ? 'line-through' : 'none',
-                      opacity: isImplemented ? 0.7 : 1,
-                    }}>
-                      <span style={{ fontWeight: 600, color: isImplemented ? '#047857' : '#4F46E5', marginRight: '0.5rem' }}>
-                        #{globalIndex + 1}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', flex: 1 }}>
+                      <span style={{ fontSize: '1.25rem' }}>
+                        {isImplemented ? '✓' : '💡'}
                       </span>
-                      {suggestion}
-                    </p>
+                      <div style={{ flex: 1 }}>
+                        <p style={{
+                          margin: 0,
+                          color: isImplemented ? '#047857' : '#374151',
+                          fontSize: '0.9375rem',
+                          fontWeight: 500,
+                          textDecoration: isImplemented ? 'line-through' : 'none',
+                          opacity: isImplemented ? 0.7 : 1,
+                        }}>
+                          <span style={{ fontWeight: 600, color: isImplemented ? '#047857' : '#4F46E5', marginRight: '0.5rem' }}>
+                            #{globalIndex + 1}
+                          </span>
+                          {suggestion.issue}
+                        </p>
+                        {suggestion.remediation && !isImplemented && (
+                          <p style={{
+                            margin: '0.5rem 0 0 0',
+                            padding: '0.5rem 0.75rem',
+                            background: '#F0F4FF',
+                            borderRadius: borderRadius.sm,
+                            color: '#4338CA',
+                            fontSize: '0.8125rem',
+                            lineHeight: 1.5,
+                            borderLeft: '3px solid #818CF8',
+                          }}>
+                            <strong style={{ color: '#4F46E5' }}>Proposed fix:</strong> {suggestion.remediation}
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  {!isImplemented && (
-                    <button
-                      onClick={() => implementSuggestion(suggestion, globalIndex)}
-                      disabled={implementing === suggestion}
-                      style={{
+                  <div style={{ display: 'flex', alignItems: 'flex-start', flexShrink: 0 }}>
+                    {!isImplemented && (
+                      <button
+                        onClick={() => implementSuggestion(suggestion.issue, globalIndex)}
+                        disabled={implementing === suggestion.issue}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          background: implementing === suggestion.issue ? '#E5E7EB' : '#667eea',
+                          border: 'none',
+                          borderRadius: borderRadius.md,
+                          color: 'white',
+                          fontSize: '0.8125rem',
+                          fontWeight: 500,
+                          cursor: implementing === suggestion.issue ? 'wait' : 'pointer',
+                          whiteSpace: 'nowrap',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.375rem',
+                        }}
+                      >
+                        {implementing === suggestion.issue ? (
+                          <>
+                            <span style={{
+                              display: 'inline-block',
+                              width: '12px',
+                              height: '12px',
+                              border: '2px solid rgba(255,255,255,0.3)',
+                              borderTopColor: 'white',
+                              borderRadius: '50%',
+                              animation: 'spin 1s linear infinite',
+                            }} />
+                            Implementing...
+                          </>
+                        ) : (
+                          'Implement'
+                        )}
+                      </button>
+                    )}
+                    {isImplemented && (
+                      <span style={{
                         padding: '0.5rem 1rem',
-                        background: implementing === suggestion ? '#E5E7EB' : '#667eea',
-                        border: 'none',
+                        background: '#D1FAE5',
                         borderRadius: borderRadius.md,
-                        color: 'white',
+                        color: '#047857',
                         fontSize: '0.8125rem',
                         fontWeight: 500,
-                        cursor: implementing === suggestion ? 'wait' : 'pointer',
-                        whiteSpace: 'nowrap',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.375rem',
-                      }}
-                    >
-                      {implementing === suggestion ? (
-                        <>
-                          <span style={{
-                            display: 'inline-block',
-                            width: '12px',
-                            height: '12px',
-                            border: '2px solid rgba(255,255,255,0.3)',
-                            borderTopColor: 'white',
-                            borderRadius: '50%',
-                            animation: 'spin 1s linear infinite',
-                          }} />
-                          Implementing...
-                        </>
-                      ) : (
-                        'Implement'
-                      )}
-                    </button>
-                  )}
-                  {isImplemented && (
-                    <span style={{
-                      padding: '0.5rem 1rem',
-                      background: '#D1FAE5',
-                      borderRadius: borderRadius.md,
-                      color: '#047857',
-                      fontSize: '0.8125rem',
-                      fontWeight: 500,
-                    }}>
-                      Implemented
-                    </span>
-                  )}
+                      }}>
+                        Implemented
+                      </span>
+                    )}
+                  </div>
                 </div>
                   );
                 })}

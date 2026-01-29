@@ -1307,7 +1307,10 @@ Output only valid JSON, no commentary:`;
         `).run(
           checkId, projectId, now,
           JSON.stringify(['No plots defined. Your story needs at least a main plot to generate a quality outline.']),
-          JSON.stringify(['Visit the Plot page to define your main plot and subplots.'])
+          JSON.stringify([{
+            issue: 'No plots defined for this story.',
+            remediation: 'Visit the Plot page to define your main plot (golden thread) and any subplots that weave through your narrative.',
+          }])
         );
 
         logger.info({ projectId, checkId }, 'coherence_check: No plots to validate');
@@ -1318,11 +1321,14 @@ Output only valid JSON, no commentary:`;
       // Check for main plot
       const hasMainPlot = plotStructure.plot_layers.some((l: any) => l.type === 'main');
       const warnings: string[] = [];
-      const suggestions: string[] = [];
+      const suggestions: Array<{ issue: string; remediation: string }> = [];
 
       if (!hasMainPlot) {
         warnings.push('No main plot (golden thread) defined. Every novel needs a central narrative arc.');
-        suggestions.push('Convert one of your subplots to main plot, or create a new main plot that ties everything together.');
+        suggestions.push({
+          issue: 'No main plot (golden thread) defined.',
+          remediation: 'Convert one of your subplots to main plot type, or create a new main plot that ties all the narrative threads together as the central story arc.',
+        });
       }
 
       // Build context for AI validation
@@ -1375,7 +1381,12 @@ Return ONLY a JSON object:
     }
   ],
   "overallWarnings": ["Any warnings about the plot structure"],
-  "suggestions": ["Actionable suggestions for improvement"]
+  "suggestions": [
+    {
+      "issue": "Brief description of the coherence issue (1 sentence)",
+      "remediation": "Specific way the AI would fix this (1-2 sentences explaining the approach)"
+    }
+  ]
 }`,
         }],
       });
