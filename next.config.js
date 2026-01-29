@@ -33,7 +33,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https:",
       "font-src 'self'",
-      "connect-src 'self' http://localhost:3001 https://novelforge-production.up.railway.app",
+      "connect-src 'self' http://localhost:3001 https://novelforge-backend-production.up.railway.app",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
