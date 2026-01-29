@@ -25,6 +25,7 @@ import {
   useDeleteStoryIdea,
   useUpdateStoryIdea,
   useExpandStoryIdea,
+  useCreateStoryIdea,
 } from '@/app/hooks/useStoryIdeas';
 import type { SavedStoryIdea, IdeaExpansionMode } from '@/shared/types';
 
@@ -34,8 +35,19 @@ export default function StoryIdeasPage() {
   const deleteIdeaMutation = useDeleteStoryIdea();
   const updateIdeaMutation = useUpdateStoryIdea();
   const expandIdeaMutation = useExpandStoryIdea();
+  const createIdeaMutation = useCreateStoryIdea();
 
   const [selectedIdeaId, setSelectedIdeaId] = useState<string | null>(null);
+  const [isAddingIdea, setIsAddingIdea] = useState(false);
+  const [addIdeaForm, setAddIdeaForm] = useState({
+    premise: '',
+    timePeriod: '',
+    characterConcepts: [''],
+    plotElements: [''],
+    uniqueTwists: [''],
+    notes: '',
+  });
+  const [addIdeaError, setAddIdeaError] = useState<string | null>(null);
   const [editingIdea, setEditingIdea] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<SavedStoryIdea>>({});
   const [filterGenre, setFilterGenre] = useState<string>('all');
@@ -151,7 +163,7 @@ export default function StoryIdeasPage() {
   // Reset to page 1 when filters change
   useMemo(() => {
     setCurrentPage(1);
-  }, [filterGenre, filterStatus]);
+  }, [filterGenre, filterStatus, filterDateRange, sortOrder]);
 
   // Selected idea details
   const selectedIdea = useMemo(() =>
@@ -234,6 +246,85 @@ export default function StoryIdeasPage() {
     setIsCheckingOriginality(false);
   };
 
+  // Handle adding a new idea manually
+  const handleStartAddIdea = () => {
+    setIsAddingIdea(true);
+    setAddIdeaForm({
+      premise: '',
+      timePeriod: '',
+      characterConcepts: [''],
+      plotElements: [''],
+      uniqueTwists: [''],
+      notes: '',
+    });
+    setAddIdeaError(null);
+  };
+
+  const handleCancelAddIdea = () => {
+    setIsAddingIdea(false);
+    setAddIdeaForm({
+      premise: '',
+      timePeriod: '',
+      characterConcepts: [''],
+      plotElements: [''],
+      uniqueTwists: [''],
+      notes: '',
+    });
+    setAddIdeaError(null);
+  };
+
+  const handleSaveAddIdea = async () => {
+    setAddIdeaError(null);
+
+    if (!addIdeaForm.premise.trim() || addIdeaForm.premise.trim().length < 10) {
+      setAddIdeaError('Please enter a premise of at least 10 characters');
+      return;
+    }
+
+    try {
+      const result = await createIdeaMutation.mutateAsync({
+        premise: addIdeaForm.premise.trim(),
+        timePeriod: addIdeaForm.timePeriod.trim() || undefined,
+        characterConcepts: addIdeaForm.characterConcepts.filter(c => c.trim()),
+        plotElements: addIdeaForm.plotElements.filter(p => p.trim()),
+        uniqueTwists: addIdeaForm.uniqueTwists.filter(t => t.trim()),
+        notes: addIdeaForm.notes.trim() || undefined,
+      });
+
+      // Select the newly created idea
+      setSelectedIdeaId(result.idea.id);
+      setIsAddingIdea(false);
+      setAddIdeaForm({
+        premise: '',
+        timePeriod: '',
+        characterConcepts: [''],
+        plotElements: [''],
+        uniqueTwists: [''],
+        notes: '',
+      });
+    } catch (err: any) {
+      console.error('Error creating idea:', err);
+      setAddIdeaError(err.message || 'Failed to create story idea');
+    }
+  };
+
+  const updateAddFormArrayItem = (field: 'characterConcepts' | 'plotElements' | 'uniqueTwists', index: number, value: string) => {
+    const arr = [...addIdeaForm[field]];
+    arr[index] = value;
+    setAddIdeaForm({ ...addIdeaForm, [field]: arr });
+  };
+
+  const addAddFormArrayItem = (field: 'characterConcepts' | 'plotElements' | 'uniqueTwists') => {
+    setAddIdeaForm({ ...addIdeaForm, [field]: [...addIdeaForm[field], ''] });
+  };
+
+  const removeAddFormArrayItem = (field: 'characterConcepts' | 'plotElements' | 'uniqueTwists', index: number) => {
+    const arr = [...addIdeaForm[field]];
+    arr.splice(index, 1);
+    if (arr.length === 0) arr.push(''); // Keep at least one empty field
+    setAddIdeaForm({ ...addIdeaForm, [field]: arr });
+  };
+
   // Reset tab when selected idea changes - keep on details unless user was on originality
   const handleSelectIdea = (ideaId: string) => {
     if (ideaId !== selectedIdeaId) {
@@ -288,21 +379,38 @@ export default function StoryIdeasPage() {
           title="No Story Ideas Yet"
           message="Generate quick story ideas to save and develop later into full concepts."
           action={
-            <Link
-              href="/new?mode=quick"
-              style={{
-                display: 'inline-block',
-                padding: '0.75rem 1.5rem',
-                background: `linear-gradient(135deg, ${colors.brandStart} 0%, ${colors.brandEnd} 100%)`,
-                borderRadius: borderRadius.md,
-                color: 'white',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                textDecoration: 'none',
-              }}
-            >
-              Generate Ideas
-            </Link>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'center' }}>
+              <Link
+                href="/new?mode=quick"
+                style={{
+                  display: 'inline-block',
+                  padding: '0.75rem 1.5rem',
+                  background: `linear-gradient(135deg, ${colors.brandStart} 0%, ${colors.brandEnd} 100%)`,
+                  borderRadius: borderRadius.md,
+                  color: 'white',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                }}
+              >
+                Generate Ideas
+              </Link>
+              <button
+                onClick={handleStartAddIdea}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: colors.surface,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: borderRadius.md,
+                  color: colors.text,
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                Add Your Own Idea
+              </button>
+            </div>
           }
         />
       );
@@ -346,6 +454,265 @@ export default function StoryIdeasPage() {
 
   // Render the right pane detail view
   const renderRightPane = () => {
+    // Add new idea mode
+    if (isAddingIdea) {
+      const labelStyle = {
+        display: 'block',
+        fontSize: '0.875rem',
+        fontWeight: 500,
+        color: colors.text,
+        marginBottom: '0.5rem',
+      };
+
+      const textareaStyle = {
+        width: '100%',
+        padding: '0.75rem',
+        border: `1px solid ${colors.border}`,
+        borderRadius: borderRadius.sm,
+        fontSize: '0.9375rem',
+        resize: 'vertical' as const,
+      };
+
+      const inputStyle = {
+        width: '100%',
+        padding: '0.75rem',
+        border: `1px solid ${colors.border}`,
+        borderRadius: borderRadius.sm,
+        fontSize: '0.9375rem',
+      };
+
+      return (
+        <div style={{ padding: '1.5rem', overflowY: 'auto', height: '100%' }}>
+          <h3 style={{
+            fontSize: '1.125rem',
+            fontWeight: 600,
+            color: colors.text,
+            marginBottom: '0.5rem',
+          }}>
+            Add Your Own Story Idea
+          </h3>
+          <p style={{
+            fontSize: '0.875rem',
+            color: colors.textSecondary,
+            marginBottom: '1.5rem',
+          }}>
+            Enter your story premise and we'll automatically infer the genre. You can then expand it to full concepts.
+          </p>
+
+          {addIdeaError && (
+            <div style={{
+              background: colors.errorLight,
+              border: `1px solid ${colors.errorBorder}`,
+              borderRadius: borderRadius.sm,
+              padding: '0.75rem 1rem',
+              marginBottom: '1rem',
+              color: colors.error,
+              fontSize: '0.875rem',
+            }}>
+              {addIdeaError}
+            </div>
+          )}
+
+          {/* Premise (Required) */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={labelStyle}>
+              Premise <span style={{ color: colors.error }}>*</span>
+            </label>
+            <textarea
+              value={addIdeaForm.premise}
+              onChange={(e) => setAddIdeaForm({ ...addIdeaForm, premise: e.target.value })}
+              placeholder="Describe your story idea in a few sentences. The genre will be automatically inferred from your description."
+              style={{ ...textareaStyle, minHeight: '120px' }}
+            />
+            <p style={{ fontSize: '0.75rem', color: colors.textTertiary, marginTop: '0.25rem' }}>
+              At least 10 characters. The more detail you provide, the better the genre inference.
+            </p>
+          </div>
+
+          {/* Time Period (Optional) */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={labelStyle}>Time Period (Optional)</label>
+            <input
+              type="text"
+              value={addIdeaForm.timePeriod}
+              onChange={(e) => setAddIdeaForm({ ...addIdeaForm, timePeriod: e.target.value })}
+              placeholder="e.g., Medieval, Victorian Era, Year 2350, Contemporary"
+              style={inputStyle}
+            />
+            <p style={{ fontSize: '0.75rem', color: colors.textTertiary, marginTop: '0.25rem' }}>
+              Helps with genre inference and story context.
+            </p>
+          </div>
+
+          {/* Character Concepts (Optional) */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={labelStyle}>Character Concepts (Optional)</label>
+            {addIdeaForm.characterConcepts.map((char, i) => (
+              <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <input
+                  type="text"
+                  value={char}
+                  onChange={(e) => updateAddFormArrayItem('characterConcepts', i, e.target.value)}
+                  placeholder="e.g., Elena - A fearless archaeologist with a hidden past"
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+                {addIdeaForm.characterConcepts.length > 1 && (
+                  <button
+                    onClick={() => removeAddFormArrayItem('characterConcepts', i)}
+                    style={{
+                      padding: '0.5rem',
+                      background: colors.errorLight,
+                      border: `1px solid ${colors.errorBorder}`,
+                      borderRadius: borderRadius.sm,
+                      color: colors.error,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              onClick={() => addAddFormArrayItem('characterConcepts')}
+              style={{
+                padding: '0.5rem 1rem',
+                background: colors.surface,
+                border: `1px solid ${colors.border}`,
+                borderRadius: borderRadius.sm,
+                color: colors.text,
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+              }}
+            >
+              + Add Character
+            </button>
+          </div>
+
+          {/* Plot Elements (Optional) */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={labelStyle}>Plot Elements (Optional)</label>
+            {addIdeaForm.plotElements.map((elem, i) => (
+              <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <input
+                  type="text"
+                  value={elem}
+                  onChange={(e) => updateAddFormArrayItem('plotElements', i, e.target.value)}
+                  placeholder="e.g., A race against time to find a lost artefact"
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+                {addIdeaForm.plotElements.length > 1 && (
+                  <button
+                    onClick={() => removeAddFormArrayItem('plotElements', i)}
+                    style={{
+                      padding: '0.5rem',
+                      background: colors.errorLight,
+                      border: `1px solid ${colors.errorBorder}`,
+                      borderRadius: borderRadius.sm,
+                      color: colors.error,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              onClick={() => addAddFormArrayItem('plotElements')}
+              style={{
+                padding: '0.5rem 1rem',
+                background: colors.surface,
+                border: `1px solid ${colors.border}`,
+                borderRadius: borderRadius.sm,
+                color: colors.text,
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+              }}
+            >
+              + Add Plot Element
+            </button>
+          </div>
+
+          {/* Unique Twists (Optional) */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={labelStyle}>Unique Twists (Optional)</label>
+            {addIdeaForm.uniqueTwists.map((twist, i) => (
+              <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <input
+                  type="text"
+                  value={twist}
+                  onChange={(e) => updateAddFormArrayItem('uniqueTwists', i, e.target.value)}
+                  placeholder="e.g., The villain turns out to be the hero's future self"
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+                {addIdeaForm.uniqueTwists.length > 1 && (
+                  <button
+                    onClick={() => removeAddFormArrayItem('uniqueTwists', i)}
+                    style={{
+                      padding: '0.5rem',
+                      background: colors.errorLight,
+                      border: `1px solid ${colors.errorBorder}`,
+                      borderRadius: borderRadius.sm,
+                      color: colors.error,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              onClick={() => addAddFormArrayItem('uniqueTwists')}
+              style={{
+                padding: '0.5rem 1rem',
+                background: colors.surface,
+                border: `1px solid ${colors.border}`,
+                borderRadius: borderRadius.sm,
+                color: colors.text,
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+              }}
+            >
+              + Add Unique Twist
+            </button>
+          </div>
+
+          {/* Notes (Optional) */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={labelStyle}>Notes (Optional)</label>
+            <textarea
+              value={addIdeaForm.notes}
+              onChange={(e) => setAddIdeaForm({ ...addIdeaForm, notes: e.target.value })}
+              placeholder="Any additional notes or thoughts about this idea..."
+              style={{ ...textareaStyle, minHeight: '80px' }}
+            />
+          </div>
+
+          <div style={{
+            display: 'flex',
+            gap: '0.75rem',
+            position: 'sticky',
+            bottom: 0,
+            background: colors.surface,
+            paddingTop: '1rem',
+          }}>
+            <ActionButton
+              variant="primary"
+              onClick={handleSaveAddIdea}
+              disabled={createIdeaMutation.isPending}
+            >
+              {createIdeaMutation.isPending ? 'Saving & Inferring Genre...' : 'Save Idea'}
+            </ActionButton>
+            <ActionButton variant="secondary" onClick={handleCancelAddIdea}>
+              Cancel
+            </ActionButton>
+          </div>
+        </div>
+      );
+    }
+
     if (!selectedIdea) {
       return (
         <SplitViewEmptyState
@@ -797,13 +1164,66 @@ export default function StoryIdeasPage() {
             <option value="used">Used</option>
             <option value="archived">Archived</option>
           </select>
+          <select
+            value={filterDateRange}
+            onChange={(e) => setFilterDateRange(e.target.value)}
+            style={{
+              padding: '0.5rem 1rem',
+              border: `1px solid ${colors.border}`,
+              borderRadius: borderRadius.sm,
+              fontSize: '0.875rem',
+              background: colors.surface,
+              color: colors.text,
+            }}
+          >
+            <option value="all">All Time</option>
+            <option value="today">Today</option>
+            <option value="week">Last 7 Days</option>
+            <option value="month">Last 30 Days</option>
+          </select>
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as 'newest' | 'oldest')}
+            style={{
+              padding: '0.5rem 1rem',
+              border: `1px solid ${colors.border}`,
+              borderRadius: borderRadius.sm,
+              fontSize: '0.875rem',
+              background: colors.surface,
+              color: colors.text,
+            }}
+          >
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+          </select>
           <div style={{
             marginLeft: 'auto',
-            fontSize: '0.875rem',
-            color: colors.textSecondary,
-            alignSelf: 'center',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem',
           }}>
-            {filteredIdeas.length} {filteredIdeas.length === 1 ? 'idea' : 'ideas'}
+            <span style={{
+              fontSize: '0.875rem',
+              color: colors.textSecondary,
+            }}>
+              {filteredIdeas.length} {filteredIdeas.length === 1 ? 'idea' : 'ideas'}
+            </span>
+            <button
+              onClick={handleStartAddIdea}
+              style={{
+                padding: '0.5rem 1rem',
+                background: `linear-gradient(135deg, ${colors.brandStart} 0%, ${colors.brandEnd} 100%)`,
+                border: 'none',
+                borderRadius: borderRadius.sm,
+                color: 'white',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              + Add Your Own
+            </button>
           </div>
         </div>
       )}

@@ -5,6 +5,29 @@ import { fetchWithAuth } from '../lib/fetch-utils';
 import type { SavedStoryIdea, IdeaExpansionMode, SavedStoryConcept } from '../../shared/types';
 
 /**
+ * Parameters for creating a manual story idea
+ */
+export interface CreateStoryIdeaParams {
+  premise: string;
+  timePeriod?: string;
+  characterConcepts?: string[];
+  plotElements?: string[];
+  uniqueTwists?: string[];
+  notes?: string;
+}
+
+/**
+ * Response from creating a manual story idea
+ */
+export interface CreateStoryIdeaResponse {
+  success: boolean;
+  idea: SavedStoryIdea;
+  inference: {
+    confidence: 'high' | 'medium' | 'low';
+  };
+}
+
+/**
  * Fetch all saved story ideas
  */
 async function fetchStoryIdeas(): Promise<SavedStoryIdea[]> {
@@ -15,6 +38,24 @@ async function fetchStoryIdeas(): Promise<SavedStoryIdea[]> {
   const data = await response.json();
   // API returns { success: true, ideas: [...] }
   return data.ideas || [];
+}
+
+/**
+ * Create a manual story idea with automatic genre inference
+ */
+async function createStoryIdea(params: CreateStoryIdeaParams): Promise<CreateStoryIdeaResponse> {
+  const response = await fetchWithAuth('/api/story-ideas/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Failed to create story idea' }));
+    throw new Error(error.message || 'Failed to create story idea');
+  }
+
+  return response.json();
 }
 
 /**
@@ -203,4 +244,23 @@ export function useStoryIdeasByGenre(genre?: string) {
     data: filteredIdeas,
     ...rest,
   };
+}
+
+/**
+ * Hook to create a manual story idea with automatic genre inference
+ */
+export function useCreateStoryIdea() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: CreateStoryIdeaParams) => createStoryIdea(params),
+    onSuccess: (data) => {
+      // Add the new idea to the cache
+      queryClient.setQueryData(['story-idea', data.idea.id], data.idea);
+      // Invalidate the list to refresh
+      queryClient.invalidateQueries({ queryKey: ['story-ideas'] });
+      // Invalidate navigation counts
+      queryClient.invalidateQueries({ queryKey: ['navigation-counts'] });
+    },
+  });
 }

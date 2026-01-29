@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { storyIdeasGenerator, GeneratedIdea, RegeneratableSection } from '../services/story-ideas-generator.js';
+import { genreInferenceService } from '../services/genre-inference.service.js';
 import { sendBadRequest, sendInternalError, sendRateLimitError, isRateLimitError } from '../utils/response-helpers.js';
 import { createLogger } from '../services/logger.service.js';
 import { generateStoryIdeasSchema, regenerateSectionSchema, validateRequest } from '../utils/schemas.js';
@@ -134,6 +135,116 @@ router.post('/save', async (req, res) => {
     });
   } catch (error) {
     sendInternalError(res, error, 'saving story idea');
+  }
+});
+
+/**
+ * POST /api/story-ideas/create
+ * Create a manual story idea with automatic genre inference
+ *
+ * This endpoint allows users to add their own story ideas without
+ * AI generation. The genre is automatically inferred from the premise text.
+ */
+router.post('/create', async (req, res) => {
+  try {
+    const { premise, timePeriod, characterConcepts, plotElements, uniqueTwists, notes } = req.body;
+
+    if (!premise || premise.trim().length < 10) {
+      return sendBadRequest(res, 'Premise must be at least 10 characters long');
+    }
+
+    logger.info({
+      premiseLength: premise.length,
+      timePeriod,
+      hasCharacters: !!characterConcepts?.length,
+      hasPlot: !!plotElements?.length,
+      hasTwists: !!uniqueTwists?.length,
+    }, 'Creating manual story idea with genre inference');
+
+    // Infer genre from the premise text
+    let inferredGenre;
+    try {
+      inferredGenre = await genreInferenceService.inferGenre(premise, timePeriod);
+    } catch (inferError: any) {
+      // If rate limited on genre inference, return that error
+      if (isRateLimitError(inferError)) {
+        return sendRateLimitError(res);
+      }
+      // For other inference errors, log but continue with defaults
+      logger.warn({ error: inferError }, 'Genre inference failed, using defaults');
+      inferredGenre = {
+        genre: 'Other',
+        subgenre: null,
+        tone: null,
+        themes: [],
+        confidence: 'low' as const,
+      };
+    }
+
+    const id = uuidv4();
+    const now = new Date().toISOString();
+
+    const stmt = db.prepare(`
+      INSERT INTO saved_story_ideas (
+        id, story_idea, character_concepts, plot_elements, unique_twists,
+        genre, subgenre, tone, themes, notes, status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'saved', ?, ?)
+    `);
+
+    stmt.run(
+      id,
+      premise.trim(),
+      JSON.stringify(characterConcepts || []),
+      JSON.stringify(plotElements || []),
+      JSON.stringify(uniqueTwists || []),
+      inferredGenre.genre,
+      inferredGenre.subgenre,
+      inferredGenre.tone,
+      JSON.stringify(inferredGenre.themes),
+      notes || null,
+      now,
+      now
+    );
+
+    // Fetch the created idea to return full data
+    const selectStmt = db.prepare('SELECT * FROM saved_story_ideas WHERE id = ?');
+    const row = selectStmt.get(id) as any;
+
+    const idea = {
+      id: row.id,
+      story_idea: row.story_idea,
+      character_concepts: JSON.parse(row.character_concepts || '[]'),
+      plot_elements: JSON.parse(row.plot_elements || '[]'),
+      unique_twists: JSON.parse(row.unique_twists || '[]'),
+      genre: row.genre,
+      subgenre: row.subgenre,
+      tone: row.tone,
+      themes: JSON.parse(row.themes || '[]'),
+      notes: row.notes,
+      status: row.status,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    };
+
+    logger.info({
+      id,
+      genre: inferredGenre.genre,
+      subgenre: inferredGenre.subgenre,
+      confidence: inferredGenre.confidence,
+    }, 'Manual story idea created with inferred genre');
+
+    res.json({
+      success: true,
+      idea,
+      inference: {
+        confidence: inferredGenre.confidence,
+      },
+    });
+  } catch (error) {
+    if (isRateLimitError(error)) {
+      return sendRateLimitError(res);
+    }
+    sendInternalError(res, error, 'creating manual story idea');
   }
 });
 
