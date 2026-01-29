@@ -1,7 +1,7 @@
 # NovelForge - Project Roadmap
 
-**Last Updated**: 2026-01-26
-**Document Version**: 3.0
+**Last Updated**: 2026-01-29
+**Document Version**: 4.0
 
 ---
 
@@ -16,12 +16,13 @@ NovelForge is an AI-powered novel writing platform that transforms story ideas i
 | **Phase 2A: User Experience** (Sprints 16-19) | 161 | ✅ Complete |
 | **Phase 2B: Advanced Features** (Sprints 22-23, 26) | 112 | ✅ Complete |
 | **Phase 2C: Remaining** (Sprints 20-21, 24-25, 27-29, 31) | ~317 | ❌ Not Started |
+| **Phase 2D: Bestseller Features** (Sprints 39-44) | ~255 | ❌ Not Started |
 | **Phase 3B: Testing & Quality** (Sprints 34-37) | 190 | ❌ Not Started |
 | **Sprint 38: Post-Completion Features** | 35 | ❌ Not Started |
 | **Sprint 30: AI Agent Expansion** | 40 | ✅ Complete |
 | **Sprint 32: Virtual Editorial Board** | 55 | ✅ Complete |
 
-**Total Completed**: ~840 points | **Remaining**: ~557 points
+**Total Completed**: ~840 points | **Remaining**: ~812 points
 
 ---
 
@@ -564,6 +565,366 @@ All Chapters Written → Auto-detect Completion
 
 ---
 
+### Phase 2D: Bestseller Features (NEW)
+
+Based on competitive research (Sudowrite, NovelAI, ProWritingAid) and traditional publishing requirements, these sprints add features essential for producing bestselling books.
+
+---
+
+#### Sprint 39: Traditional Publishing Support (~45 points)
+
+**Goal**: Provide complete support for authors pursuing traditional publishing
+
+**Why Needed**: Literary agents require specific submission formats. Authors need query letters, synopses, and properly formatted manuscripts. Currently, authors must use separate tools.
+
+**Competitive Gap**: No AI writing tool provides complete agent submission packages.
+
+| Task | Points | Description |
+|------|--------|-------------|
+| Query letter generator | 8 | 3-paragraph format with hook, synopsis, bio |
+| Query letter templates | 3 | Genre-specific templates (romance, thriller, fantasy, etc.) |
+| 1-2 page synopsis generator | 8 | Beat-by-beat plot summary for agents |
+| Agent submission package export | 5 | Bundle: query + synopsis + first 3 chapters |
+| Manuscript formatting options | 8 | Standard submission format (12pt TNR, 1" margins, .docx) |
+| Title page generator | 3 | Professional title page with contact info, word count |
+| Submission tracker | 5 | Track agent queries, responses, rejections |
+| Comp titles suggester | 5 | Find comparable published titles for query letters |
+
+**Query Letter Structure**:
+```
+Paragraph 1: Hook + premise (2-3 sentences)
+Paragraph 2: Main conflict + stakes (3-4 sentences)
+Paragraph 3: Bio + why this agent (2-3 sentences)
+```
+
+**Synopsis Requirements**:
+- 1-2 pages single-spaced
+- Present tense, third person
+- All major plot points including ending
+- Character motivations clear
+
+**Submission Format Compliance**:
+- 12pt Times New Roman
+- 1-inch margins all sides
+- Double-spaced body text
+- Header: Author surname / TITLE / Page #
+- .docx format (not PDF)
+
+---
+
+#### Sprint 40: ProWritingAid-Style Reports (~50 points)
+
+**Goal**: Provide comprehensive prose analysis reports matching industry-standard tools
+
+**Why Needed**: Authors expect 20+ analysis reports from editing software. ProWritingAid dominates fiction editing because of its pacing, echoes, and dialogue tag reports. NovelForge already has AI analysis but doesn't present it as actionable reports.
+
+**Competitive Gap**: ProWritingAid offers 25+ reports; NovelForge has analytics but not report-style presentation.
+
+| Task | Points | Description |
+|------|--------|-------------|
+| Pacing report | 8 | Visualise slow (narrative) vs fast (dialogue/action) sections |
+| Echoes report | 5 | Highlight repeated words/phrases within proximity |
+| Sentence variety report | 5 | Sentence length distribution, structure patterns |
+| Dialogue tags report | 5 | Identify overused tags, "said" alternatives |
+| Sticky sentences report | 5 | Flag sentences with too many glue words |
+| Readability report | 5 | Grade level, Flesch-Kincaid, complex word percentage |
+| Overused words report | 5 | Personal word frequency vs average |
+| Adverb report | 3 | Flag -ly adverbs, suggest stronger verbs |
+| Passive voice report | 3 | Identify passive constructions |
+| Report dashboard UI | 6 | Unified view with drill-down to specific issues |
+
+**Pacing Report Features**:
+```
+Chapter 1: ████░░████░░░████████░░ (62% fast)
+Chapter 2: ░░░░████░░░░░████░░░░░░ (35% fast) ⚠️ Slow
+Chapter 3: ████████████░░████████ (85% fast) ✓ Action
+
+Legend: █ = dialogue/action, ░ = narrative/description
+```
+
+**Echoes Detection**:
+- Flag same word used within 200 words
+- Exclude common words (the, and, but)
+- Show frequency heatmap
+- One-click navigation to occurrences
+
+**Integration with Existing Analytics**:
+- Extend current Analytics page
+- Add "Reports" tab alongside existing metrics
+- Link to specific paragraphs/sentences for each issue
+- "Fix with AI" option for flagged issues
+
+---
+
+#### Sprint 41: KDP/Publishing-Ready Export (~40 points)
+
+**Goal**: Export publication-ready files for all major platforms
+
+**Why Needed**: Authors currently export DOCX then use Atticus/Vellum for formatting. Direct KDP-ready export removes this friction and positions NovelForge as a complete solution.
+
+**Competitive Gap**: Atticus and Vellum dominate because they produce publication-ready files.
+
+| Task | Points | Description |
+|------|--------|-------------|
+| EPUB export (KDP-compliant) | 8 | Validated against KDP requirements |
+| MOBI export | 5 | Kindle legacy format |
+| Print-ready PDF | 8 | Proper margins, trim sizes, bleed |
+| Front matter templates | 5 | Title page, copyright, dedication, TOC |
+| Back matter templates | 5 | Author bio, also by, preview chapter |
+| ISBN/metadata embedding | 3 | Embed ISBN, author, categories |
+| Multiple trim sizes | 3 | 5x8, 5.5x8.5, 6x9 |
+| Style presets | 3 | Chapter heading styles, fonts, spacing |
+
+**KDP EPUB Requirements**:
+- Valid EPUB 3.0
+- Embedded fonts (subset)
+- Proper TOC with NCX
+- Cover image embedded
+- Metadata complete
+
+**Print PDF Requirements**:
+```
+Trim Size: 6" x 9" (most common)
+Margins:
+  - Inside (gutter): 0.75"
+  - Outside: 0.5"
+  - Top: 0.75"
+  - Bottom: 0.75"
+Bleed: 0.125" (for images)
+```
+
+**Front Matter Order**:
+1. Half title page
+2. Title page
+3. Copyright page
+4. Dedication (optional)
+5. Table of contents
+6. Epigraph (optional)
+
+**Back Matter Order**:
+1. Acknowledgements
+2. Author's note
+3. Also by [Author]
+4. About the author
+5. Preview chapter (optional)
+
+---
+
+#### Sprint 42: Genre Convention Validator (~35 points)
+
+**Goal**: Validate manuscripts meet reader expectations for their genre
+
+**Why Needed**: Genre conventions are non-negotiable. A romance without HEA (Happily Ever After) gets 1-star reviews. A thriller without a ticking clock loses tension. Currently, NovelForge doesn't enforce genre-specific requirements.
+
+**Competitive Gap**: No AI tool validates genre conventions before publication.
+
+| Task | Points | Description |
+|------|--------|-------------|
+| Genre convention database | 8 | Required elements per genre (50+ genres) |
+| Convention validator service | 10 | AI-powered validation against requirements |
+| Validation report UI | 5 | Checklist with pass/fail for each convention |
+| Convention gap warnings | 5 | Alert when required elements missing |
+| Trope library | 4 | 200+ tropes with descriptions |
+| Trope tagging | 3 | Auto-detect tropes in manuscript |
+
+**Genre Conventions Database**:
+
+| Genre | Mandatory Conventions |
+|-------|----------------------|
+| **Romance** | HEA/HFN ending, meet-cute, emotional journey, relationship focus |
+| **Thriller** | Ticking clock, escalating stakes, protagonist in danger, twist/reveal |
+| **Mystery** | Fair clues planted, satisfying reveal, detective figure, crime to solve |
+| **Fantasy** | Magic system, world-building, clear rules, chosen one/quest optional |
+| **Horror** | Atmosphere of dread, monster/threat, isolation, survival stakes |
+| **Sci-Fi** | Technology/science premise, world logic, exploration theme |
+| **Literary** | Character focus, prose quality, thematic depth, ambiguous ending OK |
+
+**Validation Workflow**:
+```
+Manuscript Complete → Run Convention Validator
+                           ↓
+        ┌──────────────────┼──────────────────┐
+        │                  │                  │
+   Check Required     Check Tropes      Check Taboos
+    Conventions        Present          Avoided
+        │                  │                  │
+        └──────────────────┼──────────────────┘
+                           ↓
+              Convention Report
+              ✓ HEA ending present
+              ✓ Meet-cute in Chapter 2
+              ⚠️ Low romantic tension in Act 2
+              ✓ No cheating between leads
+```
+
+**Reader Expectation Warnings**:
+- Romance: "Warning: Leads don't meet until Chapter 5 (typical: Ch 1-2)"
+- Thriller: "Warning: No ticking clock element detected"
+- Mystery: "Warning: Solution involves information not available to reader"
+
+---
+
+#### Sprint 43: Bestseller Formula Integration (~40 points)
+
+**Goal**: Integrate bestseller craft elements into the generation pipeline
+
+**Why Needed**: Research shows bestsellers follow specific patterns. Opening hooks, tension arcs, and character arcs are predictable. Enforcing these patterns increases commercial success likelihood.
+
+**Competitive Gap**: No tool validates against bestseller formulas.
+
+| Task | Points | Description |
+|------|--------|-------------|
+| Opening hook validator | 8 | Score first line/paragraph (1-10) |
+| Weak opener detection | 5 | Flag weather, waking up, mirror descriptions |
+| Tension arc validator | 8 | Score tension per scene, validate escalation |
+| Plateau scene detection | 5 | Flag scenes with flat tension |
+| Character arc validator | 8 | Track want vs need, lie to truth journey |
+| Inciting incident timing | 3 | Ensure inciting incident by Chapter 3 |
+| Bestseller checklist UI | 3 | Interactive checklist before generation |
+
+**Opening Hook Scoring**:
+```
+Score 1-3: Weak - Static description, no character agency
+Score 4-6: Average - Some interest, but passive
+Score 7-8: Good - Immediate engagement, question raised
+Score 9-10: Excellent - Compelling, impossible to stop
+
+Weak Openers to Flag:
+- Weather descriptions ("It was a dark and stormy night...")
+- Character waking up ("John's alarm blared at 6am...")
+- Mirror descriptions ("She studied her reflection...")
+- Information dumps ("In the year 2045, the world had changed...")
+- Passive voice ("The door was opened...")
+```
+
+**Tension Arc Requirements**:
+```
+Act 1: Tension rises from 3 → 5
+Act 2A: Tension peaks at 6-7 (midpoint)
+Act 2B: Tension rises to 7-8 (all is lost)
+Act 3: Climax at 9-10, resolution at 4-5
+
+Plateau Warning: 2+ consecutive scenes at same tension level
+```
+
+**Character Arc Validation**:
+```
+Protagonist Requirements:
+□ Has WANT (external goal)
+□ Has NEED (internal growth)
+□ Believes a LIE at start
+□ Discovers TRUTH by end
+□ Transformation visible in final act
+```
+
+---
+
+#### Sprint 44: Bestseller Mode (~45 points)
+
+**Goal**: Premium mode that enforces all bestseller criteria for commercial success
+
+**Why Needed**: Combines all bestseller features into a single, premium workflow that maximises commercial success likelihood.
+
+**Business Model**: Premium feature at +$20/book on top of base subscription
+
+| Task | Points | Description |
+|------|--------|-------------|
+| Bestseller mode toggle | 5 | Enable/disable in project settings |
+| Pre-generation checklist | 8 | Mandatory validation before generation |
+| Bestseller generation prompts | 10 | Enhanced prompts optimised for commercial fiction |
+| Real-time validation during generation | 8 | Validate as chapters complete |
+| Commercial viability scoring | 5 | Predict market success (1-100) |
+| Marketing package generation | 5 | Auto-generate blurb, tagline, keywords |
+| Bestseller report | 4 | Post-generation comprehensive analysis |
+
+**Bestseller Mode Checklist**:
+```
+PRE-WRITING VALIDATION
+━━━━━━━━━━━━━━━━━━━━━
+□ Strong premise with clear hook
+□ Genre conventions identified
+□ Target tropes selected (min 3)
+□ Comp titles identified (min 2)
+□ Word count target set per genre
+
+STRUCTURE VALIDATION
+━━━━━━━━━━━━━━━━━━━
+□ Save the Cat beats mapped
+□ Inciting incident by Chapter 3
+□ Midpoint reversal present
+□ All is Lost moment placed
+□ Satisfying resolution planned
+
+CHARACTER VALIDATION
+━━━━━━━━━━━━━━━━━━━━
+□ Protagonist has WANT and NEED
+□ Protagonist believes a LIE
+□ Character arc complete by end
+□ Voice samples distinct
+
+GENERATION BLOCKED UNTIL ALL ✓
+```
+
+**Bestseller Mode Enhanced Generation**:
+- All 14 agents enabled (no Draft mode)
+- Opening hook optimisation pass
+- Tension arc enforcement
+- Genre convention compliance
+- Commercial beat validation
+- Post-generation VEB analysis
+
+**Commercial Viability Score**:
+```
+Score Components:
+- Opening Hook Strength: 20%
+- Genre Convention Compliance: 20%
+- Tension Arc Quality: 15%
+- Character Arc Completeness: 15%
+- Trope Effectiveness: 10%
+- Prose Quality (VEB): 10%
+- Market Positioning: 10%
+
+Score 80+: High commercial potential
+Score 60-79: Good with revisions
+Score 40-59: Needs significant work
+Score <40: Major revision required
+```
+
+**Auto-Generated Marketing Package**:
+```
+1. Book Blurb (150-200 words)
+   - Hook line
+   - Setup paragraph
+   - Stakes paragraph
+   - Tagline
+
+2. Amazon Keywords (7)
+   - Genre + subgenre
+   - Tropes
+   - Comp title variants
+
+3. Category Recommendations
+   - Primary BISAC
+   - Secondary BISAC
+   - Amazon browse categories
+
+4. Series Positioning (if applicable)
+   - Series tagline
+   - Book-specific hooks
+```
+
+**Pricing Integration**:
+```
+Base Generation: Included in subscription
+Bestseller Mode: +$20 per book
+  - Includes all validation
+  - Includes marketing package
+  - Includes comprehensive report
+  - Priority queue
+```
+
+---
+
 ## Bug Backlog
 
 ### Remaining Issues
@@ -613,7 +974,7 @@ All Chapters Written → Auto-detect Completion
 ### Phase 3: Security & Revenue (Next 2-3 months)
 
 1. **Sprint 16**: Security Enhancements - Fix auth gaps
-2. **Sprint 20**: Revenue Infrastructure - Enable monetization
+2. **Sprint 20**: Revenue Infrastructure - Enable monetisation
 
 ### Phase 3B: Testing & Quality (Parallel with Phase 3)
 
@@ -622,21 +983,32 @@ All Chapters Written → Auto-detect Completion
 5. **Sprint 36**: Frontend Unit Tests - Components and hooks (50 pts)
 6. **Sprint 37**: Integration & E2E Tests - User journeys (55 pts)
 
-### Phase 4: Growth Features (3-6 months)
+### Phase 4: Bestseller Features (HIGH PRIORITY - 3-6 months)
 
-7. **Sprint 31**: Competitor Analysis & Feature Parity
-8. **Sprint 25**: Publishing & Marketing Tools
-9. **Sprint 28**: Publishing Platform Integration
-10. **Sprint 38**: Post-Completion Features - Auto-analytics, Follow-up page (35 pts) *(NEW)*
+Based on competitive research, these features are critical for market positioning:
 
-### Phase 5: Expansion (6-12 months)
+7. **Sprint 42**: Genre Convention Validator - Ensure reader expectations met (35 pts)
+8. **Sprint 43**: Bestseller Formula Integration - Opening hooks, tension arcs (40 pts)
+9. **Sprint 40**: ProWritingAid-Style Reports - 10 analysis reports (50 pts)
+10. **Sprint 39**: Traditional Publishing Support - Query letters, synopses (45 pts)
+11. **Sprint 41**: KDP/Publishing-Ready Export - EPUB, print PDF (40 pts)
+12. **Sprint 44**: Bestseller Mode - Premium commercial validation (45 pts)
 
-11. **Sprint 32**: Virtual Editorial Board ✅ COMPLETED
-12. **Sprint 21**: Custom AI Training
-13. **Sprint 24**: Visual Enhancements
-14. **Sprint 27**: Collaboration Features
-15. **Sprint 29**: Community & Marketplace
-16. **Sprint 30**: AI Agent Expansion ✅ COMPLETED
+### Phase 5: Growth Features (6-9 months)
+
+13. **Sprint 31**: Competitor Analysis & Feature Parity
+14. **Sprint 25**: Publishing & Marketing Tools
+15. **Sprint 28**: Publishing Platform Integration
+16. **Sprint 38**: Post-Completion Features - Auto-analytics, Follow-up page (35 pts)
+
+### Phase 6: Expansion (9-12 months)
+
+17. **Sprint 32**: Virtual Editorial Board ✅ COMPLETED
+18. **Sprint 21**: Custom AI Training
+19. **Sprint 24**: Visual Enhancements
+20. **Sprint 27**: Collaboration Features
+21. **Sprint 29**: Community & Marketplace
+22. **Sprint 30**: AI Agent Expansion ✅ COMPLETED
 
 ---
 
@@ -662,3 +1034,4 @@ The project will achieve production readiness when:
 | 2.0 | 2026-01-25 | Added testing sprints 12-15 |
 | 3.0 | 2026-01-26 | Consolidated from multiple docs, updated completion status |
 | 4.0 | 2026-01-27 | Added comprehensive testing sprints (34-37), post-completion features (38) |
+| 5.0 | 2026-01-29 | Added Bestseller Features phase (Sprints 39-44): Traditional Publishing Support, ProWritingAid-Style Reports, KDP Export, Genre Convention Validator, Bestseller Formula, Bestseller Mode. Based on competitive research vs Sudowrite, NovelAI, ProWritingAid. |

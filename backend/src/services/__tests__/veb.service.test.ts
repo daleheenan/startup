@@ -14,13 +14,13 @@ jest.mock('../claude.service.js');
 jest.mock('../../db/connection.js');
 jest.mock('../../utils/json-extractor.js');
 
-import { VEBService } from '../editing/veb.js';
+import { VEBService } from '../veb.service.js';
 import type {
   BetaSwarmResult,
   RuthlessEditorResult,
   MarketAnalystResult,
   EditorialReport,
-} from '../editing/veb.js';
+} from '../veb.service.js';
 
 describe('VEBService', () => {
   let service: VEBService;

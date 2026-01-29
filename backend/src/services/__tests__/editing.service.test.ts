@@ -3,7 +3,7 @@ import { jest } from '@jest/globals';
 jest.mock('../claude.service.js');
 jest.mock('../../db/connection.js');
 
-import { EditingService } from '../editing/developmental.js';
+import { EditingService } from '../editing.service.js';
 
 describe('EditingService', () => {
   let service: EditingService;
