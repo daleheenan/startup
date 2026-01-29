@@ -8,6 +8,7 @@ import CloneBookDialog from '../../components/CloneBookDialog';
 import DuplicateProjectDialog from '../../components/DuplicateProjectDialog';
 import CoverImageUpload from '../../components/CoverImageUpload';
 import SearchReplace from '../../components/SearchReplace';
+import BookVersionSelector from '../../components/BookVersionSelector';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
 import ProjectNavigation from '../../components/shared/ProjectNavigation';
 import LoadingState from '../../components/shared/LoadingState';
@@ -577,164 +578,6 @@ export default function ProjectDetailPage() {
       />
 
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        {/* Status Update Section */}
-        <div style={{
-          ...card,
-          marginBottom: '1.5rem',
-          padding: '1.5rem',
-          background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%)',
-          border: `1px solid ${colors.brandBorder}`,
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-            <h2 style={{ fontSize: '1.25rem', color: colors.text, fontWeight: 700, margin: 0 }}>
-              Status Update
-            </h2>
-            <span style={{
-              padding: '0.25rem 0.75rem',
-              borderRadius: borderRadius.md,
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              background: project.status === 'completed' ? colors.successLight :
-                         project.status === 'generating' ? colors.brandLight : colors.warningLight,
-              color: project.status === 'completed' ? colors.success :
-                     project.status === 'generating' ? colors.brandText : colors.warning,
-            }}>
-              {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
-            </span>
-          </div>
-
-          {/* Job Statistics */}
-          {jobStats && (jobStats.running > 0 || jobStats.pending > 0 || jobStats.completed > 0) ? (
-            <div role="status" aria-live="polite" aria-atomic="true">
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-                gap: '1rem',
-                marginBottom: '1rem',
-              }}>
-                {jobStats.running > 0 && (
-                  <div style={{
-                    padding: '0.75rem',
-                    background: colors.brandLight,
-                    borderRadius: borderRadius.md,
-                    textAlign: 'center',
-                  }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: colors.brandText }}>
-                      {jobStats.running}
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: colors.brandText }}>Running</div>
-                  </div>
-                )}
-                {jobStats.pending > 0 && (
-                  <div style={{
-                    padding: '0.75rem',
-                    background: colors.warningLight,
-                    borderRadius: borderRadius.md,
-                    textAlign: 'center',
-                  }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: colors.warning }}>
-                      {jobStats.pending}
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: colors.warning }}>Queued</div>
-                  </div>
-                )}
-                {jobStats.completed > 0 && (
-                  <div style={{
-                    padding: '0.75rem',
-                    background: colors.successLight,
-                    borderRadius: borderRadius.md,
-                    textAlign: 'center',
-                  }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: colors.success }}>
-                      {jobStats.completed}
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: colors.success }}>Completed</div>
-                  </div>
-                )}
-                {jobStats.failed > 0 && (
-                  <div style={{
-                    padding: '0.75rem',
-                    background: colors.errorLight,
-                    borderRadius: borderRadius.md,
-                    textAlign: 'center',
-                  }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: colors.error }}>
-                      {jobStats.failed}
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: colors.error }}>Failed</div>
-                  </div>
-                )}
-              </div>
-
-              {/* Active Jobs List */}
-              {(jobStats.running > 0 || jobStats.pending > 0) && (
-                <div style={{
-                  background: colors.surface,
-                  borderRadius: borderRadius.md,
-                  padding: '1rem',
-                  border: `1px solid ${colors.border}`,
-                }}>
-                  <h4 style={{ fontSize: '0.875rem', fontWeight: 600, color: colors.text, margin: '0 0 0.75rem 0' }}>
-                    Active Jobs
-                  </h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {jobStats.jobs
-                      .filter(j => j.status === 'running' || j.status === 'pending')
-                      .slice(0, 5)
-                      .map((job, index) => (
-                        <div
-                          key={job.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '0.5rem 0.75rem',
-                            background: job.status === 'running' ? 'rgba(102, 126, 234, 0.08)' : 'transparent',
-                            borderRadius: borderRadius.sm,
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span style={{
-                              width: '8px',
-                              height: '8px',
-                              borderRadius: '50%',
-                              background: job.status === 'running' ? colors.brandStart : colors.warning,
-                              animation: job.status === 'running' ? 'pulse 1.5s infinite' : 'none',
-                            }} />
-                            <span style={{ fontSize: '0.8125rem', color: colors.text }}>
-                              {getJobTypeName(job.type)}
-                              {job.chapter_number && ` - Chapter ${job.chapter_number}`}
-                            </span>
-                          </div>
-                          <span style={{
-                            fontSize: '0.75rem',
-                            padding: '0.125rem 0.5rem',
-                            borderRadius: borderRadius.sm,
-                            background: job.status === 'running' ? colors.brandLight : colors.warningLight,
-                            color: job.status === 'running' ? colors.brandText : colors.warning,
-                          }}>
-                            {job.status === 'running' ? 'Running' : 'Queued'}
-                          </span>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <p style={{ color: colors.textSecondary, fontSize: '0.875rem', margin: 0 }}>
-              No active jobs. Start by creating your story elements below.
-            </p>
-          )}
-
-          <style jsx>{`
-            @keyframes pulse {
-              0%, 100% { opacity: 1; }
-              50% { opacity: 0.5; }
-            }
-          `}</style>
-        </div>
-
         {/* Book Details Editor */}
         <div style={{
           ...card,
@@ -1022,6 +865,31 @@ export default function ProjectDetailPage() {
                 Standalone = 1 book, Trilogy = 3 books, Series = multiple books
               </p>
             </div>
+
+            {/* Version Field */}
+            {currentBookId && (
+              <div>
+                <label style={{
+                  fontSize: '0.75rem',
+                  color: colors.textSecondary,
+                  fontWeight: 600,
+                  display: 'block',
+                  marginBottom: '0.375rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}>
+                  Version
+                </label>
+                <BookVersionSelector
+                  bookId={currentBookId}
+                  showCreateButton={true}
+                  compact={false}
+                />
+                <p style={{ fontSize: '0.75rem', color: colors.textSecondary, margin: '0.375rem 0 0 0' }}>
+                  Select which version of the book to work on
+                </p>
+              </div>
+            )}
 
             {/* Clone Book Button */}
             {currentBookId && (
