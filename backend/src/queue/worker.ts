@@ -241,6 +241,9 @@ export class QueueWorker {
         return await this.outlineMarketFit(job);
       case 'outline_editorial_finalize':
         return await this.outlineEditorialFinalize(job);
+      // AI Rewrite - rewrites plot and outline based on editorial recommendations
+      case 'outline_rewrite':
+        return await this.outlineRewrite(job);
       default:
         throw new Error(`Unknown job type: ${job.type}`);
     }
@@ -1865,6 +1868,85 @@ Return ONLY a JSON object:
       checkpointManager.saveCheckpoint(job.id, 'completed', { reportId });
     } catch (error) {
       logger.error({ error, reportId }, 'outline_editorial_finalize: Error');
+      throw error;
+    }
+  }
+
+  /**
+   * Outline AI Rewrite - Rewrites plot and outline based on editorial recommendations
+   * target_id = report ID
+   */
+  private async outlineRewrite(job: Job): Promise<void> {
+    const reportId = job.target_id;
+    logger.info({ reportId }, 'outline_rewrite: Starting AI rewrite');
+
+    try {
+      const { outlineRewriteService } = await import('../services/outline-rewrite.service.js');
+
+      // Step 1: Started
+      checkpointManager.saveCheckpoint(job.id, 'started', {
+        reportId,
+        step: 'started',
+        progress: 5,
+        message: 'Initialising rewrite...',
+      });
+
+      // Step 2: Fetching data
+      checkpointManager.saveCheckpoint(job.id, 'fetching_data', {
+        reportId,
+        step: 'fetching_data',
+        progress: 10,
+        message: 'Fetching project data...',
+      });
+
+      // Step 3: Creating version
+      checkpointManager.saveCheckpoint(job.id, 'creating_version', {
+        reportId,
+        step: 'creating_version',
+        progress: 20,
+        message: 'Creating new version...',
+      });
+
+      // Step 4: Rewriting plot (service will handle the actual work)
+      checkpointManager.saveCheckpoint(job.id, 'rewriting_plot', {
+        reportId,
+        step: 'rewriting_plot',
+        progress: 40,
+        message: 'Rewriting plot structure...',
+      });
+
+      // Execute the full rewrite (includes all steps internally)
+      const result = await outlineRewriteService.rewritePlotAndOutline(reportId);
+
+      // Step 5: Completed
+      logger.info({
+        reportId,
+        newVersionId: result.newVersionId,
+        changesCount: result.changes.length,
+        inputTokens: result.tokenUsage.input,
+        outputTokens: result.tokenUsage.output,
+      }, 'outline_rewrite: Completed');
+
+      checkpointManager.saveCheckpoint(job.id, 'completed', {
+        reportId,
+        step: 'completed',
+        progress: 100,
+        message: 'Rewrite completed successfully',
+        newVersionId: result.newVersionId,
+        changes: result.changes,
+        tokenUsage: result.tokenUsage,
+      });
+    } catch (error: any) {
+      logger.error({ error: error.message, reportId }, 'outline_rewrite: Error');
+
+      checkpointManager.saveCheckpoint(job.id, 'failed', {
+        reportId,
+        step: 'failed',
+        progress: 0,
+        message: 'Rewrite failed',
+        error: error.message,
+      });
+
       throw error;
     }
   }

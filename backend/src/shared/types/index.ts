@@ -234,7 +234,9 @@ export type JobType =
   | 'outline_structure_analyst'
   | 'outline_character_arc'
   | 'outline_market_fit'
-  | 'outline_editorial_finalize';
+  | 'outline_editorial_finalize'
+  // AI Rewrite - rewrites plot and outline based on editorial recommendations
+  | 'outline_rewrite';
 
 export type JobStatus = 'pending' | 'running' | 'completed' | 'paused' | 'failed';
 

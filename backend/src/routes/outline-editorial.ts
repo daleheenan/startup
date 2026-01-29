@@ -461,4 +461,149 @@ router.delete('/outline-editorial/reports/:reportId', (req, res) => {
   }
 });
 
+// =============================================================================
+// AI Rewrite Endpoints
+// =============================================================================
+
+/**
+ * POST /api/projects/:projectId/outline-editorial/rewrite/estimate
+ * Get token estimate before initiating AI rewrite
+ */
+router.post('/projects/:projectId/outline-editorial/rewrite/estimate', async (req, res) => {
+  try {
+    const { projectId } = req.params;
+
+    // Verify project exists
+    const project = db.prepare(`
+      SELECT id FROM projects WHERE id = ?
+    `).get(projectId);
+
+    if (!project) {
+      return sendNotFound(res, 'Project');
+    }
+
+    // Check for completed report
+    const report = db.prepare(`
+      SELECT id, status FROM outline_editorial_reports
+      WHERE project_id = ? AND status = 'completed'
+      ORDER BY created_at DESC LIMIT 1
+    `).get(projectId) as any;
+
+    if (!report) {
+      return sendBadRequest(res, 'No completed editorial report found. Submit for review first.');
+    }
+
+    // Get estimate from service
+    const { outlineRewriteService } = await import('../services/outline-rewrite.service.js');
+    const estimate = await outlineRewriteService.estimateTokenUsage(projectId);
+
+    logger.info({ projectId, estimate }, 'Outline rewrite estimate calculated');
+
+    res.json(estimate);
+  } catch (error: any) {
+    logger.error({ error }, 'Error estimating outline rewrite');
+    sendInternalError(res, error, 'Outline rewrite operation');
+  }
+});
+
+/**
+ * POST /api/projects/:projectId/outline-editorial/rewrite
+ * Initiate AI rewrite of plot and outline
+ */
+router.post('/projects/:projectId/outline-editorial/rewrite', async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { versionName } = req.body;
+
+    // Verify project exists
+    const project = db.prepare(`
+      SELECT id FROM projects WHERE id = ?
+    `).get(projectId);
+
+    if (!project) {
+      return sendNotFound(res, 'Project');
+    }
+
+    // Check for completed report
+    const report = db.prepare(`
+      SELECT id, status, recommendations FROM outline_editorial_reports
+      WHERE project_id = ? AND status = 'completed'
+      ORDER BY created_at DESC LIMIT 1
+    `).get(projectId) as any;
+
+    if (!report) {
+      return sendBadRequest(res, 'No completed editorial report found. Submit for review first.');
+    }
+
+    // Check for existing pending/running rewrite job
+    const existingJob = db.prepare(`
+      SELECT id, status FROM jobs
+      WHERE type = 'outline_rewrite' AND target_id = ? AND status IN ('pending', 'running')
+    `).get(report.id) as any;
+
+    if (existingJob) {
+      return res.status(409).json({
+        error: 'A rewrite job is already in progress',
+        jobId: existingJob.id,
+        status: existingJob.status,
+      });
+    }
+
+    // Queue the rewrite job
+    const { QueueWorker } = await import('../queue/worker.js');
+    const jobId = QueueWorker.createJob('outline_rewrite', report.id);
+
+    logger.info({ projectId, reportId: report.id, jobId }, 'Outline rewrite job queued');
+
+    res.status(201).json({
+      success: true,
+      jobId,
+      reportId: report.id,
+      status: 'queued',
+      message: 'Rewrite job queued. Poll status endpoint for updates.',
+    });
+  } catch (error: any) {
+    logger.error({ error }, 'Error initiating outline rewrite');
+    sendInternalError(res, error, 'Outline rewrite operation');
+  }
+});
+
+/**
+ * GET /api/projects/:projectId/outline-editorial/rewrite/status
+ * Check AI rewrite progress
+ */
+router.get('/projects/:projectId/outline-editorial/rewrite/status', async (req, res) => {
+  try {
+    const { projectId } = req.params;
+
+    // Verify project exists
+    const project = db.prepare(`
+      SELECT id FROM projects WHERE id = ?
+    `).get(projectId);
+
+    if (!project) {
+      return sendNotFound(res, 'Project');
+    }
+
+    // Get status from service
+    const { outlineRewriteService } = await import('../services/outline-rewrite.service.js');
+    const status = await outlineRewriteService.getRewriteStatus(projectId);
+
+    if (!status) {
+      return res.json({
+        hasJob: false,
+        status: null,
+      });
+    }
+
+    res.json({
+      hasJob: true,
+      ...status,
+    });
+  } catch (error: any) {
+    logger.error({ error }, 'Error getting outline rewrite status');
+    sendInternalError(res, error, 'Outline rewrite operation');
+  }
+});
+
 export default router;

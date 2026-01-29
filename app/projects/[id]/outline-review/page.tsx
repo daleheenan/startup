@@ -223,14 +223,50 @@ interface OutlineEditorialStatus {
 
 type TabType = 'overview' | 'structure' | 'characters' | 'market';
 
+// Token estimate interface
+interface TokenEstimate {
+  estimatedInputTokens: number;
+  estimatedOutputTokens: number;
+  estimatedCost: number;
+  plotSize: { layers: number; points: number };
+  outlineSize: { acts: number; chapters: number; scenes: number };
+  recommendationsCount: number;
+}
+
+// Rewrite status interface
+interface RewriteStatus {
+  hasJob: boolean;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | null;
+  step?: string;
+  progress?: number;
+  message?: string;
+  newVersionId?: string;
+  changes?: Array<{ area: string; type: string; description: string }>;
+  tokenUsage?: { input: number; output: number };
+  error?: string;
+}
+
 // Recommendations Section Component with pagination and implement buttons
-function RecommendationsSection({ reportId, recommendations }: { reportId: string; recommendations: string[] }) {
+function RecommendationsSection({ reportId, recommendations, projectId, onRewriteComplete }: {
+  reportId: string;
+  recommendations: string[];
+  projectId: string;
+  onRewriteComplete?: () => void;
+}) {
   const [implementedSet, setImplementedSet] = useState<Set<number>>(new Set());
   const [implementingIdx, setImplementingIdx] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [loadingFeedback, setLoadingFeedback] = useState(true);
   const [previewRec, setPreviewRec] = useState<{ idx: number; rec: string } | null>(null);
   const ITEMS_PER_PAGE = 5;
+
+  // AI Rewrite state
+  const [showRewriteModal, setShowRewriteModal] = useState(false);
+  const [estimating, setEstimating] = useState(false);
+  const [estimate, setEstimate] = useState<TokenEstimate | null>(null);
+  const [rewriting, setRewriting] = useState(false);
+  const [rewriteStatus, setRewriteStatus] = useState<RewriteStatus | null>(null);
+  const [rewriteError, setRewriteError] = useState<string | null>(null);
 
   // Load existing feedback on mount
   useEffect(() => {
@@ -261,6 +297,109 @@ function RecommendationsSection({ reportId, recommendations }: { reportId: strin
     };
     loadFeedback();
   }, [reportId]);
+
+  // AI Rewrite handlers
+  const handleOpenRewriteModal = async () => {
+    setShowRewriteModal(true);
+    setEstimating(true);
+    setEstimate(null);
+    setRewriteError(null);
+
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/outline-editorial/rewrite/estimate`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setEstimate(data);
+      } else {
+        const errorData = await response.json();
+        setRewriteError(errorData.error?.message || errorData.message || 'Failed to get estimate');
+      }
+    } catch (error) {
+      console.error('Error getting estimate:', error);
+      setRewriteError('Failed to connect to server');
+    } finally {
+      setEstimating(false);
+    }
+  };
+
+  const handleStartRewrite = async () => {
+    setRewriting(true);
+    setRewriteError(null);
+
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/outline-editorial/rewrite`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          versionName: 'AI Rewrite',
+        }),
+      });
+
+      if (response.ok) {
+        // Start polling for status
+        pollRewriteStatus();
+      } else {
+        const errorData = await response.json();
+        setRewriteError(errorData.error?.message || errorData.message || 'Failed to start rewrite');
+        setRewriting(false);
+      }
+    } catch (error) {
+      console.error('Error starting rewrite:', error);
+      setRewriteError('Failed to connect to server');
+      setRewriting(false);
+    }
+  };
+
+  const pollRewriteStatus = async () => {
+    const token = getToken();
+    const poll = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/outline-editorial/rewrite/status`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setRewriteStatus(data);
+
+          if (data.status === 'completed') {
+            setRewriting(false);
+            // Trigger refresh after short delay
+            setTimeout(() => {
+              if (onRewriteComplete) {
+                onRewriteComplete();
+              }
+            }, 2000);
+          } else if (data.status === 'failed') {
+            setRewriting(false);
+            setRewriteError(data.error || 'Rewrite failed');
+          } else if (data.status === 'pending' || data.status === 'processing') {
+            // Continue polling
+            setTimeout(poll, 3000);
+          }
+        }
+      } catch (error) {
+        console.error('Error polling status:', error);
+      }
+    };
+
+    poll();
+  };
 
   const totalPages = Math.ceil(recommendations.length / ITEMS_PER_PAGE);
   const paginatedRecs = recommendations.slice(
@@ -600,6 +739,414 @@ function RecommendationsSection({ reportId, recommendations }: { reportId: strin
                 Mark as Implemented
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Rewrite Section */}
+      <div style={{
+        marginTop: '1.5rem',
+        paddingTop: '1.5rem',
+        borderTop: '1px solid #E2E8F0',
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '1rem',
+        }}>
+          <div>
+            <h5 style={{ margin: '0 0 0.25rem 0', color: '#1A1A2E', fontSize: '0.875rem' }}>
+              AI-Powered Rewrite
+            </h5>
+            <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748B' }}>
+              Let AI automatically rewrite your plot and outline to address all recommendations
+            </p>
+          </div>
+          <button
+            onClick={handleOpenRewriteModal}
+            disabled={recommendations.length === 0 || implementedSet.size === recommendations.length}
+            style={{
+              padding: '0.75rem 1.5rem',
+              background: recommendations.length === 0 || implementedSet.size === recommendations.length
+                ? '#E2E8F0'
+                : 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+              color: recommendations.length === 0 || implementedSet.size === recommendations.length
+                ? '#94A3B8'
+                : 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              cursor: recommendations.length === 0 || implementedSet.size === recommendations.length
+                ? 'not-allowed'
+                : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 2L2 7l10 5 10-5-10-5z" />
+              <path d="M2 17l10 5 10-5" />
+              <path d="M2 12l10 5 10-5" />
+            </svg>
+            AI Rewrite All
+          </button>
+        </div>
+      </div>
+
+      {/* AI Rewrite Modal */}
+      {showRewriteModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+        }} onClick={() => !rewriting && setShowRewriteModal(false)}>
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            padding: '1.5rem',
+            maxWidth: '600px',
+            width: '90%',
+            maxHeight: '80vh',
+            overflow: 'auto',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+          }} onClick={e => e.stopPropagation()}>
+            {/* Modal Header */}
+            <h3 style={{ margin: '0 0 1rem 0', color: '#1A1A2E', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2">
+                <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                <path d="M2 17l10 5 10-5" />
+                <path d="M2 12l10 5 10-5" />
+              </svg>
+              AI Rewrite Plot & Outline
+            </h3>
+
+            {/* Loading Estimate */}
+            {estimating && (
+              <div style={{ textAlign: 'center', padding: '2rem' }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  margin: '0 auto 1rem',
+                  border: '3px solid #E2E8F0',
+                  borderTopColor: '#10B981',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                }} />
+                <p style={{ margin: 0, color: '#64748B' }}>Calculating estimate...</p>
+              </div>
+            )}
+
+            {/* Estimate Display */}
+            {!estimating && estimate && !rewriting && !rewriteStatus?.status && (
+              <>
+                <div style={{
+                  background: '#F0FDF4',
+                  borderRadius: '8px',
+                  padding: '1rem',
+                  marginBottom: '1rem',
+                  border: '1px solid #BBF7D0',
+                }}>
+                  <div style={{ fontSize: '0.75rem', color: '#166534', marginBottom: '0.5rem', fontWeight: 600 }}>
+                    What will happen:
+                  </div>
+                  <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#15803D', fontSize: '0.875rem' }}>
+                    <li style={{ marginBottom: '0.25rem' }}>A new version will be created to preserve your current content</li>
+                    <li style={{ marginBottom: '0.25rem' }}>AI will rewrite your plot structure addressing {recommendations.length - implementedSet.size} recommendations</li>
+                    <li style={{ marginBottom: '0.25rem' }}>Your outline will be updated to align with the new plot</li>
+                    <li>You can always revert to the previous version</li>
+                  </ul>
+                </div>
+
+                <div style={{
+                  background: '#F8FAFC',
+                  borderRadius: '8px',
+                  padding: '1rem',
+                  marginBottom: '1.5rem',
+                }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748B', marginBottom: '0.25rem' }}>Plot Size</div>
+                      <div style={{ fontWeight: 600, color: '#1A1A2E' }}>
+                        {estimate.plotSize.layers} layers, {estimate.plotSize.points} points
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748B', marginBottom: '0.25rem' }}>Outline Size</div>
+                      <div style={{ fontWeight: 600, color: '#1A1A2E' }}>
+                        {estimate.outlineSize.acts} acts, {estimate.outlineSize.chapters} chapters
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748B', marginBottom: '0.25rem' }}>Estimated Tokens</div>
+                      <div style={{ fontWeight: 600, color: '#1A1A2E' }}>
+                        ~{Math.round((estimate.estimatedInputTokens + estimate.estimatedOutputTokens) / 1000)}k
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748B', marginBottom: '0.25rem' }}>Estimated Cost</div>
+                      <div style={{ fontWeight: 600, color: '#10B981' }}>
+                        ~${estimate.estimatedCost.toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {rewriteError && (
+                  <div style={{
+                    background: '#FEF2F2',
+                    borderRadius: '8px',
+                    padding: '1rem',
+                    marginBottom: '1rem',
+                    border: '1px solid #FECACA',
+                    color: '#991B1B',
+                    fontSize: '0.875rem',
+                  }}>
+                    {rewriteError}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={() => setShowRewriteModal(false)}
+                    style={{
+                      padding: '0.625rem 1.25rem',
+                      background: 'white',
+                      border: '1px solid #E2E8F0',
+                      borderRadius: '6px',
+                      color: '#64748B',
+                      fontSize: '0.875rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleStartRewrite}
+                    style={{
+                      padding: '0.625rem 1.25rem',
+                      background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                      border: 'none',
+                      borderRadius: '6px',
+                      color: 'white',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                      <path d="M2 17l10 5 10-5" />
+                      <path d="M2 12l10 5 10-5" />
+                    </svg>
+                    Start AI Rewrite
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Processing State */}
+            {(rewriting || (rewriteStatus?.status === 'processing' || rewriteStatus?.status === 'pending')) && (
+              <div style={{ textAlign: 'center', padding: '2rem' }}>
+                <div style={{
+                  width: '60px',
+                  height: '60px',
+                  margin: '0 auto 1.5rem',
+                  border: '4px solid #E2E8F0',
+                  borderTopColor: '#10B981',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                }} />
+                <h4 style={{ margin: '0 0 0.5rem 0', color: '#1A1A2E' }}>
+                  {rewriteStatus?.message || 'Processing rewrite...'}
+                </h4>
+                <p style={{ margin: '0 0 1.5rem 0', color: '#64748B', fontSize: '0.875rem' }}>
+                  This may take a few minutes. Please do not close this window.
+                </p>
+                {rewriteStatus?.progress !== undefined && (
+                  <div style={{
+                    width: '100%',
+                    height: '8px',
+                    background: '#E2E8F0',
+                    borderRadius: '4px',
+                    overflow: 'hidden',
+                  }}>
+                    <div style={{
+                      width: `${rewriteStatus.progress}%`,
+                      height: '100%',
+                      background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                      borderRadius: '4px',
+                      transition: 'width 0.5s ease',
+                    }} />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Success State */}
+            {rewriteStatus?.status === 'completed' && (
+              <div style={{ textAlign: 'center', padding: '2rem' }}>
+                <div style={{
+                  width: '60px',
+                  height: '60px',
+                  margin: '0 auto 1.5rem',
+                  background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </div>
+                <h4 style={{ margin: '0 0 0.5rem 0', color: '#1A1A2E' }}>
+                  Rewrite Complete!
+                </h4>
+                <p style={{ margin: '0 0 1rem 0', color: '#64748B', fontSize: '0.875rem' }}>
+                  Your plot and outline have been updated. A new version has been created.
+                </p>
+
+                {rewriteStatus.changes && rewriteStatus.changes.length > 0 && (
+                  <div style={{
+                    background: '#F8FAFC',
+                    borderRadius: '8px',
+                    padding: '1rem',
+                    marginBottom: '1rem',
+                    textAlign: 'left',
+                    maxHeight: '200px',
+                    overflow: 'auto',
+                  }}>
+                    <div style={{ fontSize: '0.75rem', color: '#64748B', marginBottom: '0.5rem', fontWeight: 600 }}>
+                      Changes Made ({rewriteStatus.changes.length}):
+                    </div>
+                    <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.875rem', color: '#475569' }}>
+                      {rewriteStatus.changes.slice(0, 5).map((change, i) => (
+                        <li key={i} style={{ marginBottom: '0.25rem' }}>
+                          <span style={{
+                            fontSize: '0.7rem',
+                            padding: '0.125rem 0.375rem',
+                            background: change.area === 'plot' ? '#EDE9FE' : '#DBEAFE',
+                            color: change.area === 'plot' ? '#7C3AED' : '#2563EB',
+                            borderRadius: '4px',
+                            marginRight: '0.5rem',
+                          }}>
+                            {change.area}
+                          </span>
+                          {change.description}
+                        </li>
+                      ))}
+                      {rewriteStatus.changes.length > 5 && (
+                        <li style={{ color: '#94A3B8' }}>
+                          ...and {rewriteStatus.changes.length - 5} more changes
+                        </li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => {
+                    setShowRewriteModal(false);
+                    setRewriteStatus(null);
+                    if (onRewriteComplete) {
+                      onRewriteComplete();
+                    }
+                  }}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    color: 'white',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  View Updated Content
+                </button>
+              </div>
+            )}
+
+            {/* Failed State */}
+            {rewriteStatus?.status === 'failed' && (
+              <div style={{ textAlign: 'center', padding: '2rem' }}>
+                <div style={{
+                  width: '60px',
+                  height: '60px',
+                  margin: '0 auto 1.5rem',
+                  background: '#FEE2E2',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </div>
+                <h4 style={{ margin: '0 0 0.5rem 0', color: '#991B1B' }}>
+                  Rewrite Failed
+                </h4>
+                <p style={{ margin: '0 0 1.5rem 0', color: '#B91C1C', fontSize: '0.875rem' }}>
+                  {rewriteStatus.error || 'An error occurred during the rewrite. Your original content is preserved.'}
+                </p>
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+                  <button
+                    onClick={() => {
+                      setShowRewriteModal(false);
+                      setRewriteStatus(null);
+                      setRewriteError(null);
+                    }}
+                    style={{
+                      padding: '0.625rem 1.25rem',
+                      background: 'white',
+                      border: '1px solid #E2E8F0',
+                      borderRadius: '6px',
+                      color: '#64748B',
+                      fontSize: '0.875rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={() => {
+                      setRewriteStatus(null);
+                      setRewriteError(null);
+                      handleStartRewrite();
+                    }}
+                    style={{
+                      padding: '0.625rem 1.25rem',
+                      background: '#EF4444',
+                      border: 'none',
+                      borderRadius: '6px',
+                      color: 'white',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Try Again
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -951,6 +1498,12 @@ export default function OutlineReviewPage() {
           <RecommendationsSection
             reportId={report.id}
             recommendations={report.recommendations}
+            projectId={projectId}
+            onRewriteComplete={() => {
+              // Refresh the page data after rewrite
+              fetchStatus();
+              fetchReport();
+            }}
           />
         )}
 
