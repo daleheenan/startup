@@ -17,6 +17,7 @@
 
 import { claudeService } from './claude.service.js';
 import { createLogger } from './logger.service.js';
+import { AI_REQUEST_TYPES } from '../constants/ai-request-types.js';
 import {
   PROSE_ANTI_PATTERNS,
   PATTERN_CATEGORIES,
@@ -185,6 +186,10 @@ Return your analysis as JSON:`;
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 2000,
       temperature: 0.7,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.PROSE_TIGHTENING,
+        contextSummary: `Prose tightening analysis`,
+      },
     });
 
     // Parse AI response

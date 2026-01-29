@@ -6,17 +6,17 @@ It is automatically read before each task and updated after task completion.
 
 MAINTENANCE RULES:
 - Maximum 50 lessons per file (older lessons archived automatically)
-- Lessons with score >= 5 are considered "proven" and prioritized
+- Lessons with score >= 5 are considered "proven" and prioritised
 - Review and prune quarterly or when file exceeds 50 entries
 -->
 
 ## Summary Statistics
 
-- **Total tasks completed**: 2
-- **Total lessons recorded**: 7
-- **Last updated**: 2026-01-26
+- **Total tasks completed**: 3
+- **Total lessons recorded**: 8
+- **Last updated**: 2026-01-29
 - **Proven lessons** (score >= 5): 0
-- **Top themes**: #architecture #patterns #database #api #typescript #repository-pattern #circuit-breaker #navigation #ui-redesign #workflow #component-design
+- **Top themes**: #architecture #patterns #database #api #typescript #repository-pattern #circuit-breaker #navigation #ui-redesign #workflow #component-design #conversational-ai #intent-detection #chat-interface
 
 ---
 
@@ -30,11 +30,47 @@ MAINTENANCE RULES:
 
 ## Active Lessons (Most Recent First)
 
+### 2026-01-29 | Task: Editorial Assistant Conversational AI Architecture
+
+**Date**: 2026-01-29
+**Task**: Designing conversational AI chat interface for Edit Story page with intent detection and approval workflow
+**Context**: Replace single-request AI refinement with multi-turn chat assistant that detects user intent (question/change/suggestion) and requires approval for recommendations
+
+**What Worked Well**:
+- Reading lessons from developer and code-reviewer agents first to understand implementation patterns and common pitfalls
+- Systematic codebase exploration: existing refine-story endpoint (lines 5082-5227), design tokens, modal patterns, edit story page structure
+- Designing stateless API (conversation history passed from client) to avoid session management complexity
+- Using Claude for intent detection rather than building separate NLP classifier - leverages existing AI capabilities
+- Three-tier intent system (question/change/suggestion) maps cleanly to three response types (answer/change_applied/recommendation)
+- Separating intent detection (fast, low-token) from response generation (detailed, higher-token) for efficient API usage
+- Project-scoped context only (Story Concept + DNA) prevents scope creep and keeps responses focused
+- Ephemeral conversation state (component-level, resets on page navigation) avoids database persistence complexity
+- Component hierarchy: EditorialAssistant (orchestrator) → ChatMessage (display) → RecommendationCard (approval UI) - clear separation of concerns
+- Parent-child communication via onApplyChanges callback keeps form state in parent, assistant just proposes changes
+- Comprehensive technical design document with: architecture diagrams, API schemas, component structure, integration points, security considerations, testing strategy
+- Task breakdown into three phases: Backend Foundation (6-8h) → Frontend Components (8-10h) → Testing & Polish (4-5h) with clear dependencies
+- Each task sized at 1-3 hours for realistic tracking and progress visibility
+- Including code examples in both technical design AND implementation tasks - developers implement faster with reference implementations
+- Documenting existing patterns to remove vs new patterns to add (what to delete, what to create, what to modify)
+
+**What Didn't Work**:
+- Initial consideration to persist conversations in database - realised ephemeral state is simpler and sufficient for use case
+- Almost designed a complex state machine for intent flow - simplified to three straightforward response types
+- First draft had separate services for each intent type - consolidated into single response generator with intent parameter
+
+**Lesson**: For conversational AI features: (1) Use the AI itself for intent detection rather than building separate classifiers - Claude can classify with structured prompts, (2) Keep conversation state ephemeral in component unless persistence has clear user value - simpler architecture, (3) Design stateless APIs where client passes conversation history - avoids session management, (4) Separate fast classification (intent detection, ~200 tokens) from detailed generation (response, ~2000 tokens) for cost efficiency, (5) Use three-tier intent model (question/change/suggestion) which maps cleanly to UI patterns (answer/apply/approve), (6) Project-scope context ruthlessly - only include data user is actively editing to prevent hallucinations and scope creep, (7) Break component hierarchy clearly: orchestrator (state management) → display (rendering) → action cards (user interaction), (8) Use callback props (onApplyChanges) to keep form state in parent - child components propose, parent decides, (9) In technical design, include: intent detection prompt templates, API request/response schemas with examples, component code structure, integration points with existing code, (10) In implementation tasks, include: specific lines to delete from existing code, exact code to add, imports needed, files to create vs modify - reduces ambiguity for developers, (11) For features replacing existing functionality, document removal steps first (delete old state, remove old handlers, remove old JSX) then addition steps.
+
+**Application Score**: 0
+
+**Tags**: #architecture #conversational-ai #intent-detection #chat-interface #stateless-api #claude-api #component-design #approval-workflow #uk-spelling #project-scoped-context #ephemeral-state #task-breakdown #code-examples #integration-patterns
+
+---
+
 ### 2026-01-26 | Task: NovelForge Navigation & UI Redesign Architecture
 
 **Date**: 2026-01-26
-**Task**: Designing comprehensive navigation redesign with workflow enforcement, story ideas feature, and settings reorganization
-**Context**: Large-scale UX improvement affecting navigation, project workflow, story creation flow, and settings organization
+**Task**: Designing comprehensive navigation redesign with workflow enforcement, story ideas feature, and settings reorganisation
+**Context**: Large-scale UX improvement affecting navigation, project workflow, story creation flow, and settings organisation
 
 **What Worked Well**:
 - Reading lessons from developer and code-reviewer agents first to understand implementation patterns and pain points
@@ -51,8 +87,8 @@ MAINTENANCE RULES:
 - Including accessibility, performance, and testing strategies in technical design, not as afterthoughts
 
 **What Didn't Work**:
-- Initial design considered creating new database tables for navigation preferences - realized existing user_settings pattern is sufficient
-- Almost designed story idea expansion as synchronous API - realized async job queue is more consistent with existing architecture
+- Initial design considered creating new database tables for navigation preferences - realised existing user_settings pattern is sufficient
+- Almost designed story idea expansion as synchronous API - realised async job queue is more consistent with existing architecture
 - First draft had prose style defaults in new table - simplified to reuse prose_styles table with project_id = null
 
 **Lesson**: For large-scale UX redesigns affecting multiple pages and workflows: (1) Read existing codebase patterns extensively before designing (navigation, pages, routes, types), (2) Identify and reuse existing components to reduce implementation scope, (3) Design changes in phases: non-breaking additions first, breaking changes last with feature flags, (4) Break implementation into <3 hour tasks grouped by phase with clear dependencies, (5) Provide code examples in technical design docs, not just interfaces - developers implement faster with reference code, (6) Include rollback procedures and feature flags from the start for large changes, (7) Design for consistency - new features should match existing architectural patterns (async jobs, API structure, database conventions), (8) Consider the complete system: types → database → API → components → integration → testing in that order.
@@ -145,14 +181,14 @@ MAINTENANCE RULES:
 
 **What Worked Well**:
 - Custom error classes with HTTP status codes
-- Centralized error handler middleware
+- Centralised error handler middleware
 - Consistent error response format
 
 **What Didn't Work**:
 - Exposing internal error details to clients
 - Swallowing errors silently in catch blocks
 
-**Lesson**: Create a hierarchy of custom error classes (ValidationError, NotFoundError, AuthError). Map them to HTTP status codes in a central handler. Log full errors server-side, return sanitized messages to clients. Never swallow errors - at minimum, log them.
+**Lesson**: Create a hierarchy of custom error classes (ValidationError, NotFoundError, AuthError). Map them to HTTP status codes in a central handler. Log full errors server-side, return sanitised messages to clients. Never swallow errors - at minimum, log them.
 
 **Application Score**: 0
 

@@ -3,6 +3,7 @@ import db from '../db/connection.js';
 import { createLogger } from './logger.service.js';
 import { extractJsonObject } from '../utils/json-extractor.js';
 import { randomUUID } from 'crypto';
+import { AI_REQUEST_TYPES } from '../constants/ai-request-types.js';
 import type {
   WordCountRevision,
   ChapterReductionProposal,
@@ -383,12 +384,21 @@ export class WordCountRevisionService {
     );
 
     try {
+      // Get projectId for tracking
+      const projectId = this.getProjectIdFromChapter(chapterId);
+
       // Call Claude
       const response = await claudeService.createCompletionWithUsage({
         system,
         messages: [{ role: 'user', content: user }],
         maxTokens: Math.max(4096, Math.round(chapter.content.length / 2)),
         temperature: 0.7,
+        tracking: {
+          requestType: AI_REQUEST_TYPES.WORD_COUNT_ANALYSIS,
+          projectId,
+          chapterId,
+          contextSummary: `Word count reduction for chapter ${chapter.chapter_number}`,
+        },
       });
 
       // Parse response
@@ -909,6 +919,22 @@ Return ONLY valid JSON with the condensed chapter and explanation:`;
   // Private helpers
   // ============================================================================
 
+  private getProjectIdFromChapter(chapterId: string): string | null {
+    try {
+      const stmt = db.prepare<[string], { project_id: string }>(`
+        SELECT b.project_id
+        FROM chapters c
+        JOIN books b ON c.book_id = b.id
+        WHERE c.id = ?
+      `);
+      const result = stmt.get(chapterId);
+      return result?.project_id || null;
+    } catch (error) {
+      logger.warn({ chapterId, error }, 'Failed to get project ID from chapter');
+      return null;
+    }
+  }
+
   private getBookStats(bookId: string, versionId?: string | null): { totalWordCount: number; chapterCount: number } {
     let result: { total_words: number; chapter_count: number } | undefined;
 
@@ -1254,12 +1280,21 @@ Return ONLY valid JSON with the condensed chapter and explanation:`;
     );
 
     try {
+      // Get projectId for tracking
+      const projectId = this.getProjectIdFromChapter(chapterId);
+
       // Call Claude
       const response = await claudeService.createCompletionWithUsage({
         system,
         messages: [{ role: 'user', content: user }],
         maxTokens: Math.max(4096, Math.round(chapterContent.content.length / 2)),
         temperature: 0.7,
+        tracking: {
+          requestType: AI_REQUEST_TYPES.CHAPTER_REDUCTION,
+          projectId,
+          chapterId,
+          contextSummary: `Enhanced word count reduction with brief for chapter ${chapter.chapter_number}`,
+        },
       });
 
       // Parse response

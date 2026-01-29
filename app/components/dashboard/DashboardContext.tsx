@@ -5,6 +5,7 @@ import {
   useContext,
   useReducer,
   useEffect,
+  useState,
   useMemo,
   type ReactNode,
 } from 'react';
@@ -157,7 +158,9 @@ export function DashboardProvider({
     sidebarCollapsed: defaultSidebarCollapsed,
   });
 
-  // Hydrate persisted state on mount
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Hydrate persisted state on mount (client-side only)
   useEffect(() => {
     const persistedGroups = loadExpandedGroups();
     if (persistedGroups !== null) {
@@ -174,18 +177,24 @@ export function DashboardProvider({
         dispatch({ type: 'TOGGLE_SIDEBAR' });
       }
     }
+
+    setIsHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentionally runs once on mount
   }, []);
 
-  // Persist expandedGroups whenever they change
+  // Persist expandedGroups whenever they change (only after hydration)
   useEffect(() => {
-    saveExpandedGroups(state.expandedGroups);
-  }, [state.expandedGroups]);
+    if (isHydrated) {
+      saveExpandedGroups(state.expandedGroups);
+    }
+  }, [state.expandedGroups, isHydrated]);
 
-  // Persist sidebarCollapsed whenever it changes
+  // Persist sidebarCollapsed whenever it changes (only after hydration)
   useEffect(() => {
-    saveSidebarCollapsed(state.sidebarCollapsed);
-  }, [state.sidebarCollapsed]);
+    if (isHydrated) {
+      saveSidebarCollapsed(state.sidebarCollapsed);
+    }
+  }, [state.sidebarCollapsed, isHydrated]);
 
   const contextValue = useMemo(
     () => ({ state, dispatch }),

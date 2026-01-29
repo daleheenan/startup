@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import { createLogger } from './logger.service.js';
 import { claudeService } from './claude.service.js';
 import { extractJsonObject } from '../utils/json-extractor.js';
+import { AI_REQUEST_TYPES } from '../constants/ai-request-types.js';
 import type {
   SequelIdea,
   UnresolvedThread,
@@ -332,6 +333,11 @@ Output only valid JSON:`;
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 3000,
       temperature: 0.8,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.SEQUEL_IDEAS,
+        projectId: project.id,
+        contextSummary: `Sequel ideas for book`,
+      },
     });
 
     try {
@@ -369,11 +375,18 @@ Respond with a JSON array of unresolved threads. Each should have:
 
 Output only valid JSON:`;
 
+    const projectId = chapters[0] ? await this.getProjectIdFromChapter(chapters[0].id) : null;
+
     const response = await claudeService.createCompletionWithUsage({
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 2000,
       temperature: 0.7,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.UNRESOLVED_THREADS,
+        projectId,
+        contextSummary: `Unresolved plot threads analysis`,
+      },
     });
 
     try {
@@ -416,6 +429,11 @@ Output only valid JSON:`;
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 2500,
       temperature: 0.7,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.CHARACTER_CONTINUATIONS,
+        projectId: project.id,
+        contextSummary: `Character continuation arcs`,
+      },
     });
 
     try {
@@ -458,6 +476,11 @@ Output only valid JSON:`;
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 2000,
       temperature: 0.8,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.WORLD_EXPANSIONS,
+        projectId: project.id,
+        contextSummary: `World expansion ideas`,
+      },
     });
 
     try {
@@ -552,6 +575,11 @@ Output only valid JSON:`;
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 2000,
       temperature: 0.9,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.TONE_VARIATIONS,
+        projectId: project.id,
+        contextSummary: `Tone variation ideas`,
+      },
     });
 
     try {
@@ -607,6 +635,25 @@ Output only valid JSON:`;
     `).run(now, bookId);
 
     return this.generateFollowUpRecommendations(bookId);
+  }
+
+  /**
+   * Helper: Get project ID from chapter ID
+   */
+  private async getProjectIdFromChapter(chapterId: string): Promise<string | null> {
+    try {
+      const stmt = db.prepare<[string], { project_id: string }>(`
+        SELECT b.project_id
+        FROM chapters c
+        JOIN books b ON c.book_id = b.id
+        WHERE c.id = ?
+      `);
+      const result = stmt.get(chapterId);
+      return result?.project_id || null;
+    } catch (error) {
+      logger.warn({ chapterId, error }, 'Failed to get project ID from chapter');
+      return null;
+    }
   }
 }
 

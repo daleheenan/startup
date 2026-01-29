@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { isAuthenticated } from '../lib/auth';
 
@@ -10,17 +10,26 @@ export default function ProjectsLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const [isMounted, setIsMounted] = useState(false);
+  const [isAuth, setIsAuth] = useState(true); // Optimistically render to avoid hydration mismatch
 
   useEffect(() => {
-    if (!isAuthenticated()) {
+    setIsMounted(true);
+    const authenticated = isAuthenticated();
+    setIsAuth(authenticated);
+
+    if (!authenticated) {
       router.push('/login');
     }
   }, [router]);
 
-  // Don't render until authentication is verified
-  if (!isAuthenticated()) {
-    return null;
+  // Always render children during SSR and initial client render
+  // This prevents hydration mismatches
+  if (!isMounted || isAuth) {
+    return <>{children}</>;
   }
 
-  return <>{children}</>;
+  // Only show nothing after mount if not authenticated
+  // (user will be redirected by the useEffect above)
+  return null;
 }

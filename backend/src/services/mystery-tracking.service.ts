@@ -3,6 +3,7 @@ import { claudeService } from './claude.service.js';
 import type { SeriesMystery } from '../shared/types/index.js';
 import { createLogger } from './logger.service.js';
 import { extractJsonArray } from '../utils/json-extractor.js';
+import { AI_REQUEST_TYPES } from '../constants/ai-request-types.js';
 
 const logger = createLogger('services:mystery-tracking');
 
@@ -53,6 +54,12 @@ export class MysteryTrackingService {
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 2048,
       temperature: 0.3,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.MYSTERY_TRACKING,
+        projectId: chapter.project_id,
+        chapterId,
+        contextSummary: `Mystery extraction from chapter ${chapter.chapter_number}`,
+      },
     });
 
     // Parse Claude's response
@@ -143,6 +150,12 @@ export class MysteryTrackingService {
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 2048,
       temperature: 0.3,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.MYSTERY_TRACKING,
+        projectId: chapter.project_id,
+        chapterId,
+        contextSummary: `Mystery resolution detection in chapter ${chapter.chapter_number}`,
+      },
     });
 
     // Parse resolutions

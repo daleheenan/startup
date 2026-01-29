@@ -53,6 +53,15 @@ jest.mock('../logger.service.js', () => ({
   })),
 }));
 
+// Mock metrics service
+const mockLogAIRequest = jest.fn();
+jest.mock('../metrics.service.js', () => ({
+  __esModule: true,
+  metricsService: {
+    logAIRequest: mockLogAIRequest,
+  },
+}));
+
 // Import the service after mocks are set up
 import { ClaudeService } from '../claude.service.js';
 import { sessionTracker } from '../session-tracker.js';
@@ -374,6 +383,247 @@ describe('ClaudeService', () => {
 
       expect(result).toEqual(mockStats);
       expect(mockGetSessionStats).toHaveBeenCalled();
+    });
+  });
+
+  describe('AI Cost Tracking', () => {
+    const validParams = {
+      system: 'You are a helpful assistant.',
+      messages: [{ role: 'user' as const, content: 'Hello!' }],
+    };
+
+    beforeEach(() => {
+      (mockCreate as any).mockImplementation(() => Promise.resolve({
+        content: [{ type: 'text', text: 'Hello there!' }],
+        usage: {
+          input_tokens: 1000,
+          output_tokens: 500,
+        },
+      }));
+    });
+
+    it('should log AI request when tracking context is provided', async () => {
+      const tracking = {
+        requestType: 'chapter_generation',
+        projectId: 'project-1',
+        chapterId: 'chapter-1',
+        contextSummary: 'Generating Chapter 1',
+      };
+
+      await service.createCompletionWithUsage({
+        ...validParams,
+        tracking,
+      });
+
+      expect(mockLogAIRequest).toHaveBeenCalledWith({
+        requestType: 'chapter_generation',
+        projectId: 'project-1',
+        chapterId: 'chapter-1',
+        inputTokens: 1000,
+        outputTokens: 500,
+        model: 'claude-opus-4-5-20251101',
+        success: true,
+        contextSummary: 'Generating Chapter 1',
+      });
+    });
+
+    it('should not log AI request when tracking context is not provided', async () => {
+      await service.createCompletionWithUsage(validParams);
+
+      expect(mockLogAIRequest).not.toHaveBeenCalled();
+    });
+
+    it('should log AI request with minimal tracking data', async () => {
+      const tracking = {
+        requestType: 'coherence_check',
+      };
+
+      await service.createCompletionWithUsage({
+        ...validParams,
+        tracking,
+      });
+
+      expect(mockLogAIRequest).toHaveBeenCalledWith({
+        requestType: 'coherence_check',
+        projectId: undefined,
+        chapterId: undefined,
+        inputTokens: 1000,
+        outputTokens: 500,
+        model: 'claude-opus-4-5-20251101',
+        success: true,
+        contextSummary: undefined,
+      });
+    });
+
+    it('should log failed requests when API call fails', async () => {
+      (mockCreate as any).mockImplementation(() => Promise.reject(new Error('API error')));
+
+      const tracking = {
+        requestType: 'veb_beta_swarm',
+        projectId: 'project-1',
+        chapterId: 'chapter-1',
+      };
+
+      await expect(
+        service.createCompletionWithUsage({
+          ...validParams,
+          tracking,
+        })
+      ).rejects.toThrow('API error');
+
+      expect(mockLogAIRequest).toHaveBeenCalledWith({
+        requestType: 'veb_beta_swarm',
+        projectId: 'project-1',
+        chapterId: 'chapter-1',
+        inputTokens: 0,
+        outputTokens: 0,
+        model: 'claude-opus-4-5-20251101',
+        success: false,
+        errorMessage: 'API error',
+        contextSummary: undefined,
+      });
+    });
+
+    it('should handle tracking errors gracefully without failing request', async () => {
+      mockLogAIRequest.mockImplementation(() => {
+        throw new Error('Database error');
+      });
+
+      const tracking = {
+        requestType: 'chapter_generation',
+        projectId: 'project-1',
+      };
+
+      const result = await service.createCompletionWithUsage({
+        ...validParams,
+        tracking,
+      });
+
+      // Request should still succeed even if tracking fails
+      expect(result.content).toBe('Hello there!');
+      expect(result.usage.input_tokens).toBe(1000);
+    });
+
+    it('should handle tracking errors on failed requests gracefully', async () => {
+      (mockCreate as any).mockImplementation(() => Promise.reject(new Error('API error')));
+      mockLogAIRequest.mockImplementation(() => {
+        throw new Error('Database error');
+      });
+
+      const tracking = {
+        requestType: 'chapter_generation',
+        projectId: 'project-1',
+      };
+
+      await expect(
+        service.createCompletionWithUsage({
+          ...validParams,
+          tracking,
+        })
+      ).rejects.toThrow('API error');
+
+      // Should have attempted to log despite tracking error
+      expect(mockLogAIRequest).toHaveBeenCalled();
+    });
+
+    it('should log with correct model from environment', async () => {
+      process.env.ANTHROPIC_MODEL = 'claude-sonnet-4-5';
+      const customModelService = new ClaudeService();
+
+      (mockCreate as any).mockImplementation(() => Promise.resolve({
+        content: [{ type: 'text', text: 'Response' }],
+        usage: { input_tokens: 500, output_tokens: 250 },
+      }));
+
+      const tracking = {
+        requestType: 'outline_generation',
+        projectId: 'project-1',
+      };
+
+      await customModelService.createCompletionWithUsage({
+        ...validParams,
+        tracking,
+      });
+
+      expect(mockLogAIRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'claude-sonnet-4-5',
+        })
+      );
+    });
+
+    it('should include actual token usage from response', async () => {
+      (mockCreate as any).mockImplementation(() => Promise.resolve({
+        content: [{ type: 'text', text: 'Response' }],
+        usage: {
+          input_tokens: 12345,
+          output_tokens: 6789,
+        },
+      }));
+
+      const tracking = {
+        requestType: 'story_dna_generation',
+        projectId: 'project-1',
+      };
+
+      await service.createCompletionWithUsage({
+        ...validParams,
+        tracking,
+      });
+
+      expect(mockLogAIRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inputTokens: 12345,
+          outputTokens: 6789,
+        })
+      );
+    });
+
+    it('should log rate limit errors with proper error message', async () => {
+      const rateLimitError: any = new Error('Rate limit exceeded');
+      rateLimitError.status = 429;
+
+      (mockCreate as any).mockImplementation(() => Promise.reject(rateLimitError));
+      mockGetCurrentSession.mockReturnValue({
+        session_resets_at: '2026-01-24T12:00:00Z',
+      });
+
+      const tracking = {
+        requestType: 'chapter_generation',
+        projectId: 'project-1',
+      };
+
+      await expect(
+        service.createCompletionWithUsage({
+          ...validParams,
+          tracking,
+        })
+      ).rejects.toThrow();
+
+      expect(mockLogAIRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          errorMessage: 'Rate limit exceeded',
+        })
+      );
+    });
+
+    it('should accept custom request types as strings', async () => {
+      const tracking = {
+        requestType: 'custom_operation',
+        projectId: 'project-1',
+      };
+
+      await service.createCompletionWithUsage({
+        ...validParams,
+        tracking,
+      });
+
+      expect(mockLogAIRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestType: 'custom_operation',
+        })
+      );
     });
   });
 });

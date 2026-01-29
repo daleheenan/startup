@@ -10,6 +10,7 @@ import { bookVersioningService, type BookVersion } from './book-versioning.servi
 import db from '../db/connection.js';
 import { createLogger } from './logger.service.js';
 import { extractJsonObject } from '../utils/json-extractor.js';
+import { AI_REQUEST_TYPES } from '../constants/ai-request-types.js';
 
 const logger = createLogger('services:outline-rewrite');
 
@@ -67,6 +68,8 @@ interface OutlineRewriteResponse {
 // ============================================================================
 
 export class OutlineRewriteService {
+  private currentProjectId: string | null = null;
+
   /**
    * Estimate token usage for a rewrite operation
    */
@@ -215,6 +218,7 @@ export class OutlineRewriteService {
         await this.fetchRewriteData(reportId);
 
       const projectId = project.id;
+      this.currentProjectId = projectId; // Store for tracking
       const plotStructure = project.plot_structure ? JSON.parse(project.plot_structure) : null;
       const outlineStructure = outline?.structure ? JSON.parse(outline.structure) : null;
       const recommendations = report.recommendations ? JSON.parse(report.recommendations) : [];
@@ -411,6 +415,9 @@ export class OutlineRewriteService {
 
     const prompt = this.buildPlotRewritePrompt(currentPlot, structureRecs, structureResults);
 
+    // Get projectId from the report context
+    const projectId = await this.getProjectIdFromContext();
+
     const response = await claudeService.createCompletionWithUsage({
       system: `You are a senior developmental editor with expertise in commercial fiction structure.
 You must use UK British spelling throughout your response.
@@ -418,6 +425,11 @@ Return ONLY valid JSON, no additional text or markdown.`,
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 8000,
       temperature: 0.4,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.OUTLINE_REWRITE,
+        projectId,
+        contextSummary: `Plot structure rewrite`,
+      },
     });
 
     const result = extractJsonObject<PlotRewriteResponse>(response.content);
@@ -539,6 +551,9 @@ Return a JSON object with this exact structure:
       rewrittenPlot
     );
 
+    // Get projectId from the report context
+    const projectId = await this.getProjectIdFromContext();
+
     const response = await claudeService.createCompletionWithUsage({
       system: `You are a master story architect specialising in commercial fiction.
 You must use UK British spelling throughout your response.
@@ -546,6 +561,11 @@ Return ONLY valid JSON, no additional text or markdown.`,
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 16000,
       temperature: 0.4,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.OUTLINE_REWRITE,
+        projectId,
+        contextSummary: `Outline structure rewrite`,
+      },
     });
 
     const result = extractJsonObject<OutlineRewriteResponse>(response.content);
@@ -657,6 +677,13 @@ Return a JSON object with this exact structure:
     { "type": "added|modified|removed", "description": "What was changed and why" }
   ]
 }`;
+  }
+
+  /**
+   * Helper: Get current projectId for tracking
+   */
+  private async getProjectIdFromContext(): Promise<string | null> {
+    return this.currentProjectId;
   }
 }
 

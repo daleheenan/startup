@@ -11,6 +11,7 @@ import type {
   SceneCard,
 } from '../shared/types/index.js';
 import { createLogger } from './logger.service.js';
+import { AI_REQUEST_TYPES } from '../constants/ai-request-types.js';
 
 const logger = createLogger('services:regeneration');
 
@@ -62,20 +63,29 @@ export class RegenerationService {
       chapterData.story_dna
     );
 
+    // Get projectId for tracking
+    const projectId = this.getProjectIdFromChapter(chapterId);
+
     // Generate 3 variations from Claude
     const variations: [string, string, string] = ['', '', ''];
 
     for (let i = 0; i < 3; i++) {
       logger.info(`[RegenerationService] Generating variation ${i + 1}/3`);
 
-      const variation = await claudeService.createCompletion({
+      const variation = await claudeService.createCompletionWithUsage({
         system,
         messages: [{ role: 'user', content: user }],
         maxTokens: Math.min(4096, (selectionEnd - selectionStart) * 2),
         temperature: 0.8 + (i * 0.1), // Slightly different temperature for variety
+        tracking: {
+          requestType: AI_REQUEST_TYPES.REGENERATION,
+          projectId,
+          chapterId,
+          contextSummary: `Variation ${i + 1} for ${mode} regeneration`,
+        },
       });
 
-      variations[i] = variation.trim();
+      variations[i] = variation.content.trim();
     }
 
     // Store in database
@@ -296,11 +306,20 @@ Rewrite this scene maintaining the plot points but improving the prose quality, 
 
 Output only the regenerated scene text:`;
 
-    const sceneContent = await claudeService.createCompletion({
+    // Get projectId for tracking
+    const projectId = this.getProjectIdFromChapter(chapterId);
+
+    const sceneContent = await claudeService.createCompletionWithUsage({
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 4096,
       temperature: 0.9,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.REGENERATION,
+        projectId,
+        chapterId,
+        contextSummary: `Scene ${sceneIndex} regeneration`,
+      },
     });
 
     // Replace scene in full content
@@ -308,7 +327,7 @@ Output only the regenerated scene text:`;
       content,
       sceneIndex,
       chapterData.scene_cards.length,
-      sceneContent.trim()
+      sceneContent.content.trim()
     );
 
     // Calculate word count
@@ -352,7 +371,7 @@ Output only the regenerated scene text:`;
       chapterId,
       'scene_regen',
       originalScene,
-      sceneContent.trim(),
+      sceneContent.content.trim(),
       'scene',
       now
     );
@@ -361,11 +380,30 @@ Output only the regenerated scene text:`;
 
     return {
       success: true,
-      sceneContent: sceneContent.trim(),
+      sceneContent: sceneContent.content.trim(),
       fullContent,
       sceneIndex,
       historyId,
     };
+  }
+
+  /**
+   * Helper: Get project ID from chapter ID
+   */
+  private getProjectIdFromChapter(chapterId: string): string | null {
+    try {
+      const stmt = db.prepare<[string], { project_id: string }>(`
+        SELECT b.project_id
+        FROM chapters c
+        JOIN books b ON c.book_id = b.id
+        WHERE c.id = ?
+      `);
+      const result = stmt.get(chapterId);
+      return result?.project_id || null;
+    } catch (error) {
+      logger.warn({ chapterId, error }, 'Failed to get project ID from chapter');
+      return null;
+    }
   }
 
   /**

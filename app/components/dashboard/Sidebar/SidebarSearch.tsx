@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { colors, spacing, borderRadius, transitions } from '@/app/lib/design-tokens';
 import { useKeyboardShortcut } from '@/app/hooks/useKeyboardShortcut';
 
@@ -16,13 +16,19 @@ interface SidebarSearchProps {
 /**
  * Detects whether the current platform is macOS so the keyboard shortcut
  * badge can display the appropriate modifier symbol (⌘ vs Ctrl).
- * Returns false during server-side rendering when `window` is unavailable.
+ * Returns false during server-side rendering and until mounted on client
+ * to prevent hydration mismatches.
  */
 function useMacDetection(): boolean {
-  if (typeof window === 'undefined') {
-    return false;
-  }
-  return navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+  const [isMac, setIsMac] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsMac(navigator.platform.toUpperCase().indexOf('MAC') >= 0);
+    }
+  }, []);
+
+  return isMac;
 }
 
 // ==================== COMPONENT ====================

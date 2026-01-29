@@ -11,6 +11,7 @@ import type {
 import { claudeService } from './claude.service.js';
 import { createLogger } from './logger.service.js';
 import { bookVersioningService } from './book-versioning.service.js';
+import { AI_REQUEST_TYPES } from '../constants/ai-request-types.js';
 
 const logger = createLogger('services:cross-book-continuity');
 
@@ -78,14 +79,19 @@ export class CrossBookContinuityService {
     // Use Claude to analyze the ending state
     const prompt = this.buildEndingStatePrompt(storyBible, lastChapter.content, lastChapter.summary);
 
-    const response = await claudeService.createCompletion({
+    const response = await claudeService.createCompletionWithUsage({
       system: 'You are analyzing the ending state of a novel for continuity tracking.',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 4000,
       temperature: 0.3,  // Lower temperature for more consistent analysis
+      tracking: {
+        requestType: AI_REQUEST_TYPES.CROSS_BOOK_CONTINUITY,
+        projectId: book.project_id,
+        contextSummary: `Ending state analysis for book ${book.book_number}`,
+      },
     });
 
-    const endingState: BookEndingState = JSON.parse(response);
+    const endingState: BookEndingState = JSON.parse(response.content);
 
     // Save to database
     const updateStmt = db.prepare(`
@@ -157,11 +163,20 @@ Create a comprehensive 500-800 word summary of this book that covers:
 
 Write in past tense, objective narrative style.`;
 
-    const summary = await claudeService.createCompletion({
+    // Get book and project info for tracking
+    const bookStmt = db.prepare<[string], Book>(`SELECT * FROM books WHERE id = ?`);
+    const book = bookStmt.get(bookId);
+
+    const summary = await claudeService.createCompletionWithUsage({
       system: 'You are creating a comprehensive book summary for trilogy continuity.',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 1500,
       temperature: 0.3,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.CROSS_BOOK_CONTINUITY,
+        projectId: book?.project_id || null,
+        contextSummary: `Book summary for continuity`,
+      },
     });
 
     // Save to database
@@ -172,14 +187,14 @@ Write in past tense, objective narrative style.`;
     `);
 
     updateStmt.run(
-      summary,
+      summary.content,
       new Date().toISOString(),
       bookId
     );
 
     logger.info(`[CrossBookContinuity] Book summary saved for book ${bookId}`);
 
-    return summary;
+    return summary.content;
   }
 
   /**

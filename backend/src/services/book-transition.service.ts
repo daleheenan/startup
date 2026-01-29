@@ -9,6 +9,7 @@ import type {
 } from '../shared/types/index.js';
 import { claudeService } from './claude.service.js';
 import { createLogger } from './logger.service.js';
+import { AI_REQUEST_TYPES } from '../constants/ai-request-types.js';
 
 const logger = createLogger('services:book-transition');
 
@@ -63,14 +64,19 @@ export class BookTransitionService {
       timeGap
     );
 
-    const response = await claudeService.createCompletion({
+    const response = await claudeService.createCompletionWithUsage({
       system: 'You are creating a transition summary between books in a trilogy.',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 2000,
       temperature: 0.7,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.BOOK_TRANSITION,
+        projectId,
+        contextSummary: `Book transition from ${fromBook.book_number} to ${toBook.book_number}`,
+      },
     });
 
-    const transitionData = JSON.parse(response);
+    const transitionData = JSON.parse(response.content);
 
     // Create transition record
     const transitionId = randomUUID();
