@@ -183,6 +183,13 @@ export const PROJECT_NAV_GROUPS: NavGroup[] = [
         workflowStep: 'plots',
       },
       {
+        id: 'quality',
+        label: 'Quality',
+        route: '/quality',
+        icon: '✓',
+        workflowStep: 'coherence',
+      },
+      {
         id: 'outline',
         label: 'Outline',
         route: '/outline',

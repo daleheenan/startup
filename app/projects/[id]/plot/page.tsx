@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
 import PlotLayersVisualization from '../../../components/PlotLayersVisualization';
-import PlotWizard from '../../../components/plot/PlotWizard';
 import { getToken } from '../../../lib/auth';
 import { colors } from '../../../lib/constants';
 import { createInitialPlotLayers, isKeyPlotLayer, toExtendedPlotLayer } from '../../../lib/plot-constants';
@@ -139,17 +138,10 @@ export default function PlotStructurePage() {
   const [extractingFromConcept, setExtractingFromConcept] = useState(false);
   const [hasAttemptedExtraction, setHasAttemptedExtraction] = useState(false);
   const [hasPopulatedInitialLayers, setHasPopulatedInitialLayers] = useState(false);
-  const [validatingCoherence, setValidatingCoherence] = useState(false);
-  const [coherenceWarnings, setCoherenceWarnings] = useState<string[]>([]);
-  const [coherenceSuggestions, setCoherenceSuggestions] = useState<string[]>([]);
-  const [isCoherent, setIsCoherent] = useState<boolean | null>(null);
-
   // Regeneration state
   const [showRegenerateModal, setShowRegenerateModal] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
 
-  // Wizard mode state
-  const [isWizardMode, setIsWizardMode] = useState(false);
   const [characters, setCharacters] = useState<Character[]>([]);
 
   // Version-related state
@@ -217,13 +209,6 @@ export default function PlotStructurePage() {
             },
           };
           setStructure(safeStructure);
-          // If there are no plot layers, default to wizard mode
-          if (safeStructure.plot_layers.length === 0) {
-            setIsWizardMode(true);
-          }
-        } else {
-          // No plot structure at all, default to wizard mode
-          setIsWizardMode(true);
         }
       }
 
@@ -320,10 +305,6 @@ export default function PlotStructurePage() {
                         },
                       };
                       setStructure(safeStructure);
-
-                      if (safeStructure.plot_layers.length === 0) {
-                        setIsWizardMode(true);
-                      }
                     }
                     setIsViewingSnapshot(false); // Active version is current, not a snapshot
                   }
@@ -467,10 +448,6 @@ export default function PlotStructurePage() {
 
       setStructure(newStructure);
       setError(null); // Clear any previous errors on success
-      // Clear previous coherence validation when structure changes
-      setIsCoherent(null);
-      setCoherenceWarnings([]);
-      setCoherenceSuggestions([]);
     } catch (err: any) {
       console.error('Plot structure save error:', err);
       setError(`Save failed: ${err.message}. Please try again or refresh the page.`);
@@ -479,36 +456,6 @@ export default function PlotStructurePage() {
     }
   };
 
-  // Validate plot coherence with story concept/DNA
-  const validatePlotCoherence = async () => {
-    setValidatingCoherence(true);
-    setError(null);
-
-    try {
-      const token = getToken();
-      const res = await fetch(`${API_BASE_URL}/api/projects/${projectId}/validate-plot-coherence`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!res.ok) {
-        throw new Error('Failed to validate plot coherence');
-      }
-
-      const data = await res.json();
-      setIsCoherent(data.isCoherent);
-      setCoherenceWarnings(data.warnings || []);
-      setCoherenceSuggestions(data.suggestions || []);
-    } catch (err: any) {
-      console.error('Error validating plot coherence:', err);
-      setError(err.message);
-    } finally {
-      setValidatingCoherence(false);
-    }
-  };
 
   // Regenerate plot structure from story elements and concept
   const handleRegeneratePlotStructure = async () => {
@@ -553,11 +500,6 @@ export default function PlotStructurePage() {
             act_three_climax: 28,
           },
         });
-
-        // Clear coherence state since structure changed
-        setIsCoherent(null);
-        setCoherenceWarnings([]);
-        setCoherenceSuggestions([]);
 
         // Show success message
         const successMsg = document.createElement('div');
@@ -892,34 +834,6 @@ export default function PlotStructurePage() {
     saveStructure(newStructure);
   };
 
-  const handleWizardUpdate = async (plots: PlotLayer[]) => {
-    const newStructure = { ...structure, plot_layers: plots };
-    await saveStructure(newStructure);
-
-    // Show success message
-    const successMsg = document.createElement('div');
-    successMsg.style.cssText = `
-      position: fixed;
-      top: 2rem;
-      right: 2rem;
-      padding: 1rem 1.5rem;
-      background: #10B981;
-      color: #FFFFFF;
-      border-radius: 8px;
-      font-size: 0.875rem;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-      z-index: 9999;
-    `;
-    successMsg.textContent = 'Plot structure saved! Redirecting to coherence check...';
-    document.body.appendChild(successMsg);
-
-    // Navigate to Coherence page after brief delay
-    setTimeout(() => {
-      successMsg.remove();
-      router.push(`/projects/${projectId}/coherence`);
-    }, 1500);
-  };
-
   // Handle version selection change
   const handleVersionChange = async (versionId: string) => {
     setSelectedVersionId(versionId);
@@ -1029,9 +943,6 @@ export default function PlotStructurePage() {
     );
   }
 
-  // Calculate book word count (estimate based on chapters)
-  const bookWordCount = totalChapters * 3000; // Rough estimate: 3000 words per chapter
-
   return (
     <DashboardLayout
       header={{ title: project?.title || 'Loading...', subtitle: 'Plot Structure & Timeline' }}
@@ -1100,75 +1011,6 @@ export default function PlotStructurePage() {
           </div>
         )}
 
-        {/* Plot Coherence Validation */}
-        {(structure.plot_layers?.length || 0) > 0 && (
-          <div style={{
-            background: isCoherent === true ? '#ECFDF5' : isCoherent === false ? '#FEF2F2' : '#F9FAFB',
-            border: `1px solid ${isCoherent === true ? '#A7F3D0' : isCoherent === false ? '#FECACA' : '#E5E7EB'}`,
-            borderRadius: '8px',
-            padding: '1rem',
-            marginBottom: '1.5rem',
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div style={{ flex: 1 }}>
-                <h3 style={{
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  color: isCoherent === true ? '#047857' : isCoherent === false ? '#DC2626' : colors.text,
-                  marginBottom: '0.5rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                }}>
-                  {isCoherent === true && '✓ '}
-                  {isCoherent === false && '⚠ '}
-                  Plot Coherence Check
-                </h3>
-                {isCoherent === null && (
-                  <p style={{ fontSize: '0.875rem', color: colors.textSecondary, margin: 0 }}>
-                    Validate that your plots align with your story concept and genre.
-                  </p>
-                )}
-                {coherenceWarnings.length > 0 && (
-                  <ul style={{ margin: '0.5rem 0', paddingLeft: '1.25rem', fontSize: '0.875rem', color: '#B45309' }}>
-                    {coherenceWarnings.map((warning, i) => (
-                      <li key={i} style={{ marginBottom: '0.25rem' }}>{warning}</li>
-                    ))}
-                  </ul>
-                )}
-                {coherenceSuggestions.length > 0 && (
-                  <ul style={{ margin: '0.5rem 0', paddingLeft: '1.25rem', fontSize: '0.875rem', color: '#4338CA' }}>
-                    {coherenceSuggestions.map((suggestion, i) => (
-                      <li key={i} style={{ marginBottom: '0.25rem' }}>{suggestion}</li>
-                    ))}
-                  </ul>
-                )}
-                {isCoherent === true && coherenceWarnings.length === 0 && (
-                  <p style={{ fontSize: '0.875rem', color: '#047857', margin: 0 }}>
-                    Your plots are coherent with your story concept. Ready to generate outline!
-                  </p>
-                )}
-              </div>
-              <button
-                onClick={validatePlotCoherence}
-                disabled={validatingCoherence}
-                style={{
-                  padding: '0.5rem 1rem',
-                  background: validatingCoherence ? '#E5E7EB' : '#FFFFFF',
-                  border: '1px solid #D1D5DB',
-                  borderRadius: '6px',
-                  color: validatingCoherence ? '#9CA3AF' : colors.text,
-                  fontSize: '0.8125rem',
-                  fontWeight: 500,
-                  cursor: validatingCoherence ? 'not-allowed' : 'pointer',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {validatingCoherence ? 'Checking...' : isCoherent !== null ? 'Re-check' : 'Validate Coherence'}
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Version Selector - only show if versions exist */}
         {versions.length > 0 && (
@@ -1275,56 +1117,7 @@ export default function PlotStructurePage() {
           </div>
         )}
 
-        {/* Mode Toggle */}
-        <div style={{
-          ...cardStyle,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}>
-          <div>
-            <h2 style={{ fontSize: '1.125rem', fontWeight: 600, color: colors.text, marginBottom: '0.5rem' }}>
-              {isWizardMode ? 'Wizard Mode' : 'Advanced Mode'}
-            </h2>
-            <p style={{ fontSize: '0.875rem', color: colors.textSecondary, margin: 0 }}>
-              {isWizardMode
-                ? 'Step-by-step guided workflow for building your plot structure'
-                : 'Full control over plot layers, points, and structure'
-              }
-            </p>
-          </div>
-          <button
-            onClick={() => setIsWizardMode(!isWizardMode)}
-            disabled={isViewingSnapshot}
-            style={{
-              padding: '0.75rem 1.5rem',
-              background: isViewingSnapshot ? '#E5E7EB' : (isWizardMode ? '#FFFFFF' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'),
-              border: isWizardMode ? '1px solid #E2E8F0' : 'none',
-              borderRadius: '8px',
-              color: isViewingSnapshot ? '#9CA3AF' : (isWizardMode ? '#667eea' : '#FFFFFF'),
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              cursor: isViewingSnapshot ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {isWizardMode ? 'Switch to Advanced Mode' : 'Switch to Wizard'}
-          </button>
-        </div>
-
-        {/* Wizard Mode */}
-        {isWizardMode ? (
-          <PlotWizard
-            key={`wizard-${structure.plot_layers?.length || 0}-${extractingFromConcept}`}
-            projectId={projectId}
-            project={project}
-            characters={characters}
-            plotLayers={structure.plot_layers}
-            onUpdate={handleWizardUpdate}
-            bookWordCount={bookWordCount}
-          />
-        ) : (
-          <>
-            {/* Advanced Mode - Original UI */}
+        {/* Advanced Mode - Original UI */}
             {/* Plot Visualization */}
             <div style={cardStyle}>
           <h2 style={{ fontSize: '1.125rem', fontWeight: 600, color: colors.text, marginBottom: '1rem' }}>
@@ -1692,7 +1485,7 @@ export default function PlotStructurePage() {
           )}
         </div>
 
-        {/* Continue to Coherence button */}
+        {/* Continue to Quality button */}
         <div style={{
           ...cardStyle,
           display: 'flex',
@@ -1710,7 +1503,7 @@ export default function PlotStructurePage() {
             </p>
           </div>
           <button
-            onClick={() => router.push(`/projects/${projectId}/coherence`)}
+            onClick={() => router.push(`/projects/${projectId}/quality`)}
             style={{
               padding: '0.75rem 1.5rem',
               background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -1724,7 +1517,7 @@ export default function PlotStructurePage() {
               whiteSpace: 'nowrap',
             }}
           >
-            Continue to Coherence →
+            Continue to Quality →
           </button>
         </div>
 
@@ -2224,8 +2017,6 @@ export default function PlotStructurePage() {
             </div>
             <style jsx>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           </div>
-        )}
-          </>
         )}
       </div>
     </DashboardLayout>

@@ -86,13 +86,18 @@ export default function ChaptersPage() {
     const refetchChapters = async () => {
       try {
         if (selectedBook === 'all') {
-          // Fetch chapters from all books (active versions)
-          const allChapters: Chapter[] = [];
-          for (const book of books) {
-            const bookChapters = await fetchChaptersForBook(book.id);
-            allChapters.push(...bookChapters);
+          // Use optimised endpoint to fetch all chapters in a single request
+          const booksWithChaptersRes = await fetchWithAuth(`/api/projects/${projectId}/books-with-chapters`);
+          if (booksWithChaptersRes.ok) {
+            const data = await booksWithChaptersRes.json();
+            const allChapters: Chapter[] = data.books.flatMap((book: any) =>
+              book.chapters.map((ch: any) => ({
+                ...ch,
+                book_id: book.id,
+              }))
+            );
+            setChapters(allChapters);
           }
-          setChapters(allChapters);
         } else {
           // Fetch chapters for selected book with optional version
           const bookChapters = await fetchChaptersForBook(selectedBook, selectedVersionId);
@@ -104,30 +109,42 @@ export default function ChaptersPage() {
     };
 
     refetchChapters();
-  }, [selectedBook, selectedVersionId, books, fetchChaptersForBook]);
+  }, [selectedBook, selectedVersionId, books, fetchChaptersForBook, projectId]);
 
   const fetchChaptersData = async () => {
     try {
       setLoading(true);
 
-      // Fetch project for navigation
-      const projectRes = await fetchWithAuth(`/api/projects/${projectId}`);
-      if (projectRes.ok) {
-        setProject(await projectRes.json());
+      // Use optimised endpoint to fetch project, books, and chapters in a single request
+      // This fixes the N+1 query problem (was making N API calls for N books)
+      const booksWithChaptersRes = await fetchWithAuth(`/api/projects/${projectId}/books-with-chapters`);
+      if (!booksWithChaptersRes.ok) {
+        const errorData = await booksWithChaptersRes.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || `Failed to fetch chapters (HTTP ${booksWithChaptersRes.status})`);
       }
 
-      // Fetch books
-      const booksRes = await fetchWithAuth(`/api/projects/${projectId}/books`);
-      if (!booksRes.ok) throw new Error('Failed to fetch books');
-      const booksData: Book[] = await booksRes.json();
+      const data = await booksWithChaptersRes.json();
+
+      // Extract project
+      setProject(data.project);
+
+      // Extract books (without chapters for the books array)
+      const booksData: Book[] = data.books.map((book: any) => ({
+        id: book.id,
+        project_id: book.project_id,
+        book_number: book.book_number,
+        title: book.title,
+        chapter_count: book.chapterCount,
+      }));
       setBooks(booksData);
 
-      // Fetch all chapters for all books (active versions by default)
-      const allChapters: Chapter[] = [];
-      for (const book of booksData) {
-        const bookChapters = await fetchChaptersForBook(book.id);
-        allChapters.push(...bookChapters);
-      }
+      // Flatten all chapters from all books
+      const allChapters: Chapter[] = data.books.flatMap((book: any) =>
+        book.chapters.map((ch: any) => ({
+          ...ch,
+          book_id: book.id,
+        }))
+      );
 
       setChapters(allChapters);
 
@@ -238,25 +255,71 @@ export default function ChaptersPage() {
   if (error) {
     return (
       <DashboardLayout
-        header={{ title: project?.title || 'Loading...', subtitle: 'Error loading chapters' }}
+        header={{ title: project?.title || 'Chapters', subtitle: 'Unable to load chapters' }}
         projectId={projectId}
       >
-        <div style={{ padding: spacing[8], textAlign: 'center' }}>
-          <p style={{ color: colors.semantic.error, marginBottom: spacing[4] }}>{error}</p>
-          <button
-            onClick={fetchChaptersData}
-            style={{
-              padding: `${spacing[3]} ${spacing[6]}`,
-              background: colors.brand.gradient,
-              color: colors.text.inverse,
-              border: 'none',
-              borderRadius: borderRadius.md,
-              cursor: 'pointer',
-              fontWeight: typography.fontWeight.semibold,
-            }}
-          >
-            Retry
-          </button>
+        <div style={{
+          maxWidth: '500px',
+          margin: '2rem auto',
+          padding: spacing[8],
+          textAlign: 'center',
+          background: colors.background.surface,
+          border: `1px solid ${colors.border.default}`,
+          borderRadius: borderRadius.lg,
+        }}>
+          <div style={{ fontSize: '3rem', marginBottom: spacing[4] }}>📚</div>
+          <h2 style={{
+            fontSize: typography.fontSize.xl,
+            fontWeight: typography.fontWeight.semibold,
+            color: colors.text.primary,
+            marginBottom: spacing[2],
+          }}>
+            Chapters Not Available
+          </h2>
+          <p style={{
+            color: colors.text.secondary,
+            marginBottom: spacing[4],
+            fontSize: typography.fontSize.base,
+          }}>
+            {error}
+          </p>
+          <p style={{
+            color: colors.text.tertiary,
+            marginBottom: spacing[6],
+            fontSize: typography.fontSize.sm,
+          }}>
+            Make sure you have generated an outline and started chapter generation first.
+          </p>
+          <div style={{ display: 'flex', gap: spacing[3], justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={fetchChaptersData}
+              style={{
+                padding: `${spacing[3]} ${spacing[6]}`,
+                background: colors.brand.gradient,
+                color: colors.text.inverse,
+                border: 'none',
+                borderRadius: borderRadius.md,
+                cursor: 'pointer',
+                fontWeight: typography.fontWeight.semibold,
+              }}
+            >
+              Retry
+            </button>
+            <Link
+              href={`/projects/${projectId}/outline`}
+              style={{
+                padding: `${spacing[3]} ${spacing[6]}`,
+                background: colors.background.surface,
+                color: colors.text.primary,
+                border: `1px solid ${colors.border.default}`,
+                borderRadius: borderRadius.md,
+                textDecoration: 'none',
+                fontWeight: typography.fontWeight.medium,
+              }}
+            >
+              Go to Outline
+            </Link>
+          </div>
         </div>
       </DashboardLayout>
     );

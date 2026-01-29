@@ -10,6 +10,7 @@ import ConfirmDialog from '../../../components/shared/ConfirmDialog';
 import VersionPromptDialog from '../../../components/VersionPromptDialog';
 import CollapsibleSection from '../../../components/CollapsibleSection';
 import AgentWorkflowVisualization from '../../../components/AgentWorkflowVisualization';
+import BookVersionSelector from '../../../components/BookVersionSelector';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -641,6 +642,26 @@ export default function OutlinePage() {
       {/* Content Area */}
       <div style={{ padding: '1.5rem 0' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+            {/* Version Selector */}
+            {book && (
+              <div style={{
+                background: '#FFFFFF',
+                border: '1px solid #E2E8F0',
+                borderRadius: '12px',
+                padding: '1rem 1.5rem',
+                marginBottom: '1.5rem',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              }}>
+                <BookVersionSelector
+                  bookId={book.id}
+                  onVersionChange={() => {
+                    // Reload data when version changes
+                    loadData();
+                  }}
+                />
+              </div>
+            )}
+
             {error && (
               <div style={{
                 background: '#FEF2F2',
