@@ -5,6 +5,7 @@ import { useCallback, type CSSProperties, type ReactNode } from 'react';
 import { DashboardProvider, useDashboardContext } from './DashboardContext';
 import Sidebar from './Sidebar';
 import SearchModal from './SearchModal/index';
+import ProjectNavButtons from './ProjectNavButtons';
 
 import {
   colors,
@@ -39,6 +40,8 @@ export interface DashboardLayoutProps {
   header?: PageHeaderConfig;
   /** Whether to render the sidebar. Defaults to true. */
   showSidebar?: boolean;
+  /** Optional project ID - when provided, shows project navigation buttons above content. */
+  projectId?: string;
 }
 
 // ==================== DASHBOARD HEADER ====================
@@ -148,6 +151,7 @@ function DashboardInner({
   children,
   header,
   showSidebar,
+  projectId,
 }: DashboardLayoutProps) {
   const { state, dispatch } = useDashboardContext();
 
@@ -194,6 +198,7 @@ function DashboardInner({
       {/* Main content region */}
       <main className="dashboard-main" style={mainStyle}>
         <div className="dashboard-content" style={contentAreaStyle}>
+          {projectId && <ProjectNavButtons projectId={projectId} />}
           {header && <DashboardHeader {...header} />}
           {children}
         </div>
@@ -250,10 +255,11 @@ export default function DashboardLayout({
   children,
   header,
   showSidebar = true,
+  projectId,
 }: DashboardLayoutProps) {
   return (
     <DashboardProvider>
-      <DashboardInner header={header} showSidebar={showSidebar}>
+      <DashboardInner header={header} showSidebar={showSidebar} projectId={projectId}>
         {children}
       </DashboardInner>
     </DashboardProvider>

@@ -142,6 +142,7 @@ import seriesRouter from './routes/series.js';
 import wordCountRevisionRouter from './routes/word-count-revision.js';
 import editorialLessonsRouter from './routes/editorial-lessons.js';
 import aiCostsRouter from './routes/ai-costs.js';
+import navigationRouter from './routes/navigation.js';
 
 // Run database migrations
 try {
@@ -269,6 +270,7 @@ app.use('/api/series', apiLimiter, requireAuth, seriesRouter); // Series managem
 app.use('/api/word-count-revision', apiLimiter, requireAuth, wordCountRevisionRouter); // Word count revision routes
 app.use('/api/editorial-lessons', apiLimiter, requireAuth, editorialLessonsRouter); // Editorial lessons routes
 app.use('/api/ai-costs', apiLimiter, requireAuth, aiCostsRouter); // AI cost tracking routes
+app.use('/api/navigation', apiLimiter, requireAuth, navigationRouter); // Navigation counts (optimised single-query endpoint)
 
 // Sentry error handler - must be BEFORE custom error handlers
 app.use(sentryErrorHandler());

@@ -98,6 +98,7 @@ export default function AnalyticsPage() {
   return (
     <DashboardLayout
       header={{ title: project?.title || 'Loading...', subtitle: 'Analytics' }}
+      projectId={projectId}
     >
 
       {/* Book and Version Selectors */}

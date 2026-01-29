@@ -303,6 +303,7 @@ export default function OriginalityPage() {
   return (
     <DashboardLayout
       header={{ title: 'Originality Check', subtitle: 'Ensure your story concept is unique and original' }}
+      projectId={projectId}
     >
 
       <div style={{ padding: '1.5rem 0' }}>

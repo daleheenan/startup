@@ -82,9 +82,24 @@ export default function StoryIdeasGenerator({
 
       if (response.ok) {
         const data = await response.json();
-        setSavedIdeas(data.ideas || []);
+        // Transform API response from snake_case to camelCase to match interface
+        const mappedIdeas = (data.ideas || []).map((i: any) => ({
+          id: i.id,
+          storyIdea: i.story_idea,
+          characterConcepts: i.character_concepts || [],
+          plotElements: i.plot_elements || [],
+          uniqueTwists: i.unique_twists || [],
+          genre: i.genre,
+          subgenre: i.subgenre,
+          tone: i.tone,
+          themes: i.themes || [],
+          notes: i.notes,
+          status: i.status,
+          createdAt: i.created_at,
+        }));
+        setSavedIdeas(mappedIdeas);
         // Build set of saved idea texts for quick lookup
-        const savedTexts = new Set<string>(data.ideas?.map((i: SavedIdea) => i.storyIdea) || []);
+        const savedTexts = new Set<string>(mappedIdeas.map((i: SavedIdea) => i.storyIdea));
         setSavedIdsSet(savedTexts);
       }
     } catch (err) {

@@ -2363,6 +2363,7 @@ export default function OutlineReviewPage() {
   return (
     <DashboardLayout
       header={{ title: 'Outline Review', subtitle: project?.title || 'Loading...' }}
+      projectId={projectId}
     >
 
       {/* Content Area */}

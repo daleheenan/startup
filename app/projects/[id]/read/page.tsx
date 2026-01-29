@@ -204,6 +204,7 @@ export default function ReadBookPage() {
     return (
       <DashboardLayout
         header={{ title: 'Error' }}
+        projectId={projectId}
       >
         <ErrorMessage message={error || 'Failed to load book'} />
       </DashboardLayout>
@@ -232,6 +233,7 @@ export default function ReadBookPage() {
   return (
     <DashboardLayout
       header={{ title: project.title, subtitle: project.author_name ? `By ${project.author_name}` : undefined }}
+      projectId={projectId}
     >
       <div style={{ padding: '1.5rem 0' }}>
         <div style={{ display: 'flex', gap: '2rem', maxWidth: '1400px', margin: '0 auto' }}>

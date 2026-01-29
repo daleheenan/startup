@@ -5,23 +5,25 @@ import { fetchWithAuth } from '../lib/fetch-utils';
 import type { NavigationCounts } from '../../shared/types';
 
 /**
- * Fetch navigation badge counts from the API
+ * Fetch navigation badge counts from the optimised API endpoint
+ *
+ * This uses a single API call instead of 3 separate calls, which helps
+ * prevent rate limiting when navigating between pages.
  */
 async function fetchNavigationCounts(): Promise<NavigationCounts> {
-  const [ideasRes, conceptsRes, projectsRes] = await Promise.all([
-    fetchWithAuth('/api/story-ideas/saved'),
-    fetchWithAuth('/api/saved-concepts'),
-    fetchWithAuth('/api/projects'),
-  ]);
+  const response = await fetchWithAuth('/api/navigation/counts');
 
-  const ideas = await ideasRes.json();
-  const concepts = await conceptsRes.json();
-  const projects = await projectsRes.json();
+  if (!response.ok) {
+    throw new Error('Failed to fetch navigation counts');
+  }
 
-  return {
-    storyIdeas: Array.isArray(ideas) ? ideas.filter((i: any) => i.status === 'saved').length : 0,
-    savedConcepts: Array.isArray(concepts) ? concepts.filter((c: any) => c.status === 'saved').length : 0,
-    activeProjects: Array.isArray(projects) ? projects.filter((p: any) => p.status !== 'completed').length : 0,
+  const data = await response.json();
+
+  // API returns { success: true, counts: { storyIdeas, savedConcepts, activeProjects } }
+  return data.counts || {
+    storyIdeas: 0,
+    savedConcepts: 0,
+    activeProjects: 0,
   };
 }
 

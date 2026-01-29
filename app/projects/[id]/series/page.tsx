@@ -277,6 +277,7 @@ export default function SeriesManagementPage() {
     return (
       <DashboardLayout
         header={{ title: 'Series Management' }}
+        projectId={projectId}
       >
         <div style={{ textAlign: 'center', padding: '3rem' }}>
           <div style={{ fontSize: '1.125rem', color: colors.textSecondary }}>
@@ -291,6 +292,7 @@ export default function SeriesManagementPage() {
     return (
       <DashboardLayout
         header={{ title: 'Series Management' }}
+        projectId={projectId}
       >
         <div style={{ padding: '1.5rem 0' }}>
           <div style={cardStyle}>
@@ -429,6 +431,7 @@ export default function SeriesManagementPage() {
   return (
     <DashboardLayout
       header={{ title: 'Series Management', subtitle: `Managing ${books.length} books in series` }}
+      projectId={projectId}
     >
 
       <div style={{ padding: '1.5rem 0' }}>

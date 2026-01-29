@@ -1020,6 +1020,7 @@ export default function PlotStructurePage() {
     return (
       <DashboardLayout
         header={{ title: project?.title || 'Loading...', subtitle: 'Plot Structure & Timeline' }}
+        projectId={projectId}
       >
         <div style={{ padding: '2rem', textAlign: 'center', color: colors.textSecondary }}>
           {extractingFromConcept ? 'Extracting plots from story concept...' : 'Loading plot structure...'}
@@ -1034,6 +1035,7 @@ export default function PlotStructurePage() {
   return (
     <DashboardLayout
       header={{ title: project?.title || 'Loading...', subtitle: 'Plot Structure & Timeline' }}
+      projectId={projectId}
     >
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
         {error && (

@@ -278,6 +278,7 @@ export default function CharactersPage() {
     return (
       <DashboardLayout
         header={{ title: project?.title || 'Loading...', subtitle: 'Characters' }}
+        projectId={projectId}
       >
         <div style={{ textAlign: 'center', padding: '48px', color: '#64748B' }}>
           Loading characters...
@@ -289,6 +290,7 @@ export default function CharactersPage() {
   return (
     <DashboardLayout
       header={{ title: project?.title || 'Loading...', subtitle: 'Create and edit your story\'s cast of characters' }}
+      projectId={projectId}
     >
       {error && (
         <div style={{

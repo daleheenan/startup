@@ -302,6 +302,7 @@ export default function FollowUpPage() {
   return (
     <DashboardLayout
       header={{ title: 'Follow-Up Ideas', subtitle: `${project?.title || 'Loading...'} - Sequel and Series Recommendations` }}
+      projectId={projectId}
     >
 
       {/* Book Selector */}

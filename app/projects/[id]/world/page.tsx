@@ -200,6 +200,7 @@ export default function WorldPage() {
   return (
     <DashboardLayout
       header={{ title: 'World Building', subtitle: 'Create and edit locations, factions, and systems' }}
+      projectId={projectId}
     >
 
       {/* Content Area */}

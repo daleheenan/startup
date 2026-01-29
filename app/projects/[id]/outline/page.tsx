@@ -635,6 +635,7 @@ export default function OutlinePage() {
   return (
     <DashboardLayout
       header={{ title: 'Story Outline', subtitle: project.title }}
+      projectId={projectId}
     >
 
       {/* Content Area */}

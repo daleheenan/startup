@@ -342,6 +342,7 @@ export default function CoherencePage() {
   return (
     <DashboardLayout
       header={{ title: 'Plot Coherence', subtitle: 'Validate that your plots align with your story concept' }}
+      projectId={projectId}
     >
       <div style={{ padding: '1.5rem 0' }}>
         <div style={{ maxWidth: '900px', margin: '0 auto' }}>

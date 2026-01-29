@@ -492,6 +492,7 @@ export default function ProgressPage() {
     return (
       <DashboardLayout
         header={{ title: project?.title || 'Loading...', subtitle: 'Chapter Generation Progress' }}
+        projectId={projectId}
       >
         <div style={{ textAlign: 'center', padding: '48px', color: '#64748B' }}>
           Loading progress...
@@ -504,6 +505,7 @@ export default function ProgressPage() {
     return (
       <DashboardLayout
         header={{ title: project?.title || 'Loading...', subtitle: 'Chapter Generation Progress' }}
+        projectId={projectId}
       >
         <p style={{ color: '#DC2626' }}>Error: {error || 'No progress data'}</p>
       </DashboardLayout>
@@ -515,6 +517,7 @@ export default function ProgressPage() {
   return (
     <DashboardLayout
       header={{ title: progress.project.title, subtitle: 'Chapter Generation Progress' }}
+      projectId={projectId}
     >
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         {/* Active Version Indicator */}

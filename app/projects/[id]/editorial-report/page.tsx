@@ -1599,6 +1599,7 @@ export default function EditorialReportPage() {
   return (
     <DashboardLayout
       header={{ title: 'Editorial Report', subtitle: project?.title || 'Loading...' }}
+      projectId={projectId}
     >
 
       {/* Content Area */}

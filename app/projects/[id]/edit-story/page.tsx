@@ -219,6 +219,7 @@ export default function EditStoryPage() {
         title: 'Edit Story',
         subtitle: project?.title ? `Edit concept and DNA for "${project.title}"` : 'Edit story concept and DNA',
       }}
+      projectId={projectId}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[6] }}>
         {/* Navigation - full width across top */}

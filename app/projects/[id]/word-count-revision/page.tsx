@@ -671,6 +671,7 @@ export default function WordCountRevisionPage() {
         title: isComprehensiveMode ? 'Comprehensive Rewrite' : 'Word Count Revision',
         subtitle: project?.title || 'Loading...'
       }}
+      projectId={projectId}
     >
 
       {/* Content Area */}

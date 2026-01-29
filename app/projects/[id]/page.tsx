@@ -564,6 +564,7 @@ export default function ProjectDetailPage() {
   return (
     <DashboardLayout
       header={{ title: project.title, subtitle: dashboardSubtitle }}
+      projectId={projectId}
     >
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         {/* Book Details Editor */}

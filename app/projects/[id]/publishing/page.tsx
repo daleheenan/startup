@@ -200,6 +200,7 @@ export default function PublishingSettingsPage() {
         title: 'Publishing Settings',
         subtitle: project?.title ? `Configure front and back matter for "${project.title}"` : 'Configure publishing options',
       }}
+      projectId={projectId}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[6] }}>
         {/* Navigation - full width across top */}

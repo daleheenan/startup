@@ -31,6 +31,7 @@ export default function ProseStylePage() {
   return (
     <DashboardLayout
       header={{ title: 'Prose Style', subtitle: project?.title || 'Loading...' }}
+      projectId={projectId}
     >
 
       {/* Main Content */}

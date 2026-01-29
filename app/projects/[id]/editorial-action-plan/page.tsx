@@ -687,6 +687,7 @@ export default function EditorialActionPlanPage() {
   return (
     <DashboardLayout
       header={{ title: 'Editorial Action Plan', subtitle: project?.title || 'Loading...' }}
+      projectId={projectId}
     >
 
       {/* Content Area */}

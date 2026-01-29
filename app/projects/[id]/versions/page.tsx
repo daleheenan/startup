@@ -363,6 +363,7 @@ export default function VersionHistoryPage() {
     return (
       <DashboardLayout
         header={{ title: project?.title || 'Loading...', subtitle: 'Version History' }}
+        projectId={projectId}
       >
         <div style={{ textAlign: 'center', padding: '48px', color: '#64748B' }}>
           Loading version history...
@@ -375,6 +376,7 @@ export default function VersionHistoryPage() {
     return (
       <DashboardLayout
         header={{ title: 'Error', subtitle: 'Version History' }}
+        projectId={projectId}
       >
         <div style={{ ...card, padding: '2rem', textAlign: 'center' }}>
           <p style={{ color: colors.error }}>{error || 'Failed to load data'}</p>
@@ -386,6 +388,7 @@ export default function VersionHistoryPage() {
   return (
     <DashboardLayout
       header={{ title: project.title, subtitle: 'Version History' }}
+      projectId={projectId}
     >
       <div style={{ maxWidth: '900px', margin: '0 auto' }}>
         {/* Book Selector (for multi-book projects) */}

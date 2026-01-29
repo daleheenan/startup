@@ -204,6 +204,7 @@ export default function FlagsPage() {
   return (
     <DashboardLayout
       header={{ title: 'Flagged Issues', subtitle: `${unresolvedFlags} unresolved / ${totalFlags} total` }}
+      projectId={projectId}
     >
       <div style={{ padding: '1.5rem 0' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>

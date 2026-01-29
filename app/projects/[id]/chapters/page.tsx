@@ -226,6 +226,7 @@ export default function ChaptersPage() {
     return (
       <DashboardLayout
         header={{ title: project?.title || 'Loading...', subtitle: 'Chapters' }}
+        projectId={projectId}
       >
         <div style={{ padding: spacing[8], textAlign: 'center' }}>
           <p style={{ color: colors.text.secondary }}>Loading chapters...</p>
@@ -238,6 +239,7 @@ export default function ChaptersPage() {
     return (
       <DashboardLayout
         header={{ title: project?.title || 'Loading...', subtitle: 'Error loading chapters' }}
+        projectId={projectId}
       >
         <div style={{ padding: spacing[8], textAlign: 'center' }}>
           <p style={{ color: colors.semantic.error, marginBottom: spacing[4] }}>{error}</p>
@@ -263,6 +265,7 @@ export default function ChaptersPage() {
   return (
     <DashboardLayout
       header={{ title: project?.title || 'Loading...', subtitle: `Manage and edit ${chapters.length} chapter${chapters.length !== 1 ? 's' : ''}` }}
+      projectId={projectId}
     >
       {/* Agent Workflow Visualization */}
       {(hasQueuedJobs || chapters.length > 0) && (

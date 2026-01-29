@@ -40,6 +40,8 @@ export default function StoryIdeasPage() {
   const [editForm, setEditForm] = useState<Partial<SavedStoryIdea>>({});
   const [filterGenre, setFilterGenre] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterDateRange, setFilterDateRange] = useState<string>('all');
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [expandingIdeaId, setExpandingIdeaId] = useState<string | null>(null);
   const [expandingMode, setExpandingMode] = useState<IdeaExpansionMode | null>(null);
   const [expandError, setExpandError] = useState<string | null>(null);
@@ -99,15 +101,45 @@ export default function StoryIdeasPage() {
     [ideas]
   );
 
-  // Filter ideas
-  const filteredIdeas = useMemo(() =>
-    ideas?.filter(idea => {
+  // Filter and sort ideas
+  const filteredIdeas = useMemo(() => {
+    let result = ideas?.filter(idea => {
       if (filterGenre !== 'all' && idea.genre !== filterGenre) return false;
       if (filterStatus !== 'all' && idea.status !== filterStatus) return false;
+
+      // Date range filter
+      if (filterDateRange !== 'all') {
+        const ideaDate = new Date(idea.created_at);
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        switch (filterDateRange) {
+          case 'today':
+            if (ideaDate < startOfToday) return false;
+            break;
+          case 'week':
+            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            if (ideaDate < weekAgo) return false;
+            break;
+          case 'month':
+            const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            if (ideaDate < monthAgo) return false;
+            break;
+        }
+      }
+
       return true;
-    }) || [],
-    [ideas, filterGenre, filterStatus]
-  );
+    }) || [];
+
+    // Sort by date
+    result.sort((a, b) => {
+      const dateA = new Date(a.created_at).getTime();
+      const dateB = new Date(b.created_at).getTime();
+      return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+    });
+
+    return result;
+  }, [ideas, filterGenre, filterStatus, filterDateRange, sortOrder]);
 
   // Pagination
   const totalPages = Math.ceil(filteredIdeas.length / ITEMS_PER_PAGE);
