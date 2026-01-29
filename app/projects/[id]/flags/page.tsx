@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { getToken, logout } from '../../../lib/auth';
+import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
+import ProjectNavigation from '../../../components/shared/ProjectNavigation';
+import { useProjectNavigation } from '@/app/hooks';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -33,6 +36,9 @@ export default function FlagsPage() {
   const [filterType, setFilterType] = useState<string>('all');
   const [filterSeverity, setFilterSeverity] = useState<string>('all');
   const [showResolved, setShowResolved] = useState(false);
+  const [project, setProject] = useState<any>(null);
+
+  const navigation = useProjectNavigation(projectId, project);
 
   useEffect(() => {
     fetchFlags();
@@ -55,7 +61,8 @@ export default function FlagsPage() {
       }
       if (!projectRes.ok) throw new Error('Failed to fetch project');
 
-      const project = await projectRes.json();
+      const projectData = await projectRes.json();
+      setProject(projectData);
 
       // Get books for this project
       const booksRes = await fetch(`${API_BASE_URL}/api/books/project/${projectId}`, { headers });
@@ -64,11 +71,27 @@ export default function FlagsPage() {
       const booksData = await booksRes.json();
       const books = booksData.books || [];
 
-      // Get chapters for each book
+      // Get chapters for each book (active version only)
       const allChapters: ChapterWithFlags[] = [];
 
       for (const book of books) {
-        const chaptersRes = await fetch(`${API_BASE_URL}/api/chapters/book/${book.id}`, { headers });
+        // Fetch active version first to get the version ID
+        let versionId: string | null = null;
+        try {
+          const versionRes = await fetch(`${API_BASE_URL}/api/books/${book.id}/versions/active`, { headers });
+          if (versionRes.ok) {
+            const versionData = await versionRes.json();
+            versionId = versionData.id;
+          }
+        } catch {
+          // Ignore version fetch errors
+        }
+
+        // Fetch chapters for the active version
+        const chaptersUrl = versionId
+          ? `${API_BASE_URL}/api/chapters/book/${book.id}?versionId=${versionId}`
+          : `${API_BASE_URL}/api/chapters/book/${book.id}`;
+        const chaptersRes = await fetch(chaptersUrl, { headers });
         if (!chaptersRes.ok) continue;
 
         const chaptersData = await chaptersRes.json();
@@ -183,27 +206,18 @@ export default function FlagsPage() {
   }
 
   return (
-    <main style={{
-      minHeight: '100vh',
-      padding: '2rem',
-    }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        {/* Header */}
-        <div style={{ marginBottom: '2rem' }}>
-          <h1 style={{
-            fontSize: '2.5rem',
-            marginBottom: '0.5rem',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text'
-          }}>
-            Flagged Issues
-          </h1>
-          <p style={{ fontSize: '1rem', color: '#888' }}>
-            {unresolvedFlags} unresolved / {totalFlags} total
-          </p>
-        </div>
+    <DashboardLayout
+      header={{ title: 'Flagged Issues', subtitle: `${unresolvedFlags} unresolved / ${totalFlags} total` }}
+    >
+      <ProjectNavigation
+        projectId={projectId}
+        project={navigation.project}
+        outline={navigation.outline}
+        chapters={navigation.chapters}
+      />
+
+      <div style={{ padding: '1.5rem 0' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
 
         {/* Filters */}
         <div style={{
@@ -419,20 +433,8 @@ export default function FlagsPage() {
           </div>
         )}
 
-        {/* Back Link */}
-        <div style={{ marginTop: '2rem', textAlign: 'center' }}>
-          <a
-            href={`/projects/${projectId}`}
-            style={{
-              color: '#667eea',
-              textDecoration: 'none',
-              fontSize: '0.875rem'
-            }}
-          >
-            ← Back to Project
-          </a>
         </div>
       </div>
-    </main>
+    </DashboardLayout>
   );
 }

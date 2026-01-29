@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { getToken, logout } from '@/app/lib/auth';
 import { fetchWithAuth } from '@/app/lib/fetch-utils';
+import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
 import ProjectNavigation from '@/app/components/shared/ProjectNavigation';
 import { useProjectNavigation } from '@/app/hooks';
 import RevisionWorkflowDisplay from '@/app/components/RevisionWorkflowDisplay';
@@ -674,94 +675,38 @@ export default function WordCountRevisionPage() {
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#F8FAFC' }}>
-      {/* Left Sidebar */}
-      <aside style={{
-        width: '72px',
-        background: '#FFFFFF',
-        borderRight: '1px solid #E2E8F0',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        padding: '1.5rem 0',
-      }}>
-        <Link
-          href="/projects"
-          style={{
-            width: '40px',
-            height: '40px',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            borderRadius: '10px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#FFFFFF',
-            fontWeight: '700',
-            fontSize: '1.25rem',
-            textDecoration: 'none',
-          }}
-        >
-          N
-        </Link>
-      </aside>
+    <DashboardLayout
+      header={{
+        title: isComprehensiveMode ? 'Comprehensive Rewrite' : 'Word Count Revision',
+        subtitle: project?.title || 'Loading...'
+      }}
+    >
+      <ProjectNavigation
+        projectId={projectId}
+        project={navigation.project}
+        outline={navigation.outline}
+        chapters={navigation.chapters}
+      />
 
-      {/* Main Content */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        {/* Top Bar */}
-        <header style={{
-          padding: '1rem 2rem',
-          background: '#FFFFFF',
-          borderBottom: '1px solid #E2E8F0',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <h1 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1A1A2E', margin: 0 }}>
-                {isComprehensiveMode ? 'Comprehensive Rewrite' : 'Word Count Revision'}
-              </h1>
-              {isComprehensiveMode && (
-                <span style={{
-                  padding: '0.25rem 0.75rem',
-                  background: 'linear-gradient(135deg, #DC2626 0%, #991B1B 100%)',
-                  color: 'white',
-                  borderRadius: '4px',
-                  fontSize: '0.75rem',
-                  fontWeight: '600',
-                }}>
-                  COMPREHENSIVE MODE
-                </span>
-              )}
-            </div>
-            <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
-              {project?.title || 'Loading...'}
-            </p>
-          </div>
-          <Link
-            href={`/projects/${projectId}`}
-            style={{
-              padding: '0.5rem 1rem',
-              color: '#64748B',
-              textDecoration: 'none',
-              fontSize: '0.875rem',
-            }}
-          >
-            ← Back to Project
-          </Link>
-        </header>
+      {/* Content Area */}
+      <div style={{ padding: '1.5rem 0' }}>
+        <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
 
-        {/* Project Navigation */}
-        <ProjectNavigation
-          projectId={projectId}
-          project={navigation.project}
-          outline={navigation.outline}
-          chapters={navigation.chapters}
-        />
-
-        {/* Content Area */}
-        <div style={{ flex: 1, padding: '2rem', overflow: 'auto' }}>
-          <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+        {/* Comprehensive Mode Badge */}
+        {isComprehensiveMode && (
+          <span style={{
+            display: 'inline-block',
+            marginBottom: '1rem',
+            padding: '0.25rem 0.75rem',
+            background: 'linear-gradient(135deg, #DC2626 0%, #991B1B 100%)',
+            color: 'white',
+            borderRadius: '4px',
+            fontSize: '0.75rem',
+            fontWeight: '600',
+          }}>
+            COMPREHENSIVE MODE
+          </span>
+        )}
 
           {/* Comprehensive Mode Banner */}
           {isComprehensiveMode && !revision && (
@@ -1675,9 +1620,8 @@ export default function WordCountRevisionPage() {
               </div>
             </div>
           )}
-          </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

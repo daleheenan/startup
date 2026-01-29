@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import PageLayout from '../../../components/shared/PageLayout';
+import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
+import ProjectNavigation from '../../../components/shared/ProjectNavigation';
 import LoadingState from '../../../components/shared/LoadingState';
 import ErrorMessage from '../../../components/shared/ErrorMessage';
 import BookVersionSelector from '../../../components/BookVersionSelector';
@@ -206,13 +207,11 @@ export default function ReadBookPage() {
 
   if (error || !project) {
     return (
-      <PageLayout
-        title="Error"
-        backLink={`/projects/${projectId}`}
-        backText="Back to Project"
+      <DashboardLayout
+        header={{ title: 'Error' }}
       >
         <ErrorMessage message={error || 'Failed to load book'} />
-      </PageLayout>
+      </DashboardLayout>
     );
   }
 
@@ -236,14 +235,18 @@ export default function ReadBookPage() {
   );
 
   return (
-    <PageLayout
-      title={project.title}
-      subtitle={subtitle as any}
-      backLink={`/projects/${projectId}`}
-      backText="Back to Project"
-      projectNavigation={navigation}
+    <DashboardLayout
+      header={{ title: project.title, subtitle: project.author_name ? `By ${project.author_name}` : undefined }}
     >
-      <div style={{ display: 'flex', gap: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
+      <ProjectNavigation
+        projectId={projectId}
+        project={navigation.project}
+        outline={navigation.outline}
+        chapters={navigation.chapters}
+      />
+
+      <div style={{ padding: '1.5rem 0' }}>
+        <div style={{ display: 'flex', gap: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
         {/* Chapter Navigation Sidebar */}
         <aside style={{
           width: '280px',
@@ -556,7 +559,8 @@ export default function ReadBookPage() {
             </div>
           )}
         </main>
+        </div>
       </div>
-    </PageLayout>
+    </DashboardLayout>
   );
 }

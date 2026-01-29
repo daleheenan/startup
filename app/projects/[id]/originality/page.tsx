@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import PageLayout from '../../../components/shared/PageLayout';
+import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
+import ProjectNavigation from '../../../components/shared/ProjectNavigation';
 import LoadingState from '../../../components/shared/LoadingState';
 import { getToken } from '../../../lib/auth';
 import { colors, gradients, borderRadius } from '../../../lib/constants';
@@ -303,14 +304,18 @@ export default function OriginalityPage() {
   }
 
   return (
-    <PageLayout
-      title="Originality Check"
-      subtitle="Ensure your story concept is unique and original"
-      backLink={`/projects/${projectId}`}
-      backText="← Back to Overview"
-      projectNavigation={navigation}
+    <DashboardLayout
+      header={{ title: 'Originality Check', subtitle: 'Ensure your story concept is unique and original' }}
     >
-      <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+      <ProjectNavigation
+        projectId={projectId}
+        project={navigation.project}
+        outline={navigation.outline}
+        chapters={navigation.chapters}
+      />
+
+      <div style={{ padding: '1.5rem 0' }}>
+        <div style={{ maxWidth: '900px', margin: '0 auto' }}>
         {error && (
           <div style={{
             padding: '1rem',
@@ -791,7 +796,8 @@ export default function OriginalityPage() {
             Continue to Outline →
           </button>
         </div>
+        </div>
       </div>
-    </PageLayout>
+    </DashboardLayout>
   );
 }

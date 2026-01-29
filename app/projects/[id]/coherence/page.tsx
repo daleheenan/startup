@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import PageLayout from '../../../components/shared/PageLayout';
+import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
+import ProjectNavigation from '../../../components/shared/ProjectNavigation';
 import LoadingState from '../../../components/shared/LoadingState';
 import AIChangeResultModal from '../../../components/shared/AIChangeResultModal';
 import { getToken } from '../../../lib/auth';
@@ -343,14 +344,18 @@ export default function CoherencePage() {
   }
 
   return (
-    <PageLayout
-      title="Plot Coherence"
-      subtitle="Validate that your plots align with your story concept"
-      backLink={`/projects/${projectId}`}
-      backText="← Back to Overview"
-      projectNavigation={navigation}
+    <DashboardLayout
+      header={{ title: 'Plot Coherence', subtitle: 'Validate that your plots align with your story concept' }}
     >
-      <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+      <ProjectNavigation
+        projectId={projectId}
+        project={navigation.project}
+        outline={navigation.outline}
+        chapters={navigation.chapters}
+      />
+
+      <div style={{ padding: '1.5rem 0' }}>
+        <div style={{ maxWidth: '900px', margin: '0 auto' }}>
         {error && (
           <div style={{
             padding: '1rem',
@@ -971,16 +976,17 @@ export default function CoherencePage() {
             Continue to Originality →
           </button>
         </div>
-      </div>
 
-      {/* AI Change Result Modal */}
-      <AIChangeResultModal
-        isOpen={changeResultModal.isOpen}
-        title={changeResultModal.title}
-        explanation={changeResultModal.explanation}
-        changesMade={changeResultModal.changesMade}
-        onClose={() => setChangeResultModal(prev => ({ ...prev, isOpen: false }))}
-      />
-    </PageLayout>
+        {/* AI Change Result Modal */}
+        <AIChangeResultModal
+          isOpen={changeResultModal.isOpen}
+          title={changeResultModal.title}
+          explanation={changeResultModal.explanation}
+          changesMade={changeResultModal.changesMade}
+          onClose={() => setChangeResultModal(prev => ({ ...prev, isOpen: false }))}
+        />
+        </div>
+      </div>
+    </DashboardLayout>
   );
 }

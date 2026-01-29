@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import PageLayout from '../../../components/shared/PageLayout';
+import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
+import ProjectNavigation from '../../../components/shared/ProjectNavigation';
 import { getToken } from '../../../lib/auth';
 import { colors, gradients } from '../../../lib/constants';
 import { useProjectNavigation } from '@/app/hooks';
@@ -277,30 +278,37 @@ export default function SeriesManagementPage() {
 
   if (loading) {
     return (
-      <PageLayout
-        title="Series Management"
-        backLink={`/projects/${projectId}`}
-        backText="← Back to Project"
-        projectNavigation={navigation}
+      <DashboardLayout
+        header={{ title: 'Series Management' }}
       >
+        <ProjectNavigation
+          projectId={projectId}
+          project={navigation.project}
+          outline={navigation.outline}
+          chapters={navigation.chapters}
+        />
         <div style={{ textAlign: 'center', padding: '3rem' }}>
           <div style={{ fontSize: '1.125rem', color: colors.textSecondary }}>
             Loading series data...
           </div>
         </div>
-      </PageLayout>
+      </DashboardLayout>
     );
   }
 
   if (books.length < 2) {
     return (
-      <PageLayout
-        title="Series Management"
-        backLink={`/projects/${projectId}`}
-        backText="← Back to Project"
-        projectNavigation={navigation}
+      <DashboardLayout
+        header={{ title: 'Series Management' }}
       >
-        <div style={cardStyle}>
+        <ProjectNavigation
+          projectId={projectId}
+          project={navigation.project}
+          outline={navigation.outline}
+          chapters={navigation.chapters}
+        />
+        <div style={{ padding: '1.5rem 0' }}>
+          <div style={cardStyle}>
           <h3 style={{ fontSize: '1.25rem', marginBottom: '1rem', color: colors.text }}>
             {books.length === 0 ? 'No Books Yet' : 'Add More Books to Create a Series'}
           </h3>
@@ -427,20 +435,25 @@ export default function SeriesManagementPage() {
               + Add Book {books.length + 1}
             </button>
           )}
+          </div>
         </div>
-      </PageLayout>
+      </DashboardLayout>
     );
   }
 
   return (
-    <PageLayout
-      title="Series Management"
-      subtitle={`Managing ${books.length} books in series`}
-      backLink={`/projects/${projectId}`}
-      backText="← Back to Project"
-      projectNavigation={navigation}
+    <DashboardLayout
+      header={{ title: 'Series Management', subtitle: `Managing ${books.length} books in series` }}
     >
-      {error && (
+      <ProjectNavigation
+        projectId={projectId}
+        project={navigation.project}
+        outline={navigation.outline}
+        chapters={navigation.chapters}
+      />
+
+      <div style={{ padding: '1.5rem 0' }}>
+        {error && (
         <div style={{
           ...cardStyle,
           background: colors.errorLight,
@@ -979,6 +992,7 @@ export default function SeriesManagementPage() {
           </div>
         </div>
       )}
-    </PageLayout>
+      </div>
+    </DashboardLayout>
   );
 }
