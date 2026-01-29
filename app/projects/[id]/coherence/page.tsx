@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import PageLayout from '../../../components/shared/PageLayout';
 import LoadingState from '../../../components/shared/LoadingState';
+import AIChangeResultModal from '../../../components/shared/AIChangeResultModal';
 import { getToken } from '../../../lib/auth';
 import { colors, gradients, borderRadius } from '../../../lib/constants';
 import { card } from '../../../lib/styles';
@@ -51,6 +52,12 @@ export default function CoherencePage() {
   const SUGGESTIONS_PER_PAGE = 5;
   const [fixedWarnings, setFixedWarnings] = useState<Set<number>>(new Set());
   const [implementedSuggestions, setImplementedSuggestions] = useState<Set<number>>(new Set());
+  const [changeResultModal, setChangeResultModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    explanation: string;
+    changesMade: string[];
+  }>({ isOpen: false, title: '', explanation: '', changesMade: [] });
 
   const navigation = useProjectNavigation(projectId, project);
 
@@ -242,8 +249,18 @@ export default function CoherencePage() {
         return;
       }
 
+      const data = await res.json();
+
       // Mark this suggestion as implemented (don't re-run coherence check)
       setImplementedSuggestions(prev => new Set(prev).add(index));
+
+      // Show modal with the changes made
+      setChangeResultModal({
+        isOpen: true,
+        title: 'Recommendation Implemented',
+        explanation: data.explanation || 'The plot structure has been updated to address this recommendation.',
+        changesMade: data.changesMade || [],
+      });
     } catch (err: any) {
       console.error('Error implementing suggestion:', err);
       setError(err.message);
@@ -279,8 +296,18 @@ export default function CoherencePage() {
         return;
       }
 
+      const data = await res.json();
+
       // Mark as fixed (don't auto re-run coherence check - user can decide when to re-check)
       setFixedWarnings(prev => new Set(prev).add(index));
+
+      // Show modal with the changes made
+      setChangeResultModal({
+        isOpen: true,
+        title: 'Warning Fixed',
+        explanation: data.explanation || 'The warning has been addressed by updating the plot structure.',
+        changesMade: data.changesMade || [],
+      });
     } catch (err: any) {
       console.error('Error fixing warning:', err);
       setError(err.message);
@@ -792,6 +819,15 @@ export default function CoherencePage() {
           </button>
         </div>
       </div>
+
+      {/* AI Change Result Modal */}
+      <AIChangeResultModal
+        isOpen={changeResultModal.isOpen}
+        title={changeResultModal.title}
+        explanation={changeResultModal.explanation}
+        changesMade={changeResultModal.changesMade}
+        onClose={() => setChangeResultModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </PageLayout>
   );
 }
