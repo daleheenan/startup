@@ -209,6 +209,8 @@ export default function StoryIdeasPage() {
       if (activeTab === 'originality' && !originalityResults[ideaId]) {
         setActiveTab('details');
       }
+      // Reset checking state when switching ideas
+      setIsCheckingOriginality(false);
     }
     setSelectedIdeaId(ideaId);
   };
@@ -540,10 +542,10 @@ export default function StoryIdeasPage() {
       );
     }
 
-    // Determine available tabs - always show originality tab if results exist or user is checking
+    // Determine available tabs - only show originality tab if results exist or user explicitly requested a check
+    // Don't show tab while loading existing results (to prevent flicker when no results exist)
     const hasOriginalityResult = !!originalityResults[selectedIdea.id];
-    const isLoadingOriginality = loadingOriginalityIds.has(selectedIdea.id);
-    const showOriginalityTab = hasOriginalityResult || activeTab === 'originality' || isLoadingOriginality;
+    const showOriginalityTab = hasOriginalityResult || isCheckingOriginality;
     const tabs = [
       { id: 'details', label: 'Details', icon: '📋' },
       ...(showOriginalityTab
