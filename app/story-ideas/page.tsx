@@ -604,6 +604,75 @@ export default function StoryIdeasPage() {
             </p>
           </div>
 
+          {/* AI Populate Button */}
+          <div
+            style={{
+              marginBottom: '1.5rem',
+              padding: '1rem',
+              background: `linear-gradient(135deg, ${colors.brandStart}10 0%, ${colors.brandEnd}10 100%)`,
+              border: `1px solid ${colors.brandStart}30`,
+              borderRadius: borderRadius.md,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <button
+                onClick={handleAIPopulate}
+                disabled={
+                  expandPremiseMutation.isPending || addIdeaForm.premise.trim().length < 10
+                }
+                style={{
+                  padding: '0.75rem 1.25rem',
+                  background:
+                    expandPremiseMutation.isPending || addIdeaForm.premise.trim().length < 10
+                      ? colors.border
+                      : `linear-gradient(135deg, ${colors.brandStart} 0%, ${colors.brandEnd} 100%)`,
+                  border: 'none',
+                  borderRadius: borderRadius.sm,
+                  color: 'white',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  cursor:
+                    expandPremiseMutation.isPending || addIdeaForm.premise.trim().length < 10
+                      ? 'not-allowed'
+                      : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                }}
+              >
+                {expandPremiseMutation.isPending ? (
+                  <>
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: '14px',
+                        height: '14px',
+                        border: '2px solid rgba(255,255,255,0.3)',
+                        borderTopColor: 'white',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite',
+                      }}
+                    />
+                    Generating...
+                  </>
+                ) : (
+                  <>✨ AI Populate</>
+                )}
+              </button>
+              <p
+                style={{
+                  fontSize: '0.8125rem',
+                  color: colors.textSecondary,
+                  margin: 0,
+                  flex: 1,
+                }}
+              >
+                Use AI to generate character concepts, plot elements, and unique twists based on
+                your premise.
+              </p>
+            </div>
+          </div>
+
           {/* Character Concepts (Optional) */}
           <div style={{ marginBottom: '1.5rem' }}>
             <label style={labelStyle}>Character Concepts (Optional)</label>
