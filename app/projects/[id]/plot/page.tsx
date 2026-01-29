@@ -260,8 +260,14 @@ export default function PlotStructurePage() {
                 return (layers || []).reduce((sum, layer) => sum + (layer.points?.length || 0), 0);
               };
 
+              // Helper function to count plot layers
+              const countLayers = (layers: PlotLayer[]): number => {
+                return (layers || []).length;
+              };
+
               // If active version has a plot_snapshot, compare it with project-level data
-              // Use whichever has more plot points (to handle stale snapshots)
+              // Project-level data is the source of truth; snapshots are for historical reference
+              // Use project data unless snapshot is clearly more complete
               if (active.plot_snapshot) {
                 try {
                   const snapshotData = typeof active.plot_snapshot === 'string'
@@ -270,15 +276,27 @@ export default function PlotStructurePage() {
 
                   if (snapshotData && snapshotData.plot_layers) {
                     const snapshotPointCount = countTotalPoints(snapshotData.plot_layers);
+                    const snapshotLayerCount = countLayers(snapshotData.plot_layers);
                     const projectPointCount = countTotalPoints(projectPlotStructure?.plot_layers || []);
+                    const projectLayerCount = countLayers(projectPlotStructure?.plot_layers || []);
 
-                    // Use project-level data if it has more points (snapshot may be stale)
-                    // Also use project data if snapshot has layers but no points while project does
-                    if (projectPointCount > snapshotPointCount) {
-                      console.log(`Using project-level plot data (${projectPointCount} points) over stale snapshot (${snapshotPointCount} points)`);
+                    console.log(`Plot data comparison - Project: ${projectLayerCount} layers, ${projectPointCount} points | Snapshot: ${snapshotLayerCount} layers, ${snapshotPointCount} points`);
+
+                    // Use project-level data if:
+                    // 1. It has more points (snapshot may be stale)
+                    // 2. It has more layers (snapshot may be stale)
+                    // 3. Counts are equal (prefer project as source of truth)
+                    const useProjectData =
+                      projectPointCount > snapshotPointCount ||
+                      projectLayerCount > snapshotLayerCount ||
+                      (projectPointCount === snapshotPointCount && projectLayerCount >= snapshotLayerCount);
+
+                    if (useProjectData) {
+                      console.log(`Using project-level plot data (more complete or equal, project is source of truth)`);
                       // Keep the project-level structure that was already set above
                     } else {
-                      // Use the snapshot data
+                      // Only use snapshot if it's clearly more complete
+                      console.log(`Using version snapshot plot data (snapshot has more data)`);
                       const plotLayers = (snapshotData.plot_layers || []).map((layer: PlotLayer) => {
                         const isKey = isKeyPlotLayer(layer.id);
                         return {
@@ -308,8 +326,11 @@ export default function PlotStructurePage() {
                     setIsViewingSnapshot(false); // Active version is current, not a snapshot
                   }
                 } catch (parseError) {
-                  console.warn('Failed to parse plot_snapshot, using project-level plot_structure');
+                  console.warn('Failed to parse plot_snapshot, using project-level plot_structure:', parseError);
+                  // Project-level data is already set, no action needed
                 }
+              } else {
+                console.log('No version snapshot, using project-level plot data');
               }
             }
           }
