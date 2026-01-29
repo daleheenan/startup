@@ -5,9 +5,7 @@ import { useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { getToken, logout } from '../../../lib/auth';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
-import ProjectNavigation from '@/app/components/shared/ProjectNavigation';
 import BookVersionSelector from '@/app/components/BookVersionSelector';
-import { useProjectNavigation } from '@/app/hooks';
 
 // Lazy load AnalyticsDashboard - heavy component with charts
 const AnalyticsDashboard = dynamic(() => import('../../../components/AnalyticsDashboard'), {
@@ -38,7 +36,6 @@ export default function AnalyticsPage() {
   const [project, setProject] = useState<any>(null);
 
   // IMPORTANT: All hooks must be called before any early returns
-  const navigation = useProjectNavigation(projectId, project);
 
   useEffect(() => {
     if (projectId) {
@@ -102,12 +99,6 @@ export default function AnalyticsPage() {
     <DashboardLayout
       header={{ title: project?.title || 'Loading...', subtitle: 'Analytics' }}
     >
-      <ProjectNavigation
-        projectId={projectId}
-        project={navigation.project}
-        outline={navigation.outline}
-        chapters={navigation.chapters}
-      />
 
       {/* Book and Version Selectors */}
       <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>

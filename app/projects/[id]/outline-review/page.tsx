@@ -5,9 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getToken, logout } from '@/app/lib/auth';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
-import ProjectNavigation from '@/app/components/shared/ProjectNavigation';
 import EditorialWorkflowVisualization from '@/app/components/EditorialWorkflowVisualization';
-import { useProjectNavigation } from '@/app/hooks';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -1190,7 +1188,6 @@ export default function OutlineReviewPage() {
   const [plotLayers, setPlotLayers] = useState<PlotLayer[]>([]);
   const [outline, setOutline] = useState<any>(null);
 
-  const navigation = useProjectNavigation(projectId, project);
 
   useEffect(() => {
     if (projectId) {
@@ -2367,12 +2364,6 @@ export default function OutlineReviewPage() {
     <DashboardLayout
       header={{ title: 'Outline Review', subtitle: project?.title || 'Loading...' }}
     >
-      <ProjectNavigation
-        projectId={projectId}
-        project={navigation.project}
-        outline={navigation.outline}
-        chapters={navigation.chapters}
-      />
 
       {/* Content Area */}
       <div style={{ padding: '1.5rem 0' }}>

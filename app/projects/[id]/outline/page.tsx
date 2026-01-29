@@ -6,8 +6,6 @@ import Link from 'next/link';
 import { getToken, logout } from '../../../lib/auth';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
 import GenerationProgress from '../../../components/GenerationProgress';
-import ProjectNavigation from '../../../components/shared/ProjectNavigation';
-import { useProjectNavigation } from '@/app/hooks';
 import ConfirmDialog from '../../../components/shared/ConfirmDialog';
 import VersionPromptDialog from '../../../components/VersionPromptDialog';
 import CollapsibleSection from '../../../components/CollapsibleSection';
@@ -128,7 +126,6 @@ export default function OutlinePage() {
   });
 
   // IMPORTANT: All hooks must be called before any early returns
-  const navigation = useProjectNavigation(projectId, project, outline);
 
   useEffect(() => {
     if (projectId) {
@@ -639,12 +636,6 @@ export default function OutlinePage() {
     <DashboardLayout
       header={{ title: 'Story Outline', subtitle: project.title }}
     >
-      <ProjectNavigation
-        projectId={projectId}
-        project={navigation.project}
-        outline={navigation.outline}
-        chapters={navigation.chapters}
-      />
 
       {/* Content Area */}
       <div style={{ padding: '1.5rem 0' }}>

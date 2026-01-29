@@ -3,13 +3,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
-import ProjectNavigation from '../../../components/shared/ProjectNavigation';
 import LoadingState from '../../../components/shared/LoadingState';
 import AIChangeResultModal from '../../../components/shared/AIChangeResultModal';
 import { getToken } from '../../../lib/auth';
 import { colors, gradients, borderRadius } from '../../../lib/constants';
 import { card } from '../../../lib/styles';
-import { useProjectNavigation } from '@/app/hooks';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -81,8 +79,6 @@ export default function CoherencePage() {
     explanation: string;
     changesMade: string[];
   }>({ isOpen: false, title: '', explanation: '', changesMade: [] });
-
-  const navigation = useProjectNavigation(projectId, project);
 
   // Fetch cached coherence check result
   const fetchCachedResult = useCallback(async () => {
@@ -347,13 +343,6 @@ export default function CoherencePage() {
     <DashboardLayout
       header={{ title: 'Plot Coherence', subtitle: 'Validate that your plots align with your story concept' }}
     >
-      <ProjectNavigation
-        projectId={projectId}
-        project={navigation.project}
-        outline={navigation.outline}
-        chapters={navigation.chapters}
-      />
-
       <div style={{ padding: '1.5rem 0' }}>
         <div style={{ maxWidth: '900px', margin: '0 auto' }}>
         {error && (

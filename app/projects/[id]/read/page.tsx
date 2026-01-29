@@ -4,13 +4,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
-import ProjectNavigation from '../../../components/shared/ProjectNavigation';
 import LoadingState from '../../../components/shared/LoadingState';
 import ErrorMessage from '../../../components/shared/ErrorMessage';
 import BookVersionSelector from '../../../components/BookVersionSelector';
 import { fetchJson } from '../../../lib/fetch-utils';
 import { getToken } from '../../../lib/auth';
-import { useProjectNavigation } from '@/app/hooks';
 import { colors, borderRadius } from '../../../lib/constants';
 import { card } from '../../../lib/styles';
 
@@ -68,9 +66,6 @@ export default function ReadBookPage() {
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Navigation hook
-  const navigation = useProjectNavigation(projectId, project, null, chapters);
 
   // Fetch project and books
   const fetchData = useCallback(async () => {
@@ -238,13 +233,6 @@ export default function ReadBookPage() {
     <DashboardLayout
       header={{ title: project.title, subtitle: project.author_name ? `By ${project.author_name}` : undefined }}
     >
-      <ProjectNavigation
-        projectId={projectId}
-        project={navigation.project}
-        outline={navigation.outline}
-        chapters={navigation.chapters}
-      />
-
       <div style={{ padding: '1.5rem 0' }}>
         <div style={{ display: 'flex', gap: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
         {/* Chapter Navigation Sidebar */}

@@ -4,13 +4,11 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
-import ProjectNavigation from '@/app/components/shared/ProjectNavigation';
 import ConfirmDialog from '../../../components/shared/ConfirmDialog';
 import { fetchJson, post } from '../../../lib/fetch-utils';
 import { getToken } from '../../../lib/auth';
 import { colors, gradients, borderRadius, shadows, API_BASE_URL } from '../../../lib/constants';
 import { card, button, buttonPrimary, buttonSecondary, buttonDisabled, input, label } from '../../../lib/styles';
-import { useProjectNavigation } from '@/app/hooks';
 
 interface Character {
   id: string;
@@ -53,7 +51,6 @@ export default function CharactersPage() {
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false); // Issue #13
 
   // IMPORTANT: All hooks must be called before any early returns
-  const navigation = useProjectNavigation(projectId, project);
 
   useEffect(() => {
     fetchCharacters();
@@ -293,12 +290,6 @@ export default function CharactersPage() {
     <DashboardLayout
       header={{ title: project?.title || 'Loading...', subtitle: 'Create and edit your story\'s cast of characters' }}
     >
-      <ProjectNavigation
-        projectId={projectId}
-        project={navigation.project}
-        outline={navigation.outline}
-        chapters={navigation.chapters}
-      />
       {error && (
         <div style={{
           padding: '1rem',

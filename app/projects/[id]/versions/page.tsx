@@ -4,10 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
-import ProjectNavigation from '@/app/components/shared/ProjectNavigation';
 import { fetchJson } from '../../../lib/fetch-utils';
 import { getToken } from '../../../lib/auth';
-import { useProjectNavigation } from '@/app/hooks';
 import { colors, borderRadius, shadows } from '../../../lib/constants';
 import { card } from '../../../lib/styles';
 
@@ -67,7 +65,6 @@ export default function VersionHistoryPage() {
   const [editNotes, setEditNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  const navigation = useProjectNavigation(projectId, project, null, []);
 
   // Handle rate limit countdown timer
   useEffect(() => {
@@ -390,12 +387,6 @@ export default function VersionHistoryPage() {
     <DashboardLayout
       header={{ title: project.title, subtitle: 'Version History' }}
     >
-      <ProjectNavigation
-        projectId={projectId}
-        project={navigation.project}
-        outline={navigation.outline}
-        chapters={navigation.chapters}
-      />
       <div style={{ maxWidth: '900px', margin: '0 auto' }}>
         {/* Book Selector (for multi-book projects) */}
         {books.length > 1 && (

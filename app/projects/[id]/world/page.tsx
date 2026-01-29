@@ -5,8 +5,6 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getToken, logout } from '../../../lib/auth';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
-import ProjectNavigation from '../../../components/shared/ProjectNavigation';
-import { useProjectNavigation } from '@/app/hooks';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -34,7 +32,6 @@ export default function WorldPage() {
   const [project, setProject] = useState<any>(null);
 
   // IMPORTANT: All hooks must be called before any early returns
-  const navigation = useProjectNavigation(projectId, project);
 
   useEffect(() => {
     fetchWorldElements();
@@ -204,12 +201,6 @@ export default function WorldPage() {
     <DashboardLayout
       header={{ title: 'World Building', subtitle: 'Create and edit locations, factions, and systems' }}
     >
-      <ProjectNavigation
-        projectId={projectId}
-        project={navigation.project}
-        outline={navigation.outline}
-        chapters={navigation.chapters}
-      />
 
       {/* Content Area */}
       <div style={{ padding: '1.5rem 0' }}>

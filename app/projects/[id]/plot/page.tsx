@@ -3,12 +3,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
-import ProjectNavigation from '@/app/components/shared/ProjectNavigation';
 import PlotLayersVisualization from '../../../components/PlotLayersVisualization';
 import PlotWizard from '../../../components/plot/PlotWizard';
 import { getToken } from '../../../lib/auth';
 import { colors } from '../../../lib/constants';
-import { useProjectNavigation } from '@/app/hooks';
 import { createInitialPlotLayers, isKeyPlotLayer, toExtendedPlotLayer } from '../../../lib/plot-constants';
 import type { ExtendedPlotLayer } from '../../../../shared/types';
 
@@ -1018,8 +1016,6 @@ export default function PlotStructurePage() {
     fontSize: '0.875rem',
   };
 
-  const navigation = useProjectNavigation(projectId, project);
-
   if (loading) {
     return (
       <DashboardLayout
@@ -1039,12 +1035,6 @@ export default function PlotStructurePage() {
     <DashboardLayout
       header={{ title: project?.title || 'Loading...', subtitle: 'Plot Structure & Timeline' }}
     >
-      <ProjectNavigation
-        projectId={projectId}
-        project={navigation.project}
-        outline={navigation.outline}
-        chapters={navigation.chapters}
-      />
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
         {error && (
           <div style={{

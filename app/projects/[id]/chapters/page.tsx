@@ -4,11 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
-import ProjectNavigation from '@/app/components/shared/ProjectNavigation';
 import BookVersionSelector from '@/app/components/BookVersionSelector';
 import { fetchWithAuth } from '../../../lib/fetch-utils';
 import { colors, borderRadius, spacing, typography, transitions } from '../../../lib/design-tokens';
-import { useProjectNavigation } from '@/app/hooks';
 import CollapsibleSection from '../../../components/CollapsibleSection';
 import AgentWorkflowVisualization from '../../../components/AgentWorkflowVisualization';
 
@@ -62,7 +60,6 @@ export default function ChaptersPage() {
   const [project, setProject] = useState<any>(null);
   const [hasQueuedJobs, setHasQueuedJobs] = useState(false);
 
-  const navigation = useProjectNavigation(projectId, project);
 
   // Fetch chapters for a specific book with optional version filter
   const fetchChaptersForBook = useCallback(async (bookId: string, versionId?: string | null) => {
@@ -267,12 +264,6 @@ export default function ChaptersPage() {
     <DashboardLayout
       header={{ title: project?.title || 'Loading...', subtitle: `Manage and edit ${chapters.length} chapter${chapters.length !== 1 ? 's' : ''}` }}
     >
-      <ProjectNavigation
-        projectId={projectId}
-        project={navigation.project}
-        outline={navigation.outline}
-        chapters={navigation.chapters}
-      />
       {/* Agent Workflow Visualization */}
       {(hasQueuedJobs || chapters.length > 0) && (
         <CollapsibleSection

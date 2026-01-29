@@ -6,8 +6,6 @@ import Link from 'next/link';
 import { getToken, logout } from '@/app/lib/auth';
 import { fetchWithAuth } from '@/app/lib/fetch-utils';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
-import ProjectNavigation from '@/app/components/shared/ProjectNavigation';
-import { useProjectNavigation } from '@/app/hooks';
 import RevisionWorkflowDisplay from '@/app/components/RevisionWorkflowDisplay';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -132,7 +130,6 @@ export default function WordCountRevisionPage() {
   const [project, setProject] = useState<any>(null);
   const [versions, setVersions] = useState<BookVersion[]>([]);
 
-  const navigation = useProjectNavigation(projectId, project);
 
   // Form state for starting a new revision
   const [targetWordCount, setTargetWordCount] = useState<number | ''>(80000);
@@ -660,12 +657,6 @@ export default function WordCountRevisionPage() {
               {isComprehensiveMode ? 'Comprehensive Rewrite' : 'Word Count Revision'}
             </h1>
           </header>
-          <ProjectNavigation
-            projectId={projectId}
-            project={navigation.project}
-            outline={navigation.outline}
-            chapters={navigation.chapters}
-          />
           <div style={{ flex: 1, padding: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div>Loading...</div>
           </div>
@@ -681,12 +672,6 @@ export default function WordCountRevisionPage() {
         subtitle: project?.title || 'Loading...'
       }}
     >
-      <ProjectNavigation
-        projectId={projectId}
-        project={navigation.project}
-        outline={navigation.outline}
-        chapters={navigation.chapters}
-      />
 
       {/* Content Area */}
       <div style={{ padding: '1.5rem 0' }}>

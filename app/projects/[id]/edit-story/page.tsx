@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
-import ProjectNavigation from '../../../components/shared/ProjectNavigation';
+import EditorialAssistant from '@/app/components/editorial/EditorialAssistant';
 import { getToken } from '../../../lib/auth';
 import { colors, typography, spacing, borderRadius } from '../../../lib/design-tokens';
 
@@ -52,7 +52,6 @@ export default function EditStoryPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [refining, setRefining] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -71,10 +70,6 @@ export default function EditStoryPage() {
   const [themes, setThemes] = useState('');
   const [proseStyle, setProseStyle] = useState('');
   const [timeframe, setTimeframe] = useState('');
-
-  // AI Feedback state
-  const [feedback, setFeedback] = useState('');
-  const [aiChanges, setAiChanges] = useState<string[]>([]);
 
   useEffect(() => {
     fetchProject();
@@ -189,84 +184,33 @@ export default function EditStoryPage() {
     }
   };
 
-  const handleAIRefine = async () => {
-    if (!feedback.trim()) {
-      setError('Please enter your feedback or instructions for AI refinement');
-      return;
+  const handleApplyEditorialChanges = (changes: {
+    concept?: Partial<{ title: string; logline: string | null; synopsis: string | null; hook: string | null; protagonistHint: string | null; conflictType: string | null }>;
+    dna?: Partial<{ genre: string; subgenre: string; tone: string; themes: string[]; proseStyle: string; timeframe?: string }>;
+  }) => {
+    // Apply concept changes
+    if (changes.concept) {
+      if (changes.concept.title !== undefined) setTitle(changes.concept.title);
+      if (changes.concept.logline !== undefined) setLogline(changes.concept.logline || '');
+      if (changes.concept.synopsis !== undefined) setSynopsis(changes.concept.synopsis || '');
+      if (changes.concept.hook !== undefined) setHook(changes.concept.hook || '');
+      if (changes.concept.protagonistHint !== undefined) setProtagonistHint(changes.concept.protagonistHint || '');
+      if (changes.concept.conflictType !== undefined) setConflictType(changes.concept.conflictType || '');
     }
 
-    setRefining(true);
-    setError(null);
-    setSuccessMessage(null);
-    setAiChanges([]);
-
-    try {
-      const token = getToken();
-      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/refine-story`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          feedback,
-          currentConcept: buildCurrentConcept(),
-          currentDNA: buildCurrentDNA(),
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Failed to refine story');
-      }
-
-      const data = await response.json();
-
-      // Update form with refined values
-      if (data.refinedConcept) {
-        setTitle(data.refinedConcept.title || title);
-        setLogline(data.refinedConcept.logline || '');
-        setSynopsis(data.refinedConcept.synopsis || '');
-        setHook(data.refinedConcept.hook || '');
-        setProtagonistHint(data.refinedConcept.protagonistHint || '');
-        setConflictType(data.refinedConcept.conflictType || '');
-      }
-
-      if (data.refinedDNA) {
-        setGenre(data.refinedDNA.genre || genre);
-        setSubgenre(data.refinedDNA.subgenre || '');
-        setTone(data.refinedDNA.tone || '');
-        setThemes(Array.isArray(data.refinedDNA.themes) ? data.refinedDNA.themes.join(', ') : '');
-        // Handle proseStyle which may be an object or a string
-        if (data.refinedDNA.proseStyle) {
-          if (typeof data.refinedDNA.proseStyle === 'object') {
-            const ps = data.refinedDNA.proseStyle;
-            const parts: string[] = [];
-            if (ps.sentenceStructure) parts.push(`Sentence structure: ${ps.sentenceStructure}`);
-            if (ps.vocabularyLevel) parts.push(`Vocabulary: ${ps.vocabularyLevel}`);
-            if (ps.dialogueStyle) parts.push(`Dialogue: ${ps.dialogueStyle}`);
-            if (ps.descriptionDensity) parts.push(`Description: ${ps.descriptionDensity}`);
-            if (ps.pacing) parts.push(`Pacing: ${ps.pacing}`);
-            if (ps.pointOfView) parts.push(`POV: ${ps.pointOfView}`);
-            setProseStyle(parts.join('. '));
-          } else {
-            setProseStyle(data.refinedDNA.proseStyle);
-          }
-        }
-        setTimeframe(data.refinedDNA.timeframe || '');
-      }
-
-      if (data.changes && data.changes.length > 0) {
-        setAiChanges(data.changes);
-      }
-
-      setSuccessMessage('AI has refined your story! Review the changes below and save when ready.');
-      setFeedback('');
-    } catch (err: any) {
-      setError(err.message || 'Failed to refine story with AI');
-    } finally {
-      setRefining(false);
+    // Apply DNA changes
+    if (changes.dna) {
+      if (changes.dna.genre !== undefined) setGenre(changes.dna.genre);
+      if (changes.dna.subgenre !== undefined) setSubgenre(changes.dna.subgenre);
+      if (changes.dna.tone !== undefined) setTone(changes.dna.tone);
+      if (changes.dna.themes !== undefined) setThemes(Array.isArray(changes.dna.themes) ? changes.dna.themes.join(', ') : '');
+      if (changes.dna.proseStyle !== undefined) setProseStyle(changes.dna.proseStyle);
+      if (changes.dna.timeframe !== undefined) setTimeframe(changes.dna.timeframe || '');
     }
+
+    // Show success message
+    setSuccessMessage('Changes applied from Editorial Assistant');
+    setTimeout(() => setSuccessMessage(null), 3000);
   };
 
   return (
@@ -279,7 +223,6 @@ export default function EditStoryPage() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[6] }}>
         {/* Navigation - full width across top */}
         <div style={{ width: '100%' }}>
-          <ProjectNavigation projectId={projectId} />
         </div>
 
         {/* Main Content */}
@@ -312,38 +255,6 @@ export default function EditStoryPage() {
             </div>
           )}
 
-          {/* AI Changes Summary */}
-          {aiChanges.length > 0 && (
-            <div style={{
-              background: '#EEF2FF',
-              border: '1px solid #A5B4FC',
-              borderRadius: borderRadius.lg,
-              padding: spacing[4],
-              marginBottom: spacing[6],
-            }}>
-              <h3 style={{
-                fontSize: typography.fontSize.sm,
-                fontWeight: typography.fontWeight.semibold,
-                color: '#4338CA',
-                margin: 0,
-                marginBottom: spacing[2],
-              }}>
-                AI Changes Made:
-              </h3>
-              <ul style={{
-                margin: 0,
-                paddingLeft: spacing[4],
-                fontSize: typography.fontSize.sm,
-                color: '#4338CA',
-                lineHeight: typography.lineHeight.relaxed,
-              }}>
-                {aiChanges.map((change, index) => (
-                  <li key={index}>{change}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
           {/* Loading State */}
           {loading && (
             <div style={{ textAlign: 'center', padding: spacing[12], color: colors.text.tertiary }}>
@@ -353,74 +264,13 @@ export default function EditStoryPage() {
 
           {!loading && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[6] }}>
-              {/* AI Feedback Section - Prominent at top */}
-              <div style={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                borderRadius: borderRadius.xl,
-                padding: spacing[6],
-              }}>
-                <h2 style={{
-                  fontSize: typography.fontSize.lg,
-                  fontWeight: typography.fontWeight.semibold,
-                  color: colors.white,
-                  margin: 0,
-                  marginBottom: spacing[2],
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: spacing[2],
-                }}>
-                  AI Story Refinement
-                </h2>
-
-                <p style={{
-                  fontSize: typography.fontSize.sm,
-                  color: 'rgba(255, 255, 255, 0.9)',
-                  margin: 0,
-                  marginBottom: spacing[4],
-                  lineHeight: typography.lineHeight.relaxed,
-                }}>
-                  Describe what you want to change about your story. AI will update the concept and DNA fields based on your feedback.
-                </p>
-
-                <textarea
-                  value={feedback}
-                  onChange={(e) => setFeedback(e.target.value)}
-                  placeholder="e.g., 'Make the tone darker and more mysterious', 'Add a romantic subplot', 'Change the setting to Victorian England', 'Make the protagonist more conflicted about their goals'..."
-                  rows={4}
-                  style={{
-                    width: '100%',
-                    padding: spacing[4],
-                    border: 'none',
-                    borderRadius: borderRadius.lg,
-                    fontSize: typography.fontSize.sm,
-                    lineHeight: typography.lineHeight.relaxed,
-                    resize: 'vertical',
-                    fontFamily: typography.fontFamily.base,
-                  }}
-                />
-
-                <div style={{ marginTop: spacing[4], display: 'flex', justifyContent: 'flex-end' }}>
-                  <button
-                    onClick={handleAIRefine}
-                    disabled={refining || !feedback.trim()}
-                    style={{
-                      padding: `${spacing[3]} ${spacing[6]}`,
-                      background: refining || !feedback.trim() ? 'rgba(255, 255, 255, 0.5)' : colors.white,
-                      border: 'none',
-                      borderRadius: borderRadius.lg,
-                      color: refining || !feedback.trim() ? 'rgba(0, 0, 0, 0.4)' : '#667eea',
-                      fontSize: typography.fontSize.sm,
-                      fontWeight: typography.fontWeight.semibold,
-                      cursor: refining || !feedback.trim() ? 'not-allowed' : 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: spacing[2],
-                    }}
-                  >
-                    {refining ? 'Refining...' : 'Refine with AI'}
-                  </button>
-                </div>
-              </div>
+              {/* Editorial Assistant - Conversational AI */}
+              <EditorialAssistant
+                projectId={projectId}
+                currentConcept={buildCurrentConcept()}
+                currentDNA={buildCurrentDNA() as any}
+                onApplyChanges={handleApplyEditorialChanges}
+              />
 
               {/* Story Concept Section */}
               <div style={{

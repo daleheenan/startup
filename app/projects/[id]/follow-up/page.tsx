@@ -5,8 +5,6 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { getToken, logout } from '../../../lib/auth';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
-import ProjectNavigation from '../../../components/shared/ProjectNavigation';
-import { useProjectNavigation } from '@/app/hooks';
 import type {
   FollowUpRecommendations,
   SequelIdea,
@@ -47,7 +45,6 @@ export default function FollowUpPage() {
   const [activeSection, setActiveSection] = useState<string>('sequel-ideas');
   const [project, setProject] = useState<any>(null);
 
-  const navigation = useProjectNavigation(projectId, project);
 
   useEffect(() => {
     if (projectId) {
@@ -306,12 +303,6 @@ export default function FollowUpPage() {
     <DashboardLayout
       header={{ title: 'Follow-Up Ideas', subtitle: `${project?.title || 'Loading...'} - Sequel and Series Recommendations` }}
     >
-      <ProjectNavigation
-        projectId={projectId}
-        project={navigation.project}
-        outline={navigation.outline}
-        chapters={navigation.chapters}
-      />
 
       {/* Book Selector */}
       {books.length > 1 && (

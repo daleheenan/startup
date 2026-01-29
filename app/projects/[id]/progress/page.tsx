@@ -8,8 +8,6 @@ import GenerationStatusBanner from '../../../components/GenerationStatusBanner';
 import ExportButtons from '../../../components/ExportButtons';
 import { getToken, logout } from '../../../lib/auth';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
-import ProjectNavigation from '@/app/components/shared/ProjectNavigation';
-import { useProjectNavigation } from '@/app/hooks';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -111,9 +109,6 @@ export default function ProgressPage() {
   const [authorValue, setAuthorValue] = useState('');
   const [saving, setSaving] = useState(false);
   const [activeVersion, setActiveVersion] = useState<{ id: string; version_name: string | null; version_number: number } | null>(null);
-
-  // IMPORTANT: All hooks must be called before any early returns
-  const navigation = useProjectNavigation(projectId, project);
 
   useEffect(() => {
     if (projectId) {
@@ -521,13 +516,6 @@ export default function ProgressPage() {
     <DashboardLayout
       header={{ title: progress.project.title, subtitle: 'Chapter Generation Progress' }}
     >
-      <ProjectNavigation
-        projectId={projectId}
-        project={navigation.project}
-        outline={navigation.outline}
-        chapters={navigation.chapters}
-      />
-
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         {/* Active Version Indicator */}
         {activeVersion && (

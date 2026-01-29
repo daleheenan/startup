@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
-import ProjectNavigation from '../../../components/shared/ProjectNavigation';
 import { getToken } from '../../../lib/auth';
 import { colors, typography, spacing, borderRadius } from '../../../lib/design-tokens';
 
@@ -205,7 +204,6 @@ export default function PublishingSettingsPage() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[6] }}>
         {/* Navigation - full width across top */}
         <div style={{ width: '100%' }}>
-          <ProjectNavigation projectId={projectId} />
         </div>
 
         {/* Main Content */}

@@ -4,8 +4,6 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { getToken, logout } from '../../../lib/auth';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
-import ProjectNavigation from '../../../components/shared/ProjectNavigation';
-import { useProjectNavigation } from '@/app/hooks';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -37,8 +35,6 @@ export default function FlagsPage() {
   const [filterSeverity, setFilterSeverity] = useState<string>('all');
   const [showResolved, setShowResolved] = useState(false);
   const [project, setProject] = useState<any>(null);
-
-  const navigation = useProjectNavigation(projectId, project);
 
   useEffect(() => {
     fetchFlags();
@@ -209,13 +205,6 @@ export default function FlagsPage() {
     <DashboardLayout
       header={{ title: 'Flagged Issues', subtitle: `${unresolvedFlags} unresolved / ${totalFlags} total` }}
     >
-      <ProjectNavigation
-        projectId={projectId}
-        project={navigation.project}
-        outline={navigation.outline}
-        chapters={navigation.chapters}
-      />
-
       <div style={{ padding: '1.5rem 0' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
 

@@ -6,8 +6,6 @@ import Link from 'next/link';
 import { getToken, logout } from '@/app/lib/auth';
 import { fetchWithAuth } from '@/app/lib/fetch-utils';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
-import ProjectNavigation from '@/app/components/shared/ProjectNavigation';
-import { useProjectNavigation } from '@/app/hooks';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -138,7 +136,6 @@ export default function EditorialActionPlanPage() {
   const [showTooltip, setShowTooltip] = useState<string | null>(null);
   const [project, setProject] = useState<any>(null);
 
-  const navigation = useProjectNavigation(projectId, project);
 
   // Helper to format underscore text
   const formatText = (text: string | undefined | null): string => {
@@ -605,12 +602,6 @@ export default function EditorialActionPlanPage() {
               Editorial Action Plan
             </h1>
           </header>
-          <ProjectNavigation
-            projectId={projectId}
-            project={navigation.project}
-            outline={navigation.outline}
-            chapters={navigation.chapters}
-          />
           <div style={{ flex: 1, padding: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div>Loading editorial action plan...</div>
           </div>
@@ -660,12 +651,6 @@ export default function EditorialActionPlanPage() {
               Editorial Action Plan
             </h1>
           </header>
-          <ProjectNavigation
-            projectId={projectId}
-            project={navigation.project}
-            outline={navigation.outline}
-            chapters={navigation.chapters}
-          />
           <div style={{ flex: 1, padding: '2rem' }}>
             <div style={{
               background: '#FEF2F2',
@@ -703,12 +688,6 @@ export default function EditorialActionPlanPage() {
     <DashboardLayout
       header={{ title: 'Editorial Action Plan', subtitle: project?.title || 'Loading...' }}
     >
-      <ProjectNavigation
-        projectId={projectId}
-        project={navigation.project}
-        outline={navigation.outline}
-        chapters={navigation.chapters}
-      />
 
       {/* Content Area */}
       <div style={{ padding: '1.5rem 0' }}>

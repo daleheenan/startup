@@ -3,10 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
-import ProjectNavigation from '../../../components/shared/ProjectNavigation';
 import { getToken } from '../../../lib/auth';
 import { colors, gradients } from '../../../lib/constants';
-import { useProjectNavigation } from '@/app/hooks';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -274,19 +272,12 @@ export default function SeriesManagementPage() {
     marginBottom: '1rem',
   };
 
-  const navigation = useProjectNavigation(projectId, project);
 
   if (loading) {
     return (
       <DashboardLayout
         header={{ title: 'Series Management' }}
       >
-        <ProjectNavigation
-          projectId={projectId}
-          project={navigation.project}
-          outline={navigation.outline}
-          chapters={navigation.chapters}
-        />
         <div style={{ textAlign: 'center', padding: '3rem' }}>
           <div style={{ fontSize: '1.125rem', color: colors.textSecondary }}>
             Loading series data...
@@ -301,12 +292,6 @@ export default function SeriesManagementPage() {
       <DashboardLayout
         header={{ title: 'Series Management' }}
       >
-        <ProjectNavigation
-          projectId={projectId}
-          project={navigation.project}
-          outline={navigation.outline}
-          chapters={navigation.chapters}
-        />
         <div style={{ padding: '1.5rem 0' }}>
           <div style={cardStyle}>
           <h3 style={{ fontSize: '1.25rem', marginBottom: '1rem', color: colors.text }}>
@@ -445,12 +430,6 @@ export default function SeriesManagementPage() {
     <DashboardLayout
       header={{ title: 'Series Management', subtitle: `Managing ${books.length} books in series` }}
     >
-      <ProjectNavigation
-        projectId={projectId}
-        project={navigation.project}
-        outline={navigation.outline}
-        chapters={navigation.chapters}
-      />
 
       <div style={{ padding: '1.5rem 0' }}>
         {error && (

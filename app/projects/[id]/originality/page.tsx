@@ -3,12 +3,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
-import ProjectNavigation from '../../../components/shared/ProjectNavigation';
 import LoadingState from '../../../components/shared/LoadingState';
 import { getToken } from '../../../lib/auth';
 import { colors, gradients, borderRadius } from '../../../lib/constants';
 import { card } from '../../../lib/styles';
-import { useProjectNavigation } from '@/app/hooks';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -72,7 +70,6 @@ export default function OriginalityPage() {
   const [showDetails, setShowDetails] = useState(false);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
-  const navigation = useProjectNavigation(projectId, project);
 
   // Fetch cached originality check result
   const fetchCachedResult = useCallback(async () => {
@@ -307,12 +304,6 @@ export default function OriginalityPage() {
     <DashboardLayout
       header={{ title: 'Originality Check', subtitle: 'Ensure your story concept is unique and original' }}
     >
-      <ProjectNavigation
-        projectId={projectId}
-        project={navigation.project}
-        outline={navigation.outline}
-        chapters={navigation.chapters}
-      />
 
       <div style={{ padding: '1.5rem 0' }}>
         <div style={{ maxWidth: '900px', margin: '0 auto' }}>

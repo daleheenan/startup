@@ -10,13 +10,11 @@ import CoverImageUpload from '../../components/CoverImageUpload';
 import SearchReplace from '../../components/SearchReplace';
 import BookVersionSelector from '../../components/BookVersionSelector';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
-import ProjectNavigation from '../../components/shared/ProjectNavigation';
 import LoadingState from '../../components/shared/LoadingState';
 import { fetchJson } from '../../lib/fetch-utils';
 import { getToken } from '../../lib/auth';
 import { colors, gradients, borderRadius } from '../../lib/constants';
 import { card } from '../../lib/styles';
-import { useProjectNavigation } from '@/app/hooks';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -137,9 +135,6 @@ export default function ProjectDetailPage() {
 
   // Duplicate project dialog state
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
-
-  // IMPORTANT: All hooks must be called before any early returns
-  const navigation = useProjectNavigation(projectId, project, outline, chapters);
 
   // Track if we've already attempted generation to prevent duplicate runs
   const [hasAttemptedGeneration, setHasAttemptedGeneration] = useState(false);
@@ -570,13 +565,6 @@ export default function ProjectDetailPage() {
     <DashboardLayout
       header={{ title: project.title, subtitle: dashboardSubtitle }}
     >
-      <ProjectNavigation
-        projectId={projectId}
-        project={navigation.project}
-        outline={navigation.outline}
-        chapters={navigation.chapters}
-      />
-
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         {/* Book Details Editor */}
         <div style={{
