@@ -42,12 +42,14 @@ async function fetchStoryIdeas(): Promise<SavedStoryIdea[]> {
 
 /**
  * Create a manual story idea with automatic genre inference
+ * Note: Uses extended timeout (60s) because genre inference requires a Claude API call
  */
 async function createStoryIdea(params: CreateStoryIdeaParams): Promise<CreateStoryIdeaResponse> {
   const response = await fetchWithAuth('/api/story-ideas/create', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
+    timeout: 60000, // 60 seconds for genre inference API call
   });
 
   if (!response.ok) {
@@ -281,6 +283,7 @@ export interface ExpandPremiseResponse {
 
 /**
  * Expand a premise using AI to generate character concepts, plot elements, and unique twists
+ * Note: Uses extended timeout (60s) because this requires a Claude API call
  */
 async function expandPremise(
   premise: string,
@@ -290,6 +293,7 @@ async function expandPremise(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ premise, timePeriod }),
+    timeout: 60000, // 60 seconds for AI premise expansion
   });
 
   if (!response.ok) {

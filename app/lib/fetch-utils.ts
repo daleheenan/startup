@@ -72,7 +72,12 @@ export async function fetchWithAuth(
 
     // BUG-012 FIX: Handle AbortError from timeout
     if (error.name === 'AbortError') {
-      throw new Error(`Request timeout after ${timeout}ms`);
+      throw new Error(`Request timed out. The server is taking too long to respond. Please try again.`);
+    }
+
+    // Handle network errors (Failed to fetch) with a more helpful message
+    if (error.message === 'Failed to fetch' || error.message?.includes('NetworkError')) {
+      throw new Error('Unable to connect to the server. Please check your connection and try again.');
     }
 
     throw error;
