@@ -53,7 +53,6 @@ interface RewriteJobStatus {
 interface PlotRewriteResponse {
   plot_layers: any[];
   act_structure?: any;
-  pacing_notes?: string;
   changes_made: { type: string; description: string }[];
 }
 
@@ -427,7 +426,6 @@ Return ONLY valid JSON, no additional text or markdown.`,
       ...currentPlot,
       plot_layers: result.plot_layers,
       act_structure: result.act_structure || currentPlot.act_structure,
-      pacing_notes: result.pacing_notes || currentPlot.pacing_notes,
     };
 
     return {
@@ -500,7 +498,6 @@ Return a JSON object with this exact structure:
     "midpoint_chapter": number,
     "act2_end_chapter": number
   },
-  "pacing_notes": "string with specific guidance",
   "changes_made": [
     { "type": "added|modified|removed", "description": "What was changed and why" }
   ]

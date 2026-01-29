@@ -488,7 +488,6 @@ export interface PlotStructure {
     act_two_end: number;
     act_three_climax: number;
   };
-  pacing_notes: string;
 }
 
 export interface SeriesMystery {

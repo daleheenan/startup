@@ -199,27 +199,3 @@ export const DEFAULT_ACT_STRUCTURE = {
   act_three_climax: 28, // Climax chapter
 };
 
-/**
- * Get default pacing notes based on genre
- */
-export function getDefaultPacingNotes(genre: string): string {
-  const normalizedGenre = genre.toLowerCase();
-
-  if (normalizedGenre.includes('thriller') || normalizedGenre.includes('action')) {
-    return 'Fast-paced with short chapters and frequent cliffhangers. Build tension steadily towards climax.';
-  }
-  if (normalizedGenre.includes('romance')) {
-    return 'Balanced pacing with emotional beats. Allow time for relationship development between plot points.';
-  }
-  if (normalizedGenre.includes('mystery')) {
-    return 'Strategic reveal of clues. Build suspense with red herrings and tension before the resolution.';
-  }
-  if (normalizedGenre.includes('literary') || normalizedGenre.includes('historical')) {
-    return 'Measured pacing with room for character introspection and atmospheric description.';
-  }
-  if (normalizedGenre.includes('fantasy') || normalizedGenre.includes('sci-fi')) {
-    return 'Balance world-building with plot advancement. Use action sequences to maintain momentum.';
-  }
-
-  return 'Balance plot advancement with character development. Vary pacing to maintain reader engagement.';
-}

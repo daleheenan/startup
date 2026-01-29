@@ -79,8 +79,6 @@ export default function PlotWizard({
 }: PlotWizardProps) {
   const [currentStep, setCurrentStep] = useState<WizardStep>('main-plot');
   const [localPlots, setLocalPlots] = useState<PlotLayer[]>(plotLayers);
-  const [pacingNotes, setPacingNotes] = useState<string>('');
-  const [isGeneratingPacing, setIsGeneratingPacing] = useState(false);
   const [validatingCoherence, setValidatingCoherence] = useState(false);
   const [isCoherent, setIsCoherent] = useState<boolean | null>(null);
   const [coherenceWarnings, setCoherenceWarnings] = useState<string[]>([]);
@@ -129,7 +127,6 @@ export default function PlotWizard({
                 act_two_end: 20,
                 act_three_climax: 23,
               },
-              pacing_notes: '',
             }
           }),
         });
@@ -237,32 +234,6 @@ export default function PlotWizard({
 
   const handleDeletePlot = (plotId: string) => {
     setLocalPlots(localPlots.filter(p => p.id !== plotId));
-  };
-
-  const handleGeneratePacing = async () => {
-    setIsGeneratingPacing(true);
-    try {
-      // Mock pacing generation - in real implementation, this would call the API
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      const subplotRec = getSubplotRecommendations(bookWordCount);
-      const warnings = [];
-
-      if (subplots.length < subplotRec.min) {
-        warnings.push(`Consider adding ${subplotRec.min - subplots.length} more subplot(s) for a ${subplotRec.label}.`);
-      }
-      if (subplots.length > subplotRec.max) {
-        warnings.push(`You have ${subplots.length - subplotRec.max} more subplot(s) than recommended. This may complicate pacing.`);
-      }
-
-      const notes = warnings.length > 0
-        ? warnings.join(' ')
-        : `Plot structure looks balanced for a ${subplotRec.label}. Good pacing potential across acts.`;
-
-      setPacingNotes(notes);
-    } finally {
-      setIsGeneratingPacing(false);
-    }
   };
 
   // Styles
@@ -430,9 +401,6 @@ export default function PlotWizard({
             projectId={projectId}
             allPlots={localPlots}
             bookWordCount={bookWordCount}
-            pacingNotes={pacingNotes}
-            isGenerating={isGeneratingPacing}
-            onGenerate={handleGeneratePacing}
             onAddSubplot={(name, description) => handleAddPlot('subplot', name, description)}
             validatingCoherence={validatingCoherence}
             isCoherent={isCoherent}
@@ -1383,9 +1351,6 @@ function PacingReviewStep({
   projectId,
   allPlots,
   bookWordCount,
-  pacingNotes,
-  isGenerating,
-  onGenerate,
   onAddSubplot,
   validatingCoherence,
   isCoherent,
@@ -1396,9 +1361,6 @@ function PacingReviewStep({
   projectId: string;
   allPlots: PlotLayer[];
   bookWordCount: number;
-  pacingNotes: string;
-  isGenerating: boolean;
-  onGenerate: () => void;
   onAddSubplot: (name: string, description: string) => void;
   validatingCoherence: boolean;
   isCoherent: boolean | null;
@@ -1587,29 +1549,9 @@ function PacingReviewStep({
         borderRadius: '8px',
         marginBottom: '2rem',
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#92400E', margin: 0 }}>
-            Pacing Recommendations
-          </h3>
-          <button
-            onClick={onGenerate}
-            disabled={isGenerating || allPlots.length === 0}
-            style={{
-              padding: '0.5rem 1rem',
-              background: isGenerating || allPlots.length === 0
-                ? '#94A3B8'
-                : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              color: '#FFFFFF',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '0.813rem',
-              fontWeight: 500,
-              cursor: isGenerating || allPlots.length === 0 ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {isGenerating ? 'Generating...' : 'Generate Pacing Notes'}
-          </button>
-        </div>
+        <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#92400E', marginBottom: '1rem' }}>
+          Pacing Recommendations
+        </h3>
 
         {recommendations.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -1657,14 +1599,6 @@ function PacingReviewStep({
           <p style={{ fontSize: '0.875rem', color: '#047857', margin: 0 }}>
             ✓ Plot structure looks balanced for your book length. Good pacing potential!
           </p>
-        )}
-
-        {pacingNotes && (
-          <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #FCD34D' }}>
-            <p style={{ fontSize: '0.875rem', color: '#78350F', margin: 0, lineHeight: 1.6 }}>
-              {pacingNotes}
-            </p>
-          </div>
         )}
       </div>
 

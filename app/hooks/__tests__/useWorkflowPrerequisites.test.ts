@@ -602,12 +602,10 @@ function createMockPlotLayer(overrides: Partial<{
 function createMockPlotStructure(overrides: Partial<{
   plot_layers: any[];
   act_structure: { act_one_end: number; act_two_midpoint: number; act_two_end: number; act_three_climax: number };
-  pacing_notes: string;
 }> = {}): any {
   return {
     plot_layers: overrides.plot_layers ?? [createMockPlotLayer()],
     act_structure: overrides.act_structure ?? { act_one_end: 5, act_two_midpoint: 12, act_two_end: 20, act_three_climax: 25 },
-    pacing_notes: overrides.pacing_notes ?? 'Standard pacing',
   };
 }
 

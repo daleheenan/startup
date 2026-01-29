@@ -30,7 +30,6 @@ interface StoryStructure {
     act_two_end: number;
     act_three_climax: number;
   };
-  pacing_notes: string;
 }
 
 interface PlotLayersVisualizationProps {
@@ -501,23 +500,6 @@ export default function PlotLayersVisualization({
         </div>
       )}
 
-      {/* Pacing notes */}
-      {structure.pacing_notes && (
-        <div style={{
-          marginTop: '1rem',
-          padding: '1rem',
-          background: '#FEF3C7',
-          border: '1px solid #FCD34D',
-          borderRadius: '8px',
-        }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#92400E', marginBottom: '0.5rem' }}>
-            Pacing Notes
-          </div>
-          <p style={{ fontSize: '0.875rem', color: '#78350F', margin: 0 }}>
-            {structure.pacing_notes}
-          </p>
-        </div>
-      )}
     </div>
   );
 }

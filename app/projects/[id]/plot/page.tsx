@@ -43,7 +43,6 @@ interface StoryStructure {
     act_two_end: number;
     act_three_climax: number;
   };
-  pacing_notes: string;
 }
 
 interface Book {
@@ -128,7 +127,6 @@ export default function PlotStructurePage() {
       act_two_end: 20,
       act_three_climax: 23,
     },
-    pacing_notes: '',
   });
   const [books, setBooks] = useState<Book[]>([]);
   const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -138,7 +136,6 @@ export default function PlotStructurePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [generatingLayerId, setGeneratingLayerId] = useState<string | null>(null);
-  const [generatingPacing, setGeneratingPacing] = useState(false);
   const [generatingNewLayer, setGeneratingNewLayer] = useState(false);
   const [generatingField, setGeneratingField] = useState<'name' | 'description' | null>(null);
   const [extractingFromConcept, setExtractingFromConcept] = useState(false);
@@ -214,7 +211,6 @@ export default function PlotStructurePage() {
               act_two_end: 20,
               act_three_climax: 23,
             },
-            pacing_notes: projectData.plot_structure.pacing_notes || '',
           };
           setStructure(safeStructure);
           // If there are no plot layers, default to wizard mode
@@ -284,7 +280,6 @@ export default function PlotStructurePage() {
                         act_two_end: 20,
                         act_three_climax: 23,
                       },
-                      pacing_notes: snapshotData.pacing_notes || '',
                     };
                     setStructure(safeStructure);
                     setIsViewingSnapshot(false); // Active version is current, not a snapshot
@@ -703,11 +698,6 @@ export default function PlotStructurePage() {
     saveStructure(newStructure);
   };
 
-  const handlePacingNotesChange = (notes: string) => {
-    const newStructure = { ...structure, pacing_notes: notes };
-    saveStructure(newStructure);
-  };
-
   const handleGenerateLayerPoints = async (layerId: string) => {
     const layer = structure.plot_layers?.find(l => l.id === layerId);
     if (!layer) return;
@@ -756,41 +746,6 @@ export default function PlotStructurePage() {
       setError(err.message);
     } finally {
       setGeneratingLayerId(null);
-    }
-  };
-
-  const handleGeneratePacingNotes = async () => {
-    setGeneratingPacing(true);
-    setError(null);
-
-    try {
-      const token = getToken();
-      const res = await fetch(`${API_BASE_URL}/api/projects/${projectId}/generate-pacing-notes`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          plotLayers: structure.plot_layers,
-          actStructure: structure.act_structure,
-          totalChapters,
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error?.message || 'Failed to generate pacing notes');
-      }
-
-      const data = await res.json();
-      const newStructure = { ...structure, pacing_notes: data.pacingNotes };
-      saveStructure(newStructure);
-    } catch (err: any) {
-      console.error('Error generating pacing notes:', err);
-      setError(err.message);
-    } finally {
-      setGeneratingPacing(false);
     }
   };
 
@@ -885,7 +840,6 @@ export default function PlotStructurePage() {
               act_two_end: 20,
               act_three_climax: 23,
             },
-            pacing_notes: snapshotData.pacing_notes || '',
           };
           setStructure(safeStructure);
         }
@@ -914,7 +868,6 @@ export default function PlotStructurePage() {
           act_two_end: 20,
           act_three_climax: 23,
         },
-        pacing_notes: project.plot_structure.pacing_notes || '',
       });
     }
   };
@@ -1606,45 +1559,6 @@ export default function PlotStructurePage() {
               ))}
             </div>
           )}
-        </div>
-
-        {/* Pacing Notes */}
-        <div style={cardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h2 style={{ fontSize: '1.125rem', fontWeight: 600, color: colors.text }}>
-              Pacing Notes
-            </h2>
-            <button
-              onClick={handleGeneratePacingNotes}
-              disabled={generatingPacing || (structure.plot_layers?.length || 0) === 0}
-              style={{
-                padding: '0.5rem 1rem',
-                background: generatingPacing || (structure.plot_layers?.length || 0) === 0
-                  ? '#94A3B8'
-                  : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                border: 'none',
-                borderRadius: '8px',
-                color: '#fff',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                cursor: generatingPacing || (structure.plot_layers?.length || 0) === 0 ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {generatingPacing ? 'Generating...' : '✨ Generate Pacing Notes'}
-            </button>
-          </div>
-          {(structure.plot_layers?.length || 0) === 0 && (
-            <p style={{ fontSize: '0.813rem', color: '#F59E0B', marginBottom: '0.5rem' }}>
-              Add plot layers first to generate pacing notes.
-            </p>
-          )}
-          <textarea
-            value={structure.pacing_notes}
-            onChange={(e) => handlePacingNotesChange(e.target.value)}
-            placeholder="Add notes about your story's pacing, tension arcs, or structure decisions..."
-            rows={6}
-            style={{ ...inputStyle, resize: 'vertical' }}
-          />
         </div>
 
         {/* Continue to Coherence button */}

@@ -3619,7 +3619,6 @@ router.get('/:id/plot-structure', (req, res) => {
         act_two_end: 20,
         act_three_climax: 23,
       },
-      pacing_notes: '',
     });
 
     res.json(plotStructure);
@@ -4121,7 +4120,6 @@ Extract 3-6 plot threads total. Focus on the most important narrative arcs.`;
         act_two_end: 20,
         act_three_climax: 23,
       },
-      pacing_notes: '',
     });
 
     // Add extracted plots to plot structure (avoid duplicates by name)
@@ -4168,90 +4166,6 @@ function getPlotColor(type: string, index: number): string {
   const colors = colorPalette[type] || colorPalette['subplot'];
   return colors[index % colors.length];
 }
-
-/**
- * POST /api/projects/:id/generate-pacing-notes
- * Generate pacing notes based on plot structure using AI
- */
-router.post('/:id/generate-pacing-notes', async (req, res) => {
-  try {
-    const { id: projectId } = req.params;
-    const { plotLayers, actStructure, totalChapters } = req.body;
-
-    if (!plotLayers || !Array.isArray(plotLayers)) {
-      return res.status(400).json({
-        error: { code: 'INVALID_REQUEST', message: 'plotLayers array is required' },
-      });
-    }
-
-    // Get project context
-    const projectStmt = db.prepare<[string], Project>(`
-      SELECT title, genre, story_dna FROM projects WHERE id = ?
-    `);
-    const project = projectStmt.get(projectId);
-
-    if (!project) {
-      return res.status(404).json({
-        error: { code: 'NOT_FOUND', message: 'Project not found' },
-      });
-    }
-
-    const storyDNA = safeJsonParse(project.story_dna as any, null);
-
-    // Build layer summary
-    const layerSummary = plotLayers.map((layer: any) =>
-      `- ${layer.name} (${layer.type}): ${layer.points?.length || 0} plot points`
-    ).join('\n');
-
-    // Import Anthropic client
-    const { default: Anthropic } = await import('@anthropic-ai/sdk');
-    const anthropic = new Anthropic();
-
-    const prompt = `You are a story structure and pacing expert. Generate concise pacing notes and recommendations for this story.
-
-**Story:**
-- Title: ${project.title}
-- Genre: ${project.genre}
-${storyDNA?.tone ? `- Tone: ${storyDNA.tone}` : ''}
-- Total Chapters: ${totalChapters || 25}
-
-**Act Structure:**
-- Act I ends: Chapter ${actStructure?.act_one_end || 5}
-- Midpoint: Chapter ${actStructure?.act_two_midpoint || 12}
-- Act II ends: Chapter ${actStructure?.act_two_end || 20}
-- Climax: Chapter ${actStructure?.act_three_climax || 23}
-
-**Plot Layers:**
-${layerSummary}
-
-Generate pacing notes that include:
-1. Tension arc recommendations for each act
-2. Key moments where multiple plot threads should intersect
-3. Suggested "breather" chapters for reader recovery
-4. Chapter-by-chapter pacing intensity suggestions (where needed)
-5. Any potential pacing issues to watch for
-
-Keep it practical and actionable. Format as clean markdown with headers and bullet points.`;
-
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
-      temperature: 0.7,
-      messages: [{ role: 'user', content: prompt }],
-    });
-
-    const pacingNotes = message.content[0].type === 'text'
-      ? message.content[0].text
-      : '';
-
-    logger.info({ projectId, notesLength: pacingNotes.length }, 'Pacing notes generated');
-
-    res.json({ pacingNotes });
-  } catch (error: any) {
-    logger.error({ error: error.message, stack: error.stack }, 'Error generating pacing notes');
-    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
-  }
-});
 
 /**
  * POST /api/projects/:id/implement-originality-suggestion
@@ -4535,7 +4449,7 @@ Output ONLY valid JSON, no additional commentary:`;
       });
     }
 
-    // Merge with existing structure (preserve act_structure and pacing_notes)
+    // Merge with existing structure (preserve act_structure)
     const updatedPlotStructure = {
       ...plotStructure,
       plot_layers: revisedPlots.plot_layers,
