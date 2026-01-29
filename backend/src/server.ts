@@ -109,7 +109,7 @@ import healthRouter from './routes/health.js';
 import progressRouter from './routes/progress.js';
 import lessonsRouter from './routes/lessons.js';
 import reflectionsRouter from './routes/reflections.js';
-import projectsRouter from './routes/projects.js';
+import projectsRouter from './routes/projects/index.js';
 import queueRouter from './routes/queue.js';
 import conceptsRouter from './routes/concepts.js';
 import outlinesRouter from './routes/outlines.js';

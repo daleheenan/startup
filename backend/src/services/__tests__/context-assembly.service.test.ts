@@ -27,7 +27,7 @@ describe('ContextAssemblyService', () => {
 
   beforeAll(async () => {
     // Import service once after mock is set up
-    const module = await import('../context-assembly.service.js');
+    const module = await import('../chapter/context-assembly.js');
     service = new module.ContextAssemblyService();
   });
 

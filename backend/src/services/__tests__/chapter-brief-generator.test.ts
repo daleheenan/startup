@@ -44,7 +44,7 @@ jest.mock('../commercial-beat-validator.js', () => ({
   ],
 }));
 
-import { ChapterBriefGeneratorService } from '../chapter-brief-generator.js';
+import { ChapterBriefGeneratorService } from '../chapter/brief-generator.js';
 import type { StoryDNA } from '../../shared/types/index.js';
 
 describe('ChapterBriefGeneratorService', () => {

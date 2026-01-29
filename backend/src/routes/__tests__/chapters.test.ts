@@ -61,7 +61,7 @@ const mockQueueChapterWorkflow = jest.fn();
 const mockRegenerateChapter = jest.fn();
 const mockGetChapterWorkflowStatus = jest.fn();
 
-jest.mock('../../services/chapter-orchestrator.service.js', () => ({
+jest.mock('../../services/chapter/index.js', () => ({
   chapterOrchestratorService: {
     queueChapterWorkflow: mockQueueChapterWorkflow,
     regenerateChapter: mockRegenerateChapter,

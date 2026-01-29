@@ -13,7 +13,7 @@
 
 import db from './src/db/connection.js';
 import { runMigrations } from './src/db/migrate.js';
-import { editingService } from './src/services/editing.service.js';
+import { editingService } from './src/services/editing/index.js';
 import { randomUUID } from 'crypto';
 
 // Run migrations first

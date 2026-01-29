@@ -10,8 +10,7 @@
 
 import db from './src/db/connection.js';
 import { runMigrations } from './src/db/migrate.js';
-import { chapterOrchestratorService } from './src/services/chapter-orchestrator.service.js';
-import { contextAssemblyService } from './src/services/context-assembly.service.js';
+import { chapterOrchestratorService, contextAssemblyService } from './src/services/chapter/index.js';
 import { progressTrackingService } from './src/services/progress-tracking.service.js';
 import { randomUUID } from 'crypto';
 

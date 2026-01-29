@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { ChapterOrchestratorService } from '../chapter-orchestrator.service.js';
+import { ChapterOrchestratorService } from '../chapter/orchestrator.js';
 
 jest.mock('../../db/connection.js');
 jest.mock('../../queue/worker.js');

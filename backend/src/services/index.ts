@@ -16,8 +16,9 @@ export * from './concept-generator';
 export * from './character-generator';
 export * from './world-generator';
 export * from './outline-generator';
-export * from './context-assembly.service';
 export * from './chapter-orchestrator.service';
+export * from './chapter-brief-generator';
+export * from './context-assembly.service';
 
 // Editorial and quality services
 export * from './specialist-agents.service';
