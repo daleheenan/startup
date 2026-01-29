@@ -8,6 +8,7 @@ import type {
   Project,
 } from '../shared/types/index.js';
 import { editorialLessonsService } from './editorial-lessons.service.js';
+import { getCompactStylePrinciples } from '../shared/style-principles.js';
 
 /**
  * ContextAssemblyService builds minimal, targeted prompts for chapter generation.
@@ -193,7 +194,9 @@ AVOID AI WRITING TELLS (CRITICAL):
 - AVOID lists of three adjectives or descriptions in a row
 - USE varied sentence structures - not every sentence should be complex
 - USE contractions naturally in dialogue and close POV narration
-- PREFER simple, direct prose over elaborate constructions`;
+- PREFER simple, direct prose over elaborate constructions
+
+${getCompactStylePrinciples()}`;
 
     // Append lessons learned from editorial reviews if available
     if (lessonsSummary && lessonsSummary.trim().length > 0) {
