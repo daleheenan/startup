@@ -146,6 +146,10 @@ export default function PlotStructurePage() {
   const [coherenceSuggestions, setCoherenceSuggestions] = useState<string[]>([]);
   const [isCoherent, setIsCoherent] = useState<boolean | null>(null);
 
+  // Regeneration state
+  const [showRegenerateModal, setShowRegenerateModal] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+
   // Wizard mode state
   const [isWizardMode, setIsWizardMode] = useState(false);
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -505,6 +509,81 @@ export default function PlotStructurePage() {
       setError(err.message);
     } finally {
       setValidatingCoherence(false);
+    }
+  };
+
+  // Regenerate plot structure from story elements and concept
+  const handleRegeneratePlotStructure = async () => {
+    setRegenerating(true);
+    setError(null);
+    setShowRegenerateModal(false);
+
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE_URL}/api/projects/${projectId}/regenerate-plot-structure`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error?.message || 'Failed to regenerate plot structure');
+      }
+
+      const data = await res.json();
+
+      if (data.success && data.plotStructure) {
+        // Update local state with the new structure
+        const plotLayers = (data.plotStructure.plot_layers || []).map((layer: PlotLayer) => {
+          const isKey = isKeyPlotLayer(layer.id);
+          return {
+            ...layer,
+            deletable: layer.deletable !== undefined ? layer.deletable : !isKey,
+            editable: layer.editable !== undefined ? layer.editable : true,
+          };
+        });
+
+        setStructure({
+          plot_layers: plotLayers,
+          act_structure: data.plotStructure.act_structure || {
+            act_one_end: 8,
+            act_two_midpoint: 15,
+            act_two_end: 22,
+            act_three_climax: 28,
+          },
+        });
+
+        // Clear coherence state since structure changed
+        setIsCoherent(null);
+        setCoherenceWarnings([]);
+        setCoherenceSuggestions([]);
+
+        // Show success message
+        const successMsg = document.createElement('div');
+        successMsg.style.cssText = `
+          position: fixed;
+          top: 2rem;
+          right: 2rem;
+          padding: 1rem 1.5rem;
+          background: #10B981;
+          color: #FFFFFF;
+          border-radius: 8px;
+          font-size: 0.875rem;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+          z-index: 9999;
+        `;
+        successMsg.textContent = `Plot structure regenerated! ${data.stats.layersGenerated} layers with ${data.stats.totalPoints} plot points created.`;
+        document.body.appendChild(successMsg);
+        setTimeout(() => successMsg.remove(), 4000);
+      }
+    } catch (err: any) {
+      console.error('Error regenerating plot structure:', err);
+      setError(err.message);
+    } finally {
+      setRegenerating(false);
     }
   };
 
@@ -1346,21 +1425,41 @@ export default function PlotStructurePage() {
             <h2 style={{ fontSize: '1.125rem', fontWeight: 600, color: colors.text }}>
               Plot Layers
             </h2>
-            <button
-              onClick={handleAddLayer}
-              style={{
-                padding: '0.5rem 1rem',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                border: 'none',
-                borderRadius: '8px',
-                color: '#fff',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                cursor: 'pointer',
-              }}
-            >
-              + Add Layer
-            </button>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button
+                onClick={() => setShowRegenerateModal(true)}
+                disabled={regenerating || isViewingSnapshot}
+                title="Delete all plots and regenerate from story concept using best practices"
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: regenerating ? '#94A3B8' : '#FFFFFF',
+                  border: '1px solid #DC2626',
+                  borderRadius: '8px',
+                  color: regenerating ? '#FFFFFF' : '#DC2626',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  cursor: regenerating || isViewingSnapshot ? 'not-allowed' : 'pointer',
+                  opacity: isViewingSnapshot ? 0.5 : 1,
+                }}
+              >
+                {regenerating ? 'Regenerating...' : '🔄 Regenerate All'}
+              </button>
+              <button
+                onClick={handleAddLayer}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                + Add Layer
+              </button>
+            </div>
           </div>
 
           {(structure.plot_layers?.length || 0) === 0 ? (

@@ -3,6 +3,7 @@ import db from '../db/connection.js';
 import type { Flag } from '../shared/types/index.js';
 import { createLogger } from './logger.service.js';
 import { extractJsonObject } from '../utils/json-extractor.js';
+import { AI_REQUEST_TYPES } from '../constants/ai-request-types.js';
 
 const logger = createLogger('services:specialist-agents');
 
@@ -126,6 +127,12 @@ Provide your analysis in this JSON format:
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 6000,
       temperature: 0.3,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.SENSITIVITY_REVIEW,
+        projectId: chapterData.project_id,
+        chapterId,
+        contextSummary: `Sensitivity review for chapter ${chapterData.chapter_number}`,
+      },
     });
 
     const parsed = extractJsonObject(apiResponse.content) as {
@@ -219,6 +226,12 @@ Provide your analysis in this JSON format:
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 6000,
       temperature: 0.2,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.RESEARCH_REVIEW,
+        projectId: chapterData.project_id,
+        chapterId,
+        contextSummary: `Research review for chapter ${chapterData.chapter_number}`,
+      },
     });
 
     const parsed = extractJsonObject(apiResponse.content) as {
@@ -314,6 +327,12 @@ Provide your beta reader report in this JSON format:
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 4000,
       temperature: 0.7, // Higher temperature for more authentic/varied reactions
+      tracking: {
+        requestType: AI_REQUEST_TYPES.BETA_READER_REVIEW,
+        projectId: chapterData.project_id,
+        chapterId,
+        contextSummary: `Beta reader review for chapter ${chapterData.chapter_number}`,
+      },
     });
 
     const parsed = extractJsonObject(apiResponse.content) as {
@@ -431,6 +450,12 @@ Provide your opening specialist report in this JSON format:
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 5000,
       temperature: 0.5,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.OPENING_REVIEW,
+        projectId: chapterData.project_id,
+        chapterId,
+        contextSummary: `Opening specialist review for chapter 1`,
+      },
     });
 
     const parsed = extractJsonObject(apiResponse.content) as {
@@ -527,6 +552,12 @@ Provide your dialogue coach report in this JSON format:
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 5000,
       temperature: 0.4,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.DIALOGUE_REVIEW,
+        projectId: chapterData.project_id,
+        chapterId,
+        contextSummary: `Dialogue coach review for chapter ${chapterData.chapter_number}`,
+      },
     });
 
     const parsed = extractJsonObject(apiResponse.content) as {
@@ -634,6 +665,12 @@ Provide your hook specialist report in this JSON format:
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 4000,
       temperature: 0.5,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.HOOK_REVIEW,
+        projectId: chapterData.project_id,
+        chapterId,
+        contextSummary: `Chapter hook review for chapter ${chapterData.chapter_number}`,
+      },
     });
 
     const parsed = extractJsonObject(apiResponse.content) as {

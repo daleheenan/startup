@@ -3,6 +3,7 @@ import db from '../db/connection.js';
 import type { Chapter, Flag } from '../shared/types/index.js';
 import { createLogger } from './logger.service.js';
 import { extractJsonObject } from '../utils/json-extractor.js';
+import { AI_REQUEST_TYPES } from '../constants/ai-request-types.js';
 
 const logger = createLogger('services:editing');
 
@@ -105,11 +106,19 @@ Provide your analysis in this JSON format:
 
 Output only valid JSON, no commentary:`;
 
+    const projectId = this.getProjectId(chapterId);
+
     const apiResponse = await claudeService.createCompletionWithUsage({
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 2000,
       temperature: 0.7,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.DEVELOPMENTAL_EDIT,
+        projectId,
+        chapterId,
+        contextSummary: `Developmental edit for chapter ${chapterData.chapter_number}`,
+      },
     });
 
     // Parse response
@@ -196,11 +205,19 @@ Return the edited chapter content, making direct improvements to prose while pre
 
 Output the edited chapter text:`;
 
+    const projectId = this.getProjectId(chapterId);
+
     const apiResponse = await claudeService.createCompletionWithUsage({
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 4096,
       temperature: 0.8,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.LINE_EDIT,
+        projectId,
+        chapterId,
+        contextSummary: `Line edit for chapter`,
+      },
     });
 
     // Extract any [NEEDS AUTHOR: ...] markers as flags
@@ -282,11 +299,19 @@ Provide your analysis in this JSON format:
 
 Output only valid JSON, no commentary:`;
 
+    const projectId = this.getProjectId(chapterId);
+
     const apiResponse = await claudeService.createCompletionWithUsage({
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 2000,
       temperature: 0.5,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.CONTINUITY_CHECK,
+        projectId,
+        chapterId,
+        contextSummary: `Continuity check for chapter`,
+      },
     });
 
     const analysis = this.parseEditorResponse(apiResponse.content);
@@ -368,11 +393,19 @@ Return the copy-edited chapter with all corrections applied.
 
 Output the corrected chapter text:`;
 
+    const projectId = this.getProjectId(chapterId);
+
     const apiResponse = await claudeService.createCompletionWithUsage({
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 4096,
       temperature: 0.3, // Lower temperature for more precise corrections
+      tracking: {
+        requestType: AI_REQUEST_TYPES.COPY_EDIT,
+        projectId,
+        chapterId,
+        contextSummary: `Copy edit for chapter`,
+      },
     });
 
     logger.info(`[EditingService] Copy edit complete`);
@@ -437,11 +470,19 @@ ${chapterData.content}
 
 Return the proofread chapter with all corrections applied. Output only the corrected text:`;
 
+    const projectId = this.getProjectId(chapterId);
+
     const apiResponse = await claudeService.createCompletionWithUsage({
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 4096,
       temperature: 0.2, // Very low temperature for precise corrections
+      tracking: {
+        requestType: AI_REQUEST_TYPES.PROOFREAD,
+        projectId,
+        chapterId,
+        contextSummary: `Proofread for chapter`,
+      },
     });
 
     logger.info(`[EditingService] Proofread complete`);
@@ -495,16 +536,43 @@ Rewrite the chapter, addressing the editor's feedback while maintaining the stor
 
 Output the revised chapter:`;
 
+    const projectId = this.getProjectId(chapterId);
+
     const apiResponse = await claudeService.createCompletionWithUsage({
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 4096,
       temperature: 1.0,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.AUTHOR_REVISION,
+        projectId,
+        chapterId,
+        contextSummary: `Author revision based on dev edit feedback`,
+      },
     });
 
     logger.info(`[EditingService] Author revision complete`);
 
     return { content: apiResponse.content.trim(), usage: apiResponse.usage };
+  }
+
+  /**
+   * Helper: Get project ID from chapter ID
+   */
+  private getProjectId(chapterId: string): string | null {
+    try {
+      const stmt = db.prepare<[string], { project_id: string }>(`
+        SELECT b.project_id
+        FROM chapters c
+        JOIN books b ON c.book_id = b.id
+        WHERE c.id = ?
+      `);
+      const result = stmt.get(chapterId);
+      return result?.project_id || null;
+    } catch (error) {
+      logger.warn({ chapterId, error }, 'Failed to get project ID from chapter');
+      return null;
+    }
   }
 
   /**

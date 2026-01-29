@@ -25,6 +25,25 @@ function safeJsonParse<T>(jsonString: string | null | undefined, fallback: T): T
 }
 
 /**
+ * Get project ID from chapter ID
+ */
+function getProjectIdFromChapter(chapterId: string): string | null {
+  try {
+    const stmt = db.prepare<[string], { project_id: string }>(`
+      SELECT b.project_id
+      FROM chapters c
+      JOIN books b ON c.book_id = b.id
+      WHERE c.id = ?
+    `);
+    const result = stmt.get(chapterId);
+    return result?.project_id || null;
+  } catch (error) {
+    logger.warn({ chapterId, error }, 'getProjectIdFromChapter: Failed to get project ID');
+    return null;
+  }
+}
+
+/**
  * QueueWorker processes jobs sequentially from the queue.
  *
  * Features:
@@ -287,6 +306,9 @@ export class QueueWorker {
         estimatedTokens: context.estimatedTokens,
       });
 
+      // Get project ID for tracking
+      const projectId = getProjectIdFromChapter(chapterId);
+
       // Step 3: Generate chapter with Claude (with token tracking)
       logger.info('generate_chapter: Generating chapter content with Claude');
       const response = await claudeService.createCompletionWithUsage({
@@ -294,11 +316,17 @@ export class QueueWorker {
         messages: [{ role: 'user', content: context.userPrompt }],
         maxTokens: 4096, // Max output length
         temperature: 1.0, // Creative writing benefits from higher temperature
+        tracking: {
+          requestType: AI_REQUEST_TYPES.CHAPTER_GENERATION,
+          projectId,
+          chapterId,
+          contextSummary: `Generating chapter content`,
+        },
       });
 
       const chapterContent = response.content;
 
-      // Track token usage
+      // Track token usage (for chapter-specific aggregation)
       logger.info({ inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens }, 'generate_chapter: Tracking tokens');
       metricsService.trackChapterTokens(chapterId, response.usage.input_tokens, response.usage.output_tokens);
 
@@ -903,14 +931,23 @@ ${chapter.content}
 
 Write the summary now:`;
 
+      // Get project ID for tracking
+      const projectId = getProjectIdFromChapter(chapterId);
+
       const apiResponse = await claudeService.createCompletionWithUsage({
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
         maxTokens: 500,
         temperature: 0.7,
+        tracking: {
+          requestType: AI_REQUEST_TYPES.GENERATE_SUMMARY,
+          projectId,
+          chapterId,
+          contextSummary: `Generating chapter ${chapter.chapter_number} summary`,
+        },
       });
 
-      // Track token usage
+      // Track token usage (for chapter-specific aggregation)
       logger.info({ inputTokens: apiResponse.usage.input_tokens, outputTokens: apiResponse.usage.output_tokens }, 'generate_summary: Tracking tokens');
       metricsService.trackChapterTokens(chapterId, apiResponse.usage.input_tokens, apiResponse.usage.output_tokens);
 

@@ -2,6 +2,7 @@ import { claudeService } from './claude.service.js';
 import db from '../db/connection.js';
 import { createLogger } from './logger.service.js';
 import { extractJsonObject } from '../utils/json-extractor.js';
+import { AI_REQUEST_TYPES } from '../constants/ai-request-types.js';
 import type {
   PlagiarismCheckResult,
   PlagiarismCheckStatus,
@@ -216,6 +217,10 @@ export class PlagiarismCheckerService {
         messages: [{ role: 'user', content: userPrompt }],
         maxTokens: 3000,
         temperature: 0.5, // Lower temperature for consistent analysis
+        tracking: {
+          requestType: AI_REQUEST_TYPES.ORIGINALITY_CHECK,
+          contextSummary: `Originality check for ${contentType} ${contentId}`,
+        },
       });
 
       const analysis = this.parseAnalysisResponse(apiResponse.content);

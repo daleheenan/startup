@@ -3,6 +3,7 @@ import db from '../db/connection.js';
 import { createLogger } from './logger.service.js';
 import { extractJsonObject } from '../utils/json-extractor.js';
 import { randomUUID } from 'crypto';
+import { AI_REQUEST_TYPES } from '../constants/ai-request-types.js';
 
 const logger = createLogger('services:veb');
 
@@ -289,6 +290,12 @@ Provide your reader reaction as JSON:`;
           messages: [{ role: 'user', content: userPrompt }],
           maxTokens: 2000,
           temperature: 0.7, // Higher for authentic varied reactions
+          tracking: {
+            requestType: AI_REQUEST_TYPES.VEB_BETA_SWARM,
+            projectId: report.project_id,
+            chapterId: chapter.id,
+            contextSummary: `VEB Beta Swarm analysis for chapter ${chapter.chapter_number}`,
+          },
         });
 
         totalInputTokens += apiResponse.usage?.input_tokens || 0;
@@ -444,6 +451,12 @@ Provide your editorial analysis as JSON:`;
           messages: [{ role: 'user', content: userPrompt }],
           maxTokens: 2500,
           temperature: 0.3, // Lower for consistent analytical output
+          tracking: {
+            requestType: AI_REQUEST_TYPES.VEB_RUTHLESS_EDITOR,
+            projectId: report.project_id,
+            chapterId: chapter.id,
+            contextSummary: `VEB Ruthless Editor analysis for chapter ${chapter.chapter_number}`,
+          },
         });
 
         totalInputTokens += apiResponse.usage?.input_tokens || 0;
@@ -637,6 +650,11 @@ Provide your market analysis as JSON:`;
         messages: [{ role: 'user', content: userPrompt }],
         maxTokens: 3000,
         temperature: 0.4,
+        tracking: {
+          requestType: AI_REQUEST_TYPES.VEB_MARKET_ANALYST,
+          projectId: report.project_id,
+          contextSummary: `VEB Market Analyst analysis`,
+        },
       });
 
       totalInputTokens = apiResponse.usage?.input_tokens || 0;

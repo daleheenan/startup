@@ -5226,4 +5226,350 @@ Respond with a JSON object in this exact format:
   }
 });
 
+/**
+ * POST /api/projects/:id/regenerate-plot-structure
+ * Delete all existing plot layers and regenerate from story elements and concept
+ *
+ * Takes into account:
+ * - Story concept (synopsis, logline, hook, protagonist, conflict)
+ * - Story DNA (genre, tone, themes)
+ * - Story Bible (characters, world elements)
+ * - Editorial lessons from VEB and Outline reviews
+ * - Best practices for bestselling novels
+ */
+router.post('/:id/regenerate-plot-structure', async (req, res) => {
+  try {
+    const { id: projectId } = req.params;
+
+    // Get project with all story data
+    const projectStmt = db.prepare<[string], any>(`
+      SELECT id, title, genre, story_concept, story_dna, story_bible, plot_structure
+      FROM projects WHERE id = ?
+    `);
+    const project = projectStmt.get(projectId);
+
+    if (!project) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project not found' },
+      });
+    }
+
+    const storyConcept = safeJsonParse(project.story_concept, null);
+    const storyDNA = safeJsonParse(project.story_dna, null);
+    const storyBible = safeJsonParse(project.story_bible, null);
+
+    // Build comprehensive story context
+    let storyContext = '';
+
+    // Story concept
+    if (storyConcept) {
+      storyContext += `
+STORY CONCEPT:
+Title: ${storyConcept.title || project.title}
+Logline: ${storyConcept.logline || 'Not provided'}
+Synopsis: ${storyConcept.synopsis || 'Not provided'}
+Hook: ${storyConcept.hook || 'Not provided'}
+Protagonist: ${storyConcept.protagonistHint || 'Not provided'}
+Core Conflict: ${storyConcept.conflictType || 'Not provided'}
+`;
+    }
+
+    // Story DNA
+    if (storyDNA) {
+      storyContext += `
+STORY DNA:
+Genre: ${storyDNA.genre || project.genre || 'Fiction'}
+Subgenre: ${storyDNA.subgenre || 'Not specified'}
+Tone: ${storyDNA.tone || 'Not specified'}
+Themes: ${Array.isArray(storyDNA.themes) ? storyDNA.themes.join(', ') : 'Not specified'}
+Prose Style: ${storyDNA.proseStyle || 'Not specified'}
+Timeframe: ${storyDNA.timeframe || 'Not specified'}
+`;
+    }
+
+    // Characters from Story Bible
+    if (storyBible?.characters?.length > 0) {
+      storyContext += `
+KEY CHARACTERS:`;
+      for (const char of storyBible.characters.slice(0, 6)) {
+        storyContext += `
+- ${char.name} (${char.role || 'Unknown role'}): ${char.description || 'No description'}
+  Arc: ${char.characterArc || 'Not defined'}
+  Goal: ${char.goals || 'Not defined'}
+  Internal Conflict: ${char.internalConflict || 'Not defined'}`;
+      }
+    }
+
+    // Fetch editorial lessons for plot-related insights
+    const lessonsStmt = db.prepare<[string], any>(`
+      SELECT title, description, category, source_module, severity_level
+      FROM editorial_lessons
+      WHERE project_id = ? AND is_active = 1
+        AND category IN ('plot', 'pacing', 'scene_structure', 'character')
+      ORDER BY effectiveness_score DESC, severity_level DESC
+      LIMIT 10
+    `);
+    const editorialLessons = lessonsStmt.all(projectId);
+
+    let lessonsContext = '';
+    if (editorialLessons.length > 0) {
+      lessonsContext = `
+LESSONS FROM PREVIOUS EDITORIAL REVIEWS:`;
+      for (const lesson of editorialLessons) {
+        lessonsContext += `
+- [${lesson.category.toUpperCase()}] ${lesson.title}: ${lesson.description}`;
+      }
+    }
+
+    // Fetch latest VEB report insights if available
+    const vebStmt = db.prepare<[string], any>(`
+      SELECT result FROM veb_reports
+      WHERE project_id = ? AND status = 'completed'
+      ORDER BY created_at DESC LIMIT 1
+    `);
+    const vebReport = vebStmt.get(projectId);
+
+    let vebInsights = '';
+    if (vebReport?.result) {
+      const vebResult = safeJsonParse(vebReport.result, null);
+      if (vebResult) {
+        vebInsights = `
+VEB INSIGHTS FROM PREVIOUS REVIEW:`;
+        if (vebResult.ruthlessEditor?.summaryVerdict) {
+          vebInsights += `
+- Ruthless Editor: ${vebResult.ruthlessEditor.summaryVerdict}`;
+        }
+        if (vebResult.betaSwarm?.summaryReaction) {
+          vebInsights += `
+- Beta Reader Feedback: ${vebResult.betaSwarm.summaryReaction}`;
+        }
+      }
+    }
+
+    // Fetch latest outline editorial report insights
+    const outlineEditorialStmt = db.prepare<[string], any>(`
+      SELECT result FROM outline_editorial_reports
+      WHERE project_id = ? AND status = 'completed'
+      ORDER BY created_at DESC LIMIT 1
+    `);
+    const outlineEditorialReport = outlineEditorialStmt.get(projectId);
+
+    let outlineInsights = '';
+    if (outlineEditorialReport?.result) {
+      const outlineResult = safeJsonParse(outlineEditorialReport.result, null);
+      if (outlineResult) {
+        outlineInsights = `
+OUTLINE EDITORIAL INSIGHTS:`;
+        if (outlineResult.structureAnalyst?.summaryVerdict) {
+          outlineInsights += `
+- Structure Analysis: ${outlineResult.structureAnalyst.summaryVerdict}`;
+        }
+        if (outlineResult.characterArc?.summaryVerdict) {
+          outlineInsights += `
+- Character Arc Analysis: ${outlineResult.characterArc.summaryVerdict}`;
+        }
+      }
+    }
+
+    // No story concept means we can't regenerate
+    if (!storyContext.includes('Synopsis:') && !storyContext.includes('Logline:')) {
+      return res.status(400).json({
+        error: {
+          code: 'NO_CONCEPT',
+          message: 'Cannot regenerate plot structure without a story concept. Please create a story concept first.',
+        },
+      });
+    }
+
+    logger.info({ projectId }, 'Regenerating plot structure from story elements');
+
+    // Build the comprehensive prompt
+    const prompt = `You are an expert story architect and bestselling novel consultant. Your task is to create a comprehensive plot structure that will form the foundation of a compelling, commercially viable novel.
+
+${storyContext}
+${lessonsContext}
+${vebInsights}
+${outlineInsights}
+
+TASK: Create a complete plot structure with multiple interwoven plot layers and specific plot points. Apply best practices from bestselling novels in the ${storyDNA?.genre || project.genre || 'Fiction'} genre.
+
+BEST PRACTICES TO APPLY:
+1. **Three-Act Structure**: Clear setup (25%), confrontation (50%), resolution (25%)
+2. **Hook Early**: The main plot must grab attention within the first 3 chapters
+3. **Interweave Subplots**: Subplots should complement and reflect the main plot's themes
+4. **Character Arcs**: Every major character needs a transformation arc
+5. **Rising Stakes**: Each act should raise the stakes progressively
+6. **Emotional Resonance**: Include moments that create emotional connection
+7. **Pacing Variety**: Mix action with quieter character moments
+8. **Satisfying Resolution**: All major plot threads must resolve
+
+REQUIRED OUTPUT FORMAT - Return ONLY valid JSON:
+{
+  "plot_layers": [
+    {
+      "id": "main-plot",
+      "name": "Main Plot - [Descriptive Title]",
+      "description": "Detailed description of the primary narrative arc (2-3 sentences)",
+      "type": "main",
+      "color": "#3b82f6",
+      "status": "active",
+      "deletable": false,
+      "editable": true,
+      "points": [
+        {
+          "id": "point-[unique-id]",
+          "chapter_number": 1,
+          "description": "Specific plot point description (what happens and why it matters)",
+          "phase": "setup",
+          "impact_level": 3
+        }
+      ]
+    }
+  ],
+  "act_structure": {
+    "act_one_end": 8,
+    "act_two_midpoint": 15,
+    "act_two_end": 22,
+    "act_three_climax": 28
+  }
+}
+
+REQUIREMENTS:
+1. Create exactly 4-6 plot layers including:
+   - One "main" type (the golden thread/primary arc)
+   - 1-2 "subplot" types (secondary story threads)
+   - 1-2 "character-arc" types (tied to major characters)
+   - Optionally: "mystery" or "romance" if genre-appropriate
+
+2. Each plot layer must have 5-8 plot points distributed across all phases:
+   - "setup" (chapters 1-8): Establish status quo, introduce conflict
+   - "rising" (chapters 9-14): Complications, obstacles, raising stakes
+   - "midpoint" (chapter 15): Major revelation or reversal
+   - "crisis" (chapters 16-22): Things fall apart, all seems lost
+   - "climax" (chapters 23-28): Final confrontation, maximum tension
+   - "falling" (chapters 29-30): Immediate aftermath
+   - "resolution" (final chapters): New equilibrium, loose ends tied
+
+3. Plot points must:
+   - Be specific and actionable (not vague)
+   - Include the consequence or emotional impact
+   - Have appropriate impact_level (1=minor, 3=significant, 5=critical turning point)
+   - Reference characters by name when relevant
+
+4. Use colours that contrast well:
+   - Main plot: #3b82f6 (blue)
+   - Subplots: #10b981 (green), #f59e0b (amber)
+   - Character arcs: #ec4899 (pink), #8b5cf6 (violet)
+   - Mystery: #7c3aed (purple)
+   - Romance: #db2777 (rose)
+
+IMPORTANT: Use UK British spelling throughout (e.g., 'colour' not 'color', 'realise' not 'realize').
+
+Generate a rich, detailed plot structure now:`;
+
+    // Call Claude API
+    const { default: Anthropic } = await import('@anthropic-ai/sdk');
+    const anthropic = new Anthropic();
+
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 8000,
+      temperature: 0.7,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const responseText = message.content[0].type === 'text'
+      ? message.content[0].text
+      : '';
+
+    // Parse the response - extract JSON
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      logger.error({ responseText: responseText.substring(0, 500) }, 'Failed to extract JSON from regeneration response');
+      throw new Error('Failed to parse plot structure from AI response');
+    }
+
+    let newPlotStructure: any;
+    try {
+      newPlotStructure = JSON.parse(jsonMatch[0]);
+    } catch (parseErr) {
+      logger.error({ parseErr, json: jsonMatch[0].substring(0, 500) }, 'JSON parse error');
+      throw new Error('Invalid JSON in AI response');
+    }
+
+    // Validate the structure
+    if (!newPlotStructure.plot_layers || !Array.isArray(newPlotStructure.plot_layers)) {
+      throw new Error('Invalid plot structure: missing plot_layers array');
+    }
+
+    // Ensure all required fields exist and add unique IDs
+    const timestamp = Date.now();
+    newPlotStructure.plot_layers = newPlotStructure.plot_layers.map((layer: any, layerIndex: number) => {
+      const layerId = layer.id || `layer-${timestamp}-${layerIndex}`;
+      return {
+        id: layerId,
+        name: layer.name || 'Untitled Plot Layer',
+        description: layer.description || '',
+        type: ['main', 'subplot', 'mystery', 'romance', 'character-arc'].includes(layer.type) ? layer.type : 'subplot',
+        color: layer.color || getPlotColor(layer.type || 'subplot', layerIndex),
+        status: layer.status || 'active',
+        deletable: layer.deletable !== undefined ? layer.deletable : true,
+        editable: layer.editable !== undefined ? layer.editable : true,
+        points: (layer.points || []).map((point: any, pointIndex: number) => ({
+          id: point.id || `point-${timestamp}-${layerIndex}-${pointIndex}`,
+          chapter_number: Math.min(Math.max(1, point.chapter_number || 1), 35),
+          description: point.description || 'Plot point',
+          phase: ['setup', 'rising', 'midpoint', 'crisis', 'climax', 'falling', 'resolution'].includes(point.phase)
+            ? point.phase
+            : 'rising',
+          impact_level: Math.min(Math.max(1, point.impact_level || 3), 5) as 1 | 2 | 3 | 4 | 5,
+        })),
+      };
+    });
+
+    // Ensure act structure has sensible defaults
+    newPlotStructure.act_structure = {
+      act_one_end: newPlotStructure.act_structure?.act_one_end || 8,
+      act_two_midpoint: newPlotStructure.act_structure?.act_two_midpoint || 15,
+      act_two_end: newPlotStructure.act_structure?.act_two_end || 22,
+      act_three_climax: newPlotStructure.act_structure?.act_three_climax || 28,
+    };
+
+    // Save the new plot structure (replacing all existing)
+    const updateStmt = db.prepare(`
+      UPDATE projects SET plot_structure = ?, updated_at = ? WHERE id = ?
+    `);
+    updateStmt.run(JSON.stringify(newPlotStructure), new Date().toISOString(), projectId);
+
+    // Sync to active book versions
+    syncPlotStructureToActiveVersions(projectId, newPlotStructure);
+
+    // Count totals for logging
+    const totalPoints = newPlotStructure.plot_layers.reduce(
+      (sum: number, layer: any) => sum + (layer.points?.length || 0),
+      0
+    );
+
+    logger.info({
+      projectId,
+      layersGenerated: newPlotStructure.plot_layers.length,
+      totalPoints,
+    }, 'Plot structure regenerated successfully');
+
+    res.json({
+      success: true,
+      plotStructure: newPlotStructure,
+      stats: {
+        layersGenerated: newPlotStructure.plot_layers.length,
+        totalPoints,
+        layerTypes: newPlotStructure.plot_layers.map((l: any) => l.type),
+      },
+      message: 'Plot structure regenerated from story elements and best practices',
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error regenerating plot structure');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
 export default router;

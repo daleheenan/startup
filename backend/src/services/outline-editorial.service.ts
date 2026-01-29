@@ -3,6 +3,7 @@ import db from '../db/connection.js';
 import { createLogger } from './logger.service.js';
 import { extractJsonObject } from '../utils/json-extractor.js';
 import { randomUUID } from 'crypto';
+import { AI_REQUEST_TYPES } from '../constants/ai-request-types.js';
 
 const logger = createLogger('services:outline-editorial');
 
@@ -273,6 +274,11 @@ export class OutlineEditorialService {
         messages: [{ role: 'user', content: prompt }],
         maxTokens: 4000,
         temperature: 0.3,
+        tracking: {
+          requestType: AI_REQUEST_TYPES.OUTLINE_STRUCTURE_ANALYST,
+          projectId: report.project_id,
+          contextSummary: `Outline Structure Analyst review`,
+        },
       });
 
       // Parse the response
@@ -352,6 +358,11 @@ export class OutlineEditorialService {
         messages: [{ role: 'user', content: prompt }],
         maxTokens: 4000,
         temperature: 0.3,
+        tracking: {
+          requestType: AI_REQUEST_TYPES.OUTLINE_CHARACTER_ARC,
+          projectId: report.project_id,
+          contextSummary: `Outline Character Arc review`,
+        },
       });
 
       const result = extractJsonObject<CharacterArcResult>(response.content);
@@ -431,6 +442,11 @@ export class OutlineEditorialService {
         messages: [{ role: 'user', content: prompt }],
         maxTokens: 4000,
         temperature: 0.3,
+        tracking: {
+          requestType: AI_REQUEST_TYPES.OUTLINE_MARKET_FIT,
+          projectId: report.project_id,
+          contextSummary: `Outline Market Fit analysis`,
+        },
       });
 
       const result = extractJsonObject<MarketFitResult>(response.content);

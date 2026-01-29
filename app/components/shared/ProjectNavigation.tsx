@@ -1,20 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { colors, borderRadius } from '@/app/lib/constants';
+import { colors } from '@/app/lib/constants';
 import {
-  PROJECT_NAV_SECTIONS,
   PROJECT_NAV_GROUPS,
   TAB_STATUS_COLORS,
   getActiveGroupFromPath,
-  getActiveSectionIdFromPath,
-  type NavSection,
   type NavGroup,
   type NavTab,
+  type WorkflowStep,
 } from '@/app/lib/navigation-constants';
-import { useWorkflowPrerequisites, type WorkflowProjectData, type WorkflowStep } from '@/app/hooks/useWorkflowPrerequisites';
+import { useWorkflowPrerequisites, type WorkflowProjectData } from '@/app/hooks/useWorkflowPrerequisites';
 import type { TabStatus } from '@/shared/types';
 
 // Flexible outline type that works with various page-specific interfaces
@@ -42,19 +40,20 @@ interface ProjectNavigationProps {
 /**
  * Project Navigation Component
  *
- * Displays a hierarchical navigation with collapsible sections:
- * - Stories (collapsed when viewing Draft Novels)
- * - Draft Novels (expanded when viewing a project, contains all project pages)
- * - Completed Novels (collapsed when viewing Draft Novels)
+ * Displays the horizontal navigation tabs for a project with collapsible groups
+ * and workflow status indicators.
  *
- * Within Draft Novels:
+ * Navigation structure:
  * - Overview (standalone)
+ * - Edit Story (standalone)
  * - Elements: Characters, World
  * - Story: Plot, Outline, Prose Style
- * - Novel: Chapters, Analytics, Follow-up
- * - Editorial: Editorial Board, Outline Review
+ * - Novel: Chapters, Versions, Analytics, Follow-up
+ * - Editorial: Editorial Board, Word Count, Outline Review
+ * - Publishing (standalone)
  *
  * Status colours:
+ * - Purple: Currently active/viewing
  * - Green: Step completed
  * - Red: Step required (not yet completed)
  * - Grey/Locked: Prerequisites not met
@@ -67,24 +66,15 @@ export default function ProjectNavigation({
 }: ProjectNavigationProps) {
   const pathname = usePathname();
 
-  // Track which sections are expanded (top-level: Stories, Draft Novels, Completed Novels)
-  const activeSectionId = getActiveSectionIdFromPath(pathname);
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(activeSectionId ? [activeSectionId] : ['draft-novels'])
-  );
-
-  // Track which groups are expanded within a section (Elements, Story, Novel, Editorial)
+  // Track which groups are expanded
   const activeGroupId = getActiveGroupFromPath(pathname, projectId);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
     new Set(activeGroupId ? [activeGroupId] : [])
   );
 
-  // Update expanded sections when active section changes
-  useEffect(() => {
-    if (activeSectionId) {
-      setExpandedSections(new Set([activeSectionId]));
-    }
-  }, [activeSectionId]);
+  // Track dropdown heights for smooth animations
+  const dropdownRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [dropdownHeights, setDropdownHeights] = useState<Record<string, number>>({});
 
   // Update expanded groups when active group changes
   useEffect(() => {
@@ -97,6 +87,17 @@ export default function ProjectNavigation({
     }
   }, [activeGroupId]);
 
+  // Calculate dropdown heights for animation
+  useEffect(() => {
+    const heights: Record<string, number> = {};
+    Object.entries(dropdownRefs.current).forEach(([groupId, ref]) => {
+      if (ref) {
+        heights[groupId] = ref.scrollHeight;
+      }
+    });
+    setDropdownHeights(heights);
+  }, []);
+
   // Get workflow prerequisites
   const prerequisiteCheck = useWorkflowPrerequisites(
     projectId,
@@ -108,18 +109,7 @@ export default function ProjectNavigation({
   const shouldEnforcePrerequisites = Boolean(project);
   const { canAccess, getBlockingReason, prerequisites } = prerequisiteCheck;
 
-  // Toggle section expansion (only one section open at a time)
-  const toggleSection = (sectionId: string) => {
-    setExpandedSections(prev => {
-      const newSet = new Set<string>();
-      if (!prev.has(sectionId)) {
-        newSet.add(sectionId);
-      }
-      return newSet;
-    });
-  };
-
-  // Toggle group expansion within a section
+  // Toggle group expansion
   const toggleGroup = (groupId: string) => {
     setExpandedGroups(prev => {
       const newSet = new Set(prev);
@@ -206,12 +196,22 @@ export default function ProjectNavigation({
     return 'optional';
   };
 
+  // Get status icon for accessibility
+  const getStatusIcon = (status: TabStatus, isActive: boolean): string | null => {
+    if (isActive) return '►';
+    if (status === 'completed') return '✓';
+    if (status === 'required') return '!';
+    if (status === 'locked') return '🔒';
+    return null;
+  };
+
   // Render a single tab
   const renderTab = (tab: NavTab, isNested: boolean = false) => {
     const fullRoute = `/projects/${projectId}${tab.route}`;
     const isActive = activeTabId === tab.id;
     const status = getTabStatus(tab.id, tab.workflowStep);
     const isLocked = status === 'locked';
+    const statusIcon = getStatusIcon(status, isActive);
 
     // Get the colour based on status
     let borderColor = 'transparent';
@@ -235,16 +235,14 @@ export default function ProjectNavigation({
       tooltipText = 'Completed';
     }
 
-    // Get status icon for accessibility
-    let statusIcon: string | null = null;
-    if (isActive) {
-      statusIcon = '►';
-    } else if (status === 'completed') {
-      statusIcon = '✓';
-    } else if (status === 'required') {
-      statusIcon = '!';
-    } else if (status === 'locked') {
-      statusIcon = '🔒';
+    // Add subtle background tint for better visibility
+    let backgroundColor = 'transparent';
+    if (isActive && isNested) {
+      backgroundColor = 'rgba(102, 126, 234, 0.08)';
+    } else if (status === 'completed' && !isActive) {
+      backgroundColor = 'rgba(16, 185, 129, 0.03)';
+    } else if (status === 'required' && !isActive) {
+      backgroundColor = 'rgba(239, 68, 68, 0.03)';
     }
 
     const tabContent = (
@@ -271,16 +269,6 @@ export default function ProjectNavigation({
       </>
     );
 
-    // Add subtle background tint for better visibility
-    let backgroundColor = 'transparent';
-    if (isActive && isNested) {
-      backgroundColor = 'rgba(102, 126, 234, 0.08)';
-    } else if (status === 'completed' && !isActive) {
-      backgroundColor = 'rgba(16, 185, 129, 0.03)';
-    } else if (status === 'required' && !isActive) {
-      backgroundColor = 'rgba(239, 68, 68, 0.03)';
-    }
-
     const tabStyle = {
       display: 'flex',
       alignItems: 'center',
@@ -293,7 +281,7 @@ export default function ProjectNavigation({
       fontSize: '0.8125rem',
       fontWeight: isActive ? 600 : 500,
       whiteSpace: 'nowrap',
-      transition: 'all 0.2s',
+      transition: 'all 0.2s ease',
       position: 'relative',
       opacity: isLocked ? 0.5 : 1,
       cursor: isLocked ? 'not-allowed' : 'pointer',
@@ -330,7 +318,7 @@ export default function ProjectNavigation({
     );
   };
 
-  // Render a navigation group (within a section)
+  // Render a navigation group
   const renderGroup = (group: NavGroup) => {
     const isExpanded = expandedGroups.has(group.id);
     const groupStatus = getGroupStatus(group);
@@ -353,6 +341,7 @@ export default function ProjectNavigation({
       const fullRoute = `/projects/${projectId}${group.route || ''}`;
       const isActive = activeTabId === group.id;
       const status = getTabStatus(group.id, group.workflowStep || 'concept');
+      const statusIcon = getStatusIcon(status, isActive);
 
       let tabBorderColor = 'transparent';
       if (isActive) {
@@ -371,20 +360,31 @@ export default function ProjectNavigation({
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem',
-              padding: '0.625rem 1rem',
-              borderBottom: `3px solid ${tabBorderColor}`,
+              padding: '0.75rem 1rem',
+              borderBottom: `4px solid ${tabBorderColor}`,
               color: isActive ? colors.brandText : colors.textSecondary,
               textDecoration: 'none',
-              fontSize: '0.8125rem',
+              fontSize: '0.875rem',
               fontWeight: isActive ? 600 : 500,
               whiteSpace: 'nowrap',
-              transition: 'all 0.2s',
+              transition: 'all 0.2s ease',
             }}
             aria-current={isActive ? 'page' : undefined}
           >
-            <span aria-hidden="true" style={{ fontSize: '0.875rem' }}>
+            <span aria-hidden="true" style={{ fontSize: '1rem' }}>
               {group.icon}
             </span>
+            {statusIcon && (
+              <span
+                aria-hidden="true"
+                style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold',
+                }}
+              >
+                {statusIcon}
+              </span>
+            )}
             <span>{group.label}</span>
           </Link>
         </div>
@@ -392,8 +392,10 @@ export default function ProjectNavigation({
     }
 
     // For groups with children, render as collapsible
+    const dropdownHeight = dropdownHeights[group.id] || 0;
+
     return (
-      <div key={group.id} style={{ display: 'flex', flexDirection: 'column' }}>
+      <div key={group.id} style={{ display: 'flex', flexDirection: 'column', position: 'relative' }}>
         <button
           onClick={() => toggleGroup(group.id)}
           onKeyDown={(e) => {
@@ -406,24 +408,24 @@ export default function ProjectNavigation({
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
-            padding: '0.625rem 1rem',
-            borderBottom: `2px solid ${borderColor}`,
+            padding: '0.75rem 1rem',
+            borderBottom: `4px solid ${borderColor}`,
             color: isActiveGroup ? colors.brandText : colors.textSecondary,
-            background: 'transparent',
+            background: isActiveGroup ? 'rgba(102, 126, 234, 0.04)' : 'transparent',
             border: 'none',
             borderBottomStyle: 'solid',
-            borderBottomWidth: '2px',
+            borderBottomWidth: '4px',
             borderBottomColor: borderColor,
-            fontSize: '0.8125rem',
+            fontSize: '0.875rem',
             fontWeight: isActiveGroup ? 600 : 500,
             whiteSpace: 'nowrap',
-            transition: 'all 0.2s',
+            transition: 'all 0.2s ease',
             cursor: 'pointer',
           }}
           aria-expanded={isExpanded}
           aria-controls={`nav-group-${group.id}`}
         >
-          <span aria-hidden="true" style={{ fontSize: '0.875rem' }}>
+          <span aria-hidden="true" style={{ fontSize: '1rem' }}>
             {group.icon}
           </span>
           <span>{group.label}</span>
@@ -432,7 +434,7 @@ export default function ProjectNavigation({
             style={{
               fontSize: '0.625rem',
               marginLeft: '0.25rem',
-              transition: 'transform 0.2s',
+              transition: 'transform 0.3s ease',
               transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
             }}
           >
@@ -440,115 +442,33 @@ export default function ProjectNavigation({
           </span>
         </button>
 
-        {/* Dropdown panel */}
+        {/* Dropdown panel with slide animation */}
         <div
           id={`nav-group-${group.id}`}
+          ref={(el) => { dropdownRefs.current[group.id] = el; }}
           style={{
-            display: isExpanded ? 'flex' : 'none',
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            zIndex: 100,
+            minWidth: '200px',
+            display: 'flex',
             flexDirection: 'column',
-            background: colors.surfaceAlt || '#F8FAFC',
-            borderBottom: `1px solid ${colors.border}`,
+            background: colors.surface,
+            borderRadius: '0 0 8px 8px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            border: `1px solid ${colors.border}`,
+            borderTop: 'none',
+            overflow: 'hidden',
+            maxHeight: isExpanded ? `${dropdownHeight || 500}px` : '0px',
+            opacity: isExpanded ? 1 : 0,
+            transition: 'max-height 0.3s ease, opacity 0.2s ease',
+            pointerEvents: isExpanded ? 'auto' : 'none',
           }}
           role="tablist"
           aria-label={`${group.label} navigation`}
         >
           {group.tabs.map(tab => renderTab(tab, true))}
-        </div>
-      </div>
-    );
-  };
-
-  // Render a navigation section (top-level collapsible)
-  const renderSection = (section: NavSection) => {
-    const isExpanded = expandedSections.has(section.id);
-    const isActiveSection = activeSectionId === section.id;
-
-    // Section header styles
-    const sectionHeaderStyle = {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.5rem',
-      padding: '0.75rem 1rem',
-      background: isActiveSection ? 'rgba(102, 126, 234, 0.08)' : colors.surfaceAlt || '#F8FAFC',
-      borderBottom: `2px solid ${isActiveSection ? TAB_STATUS_COLORS.active : colors.border}`,
-      color: isActiveSection ? colors.brandText : colors.textPrimary,
-      fontSize: '0.875rem',
-      fontWeight: 600,
-      whiteSpace: 'nowrap',
-      transition: 'all 0.2s',
-      cursor: 'pointer',
-      border: 'none',
-      width: '100%',
-      textAlign: 'left' as const,
-    };
-
-    // For standalone sections (like Completed Novels), render as direct link
-    if (section.isStandalone && section.route) {
-      return (
-        <div key={section.id} style={{ display: 'flex', flexDirection: 'column' }}>
-          <Link
-            href={section.route}
-            style={{
-              ...sectionHeaderStyle,
-              textDecoration: 'none',
-            }}
-            aria-current={isActiveSection ? 'page' : undefined}
-          >
-            <span aria-hidden="true" style={{ fontSize: '1rem' }}>
-              {section.icon}
-            </span>
-            <span>{section.label}</span>
-          </Link>
-        </div>
-      );
-    }
-
-    // For sections with groups, render as collapsible
-    return (
-      <div key={section.id} style={{ display: 'flex', flexDirection: 'column' }}>
-        <button
-          onClick={() => toggleSection(section.id)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              toggleSection(section.id);
-            }
-          }}
-          style={sectionHeaderStyle}
-          aria-expanded={isExpanded}
-          aria-controls={`nav-section-${section.id}`}
-        >
-          <span aria-hidden="true" style={{ fontSize: '1rem' }}>
-            {section.icon}
-          </span>
-          <span>{section.label}</span>
-          <span
-            aria-hidden="true"
-            style={{
-              fontSize: '0.625rem',
-              marginLeft: 'auto',
-              transition: 'transform 0.2s',
-              transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-            }}
-          >
-            ▼
-          </span>
-        </button>
-
-        {/* Section content panel */}
-        <div
-          id={`nav-section-${section.id}`}
-          style={{
-            display: isExpanded ? 'flex' : 'none',
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-            background: colors.surface,
-            borderBottom: isExpanded ? `1px solid ${colors.border}` : 'none',
-          }}
-          role="navigation"
-          aria-label={`${section.label} navigation`}
-        >
-          {section.groups.map(group => renderGroup(group))}
         </div>
       </div>
     );
@@ -560,7 +480,10 @@ export default function ProjectNavigation({
         background: colors.surface,
         borderBottom: `1px solid ${colors.border}`,
         overflowX: 'auto',
+        overflowY: 'visible',
         WebkitOverflowScrolling: 'touch',
+        position: 'relative',
+        zIndex: 50,
       }}
       role="navigation"
       aria-label="Project sections"
@@ -568,11 +491,10 @@ export default function ProjectNavigation({
       <div
         style={{
           display: 'flex',
-          flexDirection: 'column',
           minWidth: 'min-content',
         }}
       >
-        {PROJECT_NAV_SECTIONS.map(section => renderSection(section))}
+        {PROJECT_NAV_GROUPS.map(group => renderGroup(group))}
       </div>
     </nav>
   );
