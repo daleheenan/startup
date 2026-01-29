@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import type { ProseStyle, StylePreset } from '../../shared/types';
+import { fetchJson, post, put } from '../lib/fetch-utils';
 
 interface ProseStyleEditorProps {
   projectId: string;
@@ -51,8 +52,7 @@ export default function ProseStyleEditor({ projectId, currentStyleId, onStyleCha
 
   const loadStyle = async (styleId: string) => {
     try {
-      const response = await fetch(`/api/prose-styles/${styleId}`);
-      const data = await response.json();
+      const data = await fetchJson<{ style: ProseStyle }>(`/api/prose-styles/${styleId}`);
       if (data.style) {
         setStyle(data.style);
       }
@@ -63,8 +63,7 @@ export default function ProseStyleEditor({ projectId, currentStyleId, onStyleCha
 
   const loadPresets = async () => {
     try {
-      const response = await fetch('/api/prose-styles/presets/all');
-      const data = await response.json();
+      const data = await fetchJson<{ presets: StylePreset[] }>('/api/prose-styles/presets/all');
       setPresets(data.presets || []);
     } catch (error) {
       console.error('Error loading presets:', error);
@@ -73,45 +72,40 @@ export default function ProseStyleEditor({ projectId, currentStyleId, onStyleCha
 
   const handleSave = async () => {
     try {
-      const url = style.id ? `/api/prose-styles/${style.id}` : '/api/prose-styles';
-      const method = style.id ? 'PUT' : 'POST';
+      let data: { style: ProseStyle };
+      if (style.id) {
+        data = await put<{ style: ProseStyle }>(`/api/prose-styles/${style.id}`, style);
+      } else {
+        data = await post<{ style: ProseStyle }>('/api/prose-styles', style);
+      }
 
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(style),
-      });
-
-      const data = await response.json();
       if (data.style) {
         setStyle(data.style);
         onStyleChange?.(data.style);
         alert('Style saved successfully!');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving style:', error);
-      alert('Failed to save style');
+      alert(`Failed to save style: ${error.message || 'Unknown error'}`);
     }
   };
 
   const handleApplyPreset = async (preset: StylePreset) => {
     try {
-      const response = await fetch(`/api/prose-styles/presets/${preset.id}/apply`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_id: projectId, name: preset.preset_name }),
-      });
+      const data = await post<{ style: ProseStyle }>(
+        `/api/prose-styles/presets/${preset.id}/apply`,
+        { project_id: projectId, name: preset.preset_name }
+      );
 
-      const data = await response.json();
       if (data.style) {
         setStyle(data.style);
         onStyleChange?.(data.style);
         setShowPresets(false);
         alert('Preset applied successfully!');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error applying preset:', error);
-      alert('Failed to apply preset');
+      alert(`Failed to apply preset: ${error.message || 'Unknown error'}`);
     }
   };
 
@@ -125,27 +119,22 @@ export default function ProseStyleEditor({ projectId, currentStyleId, onStyleCha
 
     try {
       // First save the style if it doesn't exist
-      if (!style.id) {
-        const saveResponse = await fetch('/api/prose-styles', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(style),
-        });
-        const saveData = await saveResponse.json();
+      let currentStyleId = style.id;
+      if (!currentStyleId) {
+        const saveData = await post<{ style: ProseStyle }>('/api/prose-styles', style);
         setStyle(saveData.style);
+        currentStyleId = saveData.style.id;
       }
 
       // Add voice sample
-      const response = await fetch(`/api/prose-styles/${style.id}/voice-samples`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const data = await post<{ sample: any }>(
+        `/api/prose-styles/${currentStyleId}/voice-samples`,
+        {
           sample_text: voiceSample,
           sample_source: 'User-provided sample',
-        }),
-      });
+        }
+      );
 
-      const data = await response.json();
       if (data.sample) {
         // Update style based on voice sample analysis
         setStyle(prev => ({
@@ -156,9 +145,9 @@ export default function ProseStyleEditor({ projectId, currentStyleId, onStyleCha
         alert('Voice sample analysed! Style updated based on the sample.');
         setVoiceSample('');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error analysing voice:', error);
-      alert('Failed to analyse voice sample');
+      alert(`Failed to analyse voice sample: ${error.message || 'Unknown error'}`);
     } finally {
       setAnalysing(false);
     }
