@@ -81,12 +81,17 @@ export default function SidebarNavGroup({
   const childrenRef = useRef<HTMLDivElement>(null);
   const [childrenHeight, setChildrenHeight] = useState<number>(0);
 
-  // Measure the natural scrollHeight whenever items change
-  // We need to measure independently of expanded state to get the true height
+  // Measure the natural scrollHeight whenever items change or when expanded
   useEffect(() => {
-    if (childrenRef.current) {
-      // Temporarily remove maxHeight to measure true scrollHeight
-      const element = childrenRef.current;
+    if (!childrenRef.current) return;
+
+    const element = childrenRef.current;
+
+    // Use requestAnimationFrame to ensure DOM has fully updated
+    requestAnimationFrame(() => {
+      if (!element) return;
+
+      // Temporarily remove constraints to measure true content height
       const originalMaxHeight = element.style.maxHeight;
       const originalOverflow = element.style.overflow;
 
@@ -95,31 +100,15 @@ export default function SidebarNavGroup({
 
       const height = element.scrollHeight;
 
+      // Restore original styles
       element.style.maxHeight = originalMaxHeight;
       element.style.overflow = originalOverflow;
 
-      setChildrenHeight(height);
-    }
-  }, [items]);
-
-  // Also re-measure when expanded changes to ensure we have the correct height
-  useEffect(() => {
-    if (expanded && childrenRef.current) {
-      // Use requestAnimationFrame to ensure DOM has updated
-      requestAnimationFrame(() => {
-        if (childrenRef.current) {
-          const element = childrenRef.current;
-          const originalMaxHeight = element.style.maxHeight;
-          element.style.maxHeight = 'none';
-          const height = element.scrollHeight;
-          element.style.maxHeight = originalMaxHeight;
-          if (height > 0) {
-            setChildrenHeight(height);
-          }
-        }
-      });
-    }
-  }, [expanded]);
+      if (height > 0) {
+        setChildrenHeight(height);
+      }
+    });
+  }, [items, expanded]);
 
   // ---- Styles ----
 

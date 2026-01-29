@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useCallback, useState, type CSSProperties } from 'react';
+import { useEffect, useCallback, useState, useMemo, type CSSProperties } from 'react';
 import { usePathname } from 'next/navigation';
 
 import { useDashboardContext } from '../DashboardContext';
@@ -341,18 +341,21 @@ export default function Sidebar({ collapsed: collapsedProp, onCollapseToggle }: 
   }, []);
 
   // Build dynamic navigation groups based on preferences
-  const dynamicNavigationGroups = navigationGroups.map((group) => {
-    if (group.id === 'projects' && showAICosts) {
-      return {
-        ...group,
-        items: [
-          ...group.items,
-          { id: 'ai-costs', label: 'AI Costs', href: '/ai-costs', icon: <AICostsIcon /> },
-        ],
-      };
-    }
-    return group;
-  });
+  // Use useMemo to prevent recreation on every render
+  const dynamicNavigationGroups = useMemo(() => {
+    return navigationGroups.map((group) => {
+      if (group.id === 'projects' && showAICosts) {
+        return {
+          ...group,
+          items: [
+            ...group.items,
+            { id: 'ai-costs', label: 'AI Costs', href: '/ai-costs', icon: <AICostsIcon /> },
+          ],
+        };
+      }
+      return group;
+    });
+  }, [showAICosts]);
 
   // ---- Sync active nav item whenever the route changes ----
 
@@ -395,17 +398,12 @@ export default function Sidebar({ collapsed: collapsedProp, onCollapseToggle }: 
       }
     }
 
-    // Expand only the active group, collapse all others
-    for (const group of dynamicNavigationGroups) {
-      if (!group.isStandalone) {
-        if (group.id === activeGroupId) {
-          dispatch({ type: 'EXPAND_NAV_GROUP', payload: group.id });
-        } else {
-          dispatch({ type: 'COLLAPSE_NAV_GROUP', payload: group.id });
-        }
-      }
+    // Only auto-expand the active group if no groups are currently expanded
+    // This allows manual toggling to work without interference
+    if (activeGroupId && state.expandedGroups.size === 0) {
+      dispatch({ type: 'EXPAND_NAV_GROUP', payload: activeGroupId });
     }
-  }, [pathname, dispatch, dynamicNavigationGroups]);
+  }, [pathname, dispatch, dynamicNavigationGroups, state.expandedGroups.size]);
 
   // ---- Toggle handlers ----
 
