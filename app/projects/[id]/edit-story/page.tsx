@@ -19,12 +19,21 @@ interface StoryConcept {
   conflictType: string | null;
 }
 
+interface ProseStyleObject {
+  sentenceStructure?: string;
+  vocabularyLevel?: string;
+  dialogueStyle?: string;
+  descriptionDensity?: string;
+  pacing?: string;
+  pointOfView?: string;
+}
+
 interface StoryDNA {
   genre: string;
   subgenre: string;
   tone: string;
   themes: string[];
-  proseStyle: string;
+  proseStyle: string | ProseStyleObject;
   timeframe?: string;
 }
 
@@ -102,7 +111,25 @@ export default function EditStoryPage() {
       setSubgenre(dna.subgenre || '');
       setTone(dna.tone || '');
       setThemes(Array.isArray(dna.themes) ? dna.themes.join(', ') : '');
-      setProseStyle(dna.proseStyle || '');
+      // Handle proseStyle which may be an object or a string
+      if (dna.proseStyle) {
+        if (typeof dna.proseStyle === 'object') {
+          // Convert object to readable string format
+          const ps = dna.proseStyle;
+          const parts: string[] = [];
+          if (ps.sentenceStructure) parts.push(`Sentence structure: ${ps.sentenceStructure}`);
+          if (ps.vocabularyLevel) parts.push(`Vocabulary: ${ps.vocabularyLevel}`);
+          if (ps.dialogueStyle) parts.push(`Dialogue: ${ps.dialogueStyle}`);
+          if (ps.descriptionDensity) parts.push(`Description: ${ps.descriptionDensity}`);
+          if (ps.pacing) parts.push(`Pacing: ${ps.pacing}`);
+          if (ps.pointOfView) parts.push(`POV: ${ps.pointOfView}`);
+          setProseStyle(parts.join('. '));
+        } else {
+          setProseStyle(dna.proseStyle);
+        }
+      } else {
+        setProseStyle('');
+      }
       setTimeframe(dna.timeframe || '');
     } catch (err: any) {
       setError(err.message || 'Failed to load project');
@@ -210,7 +237,22 @@ export default function EditStoryPage() {
         setSubgenre(data.refinedDNA.subgenre || '');
         setTone(data.refinedDNA.tone || '');
         setThemes(Array.isArray(data.refinedDNA.themes) ? data.refinedDNA.themes.join(', ') : '');
-        setProseStyle(data.refinedDNA.proseStyle || '');
+        // Handle proseStyle which may be an object or a string
+        if (data.refinedDNA.proseStyle) {
+          if (typeof data.refinedDNA.proseStyle === 'object') {
+            const ps = data.refinedDNA.proseStyle;
+            const parts: string[] = [];
+            if (ps.sentenceStructure) parts.push(`Sentence structure: ${ps.sentenceStructure}`);
+            if (ps.vocabularyLevel) parts.push(`Vocabulary: ${ps.vocabularyLevel}`);
+            if (ps.dialogueStyle) parts.push(`Dialogue: ${ps.dialogueStyle}`);
+            if (ps.descriptionDensity) parts.push(`Description: ${ps.descriptionDensity}`);
+            if (ps.pacing) parts.push(`Pacing: ${ps.pacing}`);
+            if (ps.pointOfView) parts.push(`POV: ${ps.pointOfView}`);
+            setProseStyle(parts.join('. '));
+          } else {
+            setProseStyle(data.refinedDNA.proseStyle);
+          }
+        }
         setTimeframe(data.refinedDNA.timeframe || '');
       }
 
