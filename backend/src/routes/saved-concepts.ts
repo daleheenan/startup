@@ -23,13 +23,23 @@ interface SavedConcept {
 // Get all saved concepts
 router.get('/', (req, res) => {
   try {
-    const status = req.query.status as string || 'saved';
-    const stmt = db.prepare<[string], SavedConcept>(`
-      SELECT * FROM saved_concepts
-      WHERE status = ?
-      ORDER BY created_at DESC
-    `);
-    const concepts = stmt.all(status);
+    const status = req.query.status as string | undefined;
+
+    let concepts: SavedConcept[];
+    if (status) {
+      const stmt = db.prepare<[string], SavedConcept>(`
+        SELECT * FROM saved_concepts
+        WHERE status = ?
+        ORDER BY created_at DESC
+      `);
+      concepts = stmt.all(status);
+    } else {
+      const stmt = db.prepare<[], SavedConcept>(`
+        SELECT * FROM saved_concepts
+        ORDER BY created_at DESC
+      `);
+      concepts = stmt.all();
+    }
 
     const parsed = concepts.map(c => ({
       ...c,
