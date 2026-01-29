@@ -1,11 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { colors, borderRadius, spacing, transitions } from '@/app/lib/design-tokens';
 
 interface ProjectNavButtonsProps {
   projectId: string;
+  /** Optional version ID - when provided, appends ?versionId= to all navigation links */
+  versionId?: string;
 }
 
 const navItems = [
@@ -24,10 +26,17 @@ const navItems = [
 /**
  * ProjectNavButtons renders horizontal navigation buttons at the top of project pages.
  * These allow quick navigation between different sections of a project (Characters, Plot, etc.)
+ *
+ * When versionId is provided (either via prop or URL search params), it will be preserved
+ * across navigation to maintain version context.
  */
-export default function ProjectNavButtons({ projectId }: ProjectNavButtonsProps) {
+export default function ProjectNavButtons({ projectId, versionId: propVersionId }: ProjectNavButtonsProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const basePath = `/projects/${projectId}`;
+
+  // Use versionId from props, or fall back to URL search params
+  const versionId = propVersionId || searchParams.get('versionId') || undefined;
 
   // Determine which item is active
   const getIsActive = (href: string) => {
@@ -37,6 +46,15 @@ export default function ProjectNavButtons({ projectId }: ProjectNavButtonsProps)
       return pathname === basePath;
     }
     return pathname.startsWith(fullPath);
+  };
+
+  // Build href with optional versionId query param
+  const buildHref = (href: string) => {
+    const fullPath = `${basePath}${href}`;
+    if (versionId) {
+      return `${fullPath}?versionId=${versionId}`;
+    }
+    return fullPath;
   };
 
   return (
@@ -53,7 +71,7 @@ export default function ProjectNavButtons({ projectId }: ProjectNavButtonsProps)
     >
       {navItems.map((item) => {
         const isActive = getIsActive(item.href);
-        const fullHref = `${basePath}${item.href}`;
+        const fullHref = buildHref(item.href);
 
         return (
           <Link
