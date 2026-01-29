@@ -62,10 +62,13 @@ router.get('/', (req, res) => {
         WHERE b.project_id = ?
         LIMIT 1
       `);
+      // Count chapters from active versions only
       chapterCountStmt = db.prepare<[string], any>(`
         SELECT COUNT(*) as count FROM chapters c
         INNER JOIN books b ON c.book_id = b.id
+        LEFT JOIN book_versions bv ON c.version_id = bv.id
         WHERE b.project_id = ? AND c.content IS NOT NULL AND c.content != ''
+          AND (c.version_id IS NULL OR bv.is_active = 1)
       `);
 
       // Get generation status for each project (check if any jobs are running or pending)

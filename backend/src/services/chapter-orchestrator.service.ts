@@ -1,6 +1,7 @@
 import { QueueWorker } from '../queue/worker.js';
 import db from '../db/connection.js';
 import { createLogger } from './logger.service.js';
+import { bookVersioningService } from './book-versioning.service.js';
 import {
   chapterBriefGeneratorService,
   type DetailedChapterBrief,
@@ -571,39 +572,73 @@ export class ChapterOrchestratorService {
   }
 
   /**
-   * Get generation statistics for a book
+   * Get generation statistics for a book (uses active version only)
    */
-  getBookGenerationStats(bookId: string): {
+  async getBookGenerationStats(bookId: string): Promise<{
     totalChapters: number;
     pending: number;
     writing: number;
     editing: number;
     completed: number;
     failed: number;
-  } {
-    const statsStmt = db.prepare<[string], any>(`
-      SELECT
-        COUNT(*) as total,
-        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
-        SUM(CASE WHEN status = 'writing' THEN 1 ELSE 0 END) as writing,
-        SUM(CASE WHEN status = 'editing' THEN 1 ELSE 0 END) as editing,
-        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
-      FROM chapters
-      WHERE book_id = ?
-    `);
+  }> {
+    // Get active version for this book
+    const activeVersion = await bookVersioningService.getActiveVersion(bookId);
 
-    const stats = statsStmt.get(bookId);
+    let stats;
+    let chapterIds: string[];
 
-    // Count failed jobs
-    const failedStmt = db.prepare<[string], { failed: number }>(`
-      SELECT COUNT(DISTINCT target_id) as failed
-      FROM jobs
-      WHERE status = 'failed' AND target_id IN (
-        SELECT id FROM chapters WHERE book_id = ?
-      )
-    `);
+    if (activeVersion) {
+      const statsStmt = db.prepare<[string], any>(`
+        SELECT
+          COUNT(*) as total,
+          SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+          SUM(CASE WHEN status = 'writing' THEN 1 ELSE 0 END) as writing,
+          SUM(CASE WHEN status = 'editing' THEN 1 ELSE 0 END) as editing,
+          SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
+        FROM chapters
+        WHERE version_id = ?
+      `);
+      stats = statsStmt.get(activeVersion.id);
 
-    const failedJobs = failedStmt.get(bookId);
+      // Get chapter IDs for failed job count
+      const chapterIdStmt = db.prepare<[string], { id: string }>(`
+        SELECT id FROM chapters WHERE version_id = ?
+      `);
+      chapterIds = chapterIdStmt.all(activeVersion.id).map(c => c.id);
+    } else {
+      // Legacy: no versions exist
+      const statsStmt = db.prepare<[string], any>(`
+        SELECT
+          COUNT(*) as total,
+          SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+          SUM(CASE WHEN status = 'writing' THEN 1 ELSE 0 END) as writing,
+          SUM(CASE WHEN status = 'editing' THEN 1 ELSE 0 END) as editing,
+          SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
+        FROM chapters
+        WHERE book_id = ? AND version_id IS NULL
+      `);
+      stats = statsStmt.get(bookId);
+
+      // Get chapter IDs for failed job count
+      const chapterIdStmt = db.prepare<[string], { id: string }>(`
+        SELECT id FROM chapters WHERE book_id = ? AND version_id IS NULL
+      `);
+      chapterIds = chapterIdStmt.all(bookId).map(c => c.id);
+    }
+
+    // Count failed jobs for active version chapters only
+    let failedCount = 0;
+    if (chapterIds.length > 0) {
+      const placeholders = chapterIds.map(() => '?').join(',');
+      const failedStmt = db.prepare<string[], { failed: number }>(`
+        SELECT COUNT(DISTINCT target_id) as failed
+        FROM jobs
+        WHERE status = 'failed' AND target_id IN (${placeholders})
+      `);
+      const failedJobs = failedStmt.get(...chapterIds);
+      failedCount = failedJobs?.failed || 0;
+    }
 
     return {
       totalChapters: stats.total || 0,
@@ -611,12 +646,12 @@ export class ChapterOrchestratorService {
       writing: stats.writing || 0,
       editing: stats.editing || 0,
       completed: stats.completed || 0,
-      failed: failedJobs?.failed || 0,
+      failed: failedCount,
     };
   }
 
   /**
-   * Get extended generation statistics including quality metrics
+   * Get extended generation statistics including quality metrics (uses active version only)
    */
   async getBookGenerationStatsExtended(bookId: string): Promise<{
     totalChapters: number;
@@ -631,15 +666,28 @@ export class ChapterOrchestratorService {
     chaptersWithWarnings: number;
     commercialValidation?: CommercialValidationReport;
   }> {
-    const basicStats = this.getBookGenerationStats(bookId);
+    const basicStats = await this.getBookGenerationStats(bookId);
 
-    // Get word count totals
-    const wordCountStmt = db.prepare<[string], { total_words: number }>(`
-      SELECT COALESCE(SUM(word_count), 0) as total_words
-      FROM chapters
-      WHERE book_id = ? AND status = 'completed'
-    `);
-    const wordCountResult = wordCountStmt.get(bookId);
+    // Get active version for this book
+    const activeVersion = await bookVersioningService.getActiveVersion(bookId);
+
+    // Get word count totals for active version only
+    let wordCountResult;
+    if (activeVersion) {
+      const wordCountStmt = db.prepare<[string], { total_words: number }>(`
+        SELECT COALESCE(SUM(word_count), 0) as total_words
+        FROM chapters
+        WHERE version_id = ? AND status = 'completed'
+      `);
+      wordCountResult = wordCountStmt.get(activeVersion.id);
+    } else {
+      const wordCountStmt = db.prepare<[string], { total_words: number }>(`
+        SELECT COALESCE(SUM(word_count), 0) as total_words
+        FROM chapters
+        WHERE book_id = ? AND version_id IS NULL AND status = 'completed'
+      `);
+      wordCountResult = wordCountStmt.get(bookId);
+    }
 
     // Get target word count from outline
     const outlineStmt = db.prepare<[string], { target_word_count: number | null }>(`

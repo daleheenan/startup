@@ -34,7 +34,7 @@ router.post('/book/:bookId/mark-complete', async (req, res) => {
     const { bookId } = req.params;
 
     // Check if book is actually complete
-    const status = completionDetectionService.checkBookCompletion(bookId);
+    const status = await completionDetectionService.checkBookCompletion(bookId);
     if (!status.isComplete) {
       return sendBadRequest(
         res,
@@ -158,7 +158,7 @@ router.post('/book/:bookId/follow-up/generate', async (req, res) => {
     const { bookId } = req.params;
 
     // Check if book is complete
-    const status = completionDetectionService.checkBookCompletion(bookId);
+    const status = await completionDetectionService.checkBookCompletion(bookId);
     if (!status.isComplete) {
       return sendBadRequest(
         res,
@@ -194,7 +194,7 @@ router.post('/book/:bookId/follow-up/regenerate', async (req, res) => {
     const { bookId } = req.params;
 
     // Check if book is complete
-    const status = completionDetectionService.checkBookCompletion(bookId);
+    const status = await completionDetectionService.checkBookCompletion(bookId);
     if (!status.isComplete) {
       return sendBadRequest(res, 'Book must be complete to generate follow-up recommendations.');
     }

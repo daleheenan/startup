@@ -3,6 +3,7 @@ import db from '../db/connection.js';
 import { randomUUID } from 'crypto';
 import type { Chapter } from '../shared/types/index.js';
 import { chapterOrchestratorService } from '../services/chapter-orchestrator.service.js';
+import { bookVersioningService } from '../services/book-versioning.service.js';
 import { sendBadRequest, sendNotFound, sendInternalError } from '../utils/response-helpers.js';
 import { createLogger } from '../services/logger.service.js';
 import { cache } from '../services/cache.service.js';
@@ -108,8 +109,11 @@ router.get('/:id', (req, res) => {
 /**
  * POST /api/chapters
  * Create a new chapter
+ *
+ * Chapters are always created in the active version. If no version exists,
+ * Version 1 is created automatically.
  */
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const validation = validateRequest(createChapterSchema, req.body);
     if (!validation.success) {
@@ -118,17 +122,28 @@ router.post('/', (req, res) => {
 
     const { bookId, chapterNumber, title, sceneCards } = validation.data;
 
+    // Get active version or create Version 1 if none exists
+    let activeVersion = await bookVersioningService.getActiveVersion(bookId);
+    if (!activeVersion) {
+      // Create Version 1 for this book
+      activeVersion = await bookVersioningService.createVersion(bookId, {
+        name: 'Version 1',
+      });
+      logger.info({ bookId, versionId: activeVersion.id }, 'Created Version 1 for book');
+    }
+
     const chapterId = randomUUID();
     const now = new Date().toISOString();
 
     const stmt = db.prepare(`
-      INSERT INTO chapters (id, book_id, chapter_number, title, scene_cards, status, word_count, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO chapters (id, book_id, version_id, chapter_number, title, scene_cards, status, word_count, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
       chapterId,
       bookId,
+      activeVersion.id,
       chapterNumber,
       title || null,
       sceneCards ? JSON.stringify(sceneCards) : null,
@@ -141,6 +156,7 @@ router.post('/', (req, res) => {
     res.status(201).json({
       id: chapterId,
       book_id: bookId,
+      version_id: activeVersion.id,
       chapter_number: chapterNumber,
       title: title || null,
       scene_cards: sceneCards || [],

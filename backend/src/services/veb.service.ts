@@ -6,6 +6,17 @@ import { randomUUID } from 'crypto';
 
 const logger = createLogger('services:veb');
 
+// Version-aware chapter query helper for VEB
+// Filters to only include chapters from active versions (or legacy chapters without version_id)
+const VERSION_AWARE_CHAPTER_FILTER = `
+  AND (
+    c.version_id IS NULL
+    OR c.version_id IN (
+      SELECT bv.id FROM book_versions bv WHERE bv.book_id = c.book_id AND bv.is_active = 1
+    )
+  )
+`;
+
 /**
  * Virtual Editorial Board (VEB) Service
  *
@@ -144,10 +155,16 @@ export class VEBService {
   }> {
     logger.info({ projectId }, '[VEB] Submitting project to Virtual Editorial Board');
 
-    // Verify project exists and has content
+    // Verify project exists and has content (count active version chapters only)
     const projectStmt = db.prepare(`
       SELECT p.id, p.title, p.genre,
-             (SELECT COUNT(*) FROM chapters c JOIN books b ON c.book_id = b.id WHERE b.project_id = p.id AND c.content IS NOT NULL) as chapter_count
+             (SELECT COUNT(*) FROM chapters c
+              JOIN books b ON c.book_id = b.id
+              LEFT JOIN book_versions bv ON c.version_id = bv.id
+              WHERE b.project_id = p.id
+                AND c.content IS NOT NULL
+                AND (c.version_id IS NULL OR bv.is_active = 1)
+             ) as chapter_count
       FROM projects p WHERE p.id = ?
     `);
     const project = projectStmt.get(projectId) as any;
@@ -219,12 +236,14 @@ export class VEBService {
     const storyDNA = report.story_dna ? JSON.parse(report.story_dna) : {};
     const genre = storyDNA.genre || report.genre || 'fiction';
 
-    // Get all chapters
+    // Get all chapters (active versions only)
     const chaptersStmt = db.prepare(`
       SELECT c.id, c.chapter_number, c.title, c.content
       FROM chapters c
       JOIN books b ON c.book_id = b.id
+      LEFT JOIN book_versions bv ON c.version_id = bv.id
       WHERE b.project_id = ? AND c.content IS NOT NULL
+        AND (c.version_id IS NULL OR bv.is_active = 1)
       ORDER BY b.book_number, c.chapter_number
     `);
     const chapters = chaptersStmt.all(report.project_id) as any[];
@@ -363,12 +382,14 @@ Provide your reader reaction as JSON:`;
       throw new Error('Report not found');
     }
 
-    // Get all chapters
+    // Get all chapters (active versions only)
     const chaptersStmt = db.prepare(`
       SELECT c.id, c.chapter_number, c.title, c.content, c.summary
       FROM chapters c
       JOIN books b ON c.book_id = b.id
+      LEFT JOIN book_versions bv ON c.version_id = bv.id
       WHERE b.project_id = ? AND c.content IS NOT NULL
+        AND (c.version_id IS NULL OR bv.is_active = 1)
       ORDER BY b.book_number, c.chapter_number
     `);
     const chapters = chaptersStmt.all(report.project_id) as any[];
@@ -533,12 +554,14 @@ Provide your editorial analysis as JSON:`;
     const storyConcept = report.story_concept ? JSON.parse(report.story_concept) : {};
     const storyBible = report.story_bible ? JSON.parse(report.story_bible) : {};
 
-    // Get first 3 chapters and overall summary
+    // Get first 3 chapters and overall summary (active versions only)
     const chaptersStmt = db.prepare(`
       SELECT c.chapter_number, c.title, c.content, c.summary
       FROM chapters c
       JOIN books b ON c.book_id = b.id
+      LEFT JOIN book_versions bv ON c.version_id = bv.id
       WHERE b.project_id = ? AND c.content IS NOT NULL
+        AND (c.version_id IS NULL OR bv.is_active = 1)
       ORDER BY b.book_number, c.chapter_number
       LIMIT 3
     `);

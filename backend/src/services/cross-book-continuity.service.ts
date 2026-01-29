@@ -10,6 +10,7 @@ import type {
 } from '../shared/types/index.js';
 import { claudeService } from './claude.service.js';
 import { createLogger } from './logger.service.js';
+import { bookVersioningService } from './book-versioning.service.js';
 
 const logger = createLogger('services:cross-book-continuity');
 
@@ -46,14 +47,29 @@ export class CrossBookContinuityService {
 
     const storyBible: StoryBible = JSON.parse(project.story_bible);
 
-    // Get the last chapter of this book
-    const lastChapterStmt = db.prepare<[string], any>(`
-      SELECT content, summary FROM chapters
-      WHERE book_id = ?
-      ORDER BY chapter_number DESC
-      LIMIT 1
-    `);
-    const lastChapter = lastChapterStmt.get(bookId);
+    // Get active version for this book
+    const activeVersion = await bookVersioningService.getActiveVersion(bookId);
+
+    // Get the last chapter of this book's active version
+    let lastChapter: any;
+    if (activeVersion) {
+      const lastChapterStmt = db.prepare<[string], any>(`
+        SELECT content, summary FROM chapters
+        WHERE version_id = ?
+        ORDER BY chapter_number DESC
+        LIMIT 1
+      `);
+      lastChapter = lastChapterStmt.get(activeVersion.id);
+    } else {
+      // Legacy: no versions exist
+      const lastChapterStmt = db.prepare<[string], any>(`
+        SELECT content, summary FROM chapters
+        WHERE book_id = ? AND version_id IS NULL
+        ORDER BY chapter_number DESC
+        LIMIT 1
+      `);
+      lastChapter = lastChapterStmt.get(bookId);
+    }
 
     if (!lastChapter?.content) {
       throw new Error(`No completed chapters found for book ${bookId}`);

@@ -2,6 +2,7 @@ import db from '../db/connection.js';
 import type { GenerationProgress, ProgressEvent } from '../shared/types/index.js';
 import { sessionTracker } from './session-tracker.js';
 import { createLogger } from './logger.service.js';
+import { bookVersioningService } from './book-versioning.service.js';
 
 const logger = createLogger('services:progress-tracking');
 
@@ -10,20 +11,36 @@ const logger = createLogger('services:progress-tracking');
  */
 export class ProgressTrackingService {
   /**
-   * Get progress for a book
+   * Get progress for a book (uses active version's chapters only)
    */
-  getBookProgress(bookId: string): GenerationProgress {
-    // Get book and chapter stats
-    const statsStmt = db.prepare<[string], any>(`
-      SELECT
-        COUNT(*) as total_chapters,
-        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_chapters,
-        SUM(word_count) as current_word_count
-      FROM chapters
-      WHERE book_id = ?
-    `);
+  async getBookProgress(bookId: string): Promise<GenerationProgress> {
+    // Get active version for this book
+    const activeVersion = await bookVersioningService.getActiveVersion(bookId);
 
-    const stats = statsStmt.get(bookId);
+    // Get book and chapter stats for active version only
+    let stats;
+    if (activeVersion) {
+      const statsStmt = db.prepare<[string], any>(`
+        SELECT
+          COUNT(*) as total_chapters,
+          SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_chapters,
+          SUM(word_count) as current_word_count
+        FROM chapters
+        WHERE version_id = ?
+      `);
+      stats = statsStmt.get(activeVersion.id);
+    } else {
+      // Legacy: no versions exist
+      const statsStmt = db.prepare<[string], any>(`
+        SELECT
+          COUNT(*) as total_chapters,
+          SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_chapters,
+          SUM(word_count) as current_word_count
+        FROM chapters
+        WHERE book_id = ? AND version_id IS NULL
+      `);
+      stats = statsStmt.get(bookId);
+    }
 
     if (!stats || stats.total_chapters === 0) {
       return this.getEmptyProgress();
@@ -89,7 +106,7 @@ export class ProgressTrackingService {
   }
 
   /**
-   * Get progress for a project (all books)
+   * Get progress for a project (all books, using active versions only)
    */
   getProjectProgress(projectId: string): {
     totalBooks: number;
@@ -106,7 +123,7 @@ export class ProgressTrackingService {
 
     const bookStats = bookStatsStmt.get(projectId);
 
-    // Get overall chapter stats across all books
+    // Get overall chapter stats across all books (active versions only)
     const chapterStatsStmt = db.prepare<[string], any>(`
       SELECT
         COUNT(*) as total_chapters,
@@ -114,7 +131,9 @@ export class ProgressTrackingService {
         SUM(c.word_count) as current_word_count
       FROM chapters c
       JOIN books b ON c.book_id = b.id
+      LEFT JOIN book_versions bv ON c.version_id = bv.id
       WHERE b.project_id = ?
+        AND (c.version_id IS NULL OR bv.is_active = 1)
     `);
 
     const chapterStats = chapterStatsStmt.get(projectId);

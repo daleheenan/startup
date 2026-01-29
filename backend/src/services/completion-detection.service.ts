@@ -2,6 +2,7 @@ import db from '../db/connection.js';
 import { randomUUID } from 'crypto';
 import { createLogger } from './logger.service.js';
 import { QueueWorker } from '../queue/worker.js';
+import { bookVersioningService } from './book-versioning.service.js';
 import type { Book, Chapter } from '../shared/types/index.js';
 
 const logger = createLogger('services:completion-detection');
@@ -42,8 +43,9 @@ export interface CompletionRecord {
 class CompletionDetectionService {
   /**
    * Check if a book is complete (all chapters have content)
+   * Uses active version's chapters only
    */
-  checkBookCompletion(bookId: string): BookCompletionStatus {
+  async checkBookCompletion(bookId: string): Promise<BookCompletionStatus> {
     // Get book details
     const bookStmt = db.prepare<[string], Book & { is_complete: number; completed_at: string | null }>(`
       SELECT * FROM books WHERE id = ?
@@ -54,11 +56,23 @@ class CompletionDetectionService {
       throw new Error(`Book not found: ${bookId}`);
     }
 
-    // Get all chapters for this book
-    const chaptersStmt = db.prepare<[string], Chapter>(`
-      SELECT * FROM chapters WHERE book_id = ? ORDER BY chapter_number ASC
-    `);
-    const chapters = chaptersStmt.all(bookId);
+    // Get active version for this book
+    const activeVersion = await bookVersioningService.getActiveVersion(bookId);
+
+    // Get chapters for active version only (or legacy chapters if no version exists)
+    let chapters: Chapter[];
+    if (activeVersion) {
+      const chaptersStmt = db.prepare<[string], Chapter>(`
+        SELECT * FROM chapters WHERE version_id = ? ORDER BY chapter_number ASC
+      `);
+      chapters = chaptersStmt.all(activeVersion.id);
+    } else {
+      // Legacy: no versions exist, get chapters without version_id
+      const chaptersStmt = db.prepare<[string], Chapter>(`
+        SELECT * FROM chapters WHERE book_id = ? AND version_id IS NULL ORDER BY chapter_number ASC
+      `);
+      chapters = chaptersStmt.all(bookId);
+    }
 
     const totalChapters = chapters.length;
     const completedChapters = chapters.filter(ch => ch.content && ch.content.trim().length > 0).length;
@@ -87,7 +101,7 @@ class CompletionDetectionService {
    * Mark a book as complete and trigger auto-analysis
    */
   async markBookComplete(bookId: string): Promise<CompletionRecord> {
-    const status = this.checkBookCompletion(bookId);
+    const status = await this.checkBookCompletion(bookId);
 
     if (!status.isComplete) {
       throw new Error(`Book ${bookId} is not complete. ${status.completedChapters}/${status.totalChapters} chapters written.`);
@@ -226,7 +240,7 @@ class CompletionDetectionService {
       return { isNowComplete: false, completionRecord: null, vebTriggered: false };
     }
 
-    const status = this.checkBookCompletion(chapter.book_id);
+    const status = await this.checkBookCompletion(chapter.book_id);
 
     // Check if book just became complete
     if (status.isComplete && !status.completedAt) {

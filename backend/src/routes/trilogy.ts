@@ -104,12 +104,12 @@ router.get('/books/:bookId/previous-state', (req, res) => {
  * POST /api/trilogy/projects/:projectId/series-bible
  * Generate series bible for entire trilogy
  */
-router.post('/projects/:projectId/series-bible', (req, res) => {
+router.post('/projects/:projectId/series-bible', async (req, res) => {
   try {
     const { projectId } = req.params;
 
     const startTime = Date.now();
-    const seriesBible = seriesBibleGeneratorService.generateSeriesBible(projectId);
+    const seriesBible = await seriesBibleGeneratorService.generateSeriesBible(projectId);
     const duration = Date.now() - startTime;
 
     logger.info({ projectId, duration }, 'Series bible generation completed');

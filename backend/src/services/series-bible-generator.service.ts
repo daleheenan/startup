@@ -12,6 +12,7 @@ import type {
   BookEndingState,
 } from '../shared/types/index.js';
 import { createLogger } from './logger.service.js';
+import { bookVersioningService } from './book-versioning.service.js';
 
 const logger = createLogger('services:series-bible-generator');
 
@@ -23,7 +24,7 @@ export class SeriesBibleGeneratorService {
   /**
    * Generate complete series bible aggregating data from all books
    */
-  generateSeriesBible(projectId: string): SeriesBible {
+  async generateSeriesBible(projectId: string): Promise<SeriesBible> {
     logger.info(`[SeriesBible] Generating series bible for project ${projectId}`);
 
     // Get all books in the project
@@ -55,7 +56,7 @@ export class SeriesBibleGeneratorService {
     const world = this.aggregateWorldElements(books, baseStoryBible);
 
     // Aggregate timeline across books
-    const timeline = this.aggregateTimeline(books);
+    const timeline = await this.aggregateTimeline(books);
 
     // Extract themes from story DNA
     const storyDNA = project.story_dna ? JSON.parse(project.story_dna as any) : null;
@@ -222,19 +223,33 @@ export class SeriesBibleGeneratorService {
 
   /**
    * Aggregate timeline across all books
+   * Uses active version's chapters only
    */
-  private aggregateTimeline(books: Book[]): SeriesTimelineEntry[] {
+  private async aggregateTimeline(books: Book[]): Promise<SeriesTimelineEntry[]> {
     const timeline: SeriesTimelineEntry[] = [];
 
-    books.forEach(book => {
-      // Get chapters for this book to determine timespan
-      const chaptersStmt = db.prepare<[string], Chapter>(`
-        SELECT id, chapter_number, summary FROM chapters
-        WHERE book_id = ? AND status = 'completed'
-        ORDER BY chapter_number ASC
-      `);
+    for (const book of books) {
+      // Get active version for this book
+      const activeVersion = await bookVersioningService.getActiveVersion(book.id);
 
-      const chapters = chaptersStmt.all(book.id);
+      // Get chapters for this book's active version to determine timespan
+      let chapters: Chapter[];
+      if (activeVersion) {
+        const chaptersStmt = db.prepare<[string], Chapter>(`
+          SELECT id, chapter_number, summary FROM chapters
+          WHERE version_id = ? AND status = 'completed'
+          ORDER BY chapter_number ASC
+        `);
+        chapters = chaptersStmt.all(activeVersion.id);
+      } else {
+        // Legacy: no versions exist
+        const chaptersStmt = db.prepare<[string], Chapter>(`
+          SELECT id, chapter_number, summary FROM chapters
+          WHERE book_id = ? AND version_id IS NULL AND status = 'completed'
+          ORDER BY chapter_number ASC
+        `);
+        chapters = chaptersStmt.all(book.id);
+      }
 
       if (chapters.length > 0) {
         // Extract major events from chapter summaries
@@ -251,7 +266,7 @@ export class SeriesBibleGeneratorService {
           majorEvents,
         });
       }
-    });
+    }
 
     return timeline;
   }

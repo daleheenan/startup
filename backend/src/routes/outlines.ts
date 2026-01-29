@@ -666,7 +666,7 @@ router.post('/:bookId/regenerate-act/:actNumber', async (req, res) => {
  * DELETE /api/outlines/:bookId/acts
  * Delete all acts from the outline and reset to empty state
  */
-router.delete('/:bookId/acts', (req, res) => {
+router.delete('/:bookId/acts', async (req, res) => {
   try {
     const { bookId } = req.params;
 
@@ -682,11 +682,22 @@ router.delete('/:bookId/acts', (req, res) => {
       });
     }
 
-    // Delete all chapters for this book
-    const deleteChaptersStmt = db.prepare(`
-      DELETE FROM chapters WHERE book_id = ?
-    `);
-    deleteChaptersStmt.run(bookId);
+    // Get active version for this book
+    const activeVersion = await bookVersioningService.getActiveVersion(bookId);
+
+    // Delete chapters for this book's active version only
+    if (activeVersion) {
+      const deleteChaptersStmt = db.prepare(`
+        DELETE FROM chapters WHERE version_id = ?
+      `);
+      deleteChaptersStmt.run(activeVersion.id);
+    } else {
+      // Legacy: no versions exist
+      const deleteChaptersStmt = db.prepare(`
+        DELETE FROM chapters WHERE book_id = ? AND version_id IS NULL
+      `);
+      deleteChaptersStmt.run(bookId);
+    }
 
     // Reset outline structure to empty
     const emptyStructure: StoryStructure = {

@@ -2,6 +2,7 @@ import express from 'express';
 import { randomUUID } from 'crypto';
 import db from '../db/connection.js';
 import { AnalyticsService } from '../services/analyticsService.js';
+import { bookVersioningService } from '../services/book-versioning.service.js';
 import type { ChapterAnalytics, BookAnalytics, GenreBenchmark } from '../shared/types/index.js';
 import { sendBadRequest, sendNotFound, sendInternalError } from '../utils/response-helpers.js';
 
@@ -113,14 +114,26 @@ router.get('/chapter/:chapterId', (req, res) => {
 
 /**
  * Analyze all chapters in a book and calculate book-level analytics
+ * Uses active version's chapters only
  */
 router.post('/book/:bookId/analyze', async (req, res) => {
   try {
     const { bookId } = req.params;
 
-    const chapters = db.prepare(`
-      SELECT id, content, scene_cards FROM chapters WHERE book_id = ? ORDER BY chapter_number
-    `).all(bookId) as any[];
+    // Get active version for this book
+    const activeVersion = await bookVersioningService.getActiveVersion(bookId);
+
+    let chapters: any[];
+    if (activeVersion) {
+      chapters = db.prepare(`
+        SELECT id, content, scene_cards FROM chapters WHERE version_id = ? ORDER BY chapter_number
+      `).all(activeVersion.id) as any[];
+    } else {
+      // Legacy: no versions exist
+      chapters = db.prepare(`
+        SELECT id, content, scene_cards FROM chapters WHERE book_id = ? AND version_id IS NULL ORDER BY chapter_number
+      `).all(bookId) as any[];
+    }
 
     if (chapters.length === 0) {
       return sendBadRequest(res, 'No chapters found for this book');
