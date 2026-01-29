@@ -106,6 +106,15 @@ function SettingsIcon() {
 }
 
 // Menu item icons (for individual items within groups)
+function YourIdeaIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
+    </svg>
+  );
+}
+
 function QuickStartIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -217,6 +226,7 @@ const navigationGroups = [
     isStandalone: false,
     href: undefined,
     items: [
+      { id: 'your-idea', label: 'Your idea', href: '/story-ideas?add=true', icon: <YourIdeaIcon /> },
       { id: 'quick-start', label: 'Quick Start', href: '/quick-start', icon: <QuickStartIcon /> },
       { id: 'full-customization', label: 'Full Customisation', href: '/full-customization', icon: <FullCustomisationIcon /> },
       { id: 'ideas', label: 'Ideas', href: '/story-ideas', icon: <IdeasIcon /> },

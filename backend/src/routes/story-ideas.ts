@@ -249,6 +249,40 @@ router.post('/create', async (req, res) => {
 });
 
 /**
+ * POST /api/story-ideas/expand-premise
+ * Use AI to expand a premise into character concepts, plot elements, and unique twists
+ */
+router.post('/expand-premise', async (req, res) => {
+  try {
+    const { premise, timePeriod } = req.body;
+
+    if (!premise || premise.trim().length < 10) {
+      return sendBadRequest(res, 'Premise must be at least 10 characters long');
+    }
+
+    logger.info({ premiseLength: premise.length, timePeriod }, 'Expanding premise with AI');
+
+    const expansion = await storyIdeasGenerator.expandPremise(premise.trim(), timePeriod);
+
+    logger.info(
+      {
+        charactersGenerated: expansion.characterConcepts.length,
+        plotElementsGenerated: expansion.plotElements.length,
+        twistsGenerated: expansion.uniqueTwists.length,
+      },
+      'Premise expanded successfully'
+    );
+
+    res.json({ success: true, expansion });
+  } catch (error) {
+    if (isRateLimitError(error)) {
+      return sendRateLimitError(res);
+    }
+    sendInternalError(res, error, 'expanding premise');
+  }
+});
+
+/**
  * GET /api/story-ideas/saved
  * Get all saved story ideas
  */

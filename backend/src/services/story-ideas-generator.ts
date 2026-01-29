@@ -154,6 +154,129 @@ export class StoryIdeasGenerator {
   }
 
   /**
+   * Expand a user-provided premise into character concepts, plot elements, and unique twists
+   */
+  async expandPremise(
+    premise: string,
+    timePeriod?: string
+  ): Promise<{
+    characterConcepts: string[];
+    plotElements: string[];
+    uniqueTwists: string[];
+  }> {
+    if (!this.anthropic) {
+      throw new Error('Claude API not configured. Set ANTHROPIC_API_KEY in .env file');
+    }
+
+    const prompt = this.buildExpandPremisePrompt(premise, timePeriod);
+
+    logger.info({ premiseLength: premise.length, timePeriod }, 'Expanding premise with AI');
+
+    try {
+      const message = await this.anthropic.messages.create({
+        model: this.model,
+        max_tokens: 1500,
+        temperature: 0.8,
+        messages: [{ role: 'user', content: prompt }],
+      });
+
+      const responseText =
+        message.content[0].type === 'text' ? message.content[0].text : '';
+
+      const expansion = this.parseExpandPremiseResponse(responseText);
+
+      logger.info(
+        {
+          charactersCount: expansion.characterConcepts.length,
+          plotCount: expansion.plotElements.length,
+          twistsCount: expansion.uniqueTwists.length,
+        },
+        'Successfully expanded premise'
+      );
+
+      return expansion;
+    } catch (error: any) {
+      logger.error({ error }, 'Premise expansion failed');
+      throw error;
+    }
+  }
+
+  /**
+   * Build the prompt for expanding a premise
+   */
+  private buildExpandPremisePrompt(premise: string, timePeriod?: string): string {
+    const timePeriodText = timePeriod ? `\n**Time Period:** ${timePeriod}` : '';
+
+    return `You are a master storyteller. Based on the following story premise, generate character concepts, plot elements, and unique twists that would bring this story to life.
+
+**Story Premise:**
+${premise}${timePeriodText}
+
+Generate story components that:
+- Are coherent with and enhance the given premise
+- Feel natural and organic to the story world
+- Add depth and intrigue without contradicting the premise
+- Use names and details appropriate to the story's setting and time period
+
+Provide:
+1. **characterConcepts**: 2-3 character concepts. Each should have a name, role, and one distinctive trait.
+2. **plotElements**: 2-3 key plot elements that drive the story forward.
+3. **uniqueTwists**: 2 unique twists or unexpected elements that make this story stand out.
+
+Return ONLY a JSON object in this exact format:
+{
+  "characterConcepts": [
+    "Name - Role, with distinctive trait or backstory element",
+    "Name - Role, with distinctive trait or backstory element"
+  ],
+  "plotElements": [
+    "A significant event or plot point that drives the narrative",
+    "Another key plot element"
+  ],
+  "uniqueTwists": [
+    "An unexpected element that subverts expectations",
+    "Another surprising twist"
+  ]
+}`;
+  }
+
+  /**
+   * Parse the response for premise expansion
+   */
+  private parseExpandPremiseResponse(responseText: string): {
+    characterConcepts: string[];
+    plotElements: string[];
+    uniqueTwists: string[];
+  } {
+    try {
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No JSON object found in response');
+      }
+
+      const parsed = JSON.parse(jsonMatch[0]);
+
+      return {
+        characterConcepts: Array.isArray(parsed.characterConcepts)
+          ? parsed.characterConcepts.filter((c: unknown) => typeof c === 'string' && c)
+          : [],
+        plotElements: Array.isArray(parsed.plotElements)
+          ? parsed.plotElements.filter((p: unknown) => typeof p === 'string' && p)
+          : [],
+        uniqueTwists: Array.isArray(parsed.uniqueTwists)
+          ? parsed.uniqueTwists.filter((t: unknown) => typeof t === 'string' && t)
+          : [],
+      };
+    } catch (error: any) {
+      logger.error(
+        { error: error.message, responseText: responseText.substring(0, 500) },
+        'Failed to parse premise expansion response'
+      );
+      throw new Error(`Failed to parse premise expansion: ${error.message}`);
+    }
+  }
+
+  /**
    * Build the prompt for generating story ideas
    */
   private buildGeneratePrompt(

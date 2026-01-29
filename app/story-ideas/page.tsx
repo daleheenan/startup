@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getToken } from '@/app/lib/auth';
@@ -26,6 +26,7 @@ import {
   useUpdateStoryIdea,
   useExpandStoryIdea,
   useCreateStoryIdea,
+  useExpandPremise,
 } from '@/app/hooks/useStoryIdeas';
 import type { SavedStoryIdea, IdeaExpansionMode } from '@/shared/types';
 
@@ -36,6 +37,7 @@ export default function StoryIdeasPage() {
   const updateIdeaMutation = useUpdateStoryIdea();
   const expandIdeaMutation = useExpandStoryIdea();
   const createIdeaMutation = useCreateStoryIdea();
+  const expandPremiseMutation = useExpandPremise();
 
   const [selectedIdeaId, setSelectedIdeaId] = useState<string | null>(null);
   const [isAddingIdea, setIsAddingIdea] = useState(false);
@@ -65,12 +67,38 @@ export default function StoryIdeasPage() {
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+  // Open add form if ?add=true is in URL on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('add') === 'true') {
+        setIsAddingIdea(true);
+        setAddIdeaForm({
+          premise: '',
+          timePeriod: '',
+          characterConcepts: [''],
+          plotElements: [''],
+          uniqueTwists: [''],
+          notes: '',
+        });
+        setAddIdeaError(null);
+        // Clear the query parameter from URL without navigation
+        window.history.replaceState({}, '', '/story-ideas');
+      }
+    }
+  }, []);
+
+  // Track which IDs we've already attempted to load (persists across renders without causing re-renders)
+  const attemptedLoadIdsRef = useRef<Set<string>>(new Set());
+
   // Load existing originality results from API for the selected idea
+  // IMPORTANT: This function must be stable to prevent infinite loops
   const loadExistingOriginalityResult = useCallback(async (ideaId: string) => {
-    // Skip if already loaded or currently loading
-    if (originalityResults[ideaId] || loadingOriginalityIds.has(ideaId)) {
+    // Skip if already attempted to prevent duplicate/infinite requests
+    if (attemptedLoadIdsRef.current.has(ideaId)) {
       return;
     }
+    attemptedLoadIdsRef.current.add(ideaId);
 
     setLoadingOriginalityIds(prev => new Set(prev).add(ideaId));
 
@@ -98,7 +126,7 @@ export default function StoryIdeasPage() {
         return next;
       });
     }
-  }, [originalityResults, loadingOriginalityIds, API_BASE_URL]);
+  }, [API_BASE_URL]); // Only depend on API_BASE_URL which doesn't change
 
   // Load originality result when selected idea changes
   useEffect(() => {
@@ -305,6 +333,38 @@ export default function StoryIdeasPage() {
     } catch (err: any) {
       console.error('Error creating idea:', err);
       setAddIdeaError(err.message || 'Failed to create story idea');
+    }
+  };
+
+  const handleAIPopulate = async () => {
+    setAddIdeaError(null);
+
+    if (!addIdeaForm.premise.trim() || addIdeaForm.premise.trim().length < 10) {
+      setAddIdeaError('Please enter a premise of at least 10 characters before using AI Populate');
+      return;
+    }
+
+    try {
+      const result = await expandPremiseMutation.mutateAsync({
+        premise: addIdeaForm.premise.trim(),
+        timePeriod: addIdeaForm.timePeriod.trim() || undefined,
+      });
+
+      // Update the form with AI-generated content
+      setAddIdeaForm(prev => ({
+        ...prev,
+        characterConcepts:
+          result.expansion.characterConcepts.length > 0
+            ? result.expansion.characterConcepts
+            : [''],
+        plotElements:
+          result.expansion.plotElements.length > 0 ? result.expansion.plotElements : [''],
+        uniqueTwists:
+          result.expansion.uniqueTwists.length > 0 ? result.expansion.uniqueTwists : [''],
+      }));
+    } catch (err: any) {
+      console.error('Error expanding premise:', err);
+      setAddIdeaError(err.message || 'Failed to expand premise with AI');
     }
   };
 

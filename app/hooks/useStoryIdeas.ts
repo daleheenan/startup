@@ -51,8 +51,10 @@ async function createStoryIdea(params: CreateStoryIdeaParams): Promise<CreateSto
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Failed to create story idea' }));
-    throw new Error(error.message || 'Failed to create story idea');
+    const errorData = await response.json().catch(() => ({}));
+    // Backend sends errors as { error: { code, message } }
+    const message = errorData.error?.message || errorData.message || 'Failed to create story idea';
+    throw new Error(message);
   }
 
   return response.json();
@@ -262,5 +264,50 @@ export function useCreateStoryIdea() {
       // Invalidate navigation counts
       queryClient.invalidateQueries({ queryKey: ['navigation-counts'] });
     },
+  });
+}
+
+/**
+ * Response from expanding a premise with AI
+ */
+export interface ExpandPremiseResponse {
+  success: boolean;
+  expansion: {
+    characterConcepts: string[];
+    plotElements: string[];
+    uniqueTwists: string[];
+  };
+}
+
+/**
+ * Expand a premise using AI to generate character concepts, plot elements, and unique twists
+ */
+async function expandPremise(
+  premise: string,
+  timePeriod?: string
+): Promise<ExpandPremiseResponse> {
+  const response = await fetchWithAuth('/api/story-ideas/expand-premise', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ premise, timePeriod }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message =
+      errorData.error?.message || errorData.message || 'Failed to expand premise';
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
+/**
+ * Hook to expand a premise using AI
+ */
+export function useExpandPremise() {
+  return useMutation({
+    mutationFn: ({ premise, timePeriod }: { premise: string; timePeriod?: string }) =>
+      expandPremise(premise, timePeriod),
   });
 }
