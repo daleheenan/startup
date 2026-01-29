@@ -398,12 +398,12 @@ export default function Sidebar({ collapsed: collapsedProp, onCollapseToggle }: 
       }
     }
 
-    // Only auto-expand the active group if no groups are currently expanded
-    // This allows manual toggling to work without interference
-    if (activeGroupId && state.expandedGroups.size === 0) {
+    // Auto-expand the active group to ensure the active item is visible
+    // This provides better UX by showing where the user currently is
+    if (activeGroupId) {
       dispatch({ type: 'EXPAND_NAV_GROUP', payload: activeGroupId });
     }
-  }, [pathname, dispatch, dynamicNavigationGroups, state.expandedGroups.size]);
+  }, [pathname, dispatch, dynamicNavigationGroups]);
 
   // ---- Toggle handlers ----
 
