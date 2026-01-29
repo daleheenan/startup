@@ -13,4 +13,6 @@ export { useProjectProgress } from './useProjectProgress';
 export { useProjects, useProject, useInvalidateProjects } from './useProjects';
 export { useStoryIdeas, useCreateStoryIdea } from './useStoryIdeas';
 export type { CreateStoryIdeaParams, CreateStoryIdeaResponse } from './useStoryIdeas';
+export { useUserPreferences, useUpdateUserPreferences } from './useUserPreferences';
+export type { UserPreferences } from './useUserPreferences';
 export { useWorkflowPrerequisites } from './useWorkflowPrerequisites';

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useCallback, useState, useMemo, type CSSProperties } from 'react';
+import { useEffect, useCallback, useMemo, type CSSProperties } from 'react';
 import { usePathname } from 'next/navigation';
 
 import { useDashboardContext } from '../DashboardContext';
@@ -8,7 +8,7 @@ import SidebarLogo from './SidebarLogo';
 import SidebarSearch from './SidebarSearch';
 import SidebarNavGroup from './SidebarNavGroup';
 import SidebarUserProfile from './SidebarUserProfile';
-import { getToken } from '@/app/lib/auth';
+import { useUserPreferences } from '@/app/hooks/useUserPreferences';
 
 import {
   colors,
@@ -17,8 +17,6 @@ import {
   transitions,
   zIndex,
 } from '@/app/lib/design-tokens';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 // ==================== PROPS ====================
 
@@ -313,42 +311,13 @@ function deriveActiveItemId(pathname: string): string | null {
 export default function Sidebar({ collapsed: collapsedProp, onCollapseToggle }: SidebarProps) {
   const { state, dispatch } = useDashboardContext();
   const pathname = usePathname();
-  const [showAICosts, setShowAICosts] = useState(false);
 
   // Prefer the explicit prop; fall back to context-driven state.
   const collapsed = collapsedProp ?? state.sidebarCollapsed;
 
-  // Fetch user preferences to determine if AI Costs should be shown
-  useEffect(() => {
-    const fetchPreferences = async () => {
-      try {
-        const token = getToken();
-        if (!token) return;
-
-        const res = await fetch(`${API_BASE_URL}/api/user-settings/preferences`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setShowAICosts(data.preferences?.showAICostsMenu || false);
-        }
-      } catch (error) {
-        console.error('Error fetching user preferences:', error);
-      }
-    };
-
-    fetchPreferences();
-
-    // Listen for preference updates from settings page
-    const handlePreferencesUpdated = () => {
-      fetchPreferences();
-    };
-    window.addEventListener('preferencesUpdated', handlePreferencesUpdated);
-
-    return () => {
-      window.removeEventListener('preferencesUpdated', handlePreferencesUpdated);
-    };
-  }, []);
+  // Fetch user preferences using the cached hook
+  const { data: preferences } = useUserPreferences();
+  const showAICosts = preferences?.showAICostsMenu || false;
 
   // Build dynamic navigation groups based on preferences
   // Use useMemo to prevent recreation on every render

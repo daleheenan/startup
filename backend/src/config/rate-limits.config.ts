@@ -12,7 +12,7 @@ export const RateLimitConfig = {
   API: {
     /** Window size for API rate limiting (1 minute) */
     WINDOW_MS: 1 * 60 * 1000,
-    /** Maximum API requests per window */
-    MAX_REQUESTS: 100,
+    /** Maximum API requests per window (increased from 100 to handle SPA with multiple concurrent requests) */
+    MAX_REQUESTS: 300,
   },
 } as const;
