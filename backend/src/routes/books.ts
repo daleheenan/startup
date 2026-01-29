@@ -341,6 +341,33 @@ router.get('/:id/versions/active', async (req, res) => {
 });
 
 /**
+ * PUT /api/books/:id/versions/:versionId
+ * Update version details (name, notes)
+ */
+router.put('/:id/versions/:versionId', async (req, res) => {
+  try {
+    const { name, notes } = req.body;
+    const version = await bookVersioningService.updateVersion(
+      req.params.id,
+      req.params.versionId,
+      { name, notes }
+    );
+    res.json(version);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error({ error: errorMessage, bookId: req.params.id, versionId: req.params.versionId }, 'Error updating version');
+
+    if (errorMessage.includes('not found')) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: errorMessage },
+      });
+    }
+
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: errorMessage } });
+  }
+});
+
+/**
  * PUT /api/books/:id/versions/:versionId/activate
  * Switch to a different version (make it active)
  */

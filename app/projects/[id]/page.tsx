@@ -486,7 +486,7 @@ export default function ProjectDetailPage() {
   // Fetch job stats on mount and periodically
   useEffect(() => {
     fetchJobStats();
-    const interval = setInterval(fetchJobStats, 10000); // Every 10 seconds
+    const interval = setInterval(fetchJobStats, 30000); // Every 30 seconds
     return () => clearInterval(interval);
   }, [fetchJobStats]);
 

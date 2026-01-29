@@ -117,7 +117,7 @@ export default function ProgressPage() {
   useEffect(() => {
     if (projectId) {
       fetchProgressAndChapters();
-      const interval = setInterval(fetchProgressAndChapters, 5000);
+      const interval = setInterval(fetchProgressAndChapters, 15000);
       return () => clearInterval(interval);
     }
   }, [projectId]);

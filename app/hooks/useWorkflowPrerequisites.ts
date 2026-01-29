@@ -32,6 +32,7 @@ export type WorkflowStep =
   | 'outline'
   | 'outline-review'  // Sprint 39: Optional editorial review of outline before chapters
   | 'chapters'
+  | 'versions'  // Book version management
   | 'analytics'
   | 'editorial-report'
   | 'word-count-revision'  // AI-assisted word count reduction
@@ -299,6 +300,7 @@ const STEP_NAMES: Record<WorkflowStep, string> = {
   outline: 'Outline',
   'outline-review': 'Outline Review',
   chapters: 'Chapters',
+  versions: 'Version History',
   analytics: 'Analytics',
   'editorial-report': 'Editorial Report',
   'word-count-revision': 'Word Count Revision',
@@ -384,6 +386,12 @@ export function useWorkflowPrerequisites(
         isComplete: false,
         isRequired: true,
         requiresPrevious: 'outline',  // Chapters require outline (not outline-review, since it's optional)
+        missingItems: [],
+      },
+      versions: {
+        isComplete: false,
+        isRequired: false, // Version history is optional
+        requiresPrevious: 'chapters',
         missingItems: [],
       },
       analytics: {
@@ -472,6 +480,10 @@ export function useWorkflowPrerequisites(
     // Check chapters completion (at least one chapter exists)
     checks.chapters.missingItems = getMissingItemsForStep('chapters', project, outline, chapters);
     checks.chapters.isComplete = (chapters?.length ?? 0) > 0;
+
+    // Check versions completion (always accessible if chapters page is accessible)
+    checks.versions.missingItems = [];
+    checks.versions.isComplete = checks.chapters.isComplete;
 
     // Check analytics completion (at least one chapter has content)
     checks.analytics.missingItems = getMissingItemsForStep('analytics', project, outline, chapters);

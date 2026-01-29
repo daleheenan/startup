@@ -22,6 +22,7 @@ export interface BookVersion {
   book_id: string;
   version_number: number;
   version_name: string | null;
+  notes: string | null;
   plot_snapshot: string | null;  // JSON string
   outline_snapshot: string | null;  // JSON string
   is_active: number;
@@ -185,6 +186,56 @@ export class BookVersioningService {
 
     // Fallback to active version if no version has chapters
     return this.getActiveVersion(bookId);
+  }
+
+  /**
+   * Update version details (name, notes)
+   */
+  async updateVersion(
+    bookId: string,
+    versionId: string,
+    updates: { name?: string; notes?: string }
+  ): Promise<BookVersion> {
+    logger.info({ updates }, `Updating version ${versionId} for book ${bookId}`);
+
+    // Verify the version belongs to this book
+    const version = db.prepare(`
+      SELECT * FROM book_versions WHERE id = ? AND book_id = ?
+    `).get(versionId, bookId) as BookVersion | undefined;
+
+    if (!version) {
+      throw new Error(`Version ${versionId} not found for book ${bookId}`);
+    }
+
+    const setClauses: string[] = [];
+    const params: (string | null)[] = [];
+
+    if (updates.name !== undefined) {
+      setClauses.push('version_name = ?');
+      params.push(updates.name || null);
+    }
+
+    if (updates.notes !== undefined) {
+      setClauses.push('notes = ?');
+      params.push(updates.notes || null);
+    }
+
+    if (setClauses.length === 0) {
+      return version;
+    }
+
+    params.push(versionId);
+
+    db.prepare(`
+      UPDATE book_versions SET ${setClauses.join(', ')} WHERE id = ?
+    `).run(...params);
+
+    const updatedVersion = db.prepare(`
+      SELECT * FROM book_versions WHERE id = ?
+    `).get(versionId) as BookVersion;
+
+    logger.info(`Updated version ${versionId}`);
+    return updatedVersion;
   }
 
   /**

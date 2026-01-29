@@ -484,7 +484,7 @@ export default function EditorialReportPage() {
   useEffect(() => {
     // Poll for status updates while processing
     if (status?.status === 'processing') {
-      const interval = setInterval(fetchVEBStatus, 5000);
+      const interval = setInterval(fetchVEBStatus, 15000);
       return () => clearInterval(interval);
     }
   }, [status?.status]);

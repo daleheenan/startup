@@ -80,6 +80,7 @@ export type WorkflowStep =
   | 'outline'
   | 'outline-review'
   | 'chapters'
+  | 'versions'
   | 'analytics'
   | 'editorial-report'
   | 'word-count-revision'
@@ -196,6 +197,13 @@ export const PROJECT_NAV_GROUPS: NavGroup[] = [
         route: '/progress',
         icon: '📚',
         workflowStep: 'chapters',
+      },
+      {
+        id: 'versions',
+        label: 'Versions',
+        route: '/versions',
+        icon: '📑',
+        workflowStep: 'versions',
       },
       {
         id: 'analytics',

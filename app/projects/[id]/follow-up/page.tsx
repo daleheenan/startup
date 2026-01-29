@@ -280,7 +280,7 @@ export default function FollowUpPage() {
         console.error('Error polling for recommendations:', error);
         // Don't set error on polling failure - it will retry
       }
-    }, 3000); // Poll every 3 seconds
+    }, 10000); // Poll every 10 seconds
 
     // Stop polling after 5 minutes maximum
     setTimeout(() => {

@@ -291,7 +291,7 @@ export default function OutlinePage() {
         } catch (e) {
           // Ignore polling errors - main request will handle failures
         }
-      }, 3000);
+      }, 10000);
 
       setGenerationStep('Sending request to AI service...');
 
