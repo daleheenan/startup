@@ -110,6 +110,7 @@ export default function ProgressPage() {
   const [titleValue, setTitleValue] = useState('');
   const [authorValue, setAuthorValue] = useState('');
   const [saving, setSaving] = useState(false);
+  const [activeVersion, setActiveVersion] = useState<{ id: string; version_name: string | null; version_number: number } | null>(null);
 
   // IMPORTANT: All hooks must be called before any early returns
   const navigation = useProjectNavigation(projectId, project);
@@ -214,6 +215,19 @@ export default function ProgressPage() {
               ...book,
               chapters: chaptersData.chapters || [],
             });
+          }
+
+          // Fetch active version for the first book
+          if (booksWithChapters.length === 1) {
+            try {
+              const versionRes = await fetch(`${API_BASE_URL}/api/books/${book.id}/versions/active`, { headers });
+              if (versionRes.ok) {
+                const versionData = await versionRes.json();
+                setActiveVersion(versionData);
+              }
+            } catch {
+              // Ignore version fetch errors
+            }
           }
         }
         setBooks(booksWithChapters);
@@ -508,6 +522,38 @@ export default function ProgressPage() {
       />
 
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+        {/* Active Version Indicator */}
+        {activeVersion && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0.75rem 1rem',
+            background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%)',
+            borderRadius: '8px',
+            marginBottom: '1rem',
+            border: '1px solid rgba(102, 126, 234, 0.2)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '1rem' }}>📑</span>
+              <span style={{ fontSize: '0.875rem', color: '#64748B' }}>Active Version:</span>
+              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1A1A2E' }}>
+                {activeVersion.version_name || `Version ${activeVersion.version_number}`}
+              </span>
+            </div>
+            <Link
+              href={`/projects/${projectId}/versions`}
+              style={{
+                fontSize: '0.8125rem',
+                color: '#667eea',
+                textDecoration: 'none',
+                fontWeight: 500,
+              }}
+            >
+              Manage Versions
+            </Link>
+          </div>
+        )}
             {/* No Generation Started State */}
             {generationStatus === 'none' && (
               <div style={{

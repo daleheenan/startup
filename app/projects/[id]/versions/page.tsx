@@ -18,6 +18,7 @@ interface BookVersion {
   book_id: string;
   version_number: number;
   version_name: string | null;
+  notes: string | null;
   is_active: number;
   word_count: number;
   chapter_count: number;
@@ -59,6 +60,12 @@ export default function VersionHistoryPage() {
   const [error, setError] = useState<string | null>(null);
   const [rateLimitError, setRateLimitError] = useState<{ message: string; retryAfter: number } | null>(null);
   const [rateLimitCountdown, setRateLimitCountdown] = useState(0);
+
+  // Edit state for version name and notes
+  const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const navigation = useProjectNavigation(projectId, project, null, []);
 
@@ -152,6 +159,7 @@ export default function VersionHistoryPage() {
 
   const handleBookChange = async (bookId: string) => {
     setSelectedBookId(bookId);
+    setEditingVersionId(null); // Close any open edit form
     await fetchVersionsForBook(bookId);
   };
 
@@ -291,6 +299,56 @@ export default function VersionHistoryPage() {
       alert(err.message);
     } finally {
       setIsMigrating(false);
+    }
+  };
+
+  // Start editing a version
+  const handleStartEdit = (version: BookVersion) => {
+    setEditingVersionId(version.id);
+    setEditName(version.version_name || `Version ${version.version_number}`);
+    setEditNotes(version.notes || '');
+  };
+
+  // Cancel editing
+  const handleCancelEdit = () => {
+    setEditingVersionId(null);
+    setEditName('');
+    setEditNotes('');
+  };
+
+  // Save version updates
+  const handleSaveVersion = async (versionId: string) => {
+    if (!selectedBookId || isSaving) return;
+
+    setIsSaving(true);
+    try {
+      const token = getToken();
+      const response = await fetch(
+        `${API_BASE_URL}/api/books/${selectedBookId}/versions/${versionId}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: editName.trim() || null,
+            notes: editNotes.trim() || null,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error?.message || 'Failed to update version');
+      }
+
+      await fetchVersionsForBook(selectedBookId);
+      setEditingVersionId(null);
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -492,6 +550,7 @@ export default function VersionHistoryPage() {
             const isActive = version.is_active === 1;
             const chapterCount = version.actual_chapter_count || version.chapter_count;
             const wordCount = version.actual_word_count || version.word_count;
+            const isEditing = editingVersionId === version.id;
 
             return (
               <div
@@ -503,159 +562,289 @@ export default function VersionHistoryPage() {
                   background: isActive ? colors.brandLight : colors.surface,
                 }}
               >
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  marginBottom: '1rem',
-                }}>
+                {isEditing ? (
+                  // Edit Mode
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <h3 style={{
-                        fontSize: '1.125rem',
+                    <div style={{ marginBottom: '1rem' }}>
+                      <label style={{
+                        fontSize: '0.75rem',
                         fontWeight: 600,
-                        color: colors.text,
-                        margin: 0,
+                        color: colors.textSecondary,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        display: 'block',
+                        marginBottom: '0.375rem',
                       }}>
-                        {version.version_name || `Version ${version.version_number}`}
-                      </h3>
-                      {isActive && (
-                        <span style={{
-                          padding: '0.125rem 0.5rem',
-                          background: colors.success,
-                          borderRadius: borderRadius.sm,
+                        Version Name
+                      </label>
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        placeholder="e.g., Original Draft, Darker Ending, Editor Feedback v2"
+                        style={{
+                          width: '100%',
+                          padding: '0.625rem 0.75rem',
+                          border: `1px solid ${colors.border}`,
+                          borderRadius: borderRadius.md,
+                          fontSize: '0.9375rem',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                    </div>
+                    <div style={{ marginBottom: '1rem' }}>
+                      <label style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        color: colors.textSecondary,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        display: 'block',
+                        marginBottom: '0.375rem',
+                      }}>
+                        Notes
+                      </label>
+                      <textarea
+                        value={editNotes}
+                        onChange={(e) => setEditNotes(e.target.value)}
+                        placeholder="Add notes about this version... (e.g., what changes were made, why it was created)"
+                        rows={3}
+                        style={{
+                          width: '100%',
+                          padding: '0.625rem 0.75rem',
+                          border: `1px solid ${colors.border}`,
+                          borderRadius: borderRadius.md,
+                          fontSize: '0.875rem',
+                          resize: 'vertical',
+                          fontFamily: 'inherit',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        onClick={() => handleSaveVersion(version.id)}
+                        disabled={isSaving}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                          border: 'none',
+                          borderRadius: borderRadius.md,
                           color: '#FFFFFF',
-                          fontSize: '0.6875rem',
+                          fontSize: '0.8125rem',
                           fontWeight: 600,
-                          textTransform: 'uppercase',
+                          cursor: isSaving ? 'not-allowed' : 'pointer',
+                          opacity: isSaving ? 0.7 : 1,
+                        }}
+                      >
+                        {isSaving ? 'Saving...' : 'Save Changes'}
+                      </button>
+                      <button
+                        onClick={handleCancelEdit}
+                        disabled={isSaving}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          background: colors.surface,
+                          border: `1px solid ${colors.border}`,
+                          borderRadius: borderRadius.md,
+                          color: colors.textSecondary,
+                          fontSize: '0.8125rem',
+                          fontWeight: 500,
+                          cursor: isSaving ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  // View Mode
+                  <>
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      marginBottom: '1rem',
+                    }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                          <h3 style={{
+                            fontSize: '1.125rem',
+                            fontWeight: 600,
+                            color: colors.text,
+                            margin: 0,
+                          }}>
+                            {version.version_name || `Version ${version.version_number}`}
+                          </h3>
+                          {isActive && (
+                            <span style={{
+                              padding: '0.125rem 0.5rem',
+                              background: colors.success,
+                              borderRadius: borderRadius.sm,
+                              color: '#FFFFFF',
+                              fontSize: '0.6875rem',
+                              fontWeight: 600,
+                              textTransform: 'uppercase',
+                            }}>
+                              Active
+                            </span>
+                          )}
+                        </div>
+                        <p style={{
+                          fontSize: '0.8125rem',
+                          color: colors.textSecondary,
+                          margin: '0.25rem 0 0 0',
                         }}>
-                          Active
-                        </span>
+                          Created {formatDate(version.created_at)}
+                        </p>
+                        {/* Display notes if present */}
+                        {version.notes && (
+                          <p style={{
+                            fontSize: '0.875rem',
+                            color: colors.text,
+                            margin: '0.75rem 0 0 0',
+                            padding: '0.75rem',
+                            background: isActive ? colors.surface : colors.background,
+                            borderRadius: borderRadius.sm,
+                            borderLeft: `3px solid ${colors.brandBorder}`,
+                            whiteSpace: 'pre-wrap',
+                          }}>
+                            {version.notes}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Actions */}
+                      <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+                        <button
+                          onClick={() => handleStartEdit(version)}
+                          style={{
+                            padding: '0.5rem 0.875rem',
+                            background: colors.surface,
+                            border: `1px solid ${colors.border}`,
+                            borderRadius: borderRadius.md,
+                            color: colors.textSecondary,
+                            fontSize: '0.8125rem',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Edit
+                        </button>
+                        {!isActive && (
+                          <button
+                            onClick={() => handleActivateVersion(version.id)}
+                            disabled={isActivating === version.id}
+                            style={{
+                              padding: '0.5rem 0.875rem',
+                              background: colors.surface,
+                              border: `1px solid ${colors.brandBorder}`,
+                              borderRadius: borderRadius.md,
+                              color: colors.brandText,
+                              fontSize: '0.8125rem',
+                              fontWeight: 500,
+                              cursor: isActivating === version.id ? 'not-allowed' : 'pointer',
+                              opacity: isActivating === version.id ? 0.7 : 1,
+                            }}
+                          >
+                            {isActivating === version.id ? 'Activating...' : 'Make Active'}
+                          </button>
+                        )}
+                        {!isActive && versions.length > 1 && (
+                          <button
+                            onClick={() => handleDeleteVersion(
+                              version.id,
+                              version.version_name || `Version ${version.version_number}`
+                            )}
+                            disabled={isDeleting === version.id}
+                            style={{
+                              padding: '0.5rem 0.875rem',
+                              background: colors.surface,
+                              border: `1px solid ${colors.errorBorder}`,
+                              borderRadius: borderRadius.md,
+                              color: colors.error,
+                              fontSize: '0.8125rem',
+                              fontWeight: 500,
+                              cursor: isDeleting === version.id ? 'not-allowed' : 'pointer',
+                              opacity: isDeleting === version.id ? 0.7 : 1,
+                            }}
+                          >
+                            {isDeleting === version.id ? 'Deleting...' : 'Delete'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Stats */}
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                      gap: '1rem',
+                    }}>
+                      <div style={{
+                        padding: '0.75rem',
+                        background: isActive ? colors.surface : colors.background,
+                        borderRadius: borderRadius.md,
+                        textAlign: 'center',
+                      }}>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: colors.text }}>
+                          {chapterCount}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: colors.textSecondary }}>
+                          Chapters
+                        </div>
+                      </div>
+                      <div style={{
+                        padding: '0.75rem',
+                        background: isActive ? colors.surface : colors.background,
+                        borderRadius: borderRadius.md,
+                        textAlign: 'center',
+                      }}>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: colors.text }}>
+                          {(wordCount / 1000).toFixed(1)}k
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: colors.textSecondary }}>
+                          Words
+                        </div>
+                      </div>
+                      {version.completed_at && (
+                        <div style={{
+                          padding: '0.75rem',
+                          background: isActive ? colors.surface : colors.background,
+                          borderRadius: borderRadius.md,
+                          textAlign: 'center',
+                        }}>
+                          <div style={{ fontSize: '0.875rem', fontWeight: 600, color: colors.success }}>
+                            Complete
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: colors.textSecondary }}>
+                            {formatDate(version.completed_at).split(',')[0]}
+                          </div>
+                        </div>
                       )}
                     </div>
-                    <p style={{
-                      fontSize: '0.8125rem',
-                      color: colors.textSecondary,
-                      margin: '0.25rem 0 0 0',
-                    }}>
-                      Created {formatDate(version.created_at)}
-                    </p>
-                  </div>
 
-                  {/* Actions */}
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    {!isActive && (
-                      <button
-                        onClick={() => handleActivateVersion(version.id)}
-                        disabled={isActivating === version.id}
-                        style={{
-                          padding: '0.5rem 0.875rem',
-                          background: colors.surface,
-                          border: `1px solid ${colors.brandBorder}`,
-                          borderRadius: borderRadius.md,
-                          color: colors.brandText,
-                          fontSize: '0.8125rem',
-                          fontWeight: 500,
-                          cursor: isActivating === version.id ? 'not-allowed' : 'pointer',
-                          opacity: isActivating === version.id ? 0.7 : 1,
-                        }}
-                      >
-                        {isActivating === version.id ? 'Activating...' : 'Make Active'}
-                      </button>
-                    )}
-                    {!isActive && versions.length > 1 && (
-                      <button
-                        onClick={() => handleDeleteVersion(
-                          version.id,
-                          version.version_name || `Version ${version.version_number}`
-                        )}
-                        disabled={isDeleting === version.id}
-                        style={{
-                          padding: '0.5rem 0.875rem',
-                          background: colors.surface,
-                          border: `1px solid ${colors.errorBorder}`,
-                          borderRadius: borderRadius.md,
-                          color: colors.error,
-                          fontSize: '0.8125rem',
-                          fontWeight: 500,
-                          cursor: isDeleting === version.id ? 'not-allowed' : 'pointer',
-                          opacity: isDeleting === version.id ? 0.7 : 1,
-                        }}
-                      >
-                        {isDeleting === version.id ? 'Deleting...' : 'Delete'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Stats */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-                  gap: '1rem',
-                }}>
-                  <div style={{
-                    padding: '0.75rem',
-                    background: isActive ? colors.surface : colors.background,
-                    borderRadius: borderRadius.md,
-                    textAlign: 'center',
-                  }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: colors.text }}>
-                      {chapterCount}
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: colors.textSecondary }}>
-                      Chapters
-                    </div>
-                  </div>
-                  <div style={{
-                    padding: '0.75rem',
-                    background: isActive ? colors.surface : colors.background,
-                    borderRadius: borderRadius.md,
-                    textAlign: 'center',
-                  }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: colors.text }}>
-                      {(wordCount / 1000).toFixed(1)}k
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: colors.textSecondary }}>
-                      Words
-                    </div>
-                  </div>
-                  {version.completed_at && (
-                    <div style={{
-                      padding: '0.75rem',
-                      background: isActive ? colors.surface : colors.background,
-                      borderRadius: borderRadius.md,
-                      textAlign: 'center',
-                    }}>
-                      <div style={{ fontSize: '0.875rem', fontWeight: 600, color: colors.success }}>
-                        Complete
+                    {/* View Chapters Link */}
+                    {isActive && chapterCount > 0 && (
+                      <div style={{ marginTop: '1rem' }}>
+                        <Link
+                          href={`/projects/${projectId}/read`}
+                          style={{
+                            display: 'inline-block',
+                            padding: '0.5rem 1rem',
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            borderRadius: borderRadius.md,
+                            color: '#FFFFFF',
+                            textDecoration: 'none',
+                            fontSize: '0.8125rem',
+                            fontWeight: 500,
+                          }}
+                        >
+                          Read This Version
+                        </Link>
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: colors.textSecondary }}>
-                        {formatDate(version.completed_at).split(',')[0]}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* View Chapters Link */}
-                {isActive && chapterCount > 0 && (
-                  <div style={{ marginTop: '1rem' }}>
-                    <Link
-                      href={`/projects/${projectId}/read`}
-                      style={{
-                        display: 'inline-block',
-                        padding: '0.5rem 1rem',
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        borderRadius: borderRadius.md,
-                        color: '#FFFFFF',
-                        textDecoration: 'none',
-                        fontSize: '0.8125rem',
-                        fontWeight: 500,
-                      }}
-                    >
-                      Read This Version
-                    </Link>
-                  </div>
+                    )}
+                  </>
                 )}
               </div>
             );
