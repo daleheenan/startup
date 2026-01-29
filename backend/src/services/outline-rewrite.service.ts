@@ -280,6 +280,11 @@ export class OutlineRewriteService {
         UPDATE projects SET plot_structure = ?, updated_at = datetime('now') WHERE id = ?
       `).run(JSON.stringify(plotResult.rewrittenPlot), projectId);
 
+      // Update the new version's plot_snapshot with the rewritten data
+      db.prepare(`
+        UPDATE book_versions SET plot_snapshot = ? WHERE id = ?
+      `).run(JSON.stringify(plotResult.rewrittenPlot), newVersionId);
+
       // Update outline structure
       db.prepare(`
         UPDATE outlines SET structure = ?, updated_at = datetime('now') WHERE id = ?

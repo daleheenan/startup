@@ -187,9 +187,11 @@ export default function PlotStructurePage() {
 
       // Fetch project data for plot structure
       const projectRes = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, { headers });
+      let projectPlotStructure: any = null; // Store for comparison with version snapshot
       if (projectRes.ok) {
         const projectData = await projectRes.json();
         setProject(projectData);
+        projectPlotStructure = projectData.plot_structure; // Capture for later comparison
         if (projectData.plot_structure) {
           // Ensure plot_layers is always an array to prevent undefined errors
           // Mark layers with deletable/editable flags based on whether they're key layers
@@ -253,7 +255,13 @@ export default function PlotStructurePage() {
               setActiveVersionId(active.id);
               setSelectedVersionId(active.id);
 
-              // If active version has a plot_snapshot, use it instead of project-level plot_structure
+              // Helper function to count total plot points in a structure
+              const countTotalPoints = (layers: PlotLayer[]): number => {
+                return (layers || []).reduce((sum, layer) => sum + (layer.points?.length || 0), 0);
+              };
+
+              // If active version has a plot_snapshot, compare it with project-level data
+              // Use whichever has more plot points (to handle stale snapshots)
               if (active.plot_snapshot) {
                 try {
                   const snapshotData = typeof active.plot_snapshot === 'string'
@@ -261,32 +269,43 @@ export default function PlotStructurePage() {
                     : active.plot_snapshot;
 
                   if (snapshotData && snapshotData.plot_layers) {
-                    const plotLayers = (snapshotData.plot_layers || []).map((layer: PlotLayer) => {
-                      const isKey = isKeyPlotLayer(layer.id);
-                      return {
-                        ...layer,
-                        points: layer.points || [], // Ensure points array exists
-                        deletable: layer.deletable !== undefined ? layer.deletable : !isKey,
-                        editable: layer.editable !== undefined ? layer.editable : true,
+                    const snapshotPointCount = countTotalPoints(snapshotData.plot_layers);
+                    const projectPointCount = countTotalPoints(projectPlotStructure?.plot_layers || []);
+
+                    // Use project-level data if it has more points (snapshot may be stale)
+                    // Also use project data if snapshot has layers but no points while project does
+                    if (projectPointCount > snapshotPointCount) {
+                      console.log(`Using project-level plot data (${projectPointCount} points) over stale snapshot (${snapshotPointCount} points)`);
+                      // Keep the project-level structure that was already set above
+                    } else {
+                      // Use the snapshot data
+                      const plotLayers = (snapshotData.plot_layers || []).map((layer: PlotLayer) => {
+                        const isKey = isKeyPlotLayer(layer.id);
+                        return {
+                          ...layer,
+                          points: layer.points || [], // Ensure points array exists
+                          deletable: layer.deletable !== undefined ? layer.deletable : !isKey,
+                          editable: layer.editable !== undefined ? layer.editable : true,
+                        };
+                      });
+
+                      const safeStructure = {
+                        ...snapshotData,
+                        plot_layers: plotLayers,
+                        act_structure: snapshotData.act_structure || {
+                          act_one_end: 5,
+                          act_two_midpoint: 12,
+                          act_two_end: 20,
+                          act_three_climax: 23,
+                        },
                       };
-                    });
+                      setStructure(safeStructure);
 
-                    const safeStructure = {
-                      ...snapshotData,
-                      plot_layers: plotLayers,
-                      act_structure: snapshotData.act_structure || {
-                        act_one_end: 5,
-                        act_two_midpoint: 12,
-                        act_two_end: 20,
-                        act_three_climax: 23,
-                      },
-                    };
-                    setStructure(safeStructure);
-                    setIsViewingSnapshot(false); // Active version is current, not a snapshot
-
-                    if (safeStructure.plot_layers.length === 0) {
-                      setIsWizardMode(true);
+                      if (safeStructure.plot_layers.length === 0) {
+                        setIsWizardMode(true);
+                      }
                     }
+                    setIsViewingSnapshot(false); // Active version is current, not a snapshot
                   }
                 } catch (parseError) {
                   console.warn('Failed to parse plot_snapshot, using project-level plot_structure');

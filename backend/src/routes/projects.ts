@@ -33,6 +33,35 @@ function safeJsonParse(jsonString: string | null | undefined, fallback: any = nu
 }
 
 /**
+ * Helper: Sync plot structure to active versions of all books in a project
+ * This ensures version snapshots stay in sync with project-level plot data
+ */
+function syncPlotStructureToActiveVersions(projectId: string, plotStructure: any): void {
+  try {
+    const booksStmt = db.prepare<[string], { id: string }>(`
+      SELECT id FROM books WHERE project_id = ?
+    `);
+    const books = booksStmt.all(projectId);
+
+    for (const book of books) {
+      const updateVersionStmt = db.prepare(`
+        UPDATE book_versions
+        SET plot_snapshot = ?
+        WHERE book_id = ? AND is_active = 1
+      `);
+      const result = updateVersionStmt.run(JSON.stringify(plotStructure), book.id);
+
+      if (result.changes > 0) {
+        logger.debug({ bookId: book.id }, 'Synced plot_snapshot to active version');
+      }
+    }
+  } catch (error: any) {
+    // Log but don't fail - version sync is secondary
+    logger.warn({ error: error.message, projectId }, 'Failed to sync plot_snapshot to active versions');
+  }
+}
+
+/**
  * GET /api/projects
  * List all projects with progress statistics
  */
@@ -1531,6 +1560,8 @@ function propagateCharacterNameChange(
           UPDATE projects SET plot_structure = ?, updated_at = ? WHERE id = ?
         `);
         updatePlotStmt.run(JSON.stringify(plotStructure), new Date().toISOString(), projectId);
+        // Sync to active versions
+        syncPlotStructureToActiveVersions(projectId, plotStructure);
         stats.updatedPlotStructure = true;
       }
     }
@@ -1879,6 +1910,8 @@ function globalSearchReplace(
     if (plot && replaceInObject(plot, 'plot_structure')) {
       const updateStmt = db.prepare(`UPDATE projects SET plot_structure = ?, updated_at = ? WHERE id = ?`);
       updateStmt.run(JSON.stringify(plot), new Date().toISOString(), projectId);
+      // Sync to active versions
+      syncPlotStructureToActiveVersions(projectId, plot);
       projectUpdated = true;
     }
   }
@@ -2121,6 +2154,8 @@ function propagateWorldNameChange(
           UPDATE projects SET plot_structure = ?, updated_at = ? WHERE id = ?
         `);
         updatePlotStmt.run(JSON.stringify(plotStructure), new Date().toISOString(), projectId);
+        // Sync to active versions
+        syncPlotStructureToActiveVersions(projectId, plotStructure);
         stats.updatedPlotStructure = true;
       }
     }
@@ -3223,31 +3258,8 @@ router.put('/:id/plot-structure', (req, res) => {
       }
     }
 
-    // Also update the plot_snapshot for the active version of all books in this project
-    // This ensures version-specific plot data stays in sync with project-level plot
-    try {
-      const booksStmt = db.prepare<[string], { id: string }>(`
-        SELECT id FROM books WHERE project_id = ?
-      `);
-      const books = booksStmt.all(projectId);
-
-      for (const book of books) {
-        // Update the active version's plot_snapshot
-        const updateVersionStmt = db.prepare(`
-          UPDATE book_versions
-          SET plot_snapshot = ?
-          WHERE book_id = ? AND is_active = 1
-        `);
-        const result = updateVersionStmt.run(JSON.stringify(plot_structure), book.id);
-
-        if (result.changes > 0) {
-          logger.debug({ bookId: book.id }, 'Updated active version plot_snapshot');
-        }
-      }
-    } catch (versionError: any) {
-      // Log but don't fail the request - version sync is secondary
-      logger.warn({ error: versionError.message }, 'Failed to sync plot_snapshot to active versions');
-    }
+    // Sync plot structure to active versions
+    syncPlotStructureToActiveVersions(projectId, plot_structure);
 
     res.json({ success: true, plot_structure });
   } catch (error: any) {
@@ -4135,6 +4147,9 @@ Extract 3-6 plot threads total. Focus on the most important narrative arcs.`;
       `);
       updateStmt.run(JSON.stringify(plotStructure), new Date().toISOString(), projectId);
 
+      // Sync to active versions to prevent stale snapshots
+      syncPlotStructureToActiveVersions(projectId, plotStructure);
+
       logger.info({ projectId, extractedCount: plots.length, addedCount: newPlots.length }, 'Plots extracted from concept');
     } else {
       logger.info({ projectId, extractedCount: plots.length }, 'Plots extracted but all already exist');
@@ -4460,6 +4475,9 @@ Output ONLY valid JSON, no additional commentary:`;
       UPDATE projects SET plot_structure = ?, updated_at = ? WHERE id = ?
     `);
     updateStmt.run(JSON.stringify(updatedPlotStructure), new Date().toISOString(), projectId);
+
+    // Sync to active versions to prevent stale snapshots
+    syncPlotStructureToActiveVersions(projectId, updatedPlotStructure);
 
     // Trigger a new coherence check to validate the changes
     const existingJob = db.prepare<[string], { id: string }>(`
