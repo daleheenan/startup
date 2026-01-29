@@ -4464,10 +4464,37 @@ Output ONLY valid JSON, no additional commentary:`;
       });
     }
 
+    // Create a map of existing layers by ID to preserve their points
+    const existingLayersMap = new Map<string, any>();
+    for (const layer of plotStructure.plot_layers) {
+      existingLayersMap.set(layer.id, layer);
+    }
+
+    // Merge revised layers with existing ones, preserving points and other fields
+    const mergedPlotLayers = revisedPlots.plot_layers.map((revisedLayer: any) => {
+      const existingLayer = existingLayersMap.get(revisedLayer.id);
+      if (existingLayer) {
+        // Merge: use revised name/type/description, but preserve points and other existing fields
+        return {
+          ...existingLayer,
+          name: revisedLayer.name,
+          type: revisedLayer.type,
+          description: revisedLayer.description,
+          // Preserve existing points, status, color, etc.
+        };
+      }
+      // New layer from AI (shouldn't happen, but handle it)
+      return {
+        ...revisedLayer,
+        points: [],
+        status: 'active',
+      };
+    });
+
     // Merge with existing structure (preserve act_structure)
     const updatedPlotStructure = {
       ...plotStructure,
-      plot_layers: revisedPlots.plot_layers,
+      plot_layers: mergedPlotLayers,
     };
 
     // Update the project
@@ -4648,10 +4675,36 @@ Return ONLY valid JSON, no markdown formatting.`;
       throw new Error('Invalid fix response: missing fixed_plot_layers array');
     }
 
+    // Create a map of existing layers by ID to preserve their points
+    const existingLayersMap = new Map<string, any>();
+    for (const layer of plotStructure.plot_layers) {
+      existingLayersMap.set(layer.id, layer);
+    }
+
+    // Merge fixed layers with existing ones, preserving points and other fields
+    const mergedPlotLayers = fixResult.fixed_plot_layers.map((fixedLayer: any) => {
+      const existingLayer = existingLayersMap.get(fixedLayer.id);
+      if (existingLayer) {
+        // Merge: use fixed name/type/description, but preserve points, status, color, etc.
+        return {
+          ...existingLayer,
+          name: fixedLayer.name,
+          type: fixedLayer.type,
+          description: fixedLayer.description,
+        };
+      }
+      // New layer from AI (shouldn't happen, but handle it)
+      return {
+        ...fixedLayer,
+        points: [],
+        status: 'active',
+      };
+    });
+
     // Update the plot structure
     const updatedPlotStructure = {
       ...plotStructure,
-      plot_layers: fixResult.fixed_plot_layers,
+      plot_layers: mergedPlotLayers,
     };
 
     const updateStmt = db.prepare(`
@@ -4660,6 +4713,9 @@ Return ONLY valid JSON, no markdown formatting.`;
       WHERE id = ?
     `);
     updateStmt.run(JSON.stringify(updatedPlotStructure), new Date().toISOString(), projectId);
+
+    // Sync to active versions to prevent stale snapshots
+    syncPlotStructureToActiveVersions(projectId, updatedPlotStructure);
 
     // Trigger a new coherence check to validate the fix
     const existingJob = db.prepare<[string], { id: string }>(`

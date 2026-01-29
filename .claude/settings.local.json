@@ -73,7 +73,9 @@
       "Bash(do curl -s -w \"Request $i: %{time_total}s\\\\n\" -o /dev/null \"https://novelforge-backend-production.up.railway.app/api/health\")",
       "Bash(python3:*)",
       "Bash(git fetch:*)",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: Handle proseStyle object display in edit-story page\n\nThe proseStyle field from story_dna can be either a string or an object\nwith detailed properties \\(sentenceStructure, vocabularyLevel, etc.\\).\nWhen it''s an object, convert it to a readable string format instead of\ndisplaying \"[object Object]\".\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: Handle proseStyle object display in edit-story page\n\nThe proseStyle field from story_dna can be either a string or an object\nwith detailed properties \\(sentenceStructure, vocabularyLevel, etc.\\).\nWhen it''s an object, convert it to a readable string format instead of\ndisplaying \"[object Object]\".\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(wc:*)",
+      "Bash(railway:*)"
     ]
   }
 }
