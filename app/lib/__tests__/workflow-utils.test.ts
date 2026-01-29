@@ -17,18 +17,21 @@ import type { Project, Outline, Chapter, WorkflowStep } from '../../../shared/ty
 const createMockProject = (overrides?: Partial<Project>): Project => {
   const base: Project = {
     id: 'test-project-1',
-    user_id: 'user-1',
     title: 'Test Novel',
-    description: 'A test novel',
-    project_type: 'standalone',
-    target_word_count: 80000,
+    type: 'standalone',
+    genre: 'Fantasy',
     status: 'setup',
     story_dna: null,
     story_bible: null,
+    series_bible: null,
     plot_structure: null,
+    book_count: 1,
+    universe_id: null,
+    is_universe_root: false,
+    time_period_type: null,
+    specific_year: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-    deleted_at: null,
   };
 
   // Apply overrides
@@ -46,9 +49,14 @@ const createMockProject = (overrides?: Partial<Project>): Project => {
 
 const createMockOutline = (overrides?: Partial<Outline>): Outline => ({
   id: 'outline-1',
-  project_id: 'test-project-1',
+  book_id: 'book-1',
+  structure_type: 'three_act',
+  structure: {
+    type: 'three_act',
+    acts: [],
+  },
   total_chapters: 25,
-  chapter_outlines: [],
+  target_word_count: 80000,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
   ...overrides,
@@ -56,13 +64,15 @@ const createMockOutline = (overrides?: Partial<Outline>): Outline => ({
 
 const createMockChapter = (overrides?: Partial<Chapter>): Chapter => ({
   id: 'chapter-1',
-  project_id: 'test-project-1',
+  book_id: 'book-1',
   chapter_number: 1,
   title: 'Chapter 1',
+  scene_cards: [],
   content: 'Chapter content',
-  word_count: 3000,
+  summary: null,
   status: 'completed',
-  notes: null,
+  word_count: 3000,
+  flags: [],
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
   ...overrides,

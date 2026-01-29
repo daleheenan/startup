@@ -13,7 +13,7 @@ function ThrowError({ shouldThrow }: { shouldThrow: boolean }) {
 }
 
 // Component with stack trace
-function ComponentWithStack() {
+function ComponentWithStack(): React.ReactElement {
   const error = new Error('Stack trace test');
   throw error;
 }
@@ -196,7 +196,7 @@ describe('ErrorBoundary', () => {
   });
 
   it('should handle errors with no message', () => {
-    function ThrowEmptyError() {
+    function ThrowEmptyError(): React.ReactElement {
       throw new Error('');
     }
 
