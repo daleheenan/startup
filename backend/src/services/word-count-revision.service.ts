@@ -35,6 +35,9 @@ const logger = createLogger('services:word-count-revision');
 export class WordCountRevisionService {
   /**
    * Start a new revision session for a book
+   *
+   * This automatically creates a new version (e.g., Version 2) for the rewrite target.
+   * The previous version with chapters becomes the source reference.
    */
   async startRevision(
     bookId: string,
@@ -53,11 +56,48 @@ export class WordCountRevisionService {
     // Get editorial report ID if available
     const reportId = this.getLatestEditorialReportId(bookId);
 
-    // Get the source version for the revision - this should be the version with actual chapters
-    // IMPORTANT: When a new version is created for rewrite (and is now active but empty),
-    // we need to use the previous version with chapters as the source
+    // Get the source version - this is the version with actual chapters to rewrite from
     const sourceVersion = await bookVersioningService.getSourceVersionForRewrite(bookId);
     const sourceVersionId = sourceVersion?.id || null;
+
+    // IMPORTANT: Create a new version for the rewrite BEFORE starting
+    // This ensures:
+    // 1. The source version (with chapters) is preserved
+    // 2. The new version (empty) becomes active for the rewrite
+    // 3. Word count display shows source version's word count correctly
+    let targetVersionId: string | null = null;
+
+    // Check if we need to create a new version
+    const versions = await bookVersioningService.getVersions(bookId);
+    const activeVersion = versions.find(v => v.is_active === 1);
+
+    // Only create a new version if:
+    // 1. There are no versions yet (legacy book), or
+    // 2. The active version has chapters (meaning we need a fresh version for rewrite)
+    const needsNewVersion = versions.length === 0 ||
+      (activeVersion && activeVersion.actual_chapter_count > 0);
+
+    if (needsNewVersion) {
+      logger.info({ bookId, sourceVersionId, currentVersionCount: versions.length },
+        'Creating new version for rewrite target');
+
+      const newVersion = await bookVersioningService.createVersion(bookId, {
+        name: `Rewrite ${new Date().toLocaleDateString('en-GB')}`,
+        autoCreated: true,
+      });
+      targetVersionId = newVersion.id;
+
+      logger.info({
+        bookId,
+        sourceVersionId,
+        targetVersionId,
+        newVersionNumber: newVersion.version_number
+      }, 'Created new version for rewrite');
+    } else if (activeVersion) {
+      // Active version exists and has no chapters - use it as target
+      targetVersionId = activeVersion.id;
+      logger.info({ bookId, targetVersionId }, 'Using existing empty version as rewrite target');
+    }
 
     // Get current book word count and chapter count from the source version
     const bookStats = this.getBookStats(bookId, sourceVersionId);
@@ -72,12 +112,12 @@ export class WordCountRevisionService {
 
     const insertStmt = db.prepare(`
       INSERT INTO word_count_revisions (
-        id, book_id, editorial_report_id, source_version_id,
+        id, book_id, editorial_report_id, source_version_id, target_version_id,
         current_word_count, target_word_count, tolerance_percent,
         min_acceptable, max_acceptable, words_to_cut,
         status, chapters_reviewed, chapters_total, words_cut_so_far,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     insertStmt.run(
@@ -85,6 +125,7 @@ export class WordCountRevisionService {
       bookId,
       reportId,
       sourceVersionId,
+      targetVersionId,
       bookStats.totalWordCount,
       targetWordCount,
       tolerancePercent,
@@ -99,7 +140,7 @@ export class WordCountRevisionService {
       now
     );
 
-    logger.info({ revisionId, wordsToCut, sourceVersionId }, 'Created revision session');
+    logger.info({ revisionId, wordsToCut, sourceVersionId, targetVersionId }, 'Created revision session');
 
     // Calculate chapter targets and create proposals
     await this.calculateChapterTargets(revisionId);
@@ -522,34 +563,45 @@ Return ONLY valid JSON with the condensed chapter and explanation:`;
     const revision = this.getRevisionInternal(proposal.revision_id);
     const now = new Date().toISOString();
 
-    // Check if we need to create a new version for this revision session
+    // Get target version - should already exist from startRevision
     let targetVersionId = revision.target_version_id;
 
     if (!targetVersionId) {
-      // First approval in this revision - create a new version
-      logger.info({ revisionId: revision.id, bookId: revision.book_id }, 'Creating new version for editorial rewrite');
+      // Fallback: create version if it doesn't exist (shouldn't happen normally)
+      logger.warn({ revisionId: revision.id, bookId: revision.book_id },
+        'Target version not found - creating new version (this should have been done at revision start)');
 
-      // Create the new version
       const newVersion = await bookVersioningService.createVersion(revision.book_id, {
         name: `Editorial Revision ${new Date().toLocaleDateString('en-GB')}`,
         autoCreated: true,
       });
       targetVersionId = newVersion.id;
 
-      // Update the revision with the target version
       db.prepare(`
         UPDATE word_count_revisions SET target_version_id = ?, updated_at = ? WHERE id = ?
       `).run(targetVersionId, now, revision.id);
+    }
 
-      // Copy all chapters from source version to the new version
+    // Check if chapters have been copied to target version yet
+    const targetChapterCount = db.prepare<[string], { count: number }>(`
+      SELECT COUNT(*) as count FROM chapters WHERE version_id = ?
+    `).get(targetVersionId);
+
+    if (!targetChapterCount || targetChapterCount.count === 0) {
+      // First approval - copy all chapters from source version to target version
+      logger.info({
+        revisionId: revision.id,
+        sourceVersionId: revision.source_version_id,
+        targetVersionId,
+      }, 'Copying chapters from source to target version for first approval');
+
       await this.copyChaptersToNewVersion(revision.book_id, revision.source_version_id, targetVersionId);
 
       logger.info({
         revisionId: revision.id,
         sourceVersionId: revision.source_version_id,
         targetVersionId,
-        versionNumber: newVersion.version_number,
-      }, 'Created new version and copied chapters for editorial rewrite');
+      }, 'Copied chapters for editorial rewrite');
     }
 
     // Find the chapter in the target version that corresponds to the original chapter
