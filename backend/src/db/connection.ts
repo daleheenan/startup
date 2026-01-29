@@ -31,6 +31,14 @@ db.pragma('foreign_keys = ON');
 db.pragma('journal_mode = WAL');
 db.pragma('synchronous = NORMAL');
 
+// CRITICAL: Set busy timeout to prevent 503 errors during concurrent access
+// When database is locked (migrations, background jobs), wait up to 30 seconds
+// instead of failing immediately. This prevents intermittent 503 errors.
+db.pragma('busy_timeout = 30000');
+
+// Increase cache size for better read performance (negative = KB, so -64000 = 64MB)
+db.pragma('cache_size = -64000');
+
 logger.info({ path: DATABASE_PATH }, 'Database connected');
 
 export default db;
