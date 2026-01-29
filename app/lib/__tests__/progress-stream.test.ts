@@ -31,7 +31,7 @@ describe('useProgressStream', () => {
       close: ReturnType<typeof vi.fn>;
 
       constructor(url: string) {
-        eventSourceSpy(url);
+        (eventSourceSpy as (...args: unknown[]) => void)(url);
         constructorCalls.push(url);
         this.url = url;
         this.close = mockClose;

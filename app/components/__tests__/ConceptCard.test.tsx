@@ -381,7 +381,7 @@ describe('ConceptCard', () => {
       />
     );
 
-    expect(screen.getByText(/Line 1.*Line 2.*Line 3/s)).toBeInTheDocument();
+    expect(screen.getByText(/Line 1[\s\S]*Line 2[\s\S]*Line 3/)).toBeInTheDocument();
   });
 
   it('should stop propagation when save button is clicked', async () => {

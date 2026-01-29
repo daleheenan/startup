@@ -119,8 +119,8 @@ describe('useWorkflowPrerequisites', () => {
       const project = createMockProject({
         title: 'My Novel',
         story_dna: { genre: 'Fantasy' },
-        story_bible: { characters: [{ name: 'Hero', role: 'protagonist' }], world: [{ name: 'Kingdom' }] },
-        plot_structure: { plot_layers: [] }, // No plots
+        story_bible: { characters: [createMockCharacter({ name: 'Hero', role: 'protagonist' })], world: [{ name: 'Kingdom' }] },
+        plot_structure: createMockPlotStructure({ plot_layers: [] }), // No plots
       });
       const { result } = renderHook(() =>
         useWorkflowPrerequisites('project-1', project)
@@ -196,7 +196,7 @@ describe('useWorkflowPrerequisites', () => {
   describe('characters step completion', () => {
     it('should be complete with at least one character', () => {
       const project = createMockProject({
-        story_bible: { characters: [{ name: 'Hero', role: 'protagonist' }] },
+        story_bible: { characters: [createMockCharacter({ name: 'Hero', role: 'protagonist' })] },
       });
       const { result } = renderHook(() =>
         useWorkflowPrerequisites('project-1', project)
@@ -258,7 +258,9 @@ describe('useWorkflowPrerequisites', () => {
   describe('plots step completion', () => {
     it('should be complete with plot layers', () => {
       const project = createMockProject({
-        plot_structure: { plot_layers: [{ type: 'main', name: 'Main Plot' }] },
+        plot_structure: createMockPlotStructure({
+          plot_layers: [createMockPlotLayer({ type: 'main', name: 'Main Plot' })],
+        }),
       });
       const { result } = renderHook(() =>
         useWorkflowPrerequisites('project-1', project)
@@ -269,7 +271,7 @@ describe('useWorkflowPrerequisites', () => {
 
     it('should be incomplete without plot layers', () => {
       const project = createMockProject({
-        plot_structure: { plot_layers: [] },
+        plot_structure: createMockPlotStructure({ plot_layers: [] }),
       });
       const { result } = renderHook(() =>
         useWorkflowPrerequisites('project-1', project)
@@ -295,7 +297,23 @@ describe('useWorkflowPrerequisites', () => {
       const project = createMockProject();
       const outline: OutlineData = {
         structure: {
-          acts: [{ chapters: [{ title: 'Chapter 1' }] }],
+          type: 'three_act',
+          acts: [{
+            number: 1,
+            name: 'Act One',
+            description: 'Setup',
+            beats: [],
+            targetWordCount: 20000,
+            chapters: [{
+              number: 1,
+              title: 'Chapter 1',
+              summary: 'The beginning',
+              actNumber: 1,
+              povCharacter: 'Hero',
+              wordCountTarget: 3000,
+              scenes: [],
+            }],
+          }],
         },
       };
 
@@ -491,7 +509,7 @@ describe('useWorkflowPrerequisites', () => {
       const project = createMockProject({
         title: 'My Novel',
         story_dna: { genre: 'Fantasy' },
-        story_bible: { characters: [{ name: 'Hero' }], world: [] },
+        story_bible: { characters: [createMockCharacter({ name: 'Hero' })], world: [] },
       });
 
       const { result } = renderHook(() =>
@@ -536,6 +554,63 @@ describe('useWorkflowPrerequisites', () => {
   });
 });
 
+// Helper to create a mock character with all required fields
+function createMockCharacter(overrides: Partial<{
+  id: string;
+  name: string;
+  role: string;
+  personalityTraits: string[];
+  voiceSample: string;
+  goals: string[];
+  conflicts: string[];
+  relationships: { characterId: string; type: string; description: string }[];
+}> = {}) {
+  return {
+    id: overrides.id ?? `char-${Math.random().toString(36).slice(2, 9)}`,
+    name: overrides.name ?? 'Test Character',
+    role: overrides.role ?? 'protagonist',
+    personalityTraits: overrides.personalityTraits ?? ['Brave', 'Kind'],
+    voiceSample: overrides.voiceSample ?? 'Sample dialogue here',
+    goals: overrides.goals ?? ['Save the world'],
+    conflicts: overrides.conflicts ?? ['Internal doubt'],
+    relationships: overrides.relationships ?? [],
+  };
+}
+
+// Helper to create a mock plot layer with all required fields
+function createMockPlotLayer(overrides: Partial<{
+  id: string;
+  name: string;
+  description: string;
+  type: 'main' | 'subplot' | 'mystery' | 'romance' | 'character-arc';
+  color: string;
+  points: any[];
+  status: 'active' | 'resolved' | 'abandoned';
+}> = {}): any {
+  return {
+    id: overrides.id ?? `plot-${Math.random().toString(36).slice(2, 9)}`,
+    name: overrides.name ?? 'Main Plot',
+    description: overrides.description ?? 'The main plot of the story',
+    type: overrides.type ?? 'main',
+    color: overrides.color ?? '#FF5733',
+    points: overrides.points ?? [],
+    status: overrides.status ?? 'active',
+  };
+}
+
+// Helper to create a mock plot structure with all required fields
+function createMockPlotStructure(overrides: Partial<{
+  plot_layers: any[];
+  act_structure: { act_one_end: number; act_two_midpoint: number; act_two_end: number; act_three_climax: number };
+  pacing_notes: string;
+}> = {}): any {
+  return {
+    plot_layers: overrides.plot_layers ?? [createMockPlotLayer()],
+    act_structure: overrides.act_structure ?? { act_one_end: 5, act_two_midpoint: 12, act_two_end: 20, act_three_climax: 25 },
+    pacing_notes: overrides.pacing_notes ?? 'Standard pacing',
+  };
+}
+
 // Helper to create mock project with defaults
 function createMockProject(
   overrides: Partial<WorkflowProjectData> = {}
@@ -546,12 +621,12 @@ function createMockProject(
     genre: 'Fantasy',
     story_dna: { genre: 'Fantasy' },
     story_bible: {
-      characters: [{ name: 'Hero', role: 'protagonist' }],
+      characters: [createMockCharacter({ name: 'Hero', role: 'protagonist' })],
       world: [{ name: 'Kingdom' }],
     },
-    plot_structure: {
-      plot_layers: [{ type: 'main', name: 'Main Plot' }],
-    },
+    plot_structure: createMockPlotStructure({
+      plot_layers: [createMockPlotLayer({ type: 'main', name: 'Main Plot' })],
+    }),
     ...overrides,
   };
 }
@@ -566,19 +641,19 @@ function createCompleteProject(): WorkflowProjectData {
     story_concept: { logline: 'A complete story', synopsis: 'Full synopsis' },
     story_bible: {
       characters: [
-        { name: 'Hero', role: 'protagonist' },
-        { name: 'Villain', role: 'antagonist' },
+        createMockCharacter({ name: 'Hero', role: 'protagonist' }),
+        createMockCharacter({ name: 'Villain', role: 'antagonist' }),
       ],
       world: [
         { name: 'Kingdom' },
         { name: 'Castle' },
       ],
     },
-    plot_structure: {
+    plot_structure: createMockPlotStructure({
       plot_layers: [
-        { type: 'main', name: 'Main Plot' },
-        { type: 'subplot', name: 'Romance' },
+        createMockPlotLayer({ type: 'main', name: 'Main Plot' }),
+        createMockPlotLayer({ type: 'subplot', name: 'Romance' }),
       ],
-    },
+    }),
   };
 }

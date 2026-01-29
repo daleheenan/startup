@@ -302,32 +302,50 @@ export interface TestCharacter {
 
 /**
  * Factory for creating test story idea data
+ * Matches SavedStoryIdea from shared/types
  */
 export const storyIdeaFactory = {
   create: (overrides: Partial<TestStoryIdea> = {}): TestStoryIdea => ({
     id: `idea-${Math.random().toString(36).slice(2, 9)}`,
-    title: 'Test Story Idea',
+    story_idea: 'Test Story Idea',
+    character_concepts: ['Character 1', 'Character 2'],
+    plot_elements: ['Plot element 1'],
+    unique_twists: ['Twist 1'],
     genre: 'Fantasy',
-    premise: 'A test premise for a story',
+    subgenre: null,
+    tone: 'Epic',
+    themes: ['Adventure', 'Friendship'],
+    notes: null,
     status: 'saved',
-    createdAt: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
     ...overrides,
   }),
 
   createSaved: (): TestStoryIdea =>
     storyIdeaFactory.create({ status: 'saved' }),
 
-  createExpanded: (): TestStoryIdea =>
-    storyIdeaFactory.create({ status: 'expanded' }),
+  createUsed: (): TestStoryIdea =>
+    storyIdeaFactory.create({ status: 'used' }),
+
+  createArchived: (): TestStoryIdea =>
+    storyIdeaFactory.create({ status: 'archived' }),
 };
 
 export interface TestStoryIdea {
   id: string;
-  title: string;
+  story_idea: string;
+  character_concepts: string[];
+  plot_elements: string[];
+  unique_twists: string[];
   genre: string;
-  premise: string;
-  status: string;
-  createdAt: string;
+  subgenre: string | null;
+  tone: string | null;
+  themes: string[];
+  notes: string | null;
+  status: 'saved' | 'used' | 'archived';
+  created_at: string;
+  updated_at: string;
 }
 
 /**

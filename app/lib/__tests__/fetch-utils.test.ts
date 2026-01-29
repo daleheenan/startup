@@ -146,7 +146,7 @@ describe('fetch-utils', () => {
       expect(window.location.href).toBe('/login');
 
       // Restore window.location
-      window.location = originalLocation;
+      (window as any).location = originalLocation;
     });
 
     it('should handle AbortError from timeout', async () => {

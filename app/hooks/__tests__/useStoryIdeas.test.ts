@@ -42,8 +42,8 @@ describe('useStoryIdeas hooks', () => {
   describe('useStoryIdeas()', () => {
     it('should fetch all story ideas', async () => {
       const mockIdeas = [
-        storyIdeaFactory.create({ id: '1', title: 'Idea 1' }),
-        storyIdeaFactory.create({ id: '2', title: 'Idea 2' }),
+        storyIdeaFactory.create({ id: '1', story_idea: 'Idea 1' }),
+        storyIdeaFactory.create({ id: '2', story_idea: 'Idea 2' }),
       ];
 
       mockFetchWithAuth.mockResolvedValueOnce({
@@ -60,7 +60,7 @@ describe('useStoryIdeas hooks', () => {
       });
 
       expect(result.current.data).toHaveLength(2);
-      expect(result.current.data?.[0].title).toBe('Idea 1');
+      expect(result.current.data?.[0].story_idea).toBe('Idea 1');
     });
 
     it('should return empty array when no ideas exist', async () => {
@@ -112,7 +112,7 @@ describe('useStoryIdeas hooks', () => {
 
   describe('useStoryIdea()', () => {
     it('should fetch single story idea by ID', async () => {
-      const mockIdea = storyIdeaFactory.create({ id: 'idea-123', title: 'Test Idea' });
+      const mockIdea = storyIdeaFactory.create({ id: 'idea-123', story_idea: 'Test Idea' });
 
       mockFetchWithAuth.mockResolvedValueOnce({
         ok: true,
@@ -126,7 +126,7 @@ describe('useStoryIdeas hooks', () => {
       });
 
       expect(result.current.data?.id).toBe('idea-123');
-      expect(result.current.data?.title).toBe('Test Idea');
+      expect(result.current.data?.story_idea).toBe('Test Idea');
     });
 
     it('should not fetch when ID is null', async () => {
@@ -153,7 +153,7 @@ describe('useStoryIdeas hooks', () => {
 
   describe('useUpdateStoryIdea()', () => {
     it('should update a story idea', async () => {
-      const updatedIdea = storyIdeaFactory.create({ id: 'idea-1', title: 'Updated Title' });
+      const updatedIdea = storyIdeaFactory.create({ id: 'idea-1', story_idea: 'Updated Story Idea' });
 
       mockFetchWithAuth.mockResolvedValueOnce({
         ok: true,
@@ -164,7 +164,7 @@ describe('useStoryIdeas hooks', () => {
       const { result } = renderHookWithProviders(() => useUpdateStoryIdea(), { queryClient });
 
       await act(async () => {
-        result.current.mutate({ id: 'idea-1', updates: { title: 'Updated Title' } });
+        result.current.mutate({ id: 'idea-1', updates: { story_idea: 'Updated Story Idea' } });
       });
 
       await waitFor(() => {
@@ -175,7 +175,7 @@ describe('useStoryIdeas hooks', () => {
         '/api/story-ideas/saved/idea-1',
         expect.objectContaining({
           method: 'PUT',
-          body: JSON.stringify({ title: 'Updated Title' }),
+          body: JSON.stringify({ story_idea: 'Updated Story Idea' }),
         })
       );
     });
@@ -194,7 +194,7 @@ describe('useStoryIdeas hooks', () => {
       const { result } = renderHookWithProviders(() => useUpdateStoryIdea(), { queryClient });
 
       await act(async () => {
-        result.current.mutate({ id: 'idea-1', updates: { title: 'New' } });
+        result.current.mutate({ id: 'idea-1', updates: { story_idea: 'New' } });
       });
 
       await waitFor(() => {
@@ -214,7 +214,7 @@ describe('useStoryIdeas hooks', () => {
       const { result } = renderHookWithProviders(() => useUpdateStoryIdea());
 
       await act(async () => {
-        result.current.mutate({ id: 'idea-1', updates: { title: '' } });
+        result.current.mutate({ id: 'idea-1', updates: { story_idea: '' } });
       });
 
       await waitFor(() => {
