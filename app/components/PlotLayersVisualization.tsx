@@ -319,6 +319,7 @@ export default function PlotLayersVisualization({
             width: 'calc(100% - 2.5rem)',
             height: 'calc(100% - 2rem)',
           }}
+          viewBox="0 0 100 100"
           preserveAspectRatio="none"
         >
           {plotLayers.map(layer => {
@@ -330,7 +331,7 @@ export default function PlotLayersVisualization({
             }));
 
             const pathD = points.map((p, i) =>
-              `${i === 0 ? 'M' : 'L'} ${p.x}% ${p.y}%`
+              `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`
             ).join(' ');
 
             return (
@@ -343,6 +344,7 @@ export default function PlotLayersVisualization({
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 style={{ opacity: layer.status === 'resolved' ? 0.5 : 1 }}
+                vectorEffect="non-scaling-stroke"
               />
             );
           })}

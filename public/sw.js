@@ -113,8 +113,10 @@ self.addEventListener('fetch', (event) => {
           url.pathname.endsWith('.svg') ||
           url.pathname.endsWith('.woff2')
         )) {
+          // Clone BEFORE using the response
+          const responseToCache = response.clone();
           caches.open(STATIC_CACHE).then((cache) => {
-            cache.put(event.request, response.clone());
+            cache.put(event.request, responseToCache);
           });
         }
         return response;

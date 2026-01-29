@@ -48,7 +48,32 @@
       "WebFetch(domain:railway.com)",
       "Bash(railway link --help:*)",
       "Bash(railway link:*)",
-      "Bash(railway redeploy:*)"
+      "Bash(railway redeploy:*)",
+      "Bash(grep:*)",
+      "Bash(ls:*)",
+      "Bash(npx tsc:*)",
+      "Bash(railway whoami:*)",
+      "Skill(deploy-workflow)",
+      "Skill(deploy-workflow:*)",
+      "Bash(for i in {1..5})",
+      "Bash(do curl -s -w \"%{time_total}\\\\n\" -o /dev/null https://novelforge-backend-production.up.railway.app/api/health)",
+      "Bash(done)",
+      "Bash(git diff:*)",
+      "Bash(railway service list:*)",
+      "Bash(railway environment:*)",
+      "Bash(cat:*)",
+      "Bash(railway up)",
+      "WebFetch(domain:novelforge.daleheenan.com)",
+      "Bash(find:*)",
+      "Bash(vercel:*)",
+      "Bash(npx vercel:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: Use active version for chapter queries across all services\n\nAdd version-aware chapter queries to ensure only the active version''s\nchapters are used for word counts, analytics, progress tracking, and\nall other operations. This prevents incorrect data when multiple\nversions exist \\(e.g., during rewrites\\).\n\n- analytics.ts: Filter book analysis by active version\n- chapters.ts: Create chapters with version_id, auto-create Version 1\n- completion.ts: Await async checkBookCompletion calls\n- outlines.ts: Delete chapters from active version only\n- projects.ts: Filter chapter count by active version\n- trilogy.ts: Await async generateSeriesBible call\n- chapter-orchestrator.service.ts: Filter stats by active version\n- completion-detection.service.ts: Check completion for active version\n- cross-book-continuity.service.ts: Get last chapter from active version\n- progress-tracking.service.ts: Calculate progress from active version\n- series-bible-generator.service.ts: Aggregate timeline from active version\n- veb.service.ts: Filter all chapter queries by active version\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(dir /s /b)",
+      "Bash(tree:*)",
+      "Bash(do curl -s -w \"Request $i: %{time_total}s\\\\n\" -o /dev/null \"https://novelforge-backend-production.up.railway.app/api/health\")",
+      "Bash(python3:*)",
+      "Bash(git fetch:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: Handle proseStyle object display in edit-story page\n\nThe proseStyle field from story_dna can be either a string or an object\nwith detailed properties \\(sentenceStructure, vocabularyLevel, etc.\\).\nWhen it''s an object, convert it to a readable string format instead of\ndisplaying \"[object Object]\".\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }
