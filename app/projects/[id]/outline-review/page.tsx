@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getToken, logout } from '@/app/lib/auth';
+import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
 import ProjectNavigation from '@/app/components/shared/ProjectNavigation';
 import EditorialWorkflowVisualization from '@/app/components/EditorialWorkflowVisualization';
 import { useProjectNavigation } from '@/app/hooks';
@@ -1156,6 +1157,23 @@ function RecommendationsSection({ reportId, recommendations, projectId, onRewrit
   );
 }
 
+// Plot layer interface for stats
+interface PlotPoint {
+  id: string;
+  chapter_number: number;
+  description: string;
+  phase: string;
+  impact_level: number;
+}
+
+interface PlotLayer {
+  id: string;
+  name: string;
+  description: string;
+  type: 'main' | 'subplot' | 'mystery' | 'romance' | 'character-arc';
+  points?: PlotPoint[];
+}
+
 export default function OutlineReviewPage() {
   const params = useParams();
   const router = useRouter();
@@ -1169,6 +1187,8 @@ export default function OutlineReviewPage() {
   const [showSubmitSuccess, setShowSubmitSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [project, setProject] = useState<any>(null);
+  const [plotLayers, setPlotLayers] = useState<PlotLayer[]>([]);
+  const [outline, setOutline] = useState<any>(null);
 
   const navigation = useProjectNavigation(projectId, project);
 
@@ -1176,8 +1196,46 @@ export default function OutlineReviewPage() {
     if (projectId) {
       fetchProject();
       fetchStatus();
+      fetchPlotStructure();
+      fetchOutline();
     }
   }, [projectId]);
+
+  const fetchPlotStructure = async () => {
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/plot-structure`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setPlotLayers(data.plot_layers || []);
+      }
+    } catch (error) {
+      console.error('Error fetching plot structure:', error);
+    }
+  };
+
+  const fetchOutline = async () => {
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/outlines/project/${projectId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setOutline(data);
+      }
+    } catch (error) {
+      console.error('Error fetching outline:', error);
+    }
+  };
 
   useEffect(() => {
     // Poll for status updates while processing
@@ -1380,8 +1438,166 @@ export default function OutlineReviewPage() {
   const renderOverview = () => {
     if (!report) return null;
 
+    // Calculate outline stats
+    const outlineStats = outline ? {
+      acts: outline.acts?.length || 0,
+      chapters: outline.acts?.reduce((sum: number, act: any) => sum + (act.chapters?.length || 0), 0) || 0,
+      scenes: outline.acts?.reduce((sum: number, act: any) =>
+        sum + (act.chapters?.reduce((cSum: number, ch: any) => cSum + (ch.scenes?.length || 0), 0) || 0), 0) || 0,
+    } : { acts: 0, chapters: 0, scenes: 0 };
+
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        {/* Plot & Outline Stats Summary */}
+        {(plotLayers.length > 0 || outlineStats.chapters > 0) && (
+          <div style={{
+            background: '#F8FAFC',
+            borderRadius: '8px',
+            padding: '1.25rem',
+            border: '1px solid #E2E8F0',
+          }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#1A1A2E', marginBottom: '1rem', margin: '0 0 1rem 0' }}>
+              📊 Story Structure Summary
+            </h3>
+            <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
+              {/* Main Plots */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{
+                  width: '32px',
+                  height: '32px',
+                  background: '#667eea',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                }}>
+                  {plotLayers.filter(l => l.type === 'main').length}
+                </span>
+                <span style={{ color: '#64748B', fontSize: '0.875rem' }}>Main Plot{plotLayers.filter(l => l.type === 'main').length !== 1 ? 's' : ''}</span>
+              </div>
+
+              {/* Subplots */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{
+                  width: '32px',
+                  height: '32px',
+                  background: '#10B981',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                }}>
+                  {plotLayers.filter(l => l.type === 'subplot').length}
+                </span>
+                <span style={{ color: '#64748B', fontSize: '0.875rem' }}>Subplot{plotLayers.filter(l => l.type === 'subplot').length !== 1 ? 's' : ''}</span>
+              </div>
+
+              {/* Character Arcs */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{
+                  width: '32px',
+                  height: '32px',
+                  background: '#F59E0B',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                }}>
+                  {plotLayers.filter(l => l.type === 'character-arc').length}
+                </span>
+                <span style={{ color: '#64748B', fontSize: '0.875rem' }}>Character Arc{plotLayers.filter(l => l.type === 'character-arc').length !== 1 ? 's' : ''}</span>
+              </div>
+
+              {/* Total Plot Points */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderLeft: '1px solid #E2E8F0', paddingLeft: '2rem' }}>
+                <span style={{
+                  width: '32px',
+                  height: '32px',
+                  background: '#374151',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                }}>
+                  {plotLayers.reduce((sum, layer) => sum + (layer.points?.length || 0), 0)}
+                </span>
+                <span style={{ color: '#64748B', fontSize: '0.875rem' }}>Plot Point{plotLayers.reduce((sum, layer) => sum + (layer.points?.length || 0), 0) !== 1 ? 's' : ''}</span>
+              </div>
+
+              {/* Outline Stats - Acts, Chapters, Scenes */}
+              {outlineStats.chapters > 0 && (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderLeft: '1px solid #E2E8F0', paddingLeft: '2rem' }}>
+                    <span style={{
+                      width: '32px',
+                      height: '32px',
+                      background: '#6366F1',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      fontWeight: 600,
+                      fontSize: '0.875rem',
+                    }}>
+                      {outlineStats.acts}
+                    </span>
+                    <span style={{ color: '#64748B', fontSize: '0.875rem' }}>Act{outlineStats.acts !== 1 ? 's' : ''}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{
+                      width: '32px',
+                      height: '32px',
+                      background: '#EC4899',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      fontWeight: 600,
+                      fontSize: '0.875rem',
+                    }}>
+                      {outlineStats.chapters}
+                    </span>
+                    <span style={{ color: '#64748B', fontSize: '0.875rem' }}>Chapter{outlineStats.chapters !== 1 ? 's' : ''}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{
+                      width: '32px',
+                      height: '32px',
+                      background: '#14B8A6',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      fontWeight: 600,
+                      fontSize: '0.875rem',
+                    }}>
+                      {outlineStats.scenes}
+                    </span>
+                    <span style={{ color: '#64748B', fontSize: '0.875rem' }}>Scene{outlineStats.scenes !== 1 ? 's' : ''}</span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Overall Score Card */}
         <div style={{
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',

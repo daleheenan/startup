@@ -38,6 +38,7 @@ export type WorkflowStep =
   | 'word-count-revision'  // AI-assisted word count reduction
   | 'follow-up'
   | 'series'
+  | 'prose-style'  // Per-book prose style configuration
   | 'publishing';
 
 // Project data structure expected by the hook
@@ -306,6 +307,7 @@ const STEP_NAMES: Record<WorkflowStep, string> = {
   'word-count-revision': 'Word Count Revision',
   'follow-up': 'Follow-Up Ideas',
   series: 'Series Management',
+  'prose-style': 'Prose Style',
   publishing: 'Publishing Settings',
 };
 
@@ -421,6 +423,12 @@ export function useWorkflowPrerequisites(
       series: {
         isComplete: false,
         isRequired: false, // Series management is optional (for multi-book projects)
+        requiresPrevious: null, // No prerequisites - always accessible
+        missingItems: [],
+      },
+      'prose-style': {
+        isComplete: true, // Prose style is always accessible (can be configured anytime)
+        isRequired: false, // Prose style is optional
         requiresPrevious: null, // No prerequisites - always accessible
         missingItems: [],
       },

@@ -39,11 +39,20 @@ function normaliseSuggestion(suggestion: string | Suggestion): Suggestion {
   return suggestion;
 }
 
+interface PlotPoint {
+  id: string;
+  chapter_number: number;
+  description: string;
+  phase: string;
+  impact_level: number;
+}
+
 interface PlotLayer {
   id: string;
   name: string;
   description: string;
   type: 'main' | 'subplot' | 'mystery' | 'romance' | 'character-arc';
+  points?: PlotPoint[];
 }
 
 export default function CoherencePage() {
@@ -492,6 +501,119 @@ export default function CoherencePage() {
             <style jsx>{`
               @keyframes spin { to { transform: rotate(360deg); } }
             `}</style>
+          </div>
+        )}
+
+        {/* Plot Stats Summary */}
+        {plotLayers.length > 0 && (
+          <div style={{
+            ...card,
+            marginBottom: '1.5rem',
+            padding: '1.25rem',
+            background: '#F8FAFC',
+            border: '1px solid #E2E8F0',
+          }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: colors.text, marginBottom: '1rem' }}>
+              📊 Plot Structure Summary
+            </h3>
+            <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
+              {/* Main Plots */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{
+                  width: '32px',
+                  height: '32px',
+                  background: '#667eea',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                }}>
+                  {plotLayers.filter(l => l.type === 'main').length}
+                </span>
+                <span style={{ color: '#64748B', fontSize: '0.875rem' }}>Main Plot{plotLayers.filter(l => l.type === 'main').length !== 1 ? 's' : ''}</span>
+              </div>
+
+              {/* Subplots */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{
+                  width: '32px',
+                  height: '32px',
+                  background: '#10B981',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                }}>
+                  {plotLayers.filter(l => l.type === 'subplot').length}
+                </span>
+                <span style={{ color: '#64748B', fontSize: '0.875rem' }}>Subplot{plotLayers.filter(l => l.type === 'subplot').length !== 1 ? 's' : ''}</span>
+              </div>
+
+              {/* Character Arcs */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{
+                  width: '32px',
+                  height: '32px',
+                  background: '#F59E0B',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                }}>
+                  {plotLayers.filter(l => l.type === 'character-arc').length}
+                </span>
+                <span style={{ color: '#64748B', fontSize: '0.875rem' }}>Character Arc{plotLayers.filter(l => l.type === 'character-arc').length !== 1 ? 's' : ''}</span>
+              </div>
+
+              {/* Other (mystery, romance) */}
+              {plotLayers.filter(l => l.type === 'mystery' || l.type === 'romance').length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{
+                    width: '32px',
+                    height: '32px',
+                    background: '#8B5CF6',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontWeight: 600,
+                    fontSize: '0.875rem',
+                  }}>
+                    {plotLayers.filter(l => l.type === 'mystery' || l.type === 'romance').length}
+                  </span>
+                  <span style={{ color: '#64748B', fontSize: '0.875rem' }}>Specialised Thread{plotLayers.filter(l => l.type === 'mystery' || l.type === 'romance').length !== 1 ? 's' : ''}</span>
+                </div>
+              )}
+
+              {/* Total Plot Points */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderLeft: '1px solid #E2E8F0', paddingLeft: '2rem' }}>
+                <span style={{
+                  width: '32px',
+                  height: '32px',
+                  background: '#374151',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                }}>
+                  {plotLayers.reduce((sum, layer) => sum + (layer.points?.length || 0), 0)}
+                </span>
+                <span style={{ color: '#64748B', fontSize: '0.875rem' }}>Total Plot Point{plotLayers.reduce((sum, layer) => sum + (layer.points?.length || 0), 0) !== 1 ? 's' : ''}</span>
+              </div>
+            </div>
           </div>
         )}
 

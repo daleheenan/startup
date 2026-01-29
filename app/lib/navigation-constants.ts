@@ -86,6 +86,7 @@ export type WorkflowStep =
   | 'word-count-revision'
   | 'follow-up'
   | 'series'
+  | 'prose-style'
   | 'publishing';
 
 /**
@@ -183,6 +184,13 @@ export const PROJECT_NAV_GROUPS: NavGroup[] = [
         route: '/outline',
         icon: '📝',
         workflowStep: 'outline',
+      },
+      {
+        id: 'prose-style',
+        label: 'Prose Style',
+        route: '/prose-style',
+        icon: '✍️',
+        workflowStep: 'prose-style',
       },
     ],
   },
