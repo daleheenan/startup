@@ -846,6 +846,158 @@ router.delete('/:id', (req, res) => {
 });
 
 /**
+ * POST /api/projects/:id/duplicate
+ * Duplicate a project with all its story details
+ *
+ * Copies:
+ * - Story concept (title, logline, synopsis, hook, protagonistHint, conflictType)
+ * - Story DNA (genre, subgenre, tone, themes, proseStyle, timeframe)
+ * - Story Bible (characters, world, timeline)
+ * - Basic metadata (genre, time period settings)
+ *
+ * Does NOT copy:
+ * - Plot structure (fresh start)
+ * - Outlines
+ * - Chapters
+ * - Publishing settings
+ * - Metrics
+ *
+ * Request body:
+ * - title: string (optional) - New title for the duplicated project
+ */
+router.post('/:id/duplicate', (req, res) => {
+  try {
+    const sourceProjectId = req.params.id;
+    const { title } = req.body;
+
+    // Get the source project
+    const sourceProject = db.prepare(`
+      SELECT * FROM projects WHERE id = ?
+    `).get(sourceProjectId) as any;
+
+    if (!sourceProject) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Source project not found' },
+      });
+    }
+
+    // Generate new project ID and timestamp
+    const newProjectId = randomUUID();
+    const now = new Date().toISOString();
+
+    // Parse the source story concept to update the title
+    const sourceStoryConcept = safeJsonParse(sourceProject.story_concept, {});
+    const duplicateTitle = title || `${sourceProject.title} (Copy)`;
+
+    // Update the story concept with new title
+    const newStoryConcept = {
+      ...sourceStoryConcept,
+      title: duplicateTitle,
+    };
+
+    // Create the duplicated project
+    const stmt = db.prepare(`
+      INSERT INTO projects (
+        id,
+        title,
+        type,
+        genre,
+        status,
+        story_dna,
+        story_bible,
+        story_concept,
+        book_count,
+        time_period_type,
+        specific_year,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    stmt.run(
+      newProjectId,
+      duplicateTitle,
+      'standalone',  // New project starts as standalone
+      sourceProject.genre,
+      'setup',  // Fresh start
+      sourceProject.story_dna,  // Copy DNA as-is (already JSON string)
+      sourceProject.story_bible,  // Copy Bible as-is (already JSON string)
+      JSON.stringify(newStoryConcept),
+      1,  // Single book to start
+      sourceProject.time_period_type,
+      sourceProject.specific_year,
+      now,
+      now
+    );
+
+    // Create the first book for standalone project
+    const bookId = randomUUID();
+    const bookStmt = db.prepare(`
+      INSERT INTO books (id, project_id, book_number, title, status, word_count, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    bookStmt.run(
+      bookId,
+      newProjectId,
+      1,
+      duplicateTitle,
+      'setup',
+      0,
+      now,
+      now
+    );
+
+    logger.info({
+      sourceProjectId,
+      newProjectId,
+      title: duplicateTitle,
+    }, 'Duplicated project');
+
+    // Return the new project details
+    res.status(201).json({
+      success: true,
+      project: {
+        id: newProjectId,
+        title: duplicateTitle,
+        type: 'standalone',
+        genre: sourceProject.genre,
+        status: 'setup',
+        book_count: 1,
+        story_concept: newStoryConcept,
+        story_dna: safeJsonParse(sourceProject.story_dna, null),
+        story_bible: safeJsonParse(sourceProject.story_bible, null),
+        time_period_type: sourceProject.time_period_type,
+        specific_year: sourceProject.specific_year,
+        created_at: now,
+        updated_at: now,
+      },
+      book: {
+        id: bookId,
+        book_number: 1,
+        title: duplicateTitle,
+        status: 'setup',
+      },
+      copied: [
+        'Story concept (title, logline, synopsis, hook)',
+        'Story DNA (genre, tone, themes, prose style)',
+        'Story Bible (characters, world elements)',
+        'Time period settings',
+      ],
+      notCopied: [
+        'Plot structure',
+        'Outlines',
+        'Chapters',
+        'Publishing settings',
+      ],
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error duplicating project');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
  * POST /api/projects/:id/cover-image
  * Upload a cover image for the project
  * Accepts base64 encoded image data
@@ -4886,6 +5038,154 @@ router.post('/:id/search-replace', (req, res) => {
     });
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack }, 'Error in search and replace');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * POST /api/projects/:id/refine-story
+ * Use AI to refine/amend story concept and DNA based on user feedback
+ *
+ * Request body:
+ * - feedback: string - User's feedback/instructions for changes
+ * - currentConcept: StoryConcept - Current story concept values
+ * - currentDNA: StoryDNA - Current story DNA values
+ *
+ * Returns:
+ * - refinedConcept: StoryConcept - Updated story concept
+ * - refinedDNA: StoryDNA - Updated story DNA
+ * - changes: string[] - Summary of changes made
+ */
+router.post('/:id/refine-story', async (req, res) => {
+  try {
+    const projectId = req.params.id;
+    const { feedback, currentConcept, currentDNA } = req.body;
+
+    if (!feedback || typeof feedback !== 'string' || feedback.trim().length === 0) {
+      return res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'Feedback is required' },
+      });
+    }
+
+    // Get project to validate it exists
+    const projectStmt = db.prepare(`
+      SELECT id, title, genre, story_concept, story_dna FROM projects WHERE id = ?
+    `);
+    const project = projectStmt.get(projectId) as any;
+
+    if (!project) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project not found' },
+      });
+    }
+
+    // Use provided values or fall back to database values
+    const storyConcept = currentConcept || safeJsonParse(project.story_concept, {});
+    const storyDNA = currentDNA || safeJsonParse(project.story_dna, {});
+
+    logger.info({ projectId, feedbackLength: feedback.length }, 'Refining story with AI feedback');
+
+    // Build context for AI
+    const conceptContext = `
+CURRENT STORY CONCEPT:
+Title: ${storyConcept.title || project.title || 'Not set'}
+Logline: ${storyConcept.logline || 'Not set'}
+Synopsis: ${storyConcept.synopsis || 'Not set'}
+Hook: ${storyConcept.hook || 'Not set'}
+Protagonist Hint: ${storyConcept.protagonistHint || 'Not set'}
+Conflict Type: ${storyConcept.conflictType || 'Not set'}
+
+CURRENT STORY DNA:
+Genre: ${storyDNA.genre || project.genre || 'Not set'}
+Subgenre: ${storyDNA.subgenre || 'Not set'}
+Tone: ${storyDNA.tone || 'Not set'}
+Themes: ${Array.isArray(storyDNA.themes) ? storyDNA.themes.join(', ') : 'Not set'}
+Prose Style: ${storyDNA.proseStyle || 'Not set'}
+Timeframe: ${storyDNA.timeframe || 'Not set'}
+`.trim();
+
+    const { default: Anthropic } = await import('@anthropic-ai/sdk');
+    const anthropic = new Anthropic();
+
+    const prompt = `You are a skilled story development consultant. The user wants to refine their story concept and DNA based on their feedback.
+
+${conceptContext}
+
+USER FEEDBACK:
+${feedback}
+
+Based on this feedback, provide updated versions of the story concept and DNA. Make changes that address the user's feedback while maintaining consistency and quality. Only change fields that are relevant to the feedback - leave others unchanged.
+
+IMPORTANT: Use UK British spelling conventions throughout (e.g., 'colour' not 'color', 'realise' not 'realize', 'behaviour' not 'behavior').
+
+Respond with a JSON object in this exact format:
+{
+  "refinedConcept": {
+    "title": "string",
+    "logline": "string (1-2 sentences)",
+    "synopsis": "string (2-4 paragraphs)",
+    "hook": "string (the compelling opening hook)",
+    "protagonistHint": "string (brief protagonist description)",
+    "conflictType": "string (e.g., 'man vs nature', 'man vs self', etc.)"
+  },
+  "refinedDNA": {
+    "genre": "string",
+    "subgenre": "string",
+    "tone": "string",
+    "themes": ["array", "of", "theme", "strings"],
+    "proseStyle": "string",
+    "timeframe": "string (e.g., '1920s', 'Medieval Era', 'Near Future')"
+  },
+  "changes": ["array of strings describing what was changed and why"]
+}`;
+
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4096,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    // Extract the text content
+    const textContent = response.content.find(c => c.type === 'text');
+    if (!textContent || textContent.type !== 'text') {
+      throw new Error('No text response from AI');
+    }
+
+    // Parse the JSON response
+    const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('Failed to extract JSON from AI response');
+    }
+
+    const result = JSON.parse(jsonMatch[0]);
+
+    // Validate the response structure
+    if (!result.refinedConcept || !result.refinedDNA || !result.changes) {
+      throw new Error('Invalid response structure from AI');
+    }
+
+    // Ensure themes is an array
+    if (result.refinedDNA.themes && !Array.isArray(result.refinedDNA.themes)) {
+      result.refinedDNA.themes = [result.refinedDNA.themes];
+    }
+
+    logger.info({
+      projectId,
+      changesCount: result.changes.length,
+    }, 'Story refinement completed');
+
+    res.json({
+      success: true,
+      refinedConcept: result.refinedConcept,
+      refinedDNA: result.refinedDNA,
+      changes: result.changes,
+      usage: {
+        input_tokens: response.usage?.input_tokens || 0,
+        output_tokens: response.usage?.output_tokens || 0,
+      },
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error refining story');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });

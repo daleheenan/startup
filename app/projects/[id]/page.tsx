@@ -5,6 +5,7 @@ import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ExportButtons from '../../components/ExportButtons';
 import CloneBookDialog from '../../components/CloneBookDialog';
+import DuplicateProjectDialog from '../../components/DuplicateProjectDialog';
 import CoverImageUpload from '../../components/CoverImageUpload';
 import SearchReplace from '../../components/SearchReplace';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
@@ -132,6 +133,9 @@ export default function ProjectDetailPage() {
 
   // Clone dialog state
   const [showCloneDialog, setShowCloneDialog] = useState(false);
+
+  // Duplicate project dialog state
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
 
   // IMPORTANT: All hooks must be called before any early returns
   const navigation = useProjectNavigation(projectId, project, outline, chapters);
@@ -1046,6 +1050,32 @@ export default function ProjectDetailPage() {
                 </p>
               </div>
             )}
+
+            {/* Duplicate Project Button */}
+            <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: `1px solid ${colors.border}` }}>
+              <button
+                onClick={() => setShowDuplicateDialog(true)}
+                style={{
+                  padding: '0.625rem 1rem',
+                  background: colors.surface,
+                  color: colors.brandText,
+                  border: `1px solid ${colors.brandBorder}`,
+                  borderRadius: borderRadius.md,
+                  cursor: 'pointer',
+                  fontSize: '0.8125rem',
+                  fontWeight: 500,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                }}
+              >
+                <span style={{ fontSize: '1rem' }}>+</span>
+                Duplicate Project
+              </button>
+              <p style={{ fontSize: '0.75rem', color: colors.textSecondary, margin: '0.375rem 0 0 0' }}>
+                Create a new project with same story concept, DNA, characters, and world
+              </p>
+            </div>
             </div>
           </div>
         </div>
@@ -1063,6 +1093,14 @@ export default function ProjectDetailPage() {
             }}
           />
         )}
+
+        {/* Duplicate Project Dialog */}
+        <DuplicateProjectDialog
+          projectId={projectId}
+          projectTitle={project?.title || 'Project'}
+          isOpen={showDuplicateDialog}
+          onClose={() => setShowDuplicateDialog(false)}
+        />
 
         {/* Generation Progress Indicator */}
         {isGeneratingContent && (
