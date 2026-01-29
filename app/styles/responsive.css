@@ -12,6 +12,18 @@
   box-sizing: border-box;
 }
 
+/* ==================== SIDEBAR SCROLLBAR HIDING ==================== */
+
+/* Hide scrollbar for sidebar navigation while preserving scroll functionality */
+[data-desktop-sidebar] nav {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+[data-desktop-sidebar] nav::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
 /* ==================== RESPONSIVE TYPOGRAPHY ==================== */
 
 html {
