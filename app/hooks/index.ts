@@ -11,5 +11,6 @@ export { useOfflineChapter } from './useOfflineChapter';
 export { useProjectNavigation } from './useProjectNavigation';
 export { useProjectProgress } from './useProjectProgress';
 export { useProjects, useProject, useInvalidateProjects } from './useProjects';
-export { useStoryIdeas } from './useStoryIdeas';
+export { useStoryIdeas, useCreateStoryIdea } from './useStoryIdeas';
+export type { CreateStoryIdeaParams, CreateStoryIdeaResponse } from './useStoryIdeas';
 export { useWorkflowPrerequisites } from './useWorkflowPrerequisites';
