@@ -50,6 +50,7 @@ export default function CoherencePage() {
   const [suggestionPage, setSuggestionPage] = useState(0);
   const SUGGESTIONS_PER_PAGE = 5;
   const [fixedWarnings, setFixedWarnings] = useState<Set<number>>(new Set());
+  const [implementedSuggestions, setImplementedSuggestions] = useState<Set<number>>(new Set());
 
   const navigation = useProjectNavigation(projectId, project);
 
@@ -189,6 +190,10 @@ export default function CoherencePage() {
       setChecking(true);
       setError(null);
       setCoherenceResult(null);
+      // Reset tracking state for new check
+      setFixedWarnings(new Set());
+      setImplementedSuggestions(new Set());
+      setSuggestionPage(0);
       const token = getToken();
 
       const res = await fetch(`${API_BASE_URL}/api/projects/${projectId}/coherence-check`, {
@@ -211,7 +216,7 @@ export default function CoherencePage() {
     }
   };
 
-  const implementSuggestion = async (suggestion: string) => {
+  const implementSuggestion = async (suggestion: string, index: number) => {
     try {
       setImplementing(suggestion);
       const token = getToken();
@@ -237,9 +242,8 @@ export default function CoherencePage() {
         return;
       }
 
-      // Refresh data and re-run coherence check
-      await fetchData();
-      await runCoherenceCheck();
+      // Mark this suggestion as implemented (don't re-run coherence check)
+      setImplementedSuggestions(prev => new Set(prev).add(index));
     } catch (err: any) {
       console.error('Error implementing suggestion:', err);
       setError(err.message);
@@ -275,11 +279,8 @@ export default function CoherencePage() {
         return;
       }
 
-      // Mark as fixed and refresh data
+      // Mark as fixed (don't auto re-run coherence check - user can decide when to re-check)
       setFixedWarnings(prev => new Set(prev).add(index));
-      await fetchData();
-      // Optionally re-run coherence check after fix
-      await runCoherenceCheck();
     } catch (err: any) {
       console.error('Error fixing warning:', err);
       setError(err.message);
@@ -613,72 +614,101 @@ export default function CoherencePage() {
                 Recommendations ({coherenceResult.suggestions.length} total)
               </h3>
               <span style={{ fontSize: '0.875rem', color: '#6366F1' }}>
-                Showing {Math.min(suggestionPage * SUGGESTIONS_PER_PAGE + 1, coherenceResult.suggestions.length)}-{Math.min((suggestionPage + 1) * SUGGESTIONS_PER_PAGE, coherenceResult.suggestions.length)} of {coherenceResult.suggestions.length}
+                {implementedSuggestions.size} of {coherenceResult.suggestions.length} implemented
               </span>
             </div>
             <p style={{ fontSize: '0.75rem', color: '#6B7280', marginBottom: '1rem', fontStyle: 'italic' }}>
-              Each &quot;Implement&quot; button applies only that specific recommendation
+              Click &quot;Implement&quot; to apply each recommendation. Re-run the check when ready.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {coherenceResult.suggestions
                 .slice(suggestionPage * SUGGESTIONS_PER_PAGE, (suggestionPage + 1) * SUGGESTIONS_PER_PAGE)
-                .map((suggestion, index) => (
+                .map((suggestion, localIndex) => {
+                  const globalIndex = suggestionPage * SUGGESTIONS_PER_PAGE + localIndex;
+                  const isImplemented = implementedSuggestions.has(globalIndex);
+                  return (
                 <div
-                  key={suggestionPage * SUGGESTIONS_PER_PAGE + index}
+                  key={globalIndex}
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     gap: '1rem',
                     padding: '1rem',
-                    background: 'white',
+                    background: isImplemented ? '#ECFDF5' : 'white',
                     borderRadius: borderRadius.md,
-                    border: '1px solid #E0E7FF',
+                    border: `1px solid ${isImplemented ? '#A7F3D0' : '#E0E7FF'}`,
                   }}
                 >
-                  <p style={{ margin: 0, color: '#374151', fontSize: '0.9375rem', flex: 1 }}>
-                    <span style={{ fontWeight: 600, color: '#4F46E5', marginRight: '0.5rem' }}>
-                      #{suggestionPage * SUGGESTIONS_PER_PAGE + index + 1}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', flex: 1 }}>
+                    <span style={{ fontSize: '1.25rem' }}>
+                      {isImplemented ? '✓' : '💡'}
                     </span>
-                    {suggestion}
-                  </p>
-                  <button
-                    onClick={() => implementSuggestion(suggestion)}
-                    disabled={implementing === suggestion}
-                    style={{
+                    <p style={{
+                      margin: 0,
+                      color: isImplemented ? '#047857' : '#374151',
+                      fontSize: '0.9375rem',
+                      textDecoration: isImplemented ? 'line-through' : 'none',
+                      opacity: isImplemented ? 0.7 : 1,
+                    }}>
+                      <span style={{ fontWeight: 600, color: isImplemented ? '#047857' : '#4F46E5', marginRight: '0.5rem' }}>
+                        #{globalIndex + 1}
+                      </span>
+                      {suggestion}
+                    </p>
+                  </div>
+                  {!isImplemented && (
+                    <button
+                      onClick={() => implementSuggestion(suggestion, globalIndex)}
+                      disabled={implementing === suggestion}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: implementing === suggestion ? '#E5E7EB' : '#667eea',
+                        border: 'none',
+                        borderRadius: borderRadius.md,
+                        color: 'white',
+                        fontSize: '0.8125rem',
+                        fontWeight: 500,
+                        cursor: implementing === suggestion ? 'wait' : 'pointer',
+                        whiteSpace: 'nowrap',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.375rem',
+                      }}
+                    >
+                      {implementing === suggestion ? (
+                        <>
+                          <span style={{
+                            display: 'inline-block',
+                            width: '12px',
+                            height: '12px',
+                            border: '2px solid rgba(255,255,255,0.3)',
+                            borderTopColor: 'white',
+                            borderRadius: '50%',
+                            animation: 'spin 1s linear infinite',
+                          }} />
+                          Implementing...
+                        </>
+                      ) : (
+                        'Implement'
+                      )}
+                    </button>
+                  )}
+                  {isImplemented && (
+                    <span style={{
                       padding: '0.5rem 1rem',
-                      background: implementing === suggestion ? '#E5E7EB' : '#667eea',
-                      border: 'none',
+                      background: '#D1FAE5',
                       borderRadius: borderRadius.md,
-                      color: 'white',
+                      color: '#047857',
                       fontSize: '0.8125rem',
                       fontWeight: 500,
-                      cursor: implementing === suggestion ? 'wait' : 'pointer',
-                      whiteSpace: 'nowrap',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.375rem',
-                    }}
-                  >
-                    {implementing === suggestion ? (
-                      <>
-                        <span style={{
-                          display: 'inline-block',
-                          width: '12px',
-                          height: '12px',
-                          border: '2px solid rgba(255,255,255,0.3)',
-                          borderTopColor: 'white',
-                          borderRadius: '50%',
-                          animation: 'spin 1s linear infinite',
-                        }} />
-                        Implementing...
-                      </>
-                    ) : (
-                      'Implement'
-                    )}
-                  </button>
+                    }}>
+                      Implemented
+                    </span>
+                  )}
                 </div>
-              ))}
+                  );
+                })}
             </div>
 
             {/* Pagination Controls */}
