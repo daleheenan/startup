@@ -640,7 +640,7 @@ export default function PlotStructurePage() {
           if (l.id !== layerId) return l;
           return {
             ...l,
-            points: [...l.points, ...data.points],
+            points: [...(l.points || []), ...(data.points || [])],
           };
         });
         return { ...prevStructure, plot_layers: newLayers };
@@ -692,8 +692,8 @@ export default function PlotStructurePage() {
       if (layer.id !== editingPoint.layerId) return layer;
 
       const newPoints = editingPoint.point
-        ? layer.points.map(p => p.id === editingPoint.point?.id ? newPoint : p)
-        : [...layer.points, newPoint];
+        ? (layer.points || []).map(p => p.id === editingPoint.point?.id ? newPoint : p)
+        : [...(layer.points || []), newPoint];
 
       return { ...layer, points: newPoints };
     });
@@ -775,7 +775,7 @@ export default function PlotStructurePage() {
         if (l.id !== layerId) return l;
         return {
           ...l,
-          points: [...l.points, ...data.points],
+          points: [...(l.points || []), ...(data.points || [])],
         };
       });
 
@@ -807,7 +807,7 @@ export default function PlotStructurePage() {
       if (layer.id !== layerId) return layer;
       return {
         ...layer,
-        points: layer.points.filter(p => p.id !== pointId),
+        points: (layer.points || []).filter(p => p.id !== pointId),
       };
     });
 
