@@ -1,6 +1,7 @@
 import express from 'express';
 import db from '../db/connection.js';
 import { editingService } from '../services/editing.service.js';
+import { proseTightenerService } from '../services/prose-tightener.service.js';
 import { QueueWorker } from '../queue/worker.js';
 import { createLogger } from '../services/logger.service.js';
 import {
@@ -528,6 +529,152 @@ router.get('/books/:bookId/word-count', (req, res) => {
     });
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack, bookId: req.params.bookId }, 'Error getting word count');
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// PROSE TIGHTENING: Style Analysis and Rewrite Suggestions
+// ============================================================================
+
+/**
+ * POST /api/editing/prose-tighten/analyse
+ * Analyse text for style issues and get rewrite suggestions
+ */
+router.post('/prose-tighten/analyse', async (req, res) => {
+  try {
+    const { text, maxRewrites, focusCategories } = req.body;
+
+    if (!text || typeof text !== 'string') {
+      return res.status(400).json({ error: 'Text is required' });
+    }
+
+    const analysis = await proseTightenerService.analyseWithAI(text, {
+      maxRewrites: maxRewrites || 10,
+      focusCategories,
+    });
+
+    res.json(analysis);
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error analysing prose');
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/editing/prose-tighten/patterns
+ * Quick pattern-based detection only (no AI call)
+ */
+router.post('/prose-tighten/patterns', (req, res) => {
+  try {
+    const { text } = req.body;
+
+    if (!text || typeof text !== 'string') {
+      return res.status(400).json({ error: 'Text is required' });
+    }
+
+    const issues = proseTightenerService.detectPatterns(text);
+
+    res.json({
+      issues,
+      summary: {
+        totalIssues: issues.length,
+        byPattern: issues.reduce((acc, issue) => {
+          acc[issue.name] = (acc[issue.name] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>),
+      },
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error detecting patterns');
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/editing/prose-tighten/apply
+ * Apply selected rewrites to text
+ */
+router.post('/prose-tighten/apply', (req, res) => {
+  try {
+    const { text, rewrites } = req.body;
+
+    if (!text || typeof text !== 'string') {
+      return res.status(400).json({ error: 'Text is required' });
+    }
+
+    if (!rewrites || !Array.isArray(rewrites)) {
+      return res.status(400).json({ error: 'Rewrites array is required' });
+    }
+
+    const result = proseTightenerService.applyRewrites(text, rewrites);
+
+    const originalWordCount = text.trim().split(/\s+/).length;
+    const newWordCount = result.trim().split(/\s+/).length;
+
+    res.json({
+      result,
+      stats: {
+        originalWordCount,
+        newWordCount,
+        wordsSaved: originalWordCount - newWordCount,
+        percentReduction: ((originalWordCount - newWordCount) / originalWordCount * 100).toFixed(1),
+      },
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error applying rewrites');
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/editing/chapters/:chapterId/prose-tighten
+ * Analyse a chapter's prose and get tightening suggestions
+ */
+router.post('/chapters/:chapterId/prose-tighten', async (req, res) => {
+  try {
+    const { chapterId } = req.params;
+    const { maxRewrites, focusCategories } = req.body;
+
+    // Get chapter content
+    const stmt = db.prepare<[string], { content: string | null }>(`
+      SELECT content FROM chapters WHERE id = ?
+    `);
+
+    const chapter = stmt.get(chapterId);
+    if (!chapter) {
+      return res.status(404).json({ error: 'Chapter not found' });
+    }
+
+    if (!chapter.content) {
+      return res.status(400).json({ error: 'Chapter has no content to analyse' });
+    }
+
+    // Check for edit version
+    const editStmt = db.prepare<[string], { edited_content: string }>(`
+      SELECT edited_content FROM chapter_edits WHERE chapter_id = ?
+    `);
+    const edit = editStmt.get(chapterId);
+
+    // Use edited content if available, otherwise original
+    const textToAnalyse = edit ? edit.edited_content : chapter.content;
+
+    const analysis = await proseTightenerService.analyseWithAI(textToAnalyse, {
+      maxRewrites: maxRewrites || 15,
+      focusCategories,
+    });
+
+    // Generate human-readable report
+    const report = proseTightenerService.generateReport(analysis);
+
+    res.json({
+      chapterId,
+      usingEditedVersion: !!edit,
+      analysis,
+      report,
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack, chapterId: req.params.chapterId }, 'Error analysing chapter prose');
     res.status(500).json({ error: error.message });
   }
 });
