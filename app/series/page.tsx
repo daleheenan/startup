@@ -16,7 +16,7 @@ import {
   transitions,
   gradients,
 } from '@/app/lib/design-tokens';
-import { getToken } from '@/app/lib/auth';
+import { getToken, logout } from '@/app/lib/auth';
 
 // ==================== CONSTANTS ====================
 
@@ -299,6 +299,12 @@ export default function SeriesManagementPage() {
         },
       });
 
+      if (res.status === 401) {
+        logout();
+        window.location.href = '/login';
+        return;
+      }
+
       if (!res.ok) {
         throw new Error('Failed to fetch projects');
       }
@@ -321,6 +327,12 @@ export default function SeriesManagementPage() {
           'Content-Type': 'application/json',
         },
       });
+
+      if (res.status === 401) {
+        logout();
+        window.location.href = '/login';
+        return;
+      }
 
       if (!res.ok) {
         // If series table doesn't exist yet, just return empty

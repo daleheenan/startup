@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getToken } from '../lib/auth';
+import { getToken, logout } from '../lib/auth';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -93,6 +93,12 @@ export default function AuthorsPage() {
         },
       });
 
+      if (response.status === 401) {
+        logout();
+        window.location.href = '/login';
+        return;
+      }
+
       if (!response.ok) {
         throw new Error('Failed to fetch authors');
       }
@@ -120,6 +126,12 @@ export default function AuthorsPage() {
         },
         body: method === 'POST' ? JSON.stringify({ authorType: author.type }) : undefined,
       });
+
+      if (response.status === 401) {
+        logout();
+        window.location.href = '/login';
+        return;
+      }
 
       if (!response.ok) {
         throw new Error('Failed to update favorite');

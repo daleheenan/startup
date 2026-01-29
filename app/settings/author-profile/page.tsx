@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
-import { getToken } from '../../lib/auth';
+import { getToken, logout } from '../../lib/auth';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
 import { colors, typography, spacing, borderRadius, transitions, shadows } from '../../lib/design-tokens';
 
@@ -57,6 +57,12 @@ export default function AuthorProfilePage() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
+      if (response.status === 401) {
+        logout();
+        window.location.href = '/login';
+        return;
+      }
+
       if (response.ok) {
         const data = await response.json();
         setProfile(data);
@@ -99,6 +105,12 @@ export default function AuthorProfilePage() {
           authorSocialMedia: socialMedia,
         }),
       });
+
+      if (response.status === 401) {
+        logout();
+        window.location.href = '/login';
+        return;
+      }
 
       if (!response.ok) {
         throw new Error('Failed to save author profile');
@@ -154,6 +166,12 @@ export default function AuthorProfilePage() {
           }),
         });
 
+        if (response.status === 401) {
+          logout();
+          window.location.href = '/login';
+          return;
+        }
+
         if (!response.ok) {
           throw new Error('Failed to upload photo');
         }
@@ -186,6 +204,12 @@ export default function AuthorProfilePage() {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
+
+      if (response.status === 401) {
+        logout();
+        window.location.href = '/login';
+        return;
+      }
 
       if (!response.ok) {
         throw new Error('Failed to delete photo');
