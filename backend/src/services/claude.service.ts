@@ -2,6 +2,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import { sessionTracker } from './session-tracker.js';
 import { RateLimitError } from '../queue/rate-limit-handler.js';
 import { createLogger } from './logger.service.js';
+import { metricsService } from './metrics.service.js';
+import type { AIRequestType } from '../constants/ai-request-types.js';
 
 const logger = createLogger('services:claude');
 
@@ -11,6 +13,17 @@ export interface ClaudeResponse {
     input_tokens: number;
     output_tokens: number;
   };
+}
+
+/**
+ * Tracking context for AI cost logging.
+ * When provided, the request will be logged to the ai_request_log table.
+ */
+export interface TrackingContext {
+  requestType: AIRequestType | string;
+  projectId?: string | null;
+  chapterId?: string | null;
+  contextSummary?: string;
 }
 
 /**
@@ -54,13 +67,18 @@ export class ClaudeService {
   }
 
   /**
-   * Create a completion with automatic session tracking and return token usage
+   * Create a completion with automatic session tracking and return token usage.
+   * Optionally logs the request to the AI cost audit trail when tracking context is provided.
+   *
+   * @param params.tracking - Optional tracking context for cost logging. When provided,
+   *                          the request will be logged to ai_request_log table.
    */
   async createCompletionWithUsage(params: {
     system: string;
     messages: Array<{ role: 'user' | 'assistant'; content: string }>;
     maxTokens?: number;
     temperature?: number;
+    tracking?: TrackingContext;
   }): Promise<ClaudeResponse> {
     if (!this.client) {
       throw new Error('Claude API not configured. Set ANTHROPIC_API_KEY in .env file');
@@ -84,14 +102,54 @@ export class ClaudeService {
         .map((block) => (block as any).text)
         .join('\n');
 
-      return {
+      const result: ClaudeResponse = {
         content: textContent,
         usage: {
           input_tokens: response.usage.input_tokens,
           output_tokens: response.usage.output_tokens,
         },
       };
+
+      // Log to AI cost audit trail if tracking context is provided
+      if (params.tracking) {
+        try {
+          metricsService.logAIRequest({
+            requestType: params.tracking.requestType,
+            projectId: params.tracking.projectId,
+            chapterId: params.tracking.chapterId,
+            inputTokens: result.usage.input_tokens,
+            outputTokens: result.usage.output_tokens,
+            model: this.model,
+            success: true,
+            contextSummary: params.tracking.contextSummary,
+          });
+        } catch (trackingError) {
+          // Don't fail the request if tracking fails - just log the error
+          logger.error({ error: trackingError, tracking: params.tracking }, 'Failed to log AI request to audit trail');
+        }
+      }
+
+      return result;
     } catch (error: any) {
+      // Log failed request if tracking context is provided
+      if (params.tracking) {
+        try {
+          metricsService.logAIRequest({
+            requestType: params.tracking.requestType,
+            projectId: params.tracking.projectId,
+            chapterId: params.tracking.chapterId,
+            inputTokens: 0,
+            outputTokens: 0,
+            model: this.model,
+            success: false,
+            errorMessage: error?.message || 'Unknown error',
+            contextSummary: params.tracking.contextSummary,
+          });
+        } catch (trackingError) {
+          logger.error({ error: trackingError }, 'Failed to log failed AI request to audit trail');
+        }
+      }
+
       // Check for rate limit error (429) or overloaded error (529 - "too fast")
       const isRateLimit = error?.status === 429 || error?.error?.type === 'rate_limit_error';
       const isOverloaded = error?.status === 529 || error?.error?.type === 'overloaded_error' ||

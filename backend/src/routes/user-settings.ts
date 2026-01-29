@@ -793,4 +793,113 @@ router.put('/prose-style', (req, res) => {
   }
 });
 
+// ============================================================================
+// USER PREFERENCES (General Settings)
+// ============================================================================
+
+interface UserPreferences {
+  showAICostsMenu: boolean;
+  proseStyle?: any;
+}
+
+/**
+ * GET /api/user-settings/preferences
+ * Get all user preferences
+ */
+router.get('/preferences', (req, res) => {
+  try {
+    const cacheKey = `user-preferences:${DEFAULT_USER_ID}`;
+
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
+    const stmt = db.prepare<[string], { prose_style: string | null; show_ai_costs_menu: number | null }>(`
+      SELECT prose_style, show_ai_costs_menu FROM user_preferences
+      WHERE user_id = ?
+    `);
+
+    const result = stmt.get(DEFAULT_USER_ID);
+
+    const preferences: UserPreferences = {
+      showAICostsMenu: result?.show_ai_costs_menu === 1,
+      proseStyle: result?.prose_style ? safeJsonParse(result.prose_style, null) : null,
+    };
+
+    const response = { preferences };
+    cache.set(cacheKey, response, CACHE_TTL);
+
+    res.json(response);
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error fetching user preferences');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * PATCH /api/user-settings/preferences
+ * Update specific user preferences
+ */
+router.patch('/preferences', (req, res) => {
+  try {
+    const { showAICostsMenu } = req.body;
+
+    // Ensure user_preferences row exists
+    const checkStmt = db.prepare(`
+      SELECT user_id FROM user_preferences WHERE user_id = ?
+    `);
+    const existing = checkStmt.get(DEFAULT_USER_ID);
+
+    if (!existing) {
+      // Create user preferences row with provided values
+      db.prepare(`
+        INSERT INTO user_preferences (user_id, show_ai_costs_menu, created_at, updated_at)
+        VALUES (?, ?, datetime('now'), datetime('now'))
+      `).run(DEFAULT_USER_ID, showAICostsMenu === true ? 1 : 0);
+    } else {
+      // Build update query dynamically based on provided fields
+      const updates: string[] = [];
+      const values: (string | number)[] = [];
+
+      if (typeof showAICostsMenu === 'boolean') {
+        updates.push('show_ai_costs_menu = ?');
+        values.push(showAICostsMenu ? 1 : 0);
+      }
+
+      if (updates.length > 0) {
+        updates.push("updated_at = datetime('now')");
+        values.push(DEFAULT_USER_ID);
+
+        const sql = `
+          UPDATE user_preferences
+          SET ${updates.join(', ')}
+          WHERE user_id = ?
+        `;
+        db.prepare(sql).run(...values);
+      }
+    }
+
+    // Invalidate cache
+    cache.invalidate(`user-preferences:${DEFAULT_USER_ID}`);
+
+    // Return updated preferences
+    const stmt = db.prepare<[string], { prose_style: string | null; show_ai_costs_menu: number | null }>(`
+      SELECT prose_style, show_ai_costs_menu FROM user_preferences
+      WHERE user_id = ?
+    `);
+    const result = stmt.get(DEFAULT_USER_ID);
+
+    const preferences: UserPreferences = {
+      showAICostsMenu: result?.show_ai_costs_menu === 1,
+      proseStyle: result?.prose_style ? safeJsonParse(result.prose_style, null) : null,
+    };
+
+    res.json({ success: true, preferences });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error updating user preferences');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
 export default router;

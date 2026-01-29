@@ -199,35 +199,42 @@ export default function ProgressPage() {
         setProgress(progressData);
       }
 
-      // Fetch books and chapters
+      // Fetch books and chapters (for active version only)
       const booksRes = await fetch(`${API_BASE_URL}/api/books/project/${projectId}`, { headers });
       if (booksRes.ok) {
         const booksData = await booksRes.json();
         const fetchedBooks = booksData.books || [];
 
-        // Get chapters for each book
+        // Get chapters for each book (active version only)
         const booksWithChapters: Book[] = [];
         for (const book of fetchedBooks) {
-          const chaptersRes = await fetch(`${API_BASE_URL}/api/chapters/book/${book.id}`, { headers });
+          // Fetch active version first to get the version ID
+          let versionId: string | null = null;
+          try {
+            const versionRes = await fetch(`${API_BASE_URL}/api/books/${book.id}/versions/active`, { headers });
+            if (versionRes.ok) {
+              const versionData = await versionRes.json();
+              versionId = versionData.id;
+              // Set active version for UI display (first book only)
+              if (booksWithChapters.length === 0) {
+                setActiveVersion(versionData);
+              }
+            }
+          } catch {
+            // Ignore version fetch errors
+          }
+
+          // Fetch chapters for the active version
+          const chaptersUrl = versionId
+            ? `${API_BASE_URL}/api/chapters/book/${book.id}?versionId=${versionId}`
+            : `${API_BASE_URL}/api/chapters/book/${book.id}`;
+          const chaptersRes = await fetch(chaptersUrl, { headers });
           if (chaptersRes.ok) {
             const chaptersData = await chaptersRes.json();
             booksWithChapters.push({
               ...book,
               chapters: chaptersData.chapters || [],
             });
-          }
-
-          // Fetch active version for the first book
-          if (booksWithChapters.length === 1) {
-            try {
-              const versionRes = await fetch(`${API_BASE_URL}/api/books/${book.id}/versions/active`, { headers });
-              if (versionRes.ok) {
-                const versionData = await versionRes.json();
-                setActiveVersion(versionData);
-              }
-            } catch {
-              // Ignore version fetch errors
-            }
           }
         }
         setBooks(booksWithChapters);

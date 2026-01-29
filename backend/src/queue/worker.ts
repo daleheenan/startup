@@ -6,6 +6,7 @@ import { randomUUID } from 'crypto';
 import { createLogger } from '../services/logger.service.js';
 import { extractJsonObject } from '../utils/json-extractor.js';
 import { QueueConfig } from '../config/queue.config.js';
+import { AI_REQUEST_TYPES } from '../constants/ai-request-types.js';
 
 const logger = createLogger('queue:worker');
 
@@ -1279,6 +1280,20 @@ Output only valid JSON, no commentary:`;
     const projectId = job.target_id;
     logger.info({ projectId }, 'coherence_check: Starting coherence validation');
 
+    // Get book and version info early so it's available in catch block
+    const bookData = db.prepare<[string], { book_id: string }>(`
+      SELECT b.id as book_id FROM books b WHERE b.project_id = ? ORDER BY b.book_number LIMIT 1
+    `).get(projectId);
+    const bookId = bookData?.book_id || null;
+
+    let versionId: string | null = null;
+    if (bookId) {
+      const activeVersion = db.prepare<[string], { id: string }>(`
+        SELECT id FROM book_versions WHERE book_id = ? AND is_active = 1
+      `).get(bookId);
+      versionId = activeVersion?.id || null;
+    }
+
     try {
       checkpointManager.saveCheckpoint(job.id, 'started', { projectId });
 
@@ -1302,10 +1317,10 @@ Output only valid JSON, no commentary:`;
         const now = new Date().toISOString();
 
         db.prepare(`
-          INSERT INTO coherence_checks (id, project_id, checked_at, status, is_coherent, warnings, suggestions, plot_analysis)
-          VALUES (?, ?, ?, 'completed', 0, ?, ?, '[]')
+          INSERT INTO coherence_checks (id, project_id, book_id, version_id, checked_at, status, is_coherent, warnings, suggestions, plot_analysis)
+          VALUES (?, ?, ?, ?, ?, 'completed', 0, ?, ?, '[]')
         `).run(
-          checkId, projectId, now,
+          checkId, projectId, bookId, versionId, now,
           JSON.stringify(['No plots defined. Your story needs at least a main plot to generate a quality outline.']),
           JSON.stringify([{
             issue: 'No plots defined for this story.',
@@ -1420,10 +1435,10 @@ Return ONLY a JSON object:
       const now = new Date().toISOString();
 
       db.prepare(`
-        INSERT INTO coherence_checks (id, project_id, checked_at, status, is_coherent, warnings, suggestions, plot_analysis)
-        VALUES (?, ?, ?, 'completed', ?, ?, ?, ?)
+        INSERT INTO coherence_checks (id, project_id, book_id, version_id, checked_at, status, is_coherent, warnings, suggestions, plot_analysis)
+        VALUES (?, ?, ?, ?, ?, 'completed', ?, ?, ?, ?)
       `).run(
-        checkId, projectId, now, isCoherent ? 1 : 0,
+        checkId, projectId, bookId, versionId, now, isCoherent ? 1 : 0,
         JSON.stringify(finalWarnings),
         JSON.stringify(finalSuggestions),
         JSON.stringify(analysis.plotAnalysis || [])
@@ -1438,9 +1453,9 @@ Return ONLY a JSON object:
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
 
       db.prepare(`
-        INSERT INTO coherence_checks (id, project_id, checked_at, status, is_coherent, warnings, suggestions, plot_analysis, error)
-        VALUES (?, ?, ?, 'failed', 0, '[]', '[]', '[]', ?)
-      `).run(checkId, projectId, now, errorMsg);
+        INSERT INTO coherence_checks (id, project_id, book_id, version_id, checked_at, status, is_coherent, warnings, suggestions, plot_analysis, error)
+        VALUES (?, ?, ?, ?, ?, 'failed', 0, '[]', '[]', '[]', ?)
+      `).run(checkId, projectId, bookId, versionId, now, errorMsg);
 
       logger.error({ error, projectId }, 'coherence_check: Error');
       throw error;

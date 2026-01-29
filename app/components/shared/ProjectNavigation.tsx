@@ -5,9 +5,12 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { colors, borderRadius } from '@/app/lib/constants';
 import {
+  PROJECT_NAV_SECTIONS,
   PROJECT_NAV_GROUPS,
   TAB_STATUS_COLORS,
   getActiveGroupFromPath,
+  getActiveSectionIdFromPath,
+  type NavSection,
   type NavGroup,
   type NavTab,
 } from '@/app/lib/navigation-constants';
@@ -39,12 +42,15 @@ interface ProjectNavigationProps {
 /**
  * Project Navigation Component
  *
- * Displays the navigation tabs for a project with collapsible groups and workflow status indicators.
+ * Displays a hierarchical navigation with collapsible sections:
+ * - Stories (collapsed when viewing Draft Novels)
+ * - Draft Novels (expanded when viewing a project, contains all project pages)
+ * - Completed Novels (collapsed when viewing Draft Novels)
  *
- * Navigation structure:
+ * Within Draft Novels:
  * - Overview (standalone)
  * - Elements: Characters, World
- * - Story: Plot, Outline
+ * - Story: Plot, Outline, Prose Style
  * - Novel: Chapters, Analytics, Follow-up
  * - Editorial: Editorial Board, Outline Review
  *
@@ -61,11 +67,24 @@ export default function ProjectNavigation({
 }: ProjectNavigationProps) {
   const pathname = usePathname();
 
-  // Track which groups are expanded
+  // Track which sections are expanded (top-level: Stories, Draft Novels, Completed Novels)
+  const activeSectionId = getActiveSectionIdFromPath(pathname);
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(
+    new Set(activeSectionId ? [activeSectionId] : ['draft-novels'])
+  );
+
+  // Track which groups are expanded within a section (Elements, Story, Novel, Editorial)
   const activeGroupId = getActiveGroupFromPath(pathname, projectId);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
     new Set(activeGroupId ? [activeGroupId] : [])
   );
+
+  // Update expanded sections when active section changes
+  useEffect(() => {
+    if (activeSectionId) {
+      setExpandedSections(new Set([activeSectionId]));
+    }
+  }, [activeSectionId]);
 
   // Update expanded groups when active group changes
   useEffect(() => {
@@ -89,7 +108,18 @@ export default function ProjectNavigation({
   const shouldEnforcePrerequisites = Boolean(project);
   const { canAccess, getBlockingReason, prerequisites } = prerequisiteCheck;
 
-  // Toggle group expansion
+  // Toggle section expansion (only one section open at a time)
+  const toggleSection = (sectionId: string) => {
+    setExpandedSections(prev => {
+      const newSet = new Set<string>();
+      if (!prev.has(sectionId)) {
+        newSet.add(sectionId);
+      }
+      return newSet;
+    });
+  };
+
+  // Toggle group expansion within a section
   const toggleGroup = (groupId: string) => {
     setExpandedGroups(prev => {
       const newSet = new Set(prev);
@@ -205,16 +235,16 @@ export default function ProjectNavigation({
       tooltipText = 'Completed';
     }
 
-    // Get status icon for accessibility (Issue #5, #46)
+    // Get status icon for accessibility
     let statusIcon: string | null = null;
     if (isActive) {
-      statusIcon = '►'; // Active indicator
+      statusIcon = '►';
     } else if (status === 'completed') {
-      statusIcon = '✓'; // Checkmark for completed
+      statusIcon = '✓';
     } else if (status === 'required') {
-      statusIcon = '!'; // Exclamation for required
+      statusIcon = '!';
     } else if (status === 'locked') {
-      statusIcon = '🔒'; // Lock for locked
+      statusIcon = '🔒';
     }
 
     const tabContent = (
@@ -241,7 +271,7 @@ export default function ProjectNavigation({
       </>
     );
 
-    // Add subtle background tint for better visibility (Issue #6)
+    // Add subtle background tint for better visibility
     let backgroundColor = 'transparent';
     if (isActive && isNested) {
       backgroundColor = 'rgba(102, 126, 234, 0.08)';
@@ -256,8 +286,8 @@ export default function ProjectNavigation({
       alignItems: 'center',
       gap: '0.375rem',
       padding: isNested ? '0.5rem 1rem 0.5rem 2.5rem' : '0.625rem 1rem',
-      borderLeft: isNested ? `4px solid ${borderColor}` : 'none', // Increased from 3px to 4px (Issue #6)
-      borderBottom: !isNested ? `4px solid ${borderColor}` : 'none', // Increased from 2px to 4px (Issue #6)
+      borderLeft: isNested ? `4px solid ${borderColor}` : 'none',
+      borderBottom: !isNested ? `4px solid ${borderColor}` : 'none',
       color: isActive ? colors.brandText : colors.textSecondary,
       textDecoration: 'none',
       fontSize: '0.8125rem',
@@ -300,7 +330,7 @@ export default function ProjectNavigation({
     );
   };
 
-  // Render a navigation group
+  // Render a navigation group (within a section)
   const renderGroup = (group: NavGroup) => {
     const isExpanded = expandedGroups.has(group.id);
     const groupStatus = getGroupStatus(group);
@@ -341,18 +371,18 @@ export default function ProjectNavigation({
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem',
-              padding: '0.75rem 1rem',
+              padding: '0.625rem 1rem',
               borderBottom: `3px solid ${tabBorderColor}`,
               color: isActive ? colors.brandText : colors.textSecondary,
               textDecoration: 'none',
-              fontSize: '0.875rem',
+              fontSize: '0.8125rem',
               fontWeight: isActive ? 600 : 500,
               whiteSpace: 'nowrap',
               transition: 'all 0.2s',
             }}
             aria-current={isActive ? 'page' : undefined}
           >
-            <span aria-hidden="true" style={{ fontSize: '1rem' }}>
+            <span aria-hidden="true" style={{ fontSize: '0.875rem' }}>
               {group.icon}
             </span>
             <span>{group.label}</span>
@@ -376,7 +406,7 @@ export default function ProjectNavigation({
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
-            padding: '0.75rem 1rem',
+            padding: '0.625rem 1rem',
             borderBottom: `2px solid ${borderColor}`,
             color: isActiveGroup ? colors.brandText : colors.textSecondary,
             background: 'transparent',
@@ -384,7 +414,7 @@ export default function ProjectNavigation({
             borderBottomStyle: 'solid',
             borderBottomWidth: '2px',
             borderBottomColor: borderColor,
-            fontSize: '0.875rem',
+            fontSize: '0.8125rem',
             fontWeight: isActiveGroup ? 600 : 500,
             whiteSpace: 'nowrap',
             transition: 'all 0.2s',
@@ -393,7 +423,7 @@ export default function ProjectNavigation({
           aria-expanded={isExpanded}
           aria-controls={`nav-group-${group.id}`}
         >
-          <span aria-hidden="true" style={{ fontSize: '1rem' }}>
+          <span aria-hidden="true" style={{ fontSize: '0.875rem' }}>
             {group.icon}
           </span>
           <span>{group.label}</span>
@@ -428,6 +458,102 @@ export default function ProjectNavigation({
     );
   };
 
+  // Render a navigation section (top-level collapsible)
+  const renderSection = (section: NavSection) => {
+    const isExpanded = expandedSections.has(section.id);
+    const isActiveSection = activeSectionId === section.id;
+
+    // Section header styles
+    const sectionHeaderStyle = {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+      padding: '0.75rem 1rem',
+      background: isActiveSection ? 'rgba(102, 126, 234, 0.08)' : colors.surfaceAlt || '#F8FAFC',
+      borderBottom: `2px solid ${isActiveSection ? TAB_STATUS_COLORS.active : colors.border}`,
+      color: isActiveSection ? colors.brandText : colors.textPrimary,
+      fontSize: '0.875rem',
+      fontWeight: 600,
+      whiteSpace: 'nowrap',
+      transition: 'all 0.2s',
+      cursor: 'pointer',
+      border: 'none',
+      width: '100%',
+      textAlign: 'left' as const,
+    };
+
+    // For standalone sections (like Completed Novels), render as direct link
+    if (section.isStandalone && section.route) {
+      return (
+        <div key={section.id} style={{ display: 'flex', flexDirection: 'column' }}>
+          <Link
+            href={section.route}
+            style={{
+              ...sectionHeaderStyle,
+              textDecoration: 'none',
+            }}
+            aria-current={isActiveSection ? 'page' : undefined}
+          >
+            <span aria-hidden="true" style={{ fontSize: '1rem' }}>
+              {section.icon}
+            </span>
+            <span>{section.label}</span>
+          </Link>
+        </div>
+      );
+    }
+
+    // For sections with groups, render as collapsible
+    return (
+      <div key={section.id} style={{ display: 'flex', flexDirection: 'column' }}>
+        <button
+          onClick={() => toggleSection(section.id)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              toggleSection(section.id);
+            }
+          }}
+          style={sectionHeaderStyle}
+          aria-expanded={isExpanded}
+          aria-controls={`nav-section-${section.id}`}
+        >
+          <span aria-hidden="true" style={{ fontSize: '1rem' }}>
+            {section.icon}
+          </span>
+          <span>{section.label}</span>
+          <span
+            aria-hidden="true"
+            style={{
+              fontSize: '0.625rem',
+              marginLeft: 'auto',
+              transition: 'transform 0.2s',
+              transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+            }}
+          >
+            ▼
+          </span>
+        </button>
+
+        {/* Section content panel */}
+        <div
+          id={`nav-section-${section.id}`}
+          style={{
+            display: isExpanded ? 'flex' : 'none',
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            background: colors.surface,
+            borderBottom: isExpanded ? `1px solid ${colors.border}` : 'none',
+          }}
+          role="navigation"
+          aria-label={`${section.label} navigation`}
+        >
+          {section.groups.map(group => renderGroup(group))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <nav
       style={{
@@ -442,10 +568,11 @@ export default function ProjectNavigation({
       <div
         style={{
           display: 'flex',
+          flexDirection: 'column',
           minWidth: 'min-content',
         }}
       >
-        {PROJECT_NAV_GROUPS.map(group => renderGroup(group))}
+        {PROJECT_NAV_SECTIONS.map(section => renderSection(section))}
       </div>
     </nav>
   );

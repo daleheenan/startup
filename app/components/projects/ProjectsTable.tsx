@@ -24,6 +24,12 @@ interface ProjectMetrics {
     gbp: string;
     display: string;
   };
+  aiCost?: {
+    usd: string;
+    gbp: string;
+    display: string;
+    requests: number;
+  };
   content: {
     chapters: number;
     words: number;
@@ -660,15 +666,16 @@ export default function ProjectsTable({
                     {formatStats(project.metrics?.content?.words, project.progress?.chaptersWritten)}
                   </td>
 
-                  {/* Total Cost */}
+                  {/* Total AI Cost */}
                   <td
                     style={{
                       padding: `${spacing[2]} ${spacing[3]}`,
                       fontSize: typography.fontSize.xs,
                       color: colors.text.tertiary,
                     }}
+                    title={project.metrics?.aiCost ? `${project.metrics.aiCost.requests} AI requests` : undefined}
                   >
-                    {project.metrics?.cost?.display || '—'}
+                    {project.metrics?.aiCost?.display || project.metrics?.cost?.display || '—'}
                   </td>
 
                   {/* Actions - Hover reveal with icons */}

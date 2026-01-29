@@ -215,17 +215,25 @@ router.get('/:id/progress', (req, res) => {
       });
     }
 
-    // Step 2: Fetch all books for the project
+    // Step 2: Fetch all books for the project and their active versions
     const booksStmt = db.prepare<[string], any>(`
-      SELECT id FROM books WHERE project_id = ?
+      SELECT b.id, bv.id as active_version_id, bv.version_number, bv.version_name
+      FROM books b
+      LEFT JOIN book_versions bv ON b.id = bv.book_id AND bv.is_active = 1
+      WHERE b.project_id = ?
     `);
     const books = booksStmt.all(projectId);
 
-    // Step 3: Fetch all chapters for all books with status counts
+    // Get the active version IDs for filtering
+    const activeVersionIds = books.map((b: any) => b.active_version_id).filter(Boolean);
+
+    // Step 3: Fetch chapters for ACTIVE VERSIONS ONLY (or legacy chapters with null version_id)
+    // This ensures progress reflects the currently selected version, not all versions
     const chaptersStmt = db.prepare(`
       SELECT
         c.id,
         c.book_id,
+        c.version_id,
         c.chapter_number,
         c.title,
         c.status,
@@ -235,7 +243,9 @@ router.get('/:id/progress', (req, res) => {
         c.updated_at
       FROM chapters c
       INNER JOIN books b ON c.book_id = b.id
+      LEFT JOIN book_versions bv ON c.version_id = bv.id
       WHERE b.project_id = ?
+        AND (c.version_id IS NULL OR bv.is_active = 1)
       ORDER BY b.book_number ASC, c.chapter_number ASC
     `);
     const allChapters = chaptersStmt.all(projectId) as any[];
@@ -268,7 +278,7 @@ router.get('/:id/progress', (req, res) => {
       ? Math.round(totalWordCount / chapterStats.completed)
       : 2250;
 
-    // Step 4: Fetch queue statistics for this project
+    // Step 4: Fetch queue statistics for this project (active version only)
     const queueStmt = db.prepare(`
       SELECT
         j.status,
@@ -276,7 +286,9 @@ router.get('/:id/progress', (req, res) => {
       FROM jobs j
       INNER JOIN chapters c ON j.target_id = c.id
       INNER JOIN books b ON c.book_id = b.id
+      LEFT JOIN book_versions bv ON c.version_id = bv.id
       WHERE b.project_id = ?
+        AND (c.version_id IS NULL OR bv.is_active = 1)
       GROUP BY j.status
     `);
     const queueResults = queueStmt.all(projectId) as any[];
@@ -295,7 +307,7 @@ router.get('/:id/progress', (req, res) => {
       if (row.status === 'paused') queueStats.paused = row.count;
     });
 
-    // Step 5: Get current activity (most recent running job)
+    // Step 5: Get current activity (most recent running job) - active version only
     const currentActivityStmt = db.prepare(`
       SELECT
         j.id as job_id,
@@ -306,13 +318,15 @@ router.get('/:id/progress', (req, res) => {
       FROM jobs j
       INNER JOIN chapters c ON j.target_id = c.id
       INNER JOIN books b ON c.book_id = b.id
+      LEFT JOIN book_versions bv ON c.version_id = bv.id
       WHERE b.project_id = ? AND j.status = 'running'
+        AND (c.version_id IS NULL OR bv.is_active = 1)
       ORDER BY j.started_at DESC
       LIMIT 1
     `);
     const currentActivity = currentActivityStmt.get(projectId) as any;
 
-    // Step 6: Get recent events (last 10 completed jobs)
+    // Step 6: Get recent events (last 10 completed jobs) - active version only
     const recentEventsStmt = db.prepare(`
       SELECT
         j.id,
@@ -322,7 +336,9 @@ router.get('/:id/progress', (req, res) => {
       FROM jobs j
       INNER JOIN chapters c ON j.target_id = c.id
       INNER JOIN books b ON c.book_id = b.id
+      LEFT JOIN book_versions bv ON c.version_id = bv.id
       WHERE b.project_id = ? AND j.status = 'completed'
+        AND (c.version_id IS NULL OR bv.is_active = 1)
       ORDER BY j.completed_at DESC
       LIMIT 10
     `);
@@ -444,6 +460,14 @@ router.get('/:id/progress', (req, res) => {
       };
     }
 
+    // Get the first book's active version info for display
+    const firstBook = books[0];
+    const activeVersion = firstBook?.active_version_id ? {
+      id: firstBook.active_version_id,
+      versionNumber: firstBook.version_number,
+      versionName: firstBook.version_name,
+    } : null;
+
     // Construct response
     const response = {
       project: {
@@ -471,6 +495,7 @@ router.get('/:id/progress', (req, res) => {
       recentEvents,
       flags: flagStats,
       rateLimitStatus,
+      activeVersion,
     };
 
     res.json(response);
@@ -3403,12 +3428,29 @@ Return ONLY a JSON object:
 
 /**
  * GET /api/projects/:id/coherence-check
- * Get the latest cached coherence check result for a project
+ * Get the latest cached coherence check result for a project's active book version
  * Returns cached result if available, or status if check is in progress
  */
 router.get('/:id/coherence-check', (req, res) => {
   try {
     const { id: projectId } = req.params;
+
+    // Get the first book and its active version
+    const bookData = db.prepare<[string], { book_id: string }>(`
+      SELECT b.id as book_id
+      FROM books b
+      WHERE b.project_id = ?
+      ORDER BY b.book_number
+      LIMIT 1
+    `).get(projectId);
+
+    let activeVersionId: string | null = null;
+    if (bookData?.book_id) {
+      const activeVersion = db.prepare<[string], { id: string }>(`
+        SELECT id FROM book_versions WHERE book_id = ? AND is_active = 1
+      `).get(bookData.book_id);
+      activeVersionId = activeVersion?.id || null;
+    }
 
     // Check for running/pending job first
     const pendingJob = db.prepare<[string], { id: string; status: string; created_at: string }>(`
@@ -3424,21 +3466,25 @@ router.get('/:id/coherence-check', (req, res) => {
         jobId: pendingJob.id,
         startedAt: pendingJob.created_at,
         message: pendingJob.status === 'running' ? 'Coherence check in progress...' : 'Coherence check queued...',
+        activeVersionId,
       });
     }
 
-    // Get the latest completed coherence check
-    const latestCheck = db.prepare<[string], any>(`
+    // Get the latest completed coherence check for this version
+    // If version_id is null, check for legacy records (null) or matching version
+    const latestCheck = db.prepare<[string, string | null, string | null], any>(`
       SELECT * FROM coherence_checks
       WHERE project_id = ?
+        AND (version_id = ? OR (version_id IS NULL AND ? IS NULL))
       ORDER BY checked_at DESC
       LIMIT 1
-    `).get(projectId);
+    `).get(projectId, activeVersionId, activeVersionId);
 
     if (!latestCheck) {
       return res.json({
         status: 'none',
-        message: 'No coherence check has been run for this project',
+        message: 'No coherence check has been run for this project version',
+        activeVersionId,
       });
     }
 
@@ -3451,6 +3497,8 @@ router.get('/:id/coherence-check', (req, res) => {
       suggestions: safeJsonParse(latestCheck.suggestions, []),
       plotAnalysis: safeJsonParse(latestCheck.plot_analysis, []),
       error: latestCheck.error,
+      versionId: latestCheck.version_id,
+      activeVersionId,
     });
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack }, 'Error fetching coherence check');

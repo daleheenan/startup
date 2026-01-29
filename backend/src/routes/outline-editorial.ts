@@ -184,28 +184,45 @@ router.post('/projects/:projectId/outline-editorial/submit', async (req, res) =>
 
 /**
  * GET /api/projects/:projectId/outline-editorial/status
- * Check outline editorial processing status
+ * Check outline editorial processing status for the active book version
  */
 router.get('/projects/:projectId/outline-editorial/status', (req, res) => {
   try {
     const { projectId } = req.params;
 
-    // Get project review status
+    // Get project review status and the first book with its active version
     const project = db.prepare(`
-      SELECT outline_review_status, outline_review_completed_at FROM projects WHERE id = ?
+      SELECT p.outline_review_status, p.outline_review_completed_at,
+             b.id as book_id
+      FROM projects p
+      LEFT JOIN books b ON b.project_id = p.id
+      WHERE p.id = ?
+      ORDER BY b.book_number
+      LIMIT 1
     `).get(projectId) as any;
 
     if (!project) {
       return sendNotFound(res, 'Project');
     }
 
-    // Get the most recent report
+    // Get the active version for the book (if versioning is enabled)
+    let activeVersionId: string | null = null;
+    if (project.book_id) {
+      const activeVersion = db.prepare(`
+        SELECT id FROM book_versions WHERE book_id = ? AND is_active = 1
+      `).get(project.book_id) as { id: string } | undefined;
+      activeVersionId = activeVersion?.id || null;
+    }
+
+    // Get the most recent report for this version
+    // If version_id is null, we check for reports that also have null version_id (legacy) OR version_id matches
     const report = db.prepare(`
       SELECT * FROM outline_editorial_reports
       WHERE project_id = ?
+        AND (version_id = ? OR (version_id IS NULL AND ? IS NULL))
       ORDER BY created_at DESC
       LIMIT 1
-    `).get(projectId) as any;
+    `).get(projectId, activeVersionId, activeVersionId) as any;
 
     if (!report) {
       return res.json({
@@ -214,6 +231,7 @@ router.get('/projects/:projectId/outline-editorial/status', (req, res) => {
         status: null,
         modules: null,
         progress: 0,
+        activeVersionId,
       });
     }
 
@@ -243,6 +261,8 @@ router.get('/projects/:projectId/outline-editorial/status', (req, res) => {
       createdAt: report.created_at,
       completedAt: report.completed_at,
       error: report.error,
+      versionId: report.version_id,
+      activeVersionId,
     });
   } catch (error: any) {
     logger.error({ error }, 'Error getting outline editorial status');
@@ -252,18 +272,37 @@ router.get('/projects/:projectId/outline-editorial/status', (req, res) => {
 
 /**
  * GET /api/projects/:projectId/outline-editorial/report
- * Get the full outline editorial report
+ * Get the full outline editorial report for the active book version
  */
 router.get('/projects/:projectId/outline-editorial/report', (req, res) => {
   try {
     const { projectId } = req.params;
 
+    // Get the first book and its active version
+    const bookData = db.prepare(`
+      SELECT b.id as book_id
+      FROM books b
+      WHERE b.project_id = ?
+      ORDER BY b.book_number
+      LIMIT 1
+    `).get(projectId) as { book_id: string } | undefined;
+
+    let activeVersionId: string | null = null;
+    if (bookData?.book_id) {
+      const activeVersion = db.prepare(`
+        SELECT id FROM book_versions WHERE book_id = ? AND is_active = 1
+      `).get(bookData.book_id) as { id: string } | undefined;
+      activeVersionId = activeVersion?.id || null;
+    }
+
+    // Get report for this version
     const report = db.prepare(`
       SELECT * FROM outline_editorial_reports
       WHERE project_id = ?
+        AND (version_id = ? OR (version_id IS NULL AND ? IS NULL))
       ORDER BY created_at DESC
       LIMIT 1
-    `).get(projectId) as any;
+    `).get(projectId, activeVersionId, activeVersionId) as any;
 
     if (!report) {
       return sendNotFound(res, 'Outline editorial report');

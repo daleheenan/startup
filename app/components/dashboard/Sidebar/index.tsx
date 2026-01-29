@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useCallback, type CSSProperties } from 'react';
+import { useEffect, useCallback, useState, type CSSProperties } from 'react';
 import { usePathname } from 'next/navigation';
 
 import { useDashboardContext } from '../DashboardContext';
@@ -8,6 +8,7 @@ import SidebarLogo from './SidebarLogo';
 import SidebarSearch from './SidebarSearch';
 import SidebarNavGroup from './SidebarNavGroup';
 import SidebarUserProfile from './SidebarUserProfile';
+import { getToken } from '@/app/lib/auth';
 
 import {
   colors,
@@ -16,6 +17,8 @@ import {
   transitions,
   zIndex,
 } from '@/app/lib/design-tokens';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 // ==================== PROPS ====================
 
@@ -182,6 +185,15 @@ function EditorialIcon() {
   );
 }
 
+function AICostsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="1" x2="12" y2="23" />
+      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+    </svg>
+  );
+}
+
 // ==================== NAVIGATION STRUCTURE ====================
 
 /**
@@ -291,20 +303,91 @@ function deriveActiveItemId(pathname: string): string | null {
 export default function Sidebar({ collapsed: collapsedProp, onCollapseToggle }: SidebarProps) {
   const { state, dispatch } = useDashboardContext();
   const pathname = usePathname();
+  const [showAICosts, setShowAICosts] = useState(false);
 
   // Prefer the explicit prop; fall back to context-driven state.
   const collapsed = collapsedProp ?? state.sidebarCollapsed;
 
+  // Fetch user preferences to determine if AI Costs should be shown
+  useEffect(() => {
+    const fetchPreferences = async () => {
+      try {
+        const token = getToken();
+        if (!token) return;
+
+        const res = await fetch(`${API_BASE_URL}/api/user-settings/preferences`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setShowAICosts(data.preferences?.showAICostsMenu || false);
+        }
+      } catch (error) {
+        console.error('Error fetching user preferences:', error);
+      }
+    };
+
+    fetchPreferences();
+
+    // Listen for preference updates from settings page
+    const handlePreferencesUpdated = () => {
+      fetchPreferences();
+    };
+    window.addEventListener('preferencesUpdated', handlePreferencesUpdated);
+
+    return () => {
+      window.removeEventListener('preferencesUpdated', handlePreferencesUpdated);
+    };
+  }, []);
+
+  // Build dynamic navigation groups based on preferences
+  const dynamicNavigationGroups = navigationGroups.map((group) => {
+    if (group.id === 'projects' && showAICosts) {
+      return {
+        ...group,
+        items: [
+          ...group.items,
+          { id: 'ai-costs', label: 'AI Costs', href: '/ai-costs', icon: <AICostsIcon /> },
+        ],
+      };
+    }
+    return group;
+  });
+
   // ---- Sync active nav item whenever the route changes ----
 
   useEffect(() => {
-    const activeId = deriveActiveItemId(pathname);
+    // Custom active item derivation that uses dynamic navigation groups
+    const deriveActiveItemIdFromGroups = (currentPath: string): string | null => {
+      // First pass: check all nested items (higher priority)
+      for (const group of dynamicNavigationGroups) {
+        for (const item of group.items) {
+          if (item.href.startsWith('http://') || item.href.startsWith('https://')) {
+            continue;
+          }
+          if (currentPath === item.href || (item.href !== '/' && currentPath.startsWith(item.href))) {
+            return item.id;
+          }
+        }
+      }
+      // Second pass: check standalone groups (lower priority)
+      for (const group of dynamicNavigationGroups) {
+        if (group.isStandalone && group.href) {
+          if (currentPath === group.href || (group.href !== '/' && currentPath.startsWith(group.href))) {
+            return group.id;
+          }
+        }
+      }
+      return null;
+    };
+
+    const activeId = deriveActiveItemIdFromGroups(pathname);
     dispatch({ type: 'SET_ACTIVE_NAV_ITEM', payload: activeId });
 
     // Find which group contains the active item
     let activeGroupId: string | null = null;
     if (activeId) {
-      for (const group of navigationGroups) {
+      for (const group of dynamicNavigationGroups) {
         if (group.items.some((item) => item.id === activeId)) {
           activeGroupId = group.id;
           break;
@@ -313,7 +396,7 @@ export default function Sidebar({ collapsed: collapsedProp, onCollapseToggle }: 
     }
 
     // Expand only the active group, collapse all others
-    for (const group of navigationGroups) {
+    for (const group of dynamicNavigationGroups) {
       if (!group.isStandalone) {
         if (group.id === activeGroupId) {
           dispatch({ type: 'EXPAND_NAV_GROUP', payload: group.id });
@@ -322,7 +405,7 @@ export default function Sidebar({ collapsed: collapsedProp, onCollapseToggle }: 
         }
       }
     }
-  }, [pathname, dispatch]);
+  }, [pathname, dispatch, dynamicNavigationGroups]);
 
   // ---- Toggle handlers ----
 
@@ -410,7 +493,7 @@ export default function Sidebar({ collapsed: collapsedProp, onCollapseToggle }: 
 
       {/* Navigation groups — scrollable region */}
       <nav style={navSectionStyle} aria-label="Main navigation">
-        {navigationGroups.map((group) => (
+        {dynamicNavigationGroups.map((group) => (
           <SidebarNavGroup
             key={group.id}
             id={group.id}

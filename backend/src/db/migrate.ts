@@ -341,6 +341,10 @@ export function runMigrations() {
       '046_editorial_lessons.sql',       // DB version 46 - editorial lessons learned tracking
       '047_editorial_rewrite_versioning.sql', // DB version 47 - versioning for editorial rewrites
       '048_commercial_beat_validation.sql', // DB version 48 - commercial beat validation and chapter briefs
+      '049_version_notes.sql',             // DB version 49 - version notes for book versions
+      '050_version_aware_reports.sql',     // DB version 50 - version-aware editorial reports
+      '051_ai_request_log.sql',            // DB version 51 - AI request audit log for cost tracking
+      '052_backfill_ai_request_log.sql',   // DB version 52 - backfill historical AI costs
     ];
 
     for (let i = 0; i < migrationFiles.length; i++) {
@@ -465,6 +469,10 @@ export function getMigrationStatus(): {
     '046_editorial_lessons.sql',
     '047_editorial_rewrite_versioning.sql',
     '048_commercial_beat_validation.sql',
+    '049_version_notes.sql',
+    '050_version_aware_reports.sql',
+    '051_ai_request_log.sql',
+    '052_backfill_ai_request_log.sql',
   ];
 
   const pendingMigrations: string[] = [];

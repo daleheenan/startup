@@ -1,10 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getToken } from '../lib/auth';
 import { colors, typography, spacing, borderRadius, transitions, shadows } from '../lib/design-tokens';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
+
+// ==================== USER PREFERENCES TYPES ====================
+
+interface UserPreferences {
+  showAICostsMenu: boolean;
+}
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -124,9 +130,58 @@ export default function SettingsPage() {
     recipes: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [preferences, setPreferences] = useState<UserPreferences>({
+    showAICostsMenu: false,
+  });
+  const [savingPreferences, setSavingPreferences] = useState(false);
 
   useEffect(() => {
     fetchStats();
+    fetchPreferences();
+  }, []);
+
+  const fetchPreferences = async () => {
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE_URL}/api/user-settings/preferences`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPreferences({
+          showAICostsMenu: data.preferences?.showAICostsMenu || false,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching preferences:', error);
+    }
+  };
+
+  const updatePreference = useCallback(async (key: keyof UserPreferences, value: boolean) => {
+    setSavingPreferences(true);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE_URL}/api/user-settings/preferences`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ [key]: value }),
+      });
+
+      if (res.ok) {
+        setPreferences((prev) => ({ ...prev, [key]: value }));
+        // Trigger a page reload to update navigation
+        if (key === 'showAICostsMenu') {
+          window.dispatchEvent(new CustomEvent('preferencesUpdated'));
+        }
+      }
+    } catch (error) {
+      console.error('Error updating preference:', error);
+    } finally {
+      setSavingPreferences(false);
+    }
   }, []);
 
   const fetchStats = async () => {
@@ -338,6 +393,98 @@ export default function SettingsPage() {
               </div>
             </Link>
           ))}
+        </div>
+
+        {/* Display Preferences */}
+        <div style={{ ...tipsContainerStyle, marginTop: spacing[6] }}>
+          <h2 style={tipsTitleStyle}>Display Preferences</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[4] }}>
+            {/* AI Costs Toggle */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: spacing[4],
+                background: colors.background.primary,
+                borderRadius: borderRadius.md,
+              }}
+            >
+              <div>
+                <h3
+                  style={{
+                    margin: 0,
+                    marginBottom: spacing[1],
+                    fontSize: typography.fontSize.sm,
+                    fontWeight: typography.fontWeight.semibold,
+                    color: colors.text.primary,
+                    fontFamily: typography.fontFamily.base,
+                  }}
+                >
+                  Show AI Costs in Menu
+                </h3>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: typography.fontSize.xs,
+                    color: colors.text.tertiary,
+                    fontFamily: typography.fontFamily.base,
+                  }}
+                >
+                  Display the AI Costs page in the main navigation for tracking all AI request costs
+                </p>
+              </div>
+              <label
+                style={{
+                  position: 'relative',
+                  display: 'inline-block',
+                  width: '48px',
+                  height: '24px',
+                  cursor: savingPreferences ? 'wait' : 'pointer',
+                  opacity: savingPreferences ? 0.7 : 1,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={preferences.showAICostsMenu}
+                  onChange={(e) => updatePreference('showAICostsMenu', e.target.checked)}
+                  disabled={savingPreferences}
+                  style={{
+                    opacity: 0,
+                    width: 0,
+                    height: 0,
+                  }}
+                />
+                <span
+                  style={{
+                    position: 'absolute',
+                    cursor: savingPreferences ? 'wait' : 'pointer',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: preferences.showAICostsMenu ? colors.brand.primary : colors.background.surfaceHover,
+                    transition: transitions.all,
+                    borderRadius: '24px',
+                  }}
+                >
+                  <span
+                    style={{
+                      position: 'absolute',
+                      content: '""',
+                      height: '18px',
+                      width: '18px',
+                      left: preferences.showAICostsMenu ? '27px' : '3px',
+                      bottom: '3px',
+                      background: colors.white,
+                      transition: transitions.all,
+                      borderRadius: '50%',
+                    }}
+                  />
+                </span>
+              </label>
+            </div>
+          </div>
         </div>
 
         {/* Quick Tips */}

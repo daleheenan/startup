@@ -158,11 +158,18 @@ export class OutlineEditorialService {
     logger.info({ projectId }, '[OutlineEditorial] Submitting outline for editorial review');
 
     // Verify project exists and has an outline
+    // Get the first book and its outline for this project
     const projectStmt = db.prepare(`
       SELECT p.id, p.title, p.genre, p.story_dna, p.story_bible,
-             (SELECT o.id FROM outlines o JOIN books b ON o.book_id = b.id WHERE b.project_id = p.id LIMIT 1) as outline_id,
-             (SELECT o.structure FROM outlines o JOIN books b ON o.book_id = b.id WHERE b.project_id = p.id LIMIT 1) as outline_structure
-      FROM projects p WHERE p.id = ?
+             b.id as book_id,
+             o.id as outline_id,
+             o.structure as outline_structure
+      FROM projects p
+      JOIN books b ON b.project_id = p.id
+      LEFT JOIN outlines o ON o.book_id = b.id
+      WHERE p.id = ?
+      ORDER BY b.book_number
+      LIMIT 1
     `);
     const project = projectStmt.get(projectId) as any;
 
@@ -174,13 +181,22 @@ export class OutlineEditorialService {
       throw new Error('Project has no outline to review');
     }
 
-    // Check for existing pending/processing report
+    // Get the active version for this book (if versioning is enabled)
+    const activeVersionStmt = db.prepare(`
+      SELECT id FROM book_versions WHERE book_id = ? AND is_active = 1
+    `);
+    const activeVersion = activeVersionStmt.get(project.book_id) as { id: string } | undefined;
+    const versionId = activeVersion?.id || null;
+
+    // Check for existing pending/processing report for this version
+    // If there's already a report in progress for a different version, still allow a new one
     const existingStmt = db.prepare(`
       SELECT id, status FROM outline_editorial_reports
       WHERE project_id = ? AND status IN ('pending', 'processing')
+        AND (version_id = ? OR (version_id IS NULL AND ? IS NULL))
       ORDER BY created_at DESC LIMIT 1
     `);
-    const existing = existingStmt.get(projectId) as any;
+    const existing = existingStmt.get(projectId, versionId, versionId) as any;
 
     if (existing) {
       return {
@@ -189,13 +205,13 @@ export class OutlineEditorialService {
       };
     }
 
-    // Create new report
+    // Create new report with book_id and version_id for proper version tracking
     const reportId = randomUUID();
     const insertStmt = db.prepare(`
-      INSERT INTO outline_editorial_reports (id, project_id, outline_id, status)
-      VALUES (?, ?, ?, 'pending')
+      INSERT INTO outline_editorial_reports (id, project_id, book_id, version_id, outline_id, status)
+      VALUES (?, ?, ?, ?, ?, 'pending')
     `);
-    insertStmt.run(reportId, projectId, project.outline_id);
+    insertStmt.run(reportId, projectId, project.book_id, versionId, project.outline_id);
 
     // Update project review status
     const updateProjectStmt = db.prepare(`
@@ -203,7 +219,7 @@ export class OutlineEditorialService {
     `);
     updateProjectStmt.run(projectId);
 
-    logger.info({ reportId, projectId, outlineId: project.outline_id }, '[OutlineEditorial] Created outline editorial report');
+    logger.info({ reportId, projectId, bookId: project.book_id, versionId, outlineId: project.outline_id }, '[OutlineEditorial] Created outline editorial report');
 
     return {
       reportId,

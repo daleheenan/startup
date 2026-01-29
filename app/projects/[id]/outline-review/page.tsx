@@ -2432,34 +2432,66 @@ export default function OutlineReviewPage() {
           </div>
         ) : (
           <>
-            {/* Tabs */}
+            {/* Tabs and Actions Header */}
             <div style={{
               display: 'flex',
-              gap: '0.5rem',
+              justifyContent: 'space-between',
+              alignItems: 'center',
               marginBottom: '1.5rem',
               borderBottom: '1px solid #E2E8F0',
               paddingBottom: '0.5rem',
+              flexWrap: 'wrap',
+              gap: '0.5rem',
             }}>
-              {(['overview', 'structure', 'characters', 'market'] as TabType[]).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  style={{
-                    padding: '0.75rem 1.5rem',
-                    background: activeTab === tab ? '#667eea' : 'transparent',
-                    color: activeTab === tab ? 'white' : '#64748B',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontWeight: activeTab === tab ? '600' : '400',
-                    textTransform: 'capitalize',
-                  }}
-                >
-                  {tab === 'structure' ? 'Story Structure' :
-                    tab === 'characters' ? 'Character Arcs' :
-                      tab === 'market' ? 'Market Fit' : tab}
-                </button>
-              ))}
+              {/* Tabs */}
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                {(['overview', 'structure', 'characters', 'market'] as TabType[]).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      background: activeTab === tab ? '#667eea' : 'transparent',
+                      color: activeTab === tab ? 'white' : '#64748B',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontWeight: activeTab === tab ? '600' : '400',
+                      textTransform: 'capitalize',
+                    }}
+                  >
+                    {tab === 'structure' ? 'Story Structure' :
+                      tab === 'characters' ? 'Character Arcs' :
+                        tab === 'market' ? 'Market Fit' : tab}
+                  </button>
+                ))}
+              </div>
+
+              {/* Request New Review Button */}
+              <button
+                onClick={handleSubmit}
+                disabled={submitting}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: submitting ? '#94A3B8' : 'transparent',
+                  color: submitting ? 'white' : '#667eea',
+                  border: '1px solid #667eea',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: submitting ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.375rem',
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M23 4v6h-6" />
+                  <path d="M1 20v-6h6" />
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                </svg>
+                {submitting ? 'Submitting...' : 'Request New Review'}
+              </button>
             </div>
 
             {/* Tab Content */}
