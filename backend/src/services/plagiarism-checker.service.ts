@@ -159,6 +159,180 @@ export class PlagiarismCheckerService {
   }
 
   /**
+   * Check all chapters in a book for originality
+   * Supports filtering by versionId
+   */
+  async checkBook(bookId: string, versionId?: string): Promise<BatchPlagiarismResult> {
+    logger.info({ bookId, versionId }, '[PlagiarismChecker] Checking book chapters');
+
+    let chapters: { id: string; chapter_number: number; content: string | null }[];
+
+    if (versionId) {
+      const stmt = db.prepare<[string], { id: string; chapter_number: number; content: string | null }>(`
+        SELECT id, chapter_number, content
+        FROM chapters
+        WHERE version_id = ? AND content IS NOT NULL
+        ORDER BY chapter_number
+      `);
+      chapters = stmt.all(versionId);
+    } else {
+      // Get active version for the book
+      const activeVersionStmt = db.prepare<[string], { id: string }>(`
+        SELECT id FROM book_versions WHERE book_id = ? AND is_active = 1
+      `);
+      const activeVersion = activeVersionStmt.get(bookId);
+
+      if (activeVersion) {
+        const stmt = db.prepare<[string], { id: string; chapter_number: number; content: string | null }>(`
+          SELECT id, chapter_number, content
+          FROM chapters
+          WHERE version_id = ? AND content IS NOT NULL
+          ORDER BY chapter_number
+        `);
+        chapters = stmt.all(activeVersion.id);
+      } else {
+        // Legacy: no versions
+        const stmt = db.prepare<[string], { id: string; chapter_number: number; content: string | null }>(`
+          SELECT id, chapter_number, content
+          FROM chapters
+          WHERE book_id = ? AND version_id IS NULL AND content IS NOT NULL
+          ORDER BY chapter_number
+        `);
+        chapters = stmt.all(bookId);
+      }
+    }
+
+    if (chapters.length === 0) {
+      return {
+        totalChecked: 0,
+        passedCount: 0,
+        flaggedCount: 0,
+        averageOriginalityScore: 0,
+        results: [],
+      };
+    }
+
+    const results: PlagiarismCheckResult[] = [];
+    let passedCount = 0;
+    let flaggedCount = 0;
+    let totalScore = 0;
+
+    for (const chapter of chapters) {
+      try {
+        const result = await this.checkChapter(chapter.id);
+        results.push(result);
+
+        if (result.status === 'passed') {
+          passedCount++;
+        } else if (result.status === 'flagged') {
+          flaggedCount++;
+        }
+
+        totalScore += result.originalityScore.overall;
+      } catch (error) {
+        logger.error({ error, chapterId: chapter.id }, 'Failed to check chapter');
+      }
+    }
+
+    return {
+      totalChecked: results.length,
+      passedCount,
+      flaggedCount,
+      averageOriginalityScore: results.length > 0 ? totalScore / results.length : 0,
+      results,
+    };
+  }
+
+  /**
+   * Get originality summary for a book (from existing chapter check results)
+   */
+  getBookOriginalitySummary(bookId: string, versionId?: string): BatchPlagiarismResult | null {
+    logger.info({ bookId, versionId }, '[PlagiarismChecker] Getting book originality summary');
+
+    let chapterIds: { id: string }[];
+
+    if (versionId) {
+      const stmt = db.prepare<[string], { id: string }>(`
+        SELECT id FROM chapters WHERE version_id = ? AND content IS NOT NULL ORDER BY chapter_number
+      `);
+      chapterIds = stmt.all(versionId);
+    } else {
+      // Get active version
+      const activeVersionStmt = db.prepare<[string], { id: string }>(`
+        SELECT id FROM book_versions WHERE book_id = ? AND is_active = 1
+      `);
+      const activeVersion = activeVersionStmt.get(bookId);
+
+      if (activeVersion) {
+        const stmt = db.prepare<[string], { id: string }>(`
+          SELECT id FROM chapters WHERE version_id = ? AND content IS NOT NULL ORDER BY chapter_number
+        `);
+        chapterIds = stmt.all(activeVersion.id);
+      } else {
+        const stmt = db.prepare<[string], { id: string }>(`
+          SELECT id FROM chapters WHERE book_id = ? AND version_id IS NULL AND content IS NOT NULL ORDER BY chapter_number
+        `);
+        chapterIds = stmt.all(bookId);
+      }
+    }
+
+    if (chapterIds.length === 0) {
+      return null;
+    }
+
+    const results: PlagiarismCheckResult[] = [];
+    let passedCount = 0;
+    let flaggedCount = 0;
+    let totalScore = 0;
+
+    for (const { id: chapterId } of chapterIds) {
+      const latestResult = this.getLatestCheckResultSync(chapterId);
+      if (latestResult) {
+        results.push(latestResult);
+
+        if (latestResult.status === 'passed') {
+          passedCount++;
+        } else if (latestResult.status === 'flagged') {
+          flaggedCount++;
+        }
+
+        totalScore += latestResult.originalityScore.overall;
+      }
+    }
+
+    if (results.length === 0) {
+      return null;
+    }
+
+    return {
+      totalChecked: results.length,
+      passedCount,
+      flaggedCount,
+      averageOriginalityScore: results.length > 0 ? totalScore / results.length : 0,
+      results,
+    };
+  }
+
+  /**
+   * Synchronous version of getLatestCheckResult for internal use
+   */
+  private getLatestCheckResultSync(contentId: string): PlagiarismCheckResult | null {
+    const stmt = db.prepare<[string], any>(`
+      SELECT * FROM plagiarism_checks
+      WHERE content_id = ?
+      ORDER BY checked_at DESC
+      LIMIT 1
+    `);
+    const row = stmt.get(contentId);
+
+    if (!row) {
+      return null;
+    }
+
+    return this.rowToResult(row);
+  }
+
+  /**
    * Batch check all saved concepts
    */
   async checkAllConcepts(): Promise<BatchPlagiarismResult> {
@@ -481,6 +655,24 @@ Output ONLY valid JSON, no additional commentary:`;
   }
 
   /**
+   * Convert a database row to PlagiarismCheckResult
+   */
+  private rowToResult(row: any): PlagiarismCheckResult {
+    return {
+      id: row.id,
+      contentType: row.content_type,
+      contentId: row.content_id,
+      checkedAt: row.checked_at,
+      status: row.status,
+      originalityScore: JSON.parse(row.originality_score),
+      similarWorks: JSON.parse(row.similar_works),
+      flags: JSON.parse(row.flags),
+      recommendations: JSON.parse(row.recommendations),
+      analysisDetails: JSON.parse(row.analysis_details),
+    };
+  }
+
+  /**
    * Get previous check results for content
    */
   async getCheckResults(contentId: string): Promise<PlagiarismCheckResult[]> {
@@ -492,18 +684,7 @@ Output ONLY valid JSON, no additional commentary:`;
       `);
       const rows = stmt.all(contentId);
 
-      return rows.map((row: any) => ({
-        id: row.id,
-        contentType: row.content_type,
-        contentId: row.content_id,
-        checkedAt: row.checked_at,
-        status: row.status,
-        originalityScore: JSON.parse(row.originality_score),
-        similarWorks: JSON.parse(row.similar_works),
-        flags: JSON.parse(row.flags),
-        recommendations: JSON.parse(row.recommendations),
-        analysisDetails: JSON.parse(row.analysis_details),
-      }));
+      return rows.map((row: any) => this.rowToResult(row));
     } catch (error) {
       logger.warn({ error }, 'Failed to get check results - table may not exist');
       return [];

@@ -144,7 +144,12 @@ export default function AnalyticsPage() {
           <p>No books found for this project.</p>
         </div>
       ) : (
-        <AnalyticsDashboard key={selectedBookId} bookId={selectedBookId} genre={project?.genre} />
+        <AnalyticsDashboard
+          key={`${selectedBookId}-${selectedVersionId || 'active'}`}
+          bookId={selectedBookId}
+          versionId={selectedVersionId}
+          genre={project?.genre}
+        />
       )}
     </DashboardLayout>
   );

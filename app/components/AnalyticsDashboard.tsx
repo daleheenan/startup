@@ -110,14 +110,25 @@ const metricExplanations: Record<string, string> = {
 
 interface AnalyticsDashboardProps {
   bookId: string;
+  versionId?: string | null;
   genre?: string;
 }
 
-export default function AnalyticsDashboard({ bookId, genre = 'default' }: AnalyticsDashboardProps) {
+interface OriginalitySummary {
+  totalChecked: number;
+  passedCount: number;
+  flaggedCount: number;
+  averageOriginalityScore: number;
+  results: any[];
+}
+
+export default function AnalyticsDashboard({ bookId, versionId, genre = 'default' }: AnalyticsDashboardProps) {
   const [bookAnalytics, setBookAnalytics] = useState<BookAnalytics | null>(null);
   const [chapterAnalytics, setChapterAnalytics] = useState<ChapterAnalytics[]>([]);
+  const [originalitySummary, setOriginalitySummary] = useState<OriginalitySummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
+  const [checkingOriginality, setCheckingOriginality] = useState(false);
 
   // Get genre-specific targets (normalise genre name)
   const normalizedGenre = genre?.toLowerCase().replace(/[^a-z]/g, '') || 'default';
@@ -129,7 +140,7 @@ export default function AnalyticsDashboard({ bookId, genre = 'default' }: Analyt
       console.error('Failed to load analytics on mount:', err);
       setLoading(false);
     });
-  }, [bookId]);
+  }, [bookId, versionId]);
 
   const loadAnalytics = async () => {
     try {
@@ -147,11 +158,24 @@ export default function AnalyticsDashboard({ bookId, genre = 'default' }: Analyt
         setBookAnalytics(bookData.analytics);
       }
 
-      // Load chapter analytics
-      const chaptersResponse = await fetch(`${API_BASE_URL}/api/analytics/book/${bookId}/chapters`, { headers });
+      // Load chapter analytics (filter by version if specified)
+      const chaptersUrl = versionId
+        ? `${API_BASE_URL}/api/analytics/book/${bookId}/chapters?versionId=${versionId}`
+        : `${API_BASE_URL}/api/analytics/book/${bookId}/chapters`;
+      const chaptersResponse = await fetch(chaptersUrl, { headers });
       if (chaptersResponse.ok) {
         const chaptersData = await chaptersResponse.json();
         setChapterAnalytics(chaptersData.analytics || []);
+      }
+
+      // Load originality summary (filter by version if specified)
+      const originalityUrl = versionId
+        ? `${API_BASE_URL}/api/plagiarism/book/${bookId}/summary?versionId=${versionId}`
+        : `${API_BASE_URL}/api/plagiarism/book/${bookId}/summary`;
+      const originalityResponse = await fetch(originalityUrl, { headers });
+      if (originalityResponse.ok) {
+        const originalityData = await originalityResponse.json();
+        setOriginalitySummary(originalityData.summary || null);
       }
     } catch (error) {
       console.error('Error loading analytics:', error);
@@ -184,6 +208,38 @@ export default function AnalyticsDashboard({ bookId, genre = 'default' }: Analyt
       alert('Failed to analyze book');
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  const handleCheckOriginality = async () => {
+    setCheckingOriginality(true);
+    try {
+      const token = getToken();
+      const url = versionId
+        ? `${API_BASE_URL}/api/plagiarism/check/book/${bookId}?versionId=${versionId}`
+        : `${API_BASE_URL}/api/plagiarism/check/book/${bookId}`;
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setOriginalitySummary(data);
+        alert(`Originality check complete! ${data.totalChecked} chapters checked.`);
+      } else {
+        const error = await response.json();
+        alert(`Error: ${error.error?.message || 'Failed to check originality'}`);
+      }
+    } catch (error) {
+      console.error('Error checking originality:', error);
+      alert('Failed to check originality');
+    } finally {
+      setCheckingOriginality(false);
     }
   };
 
@@ -326,6 +382,39 @@ export default function AnalyticsDashboard({ bookId, genre = 'default' }: Analyt
           <PacingHeatMap chapters={chapterAnalytics} />
         </div>
       )}
+
+      {/* Originality Check */}
+      <div style={{ marginBottom: '24px', padding: '16px', background: '#f9f9f9', borderRadius: '8px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h3 style={{ fontSize: '18px', fontWeight: '600', margin: 0 }}>Originality Check</h3>
+          <button
+            onClick={handleCheckOriginality}
+            disabled={checkingOriginality}
+            style={{
+              padding: '8px 16px',
+              background: checkingOriginality ? '#ccc' : '#6366F1',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: checkingOriginality ? 'not-allowed' : 'pointer',
+              fontSize: '14px',
+            }}
+          >
+            {checkingOriginality ? 'Checking...' : originalitySummary ? 'Re-check Originality' : 'Check Originality'}
+          </button>
+        </div>
+
+        {originalitySummary ? (
+          <OriginalitySummaryDisplay summary={originalitySummary} />
+        ) : (
+          <div style={{ textAlign: 'center', padding: '24px', color: '#666' }}>
+            <p style={{ marginBottom: '8px' }}>No originality check results available yet.</p>
+            <p style={{ fontSize: '14px', color: '#999' }}>
+              Click "Check Originality" to analyse your chapters for potential similarities to published works.
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -540,6 +629,180 @@ function PacingHeatMap({ chapters }: { chapters: ChapterAnalytics[] }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function OriginalitySummaryDisplay({ summary }: { summary: OriginalitySummary }) {
+  const getScoreColor = (score: number): string => {
+    if (score >= 75) return '#16a34a'; // Green
+    if (score >= 50) return '#d97706'; // Amber
+    return '#dc2626'; // Red
+  };
+
+  const getStatusColor = (status: string): { bg: string; text: string } => {
+    if (status === 'passed') return { bg: '#D1FAE5', text: '#065F46' };
+    if (status === 'flagged') return { bg: '#FEE2E2', text: '#991B1B' };
+    return { bg: '#FEF3C7', text: '#92400E' };
+  };
+
+  const avgScore = summary.averageOriginalityScore;
+  const scoreColor = getScoreColor(avgScore);
+
+  return (
+    <div>
+      {/* Overall Score */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '24px',
+        marginBottom: '20px',
+        padding: '16px',
+        background: 'white',
+        borderRadius: '8px',
+        border: `2px solid ${scoreColor}`,
+      }}>
+        <div style={{
+          width: '80px',
+          height: '80px',
+          borderRadius: '50%',
+          background: `conic-gradient(${scoreColor} ${avgScore * 3.6}deg, #E5E7EB ${avgScore * 3.6}deg)`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <div style={{
+            width: '60px',
+            height: '60px',
+            borderRadius: '50%',
+            background: 'white',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '20px',
+            fontWeight: 'bold',
+            color: scoreColor,
+          }}>
+            {avgScore.toFixed(0)}
+          </div>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '4px' }}>
+            Average Originality Score
+          </div>
+          <div style={{ fontSize: '14px', color: '#666' }}>
+            {summary.totalChecked} chapter{summary.totalChecked !== 1 ? 's' : ''} checked
+          </div>
+          <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
+            <span style={{ fontSize: '14px', color: '#065F46' }}>
+              {summary.passedCount} passed
+            </span>
+            <span style={{ fontSize: '14px', color: '#991B1B' }}>
+              {summary.flaggedCount} flagged
+            </span>
+            <span style={{ fontSize: '14px', color: '#92400E' }}>
+              {summary.totalChecked - summary.passedCount - summary.flaggedCount} need review
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Chapter Results */}
+      {summary.results.length > 0 && (
+        <div>
+          <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: '#374151' }}>
+            Chapter Results
+          </h4>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {summary.results.map((result, index) => {
+              const chapterScore = result.originalityScore?.overall ?? 0;
+              const statusColors = getStatusColor(result.status);
+
+              return (
+                <div
+                  key={result.id || index}
+                  title={`Chapter: ${chapterScore}/100 originality\nStatus: ${result.status}`}
+                  style={{
+                    width: '60px',
+                    height: '60px',
+                    background: getScoreColor(chapterScore),
+                    borderRadius: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ fontSize: '11px', opacity: 0.9 }}>Ch {index + 1}</div>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{chapterScore}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Flags Summary */}
+      {summary.results.some(r => r.flags && r.flags.length > 0) && (
+        <div style={{ marginTop: '20px' }}>
+          <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: '#374151' }}>
+            Originality Concerns
+          </h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {summary.results
+              .flatMap((r, chIdx) =>
+                (r.flags || []).slice(0, 2).map((flag: any) => ({
+                  ...flag,
+                  chapter: chIdx + 1,
+                }))
+              )
+              .slice(0, 5)
+              .map((flag: any, idx: number) => {
+                const severityColors = {
+                  high: { bg: '#FEE2E2', border: '#FECACA', text: '#991B1B' },
+                  medium: { bg: '#FEF3C7', border: '#FDE68A', text: '#92400E' },
+                  low: { bg: '#F3F4F6', border: '#E5E7EB', text: '#374151' },
+                };
+                const colors = severityColors[flag.severity as keyof typeof severityColors] || severityColors.low;
+
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      padding: '12px',
+                      background: colors.bg,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: '6px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                      <span style={{
+                        padding: '2px 6px',
+                        background: colors.border,
+                        borderRadius: '4px',
+                        fontSize: '10px',
+                        fontWeight: '600',
+                        textTransform: 'uppercase',
+                        color: colors.text,
+                      }}>
+                        {flag.severity}
+                      </span>
+                      <span style={{ fontSize: '12px', color: '#666' }}>Chapter {flag.chapter}</span>
+                    </div>
+                    <div style={{ fontSize: '13px', color: colors.text }}>{flag.description}</div>
+                    {flag.suggestion && (
+                      <div style={{ fontSize: '12px', color: '#10B981', marginTop: '4px' }}>
+                        Suggestion: {flag.suggestion}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

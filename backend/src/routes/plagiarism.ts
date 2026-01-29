@@ -96,6 +96,59 @@ router.post('/check/chapter/:id', async (req, res) => {
 });
 
 /**
+ * Check all chapters in a book for originality
+ * POST /api/plagiarism/check/book/:bookId
+ * Query params: versionId (optional) - specific version to check
+ */
+router.post('/check/book/:bookId', async (req, res) => {
+  try {
+    const { bookId } = req.params;
+    const { versionId } = req.query as { versionId?: string };
+
+    if (!bookId) {
+      return sendBadRequest(res, 'Book ID is required');
+    }
+
+    const result = await plagiarismCheckerService.checkBook(bookId, versionId);
+    res.json(result);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) {
+      return sendNotFound(res, 'Book');
+    }
+    sendInternalError(res, error, 'checking book originality');
+  }
+});
+
+/**
+ * Get originality summary for a book (from existing chapter check results)
+ * GET /api/plagiarism/book/:bookId/summary
+ * Query params: versionId (optional) - specific version to get summary for
+ */
+router.get('/book/:bookId/summary', (req, res) => {
+  try {
+    const { bookId } = req.params;
+    const { versionId } = req.query as { versionId?: string };
+
+    if (!bookId) {
+      return sendBadRequest(res, 'Book ID is required');
+    }
+
+    const summary = plagiarismCheckerService.getBookOriginalitySummary(bookId, versionId);
+
+    if (!summary) {
+      return res.json({
+        summary: null,
+        message: 'No originality check results found for this book. Run a check first.',
+      });
+    }
+
+    res.json({ summary });
+  } catch (error: any) {
+    sendInternalError(res, error, 'getting book originality summary');
+  }
+});
+
+/**
  * Check raw content for originality (before saving)
  * POST /api/plagiarism/check/raw
  */

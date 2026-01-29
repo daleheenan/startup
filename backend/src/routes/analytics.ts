@@ -236,14 +236,40 @@ router.get('/book/:bookId', (req, res) => {
 
 /**
  * Get all chapter analytics for a book
+ * Supports optional versionId query param to filter by version
  */
-router.get('/book/:bookId/chapters', (req, res) => {
+router.get('/book/:bookId/chapters', async (req, res) => {
   try {
-    const chaptersAnalytics = db.prepare(`
-      SELECT ca.* FROM chapter_analytics ca
-      JOIN chapters c ON ca.chapter_id = c.id
-      WHERE c.book_id = ? ORDER BY c.chapter_number
-    `).all(req.params.bookId) as any[];
+    const { bookId } = req.params;
+    const { versionId } = req.query;
+
+    let chaptersAnalytics: any[];
+
+    if (versionId) {
+      // Filter by specific version
+      chaptersAnalytics = db.prepare(`
+        SELECT ca.* FROM chapter_analytics ca
+        JOIN chapters c ON ca.chapter_id = c.id
+        WHERE c.book_id = ? AND c.version_id = ? ORDER BY c.chapter_number
+      `).all(bookId, versionId) as any[];
+    } else {
+      // Get active version chapters
+      const activeVersion = await bookVersioningService.getActiveVersion(bookId);
+      if (activeVersion) {
+        chaptersAnalytics = db.prepare(`
+          SELECT ca.* FROM chapter_analytics ca
+          JOIN chapters c ON ca.chapter_id = c.id
+          WHERE c.version_id = ? ORDER BY c.chapter_number
+        `).all(activeVersion.id) as any[];
+      } else {
+        // Legacy: no versions exist
+        chaptersAnalytics = db.prepare(`
+          SELECT ca.* FROM chapter_analytics ca
+          JOIN chapters c ON ca.chapter_id = c.id
+          WHERE c.book_id = ? AND c.version_id IS NULL ORDER BY c.chapter_number
+        `).all(bookId) as any[];
+      }
+    }
 
     res.json({ analytics: chaptersAnalytics.map(parseAnalyticsRow) });
   } catch (error: any) {
