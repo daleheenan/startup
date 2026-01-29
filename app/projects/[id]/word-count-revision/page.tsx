@@ -134,7 +134,7 @@ export default function WordCountRevisionPage() {
   const navigation = useProjectNavigation(projectId, project);
 
   // Form state for starting a new revision
-  const [targetWordCount, setTargetWordCount] = useState<number>(80000);
+  const [targetWordCount, setTargetWordCount] = useState<number | ''>(80000);
   const [tolerancePercent, setTolerancePercent] = useState<number>(5);
   const [isStarting, setIsStarting] = useState(false);
 
@@ -289,7 +289,7 @@ export default function WordCountRevisionPage() {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ targetWordCount, tolerancePercent, forceRestart }),
+        body: JSON.stringify({ targetWordCount: targetWordCount || 80000, tolerancePercent, forceRestart }),
       });
 
       if (!res.ok) {
@@ -879,7 +879,22 @@ export default function WordCountRevisionPage() {
                   <input
                     type="number"
                     value={targetWordCount}
-                    onChange={(e) => setTargetWordCount(parseInt(e.target.value) || 80000)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '') {
+                        setTargetWordCount('');
+                      } else {
+                        const num = parseInt(val);
+                        if (!isNaN(num)) {
+                          setTargetWordCount(num);
+                        }
+                      }
+                    }}
+                    onBlur={() => {
+                      if (targetWordCount === '' || targetWordCount < 1000) {
+                        setTargetWordCount(80000);
+                      }
+                    }}
                     min={1000}
                     style={{
                       padding: '0.75rem 1rem',
@@ -920,13 +935,13 @@ export default function WordCountRevisionPage() {
               }}>
                 <div style={{ color: '#5B21B6', fontSize: '0.875rem' }}>
                   <strong>Acceptable Range:</strong>{' '}
-                  {Math.round(targetWordCount * (1 - tolerancePercent / 100)).toLocaleString()} -{' '}
-                  {Math.round(targetWordCount * (1 + tolerancePercent / 100)).toLocaleString()} words
+                  {Math.round((targetWordCount || 0) * (1 - tolerancePercent / 100)).toLocaleString()} -{' '}
+                  {Math.round((targetWordCount || 0) * (1 + tolerancePercent / 100)).toLocaleString()} words
                 </div>
                 <div style={{ color: '#5B21B6', fontSize: '0.875rem', marginTop: '0.5rem' }}>
                   <strong>Words to Cut:</strong>{' '}
-                  ~{Math.max(0, (selectedBook.word_count || 0) - targetWordCount).toLocaleString()} words
-                  ({((Math.max(0, (selectedBook.word_count || 0) - targetWordCount) / (selectedBook.word_count || 1)) * 100).toFixed(1)}%)
+                  ~{Math.max(0, (selectedBook.word_count || 0) - (targetWordCount || 0)).toLocaleString()} words
+                  ({((Math.max(0, (selectedBook.word_count || 0) - (targetWordCount || 0)) / (selectedBook.word_count || 1)) * 100).toFixed(1)}%)
                 </div>
               </div>
 
