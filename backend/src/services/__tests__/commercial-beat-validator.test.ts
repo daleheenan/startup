@@ -54,7 +54,12 @@ describe('CommercialBeatValidatorService', () => {
 
     it('should have tolerance ranges for all beats', () => {
       for (const beat of COMMERCIAL_BEATS) {
-        expect(beat.toleranceMin).toBeLessThan(beat.idealPercentage);
+        // Opening Hook is a special case with idealPercentage of 0
+        if (beat.idealPercentage === 0) {
+          expect(beat.toleranceMin).toBeLessThanOrEqual(beat.idealPercentage);
+        } else {
+          expect(beat.toleranceMin).toBeLessThan(beat.idealPercentage);
+        }
         expect(beat.toleranceMax).toBeGreaterThan(beat.idealPercentage);
       }
     });

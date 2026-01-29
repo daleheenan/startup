@@ -294,7 +294,7 @@ describe('User Settings Router - Preferences', () => {
 
       // Should not call UPDATE since no valid fields
       const updateCalls = mockPrepare.mock.calls.filter(call =>
-        call[0]?.includes('UPDATE user_preferences')
+        (call[0] as string)?.includes('UPDATE user_preferences')
       );
       expect(updateCalls.length).toBe(0);
     });

@@ -69,6 +69,17 @@ jest.mock('../../services/chapter-orchestrator.service.js', () => ({
   },
 }));
 
+// Mock book versioning service
+const mockGetActiveVersion = jest.fn() as jest.Mock;
+const mockCreateVersion = jest.fn() as jest.Mock;
+
+jest.mock('../../services/book-versioning.service.js', () => ({
+  bookVersioningService: {
+    getActiveVersion: mockGetActiveVersion,
+    createVersion: mockCreateVersion,
+  },
+}));
+
 describe('Chapters Router', () => {
   let app: express.Application;
 
@@ -82,6 +93,22 @@ describe('Chapters Router', () => {
     mockQueueChapterWorkflow.mockReset();
     mockRegenerateChapter.mockReset();
     mockGetChapterWorkflowStatus.mockReset();
+    mockGetActiveVersion.mockReset();
+    mockCreateVersion.mockReset();
+
+    // Default mock for book versioning - return an existing version
+    (mockGetActiveVersion as any).mockResolvedValue({
+      id: 'version-1',
+      book_id: '550e8400-e29b-41d4-a716-446655440000',
+      name: 'Version 1',
+      is_active: true,
+    });
+    (mockCreateVersion as any).mockResolvedValue({
+      id: 'version-1',
+      book_id: '550e8400-e29b-41d4-a716-446655440000',
+      name: 'Version 1',
+      is_active: true,
+    });
 
     // Setup Express app with route - import fresh each time
     app = express();

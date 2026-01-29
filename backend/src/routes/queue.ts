@@ -170,7 +170,20 @@ router.delete('/jobs', (req, res) => {
 
     if (ids) {
       // Delete specific jobs by ID
-      const jobIds = (ids as string).split(',').map(id => id.trim());
+      const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const rawIds = (ids as string).split(',').map(id => id.trim());
+      const jobIds = rawIds.filter(id => UUID_REGEX.test(id));
+
+      if (jobIds.length === 0) {
+        return res.status(400).json({
+          error: { code: 'INVALID_INPUT', message: 'No valid job IDs provided' }
+        });
+      }
+
+      if (jobIds.length !== rawIds.length) {
+        logger.warn({ provided: rawIds.length, valid: jobIds.length }, 'Some job IDs were invalid and ignored');
+      }
+
       const placeholders = jobIds.map(() => '?').join(',');
       const stmt = db.prepare(`DELETE FROM jobs WHERE id IN (${placeholders})`);
       const result = stmt.run(...jobIds);

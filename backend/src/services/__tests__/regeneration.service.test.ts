@@ -88,20 +88,22 @@ The stone doors loomed before them, ancient and forbidding.`;
 
       jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
 
-      // Mock Claude responses for 3 variations
-      (mockClaudeService.createCompletion as any)
-        .mockResolvedValueOnce('"Are you certain about this?" Elena whispered, her voice trembling.\n\n"I must," Marcus said, though doubt clouded his eyes.')
-        .mockResolvedValueOnce('"Do you truly want to do this?" Elena asked softly.\n\n"There\'s no turning back now," Marcus answered, his resolve wavering.')
-        .mockResolvedValueOnce('"Second thoughts?" Elena murmured.\n\n"Too late for that," Marcus said, forcing confidence into his tone.');
+      // Mock Claude responses for 3 variations (createCompletionWithUsage returns {content, usage})
+      (mockClaudeService.createCompletionWithUsage as any)
+        .mockResolvedValueOnce({ content: '"Are you certain about this?" Elena whispered, her voice trembling.\n\n"I must," Marcus said, though doubt clouded his eyes.', usage: { input_tokens: 100, output_tokens: 50 } })
+        .mockResolvedValueOnce({ content: '"Do you truly want to do this?" Elena asked softly.\n\n"There\'s no turning back now," Marcus answered, his resolve wavering.', usage: { input_tokens: 100, output_tokens: 50 } })
+        .mockResolvedValueOnce({ content: '"Second thoughts?" Elena murmured.\n\n"Too late for that," Marcus said, forcing confidence into his tone.', usage: { input_tokens: 100, output_tokens: 50 } });
 
       // Mock database operations
+      const mockProjectIdStmt = { get: jest.fn().mockReturnValue({ project_id: 'project-123' }) };
       const mockInsertStmt = { run: jest.fn() };
       const mockHistoryStmt = { run: jest.fn() };
       const mockPrepare = jest.fn();
       mockDb.prepare = mockPrepare;
       mockPrepare
-        .mockReturnValueOnce(mockInsertStmt)
-        .mockReturnValueOnce(mockHistoryStmt);
+        .mockReturnValueOnce(mockProjectIdStmt)  // getProjectIdFromChapter
+        .mockReturnValueOnce(mockInsertStmt)     // insert variation
+        .mockReturnValueOnce(mockHistoryStmt);   // insert history
 
       const result = await service.generateVariations(
         'chapter-123',
@@ -123,16 +125,16 @@ The stone doors loomed before them, ancient and forbidding.`;
       expect(result.contextAfter).toBeTruthy();
 
       // Verify Claude was called 3 times with increasing temperature
-      expect(mockClaudeService.createCompletion).toHaveBeenCalledTimes(3);
-      expect(mockClaudeService.createCompletion).toHaveBeenNthCalledWith(
+      expect(mockClaudeService.createCompletionWithUsage).toHaveBeenCalledTimes(3);
+      expect(mockClaudeService.createCompletionWithUsage).toHaveBeenNthCalledWith(
         1,
         expect.objectContaining({ temperature: 0.8 })
       );
-      expect(mockClaudeService.createCompletion).toHaveBeenNthCalledWith(
+      expect(mockClaudeService.createCompletionWithUsage).toHaveBeenNthCalledWith(
         2,
         expect.objectContaining({ temperature: 0.9 })
       );
-      expect(mockClaudeService.createCompletion).toHaveBeenNthCalledWith(
+      expect(mockClaudeService.createCompletionWithUsage).toHaveBeenNthCalledWith(
         3,
         expect.objectContaining({ temperature: 1.0 })
       );
@@ -179,14 +181,16 @@ The stone doors loomed before them, ancient and forbidding.`;
 
       jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
 
-      (mockClaudeService.createCompletion as any)
-        .mockResolvedValueOnce('The ancient temple rose from the mist, bathed in silver moonlight.')
-        .mockResolvedValueOnce('Moonbeams danced across the temple\'s weathered stones, casting long shadows.')
-        .mockResolvedValueOnce('The temple\'s silhouette stood stark against the luminous moon.');
+      (mockClaudeService.createCompletionWithUsage as any)
+        .mockResolvedValueOnce({ content: 'The ancient temple rose from the mist, bathed in silver moonlight.', usage: { input_tokens: 100, output_tokens: 50 } })
+        .mockResolvedValueOnce({ content: 'Moonbeams danced across the temple\'s weathered stones, casting long shadows.', usage: { input_tokens: 100, output_tokens: 50 } })
+        .mockResolvedValueOnce({ content: 'The temple\'s silhouette stood stark against the luminous moon.', usage: { input_tokens: 100, output_tokens: 50 } });
 
+      const mockProjectIdStmt = { get: jest.fn().mockReturnValue({ project_id: 'project-123' }) };
       const mockInsertStmt = { run: jest.fn() };
       const mockHistoryStmt = { run: jest.fn() };
       mockDb.prepare = jest.fn()
+        .mockReturnValueOnce(mockProjectIdStmt)  // getProjectIdFromChapter
         .mockReturnValueOnce(mockInsertStmt)
         .mockReturnValueOnce(mockHistoryStmt);
 
@@ -200,7 +204,7 @@ The stone doors loomed before them, ancient and forbidding.`;
 
       expect(result.mode).toBe('description');
       expect(result.variations[0]).toContain('ancient temple');
-      expect(mockClaudeService.createCompletion).toHaveBeenCalledWith(
+      expect(mockClaudeService.createCompletionWithUsage).toHaveBeenCalledWith(
         expect.objectContaining({
           system: expect.stringContaining('DESCRIPTION'),
         })
@@ -220,14 +224,16 @@ The stone doors loomed before them, ancient and forbidding.`;
 
       jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
 
-      (mockClaudeService.createCompletion as any)
-        .mockResolvedValueOnce('Scene variation 1...')
-        .mockResolvedValueOnce('Scene variation 2...')
-        .mockResolvedValueOnce('Scene variation 3...');
+      (mockClaudeService.createCompletionWithUsage as any)
+        .mockResolvedValueOnce({ content: 'Scene variation 1...', usage: { input_tokens: 100, output_tokens: 50 } })
+        .mockResolvedValueOnce({ content: 'Scene variation 2...', usage: { input_tokens: 100, output_tokens: 50 } })
+        .mockResolvedValueOnce({ content: 'Scene variation 3...', usage: { input_tokens: 100, output_tokens: 50 } });
 
+      const mockProjectIdStmt = { get: jest.fn().mockReturnValue({ project_id: 'project-123' }) };
       const mockInsertStmt = { run: jest.fn() };
       const mockHistoryStmt = { run: jest.fn() };
       mockDb.prepare = jest.fn()
+        .mockReturnValueOnce(mockProjectIdStmt)  // getProjectIdFromChapter
         .mockReturnValueOnce(mockInsertStmt)
         .mockReturnValueOnce(mockHistoryStmt);
 
@@ -240,7 +246,7 @@ The stone doors loomed before them, ancient and forbidding.`;
       );
 
       expect(result.mode).toBe('scene');
-      expect(mockClaudeService.createCompletion).toHaveBeenCalledWith(
+      expect(mockClaudeService.createCompletionWithUsage).toHaveBeenCalledWith(
         expect.objectContaining({
           system: expect.stringContaining('ENTIRE SCENE'),
         })
@@ -258,14 +264,16 @@ The stone doors loomed before them, ancient and forbidding.`;
 
       jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
 
-      (mockClaudeService.createCompletion as any)
-        .mockResolvedValueOnce('Variation 1')
-        .mockResolvedValueOnce('Variation 2')
-        .mockResolvedValueOnce('Variation 3');
+      (mockClaudeService.createCompletionWithUsage as any)
+        .mockResolvedValueOnce({ content: 'Variation 1', usage: { input_tokens: 100, output_tokens: 50 } })
+        .mockResolvedValueOnce({ content: 'Variation 2', usage: { input_tokens: 100, output_tokens: 50 } })
+        .mockResolvedValueOnce({ content: 'Variation 3', usage: { input_tokens: 100, output_tokens: 50 } });
 
+      const mockProjectIdStmt = { get: jest.fn().mockReturnValue({ project_id: 'project-123' }) };
       const mockInsertStmt = { run: jest.fn() };
       const mockHistoryStmt = { run: jest.fn() };
       mockDb.prepare = jest.fn()
+        .mockReturnValueOnce(mockProjectIdStmt)  // getProjectIdFromChapter
         .mockReturnValueOnce(mockInsertStmt)
         .mockReturnValueOnce(mockHistoryStmt);
 
@@ -351,14 +359,16 @@ The stone doors loomed before them, ancient and forbidding.`;
 
       const extractContextSpy = jest.spyOn(service as any, 'extractContext');
 
-      (mockClaudeService.createCompletion as any)
-        .mockResolvedValueOnce('Var 1')
-        .mockResolvedValueOnce('Var 2')
-        .mockResolvedValueOnce('Var 3');
+      (mockClaudeService.createCompletionWithUsage as any)
+        .mockResolvedValueOnce({ content: 'Var 1', usage: { input_tokens: 100, output_tokens: 50 } })
+        .mockResolvedValueOnce({ content: 'Var 2', usage: { input_tokens: 100, output_tokens: 50 } })
+        .mockResolvedValueOnce({ content: 'Var 3', usage: { input_tokens: 100, output_tokens: 50 } });
 
+      const mockProjectIdStmt = { get: jest.fn().mockReturnValue({ project_id: 'project-123' }) };
       const mockInsertStmt = { run: jest.fn() };
       const mockHistoryStmt = { run: jest.fn() };
       mockDb.prepare = jest.fn()
+        .mockReturnValueOnce(mockProjectIdStmt)  // getProjectIdFromChapter
         .mockReturnValueOnce(mockInsertStmt)
         .mockReturnValueOnce(mockHistoryStmt);
 
@@ -650,13 +660,15 @@ Scene 2 paragraph 2.`;
       jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
 
       const regeneratedScene = 'This is the regenerated scene with improved prose and pacing.';
-      (mockClaudeService.createCompletion as any).mockResolvedValue(regeneratedScene);
+      (mockClaudeService.createCompletionWithUsage as any).mockResolvedValue({ content: regeneratedScene, usage: { input_tokens: 100, output_tokens: 50 } });
 
+      const mockProjectIdStmt = { get: jest.fn().mockReturnValue({ project_id: 'project-123' }) };
       const mockExistingEditStmt = { get: jest.fn().mockReturnValue(null) };
       const mockInsertEditStmt = { run: jest.fn() };
       const mockHistoryStmt = { run: jest.fn() };
 
       mockDb.prepare = jest.fn()
+        .mockReturnValueOnce(mockProjectIdStmt)     // getProjectIdFromChapter
         .mockReturnValueOnce(mockExistingEditStmt)
         .mockReturnValueOnce(mockInsertEditStmt)
         .mockReturnValueOnce(mockHistoryStmt);
@@ -669,7 +681,7 @@ Scene 2 paragraph 2.`;
       expect(result.historyId).toMatch(/^hist_/);
       expect(result.fullContent).toContain(regeneratedScene);
 
-      expect(mockClaudeService.createCompletion).toHaveBeenCalledWith(
+      expect(mockClaudeService.createCompletionWithUsage).toHaveBeenCalledWith(
         expect.objectContaining({
           system: expect.stringContaining('Author Agent'),
           messages: expect.arrayContaining([
@@ -694,13 +706,15 @@ Scene 2 paragraph 2.`;
       jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
 
       const regeneratedScene = 'Regenerated final scene.';
-      (mockClaudeService.createCompletion as any).mockResolvedValue(regeneratedScene);
+      (mockClaudeService.createCompletionWithUsage as any).mockResolvedValue({ content: regeneratedScene, usage: { input_tokens: 100, output_tokens: 50 } });
 
+      const mockProjectIdStmt = { get: jest.fn().mockReturnValue({ project_id: 'project-123' }) };
       const mockExistingEditStmt = { get: jest.fn().mockReturnValue(null) };
       const mockInsertEditStmt = { run: jest.fn() };
       const mockHistoryStmt = { run: jest.fn() };
 
       mockDb.prepare = jest.fn()
+        .mockReturnValueOnce(mockProjectIdStmt)     // getProjectIdFromChapter
         .mockReturnValueOnce(mockExistingEditStmt)
         .mockReturnValueOnce(mockInsertEditStmt)
         .mockReturnValueOnce(mockHistoryStmt);
@@ -722,13 +736,15 @@ Scene 2 paragraph 2.`;
       jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
 
       const regeneratedScene = 'Updated scene.';
-      (mockClaudeService.createCompletion as any).mockResolvedValue(regeneratedScene);
+      (mockClaudeService.createCompletionWithUsage as any).mockResolvedValue({ content: regeneratedScene, usage: { input_tokens: 100, output_tokens: 50 } });
 
+      const mockProjectIdStmt = { get: jest.fn().mockReturnValue({ project_id: 'project-123' }) };
       const mockExistingEditStmt = { get: jest.fn().mockReturnValue({ id: 'edit-456' }) };
       const mockUpdateEditStmt = { run: jest.fn() };
       const mockHistoryStmt = { run: jest.fn() };
 
       mockDb.prepare = jest.fn()
+        .mockReturnValueOnce(mockProjectIdStmt)     // getProjectIdFromChapter
         .mockReturnValueOnce(mockExistingEditStmt)
         .mockReturnValueOnce(mockUpdateEditStmt)
         .mockReturnValueOnce(mockHistoryStmt);
@@ -792,20 +808,22 @@ Scene 2 paragraph 2.`;
 
       jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
 
-      (mockClaudeService.createCompletion as any).mockResolvedValue('Regenerated.');
+      (mockClaudeService.createCompletionWithUsage as any).mockResolvedValue({ content: 'Regenerated.', usage: { input_tokens: 100, output_tokens: 50 } });
 
+      const mockProjectIdStmt = { get: jest.fn().mockReturnValue({ project_id: 'project-123' }) };
       const mockExistingEditStmt = { get: jest.fn().mockReturnValue(null) };
       const mockInsertEditStmt = { run: jest.fn() };
       const mockHistoryStmt = { run: jest.fn() };
 
       mockDb.prepare = jest.fn()
+        .mockReturnValueOnce(mockProjectIdStmt)     // getProjectIdFromChapter
         .mockReturnValueOnce(mockExistingEditStmt)
         .mockReturnValueOnce(mockInsertEditStmt)
         .mockReturnValueOnce(mockHistoryStmt);
 
       await service.regenerateScene('chapter-123', 0);
 
-      const callArgs = (mockClaudeService.createCompletion as any).mock.calls[0][0];
+      const callArgs = (mockClaudeService.createCompletionWithUsage as any).mock.calls[0][0];
       expect(callArgs.messages[0].content).toContain('STORY DNA');
       expect(callArgs.messages[0].content).toContain('SCENE CARD');
       expect(callArgs.messages[0].content).toContain(mockSceneCards[0].goal);
@@ -822,13 +840,15 @@ Scene 2 paragraph 2.`;
       jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
 
       const regeneratedScene = 'New scene content.';
-      (mockClaudeService.createCompletion as any).mockResolvedValue(regeneratedScene);
+      (mockClaudeService.createCompletionWithUsage as any).mockResolvedValue({ content: regeneratedScene, usage: { input_tokens: 100, output_tokens: 50 } });
 
+      const mockProjectIdStmt = { get: jest.fn().mockReturnValue({ project_id: 'project-123' }) };
       const mockExistingEditStmt = { get: jest.fn().mockReturnValue(null) };
       const mockInsertEditStmt = { run: jest.fn() };
       const mockHistoryStmt = { run: jest.fn() };
 
       mockDb.prepare = jest.fn()
+        .mockReturnValueOnce(mockProjectIdStmt)     // getProjectIdFromChapter
         .mockReturnValueOnce(mockExistingEditStmt)
         .mockReturnValueOnce(mockInsertEditStmt)
         .mockReturnValueOnce(mockHistoryStmt);
@@ -1171,7 +1191,7 @@ Scene 2 paragraph 2.`;
 
       jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
 
-      (mockClaudeService.createCompletion as any).mockRejectedValue(
+      (mockClaudeService.createCompletionWithUsage as any).mockRejectedValue(
         new Error('Claude API error')
       );
 
@@ -1190,17 +1210,20 @@ Scene 2 paragraph 2.`;
 
       jest.spyOn(service as any, 'getChapterData').mockReturnValue(mockChapterData);
 
-      (mockClaudeService.createCompletion as any)
-        .mockResolvedValueOnce('Var 1')
-        .mockResolvedValueOnce('Var 2')
-        .mockResolvedValueOnce('Var 3');
+      (mockClaudeService.createCompletionWithUsage as any)
+        .mockResolvedValueOnce({ content: 'Var 1', usage: { input_tokens: 100, output_tokens: 50 } })
+        .mockResolvedValueOnce({ content: 'Var 2', usage: { input_tokens: 100, output_tokens: 50 } })
+        .mockResolvedValueOnce({ content: 'Var 3', usage: { input_tokens: 100, output_tokens: 50 } });
 
+      const mockProjectIdStmt = { get: jest.fn().mockReturnValue({ project_id: 'project-123' }) };
       const mockInsertStmt = {
         run: jest.fn().mockImplementation(() => {
           throw new Error('Database insert error');
         }),
       };
-      mockDb.prepare = jest.fn().mockReturnValueOnce(mockInsertStmt);
+      mockDb.prepare = jest.fn()
+        .mockReturnValueOnce(mockProjectIdStmt)  // getProjectIdFromChapter
+        .mockReturnValueOnce(mockInsertStmt);
 
       await expect(
         service.generateVariations('chapter-123', 0, 10, 'general')

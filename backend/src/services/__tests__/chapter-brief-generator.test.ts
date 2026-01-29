@@ -142,12 +142,22 @@ describe('ChapterBriefGeneratorService', () => {
       // Mock brief storage
       const mockInsertBriefStmt = {
         run: jest.fn(),
+        get: jest.fn(),
+        all: jest.fn().mockReturnValue([]),
+      };
+
+      // Default mock for any additional db.prepare calls
+      const defaultMockStmt = {
+        run: jest.fn(),
+        get: jest.fn().mockReturnValue(null),
+        all: jest.fn().mockReturnValue([]),
       };
 
       mockDb.prepare = jest.fn()
         .mockReturnValueOnce(mockBookStmt)
         .mockReturnValueOnce(mockPrevChapterStmt)
-        .mockReturnValueOnce(mockInsertBriefStmt);
+        .mockReturnValueOnce(mockInsertBriefStmt)
+        .mockReturnValue(defaultMockStmt);
 
       const result = await service.generateChapterBrief({
         bookId,

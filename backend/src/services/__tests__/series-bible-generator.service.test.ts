@@ -4,6 +4,18 @@ import type { Book, Project, StoryBible, BookEndingState } from '../../shared/ty
 
 jest.mock('../../db/connection.js');
 
+// Mock book versioning service to return a valid version
+jest.mock('../book-versioning.service.js', () => ({
+  bookVersioningService: {
+    getActiveVersion: jest.fn().mockReturnValue({
+      id: 'version-1',
+      book_id: 'book-1',
+      name: 'Version 1',
+      is_active: true,
+    }),
+  },
+}));
+
 describe('SeriesBibleGeneratorService', () => {
   let service: SeriesBibleGeneratorService;
   let mockDb: any;
@@ -16,7 +28,7 @@ describe('SeriesBibleGeneratorService', () => {
   });
 
   describe('generateSeriesBible', () => {
-    it('should generate complete series bible from multiple books', () => {
+    it('should generate complete series bible from multiple books', async () => {
       const mockBooks: Book[] = [
         {
           id: 'book-1',
@@ -142,7 +154,7 @@ describe('SeriesBibleGeneratorService', () => {
         .mockReturnValueOnce(mysteriesStmt)
         .mockReturnValueOnce(updateStmt);
 
-      const result = service.generateSeriesBible('project-1');
+      const result = await service.generateSeriesBible('project-1');
 
       expect(result).toBeDefined();
       expect(result.characters).toHaveLength(1);
@@ -153,19 +165,19 @@ describe('SeriesBibleGeneratorService', () => {
       expect(updateStmt.run).toHaveBeenCalled();
     });
 
-    it('should throw error if no books found', () => {
+    it('should throw error if no books found', async () => {
       const mockPrepare = jest.fn();
       mockDb.prepare = mockPrepare;
 
       const booksStmt = { all: jest.fn().mockReturnValue([]) };
       mockPrepare.mockReturnValueOnce(booksStmt);
 
-      expect(() => service.generateSeriesBible('project-1')).toThrow(
+      await expect(service.generateSeriesBible('project-1')).rejects.toThrow(
         'No books found for project project-1'
       );
     });
 
-    it('should throw error if story bible not found', () => {
+    it('should throw error if story bible not found', async () => {
       const mockBooks: Book[] = [
         {
           id: 'book-1',
@@ -208,7 +220,7 @@ describe('SeriesBibleGeneratorService', () => {
         .mockReturnValueOnce(booksStmt)
         .mockReturnValueOnce(projectStmt);
 
-      expect(() => service.generateSeriesBible('project-1')).toThrow(
+      await expect(service.generateSeriesBible('project-1')).rejects.toThrow(
         'Story bible not found for project project-1'
       );
     });

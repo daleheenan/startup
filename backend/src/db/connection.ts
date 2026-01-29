@@ -39,6 +39,9 @@ db.pragma('busy_timeout = 30000');
 // Increase cache size for better read performance (negative = KB, so -64000 = 64MB)
 db.pragma('cache_size = -64000');
 
+// Use memory for temporary tables (improves performance for complex queries with JOINs, GROUP BY, ORDER BY)
+db.pragma('temp_store = MEMORY');
+
 logger.info({ path: DATABASE_PATH }, 'Database connected');
 
 export default db;
