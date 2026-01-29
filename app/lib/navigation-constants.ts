@@ -3,18 +3,14 @@
  *
  * Constants for primary navigation, project navigation tabs, and visual styling
  *
- * Navigation structure (hierarchical with collapsible sections):
- * - Stories (collapsed when viewing Draft Novels)
- *   - Quick Start, Full Customisation, Ideas, Concepts
- * - Draft Novels (expanded when viewing a project)
- *   - Overview
- *   - Edit Story
- *   - Elements: Characters, World
- *   - Story: Plot, Outline, Prose Style
- *   - Novel: Chapters, Versions, Analytics, Follow-up
- *   - Editorial: Editorial Board, Word Count, Outline Review
- *   - Publishing
- * - Completed Novels (collapsed when viewing Draft Novels)
+ * Navigation structure:
+ * - Overview (standalone)
+ * - Edit Story (standalone)
+ * - Elements: Characters, World
+ * - Story: Plot, Outline, Prose Style
+ * - Novel: Chapters, Versions, Analytics, Follow-up
+ * - Editorial: Editorial Board, Word Count, Outline Review
+ * - Publishing (standalone)
  */
 
 import type { NavigationSection, PrimaryNavigationItem, TabStatus } from '../../shared/types';
@@ -107,7 +103,7 @@ export interface NavTab {
 }
 
 /**
- * Navigation group configuration (subsection within a section)
+ * Navigation group configuration
  */
 export interface NavGroup {
   id: string;
@@ -123,31 +119,16 @@ export interface NavGroup {
 }
 
 /**
- * Navigation section configuration (top-level collapsible section)
- */
-export interface NavSection {
-  id: string;
-  label: string;
-  icon: string;
-  /** Groups within this section (e.g., Elements, Story, Novel within Draft Novels) */
-  groups: NavGroup[];
-  /** If true, this section is a direct link with no nested content */
-  isStandalone?: boolean;
-  /** Route for standalone sections */
-  route?: string;
-  /** Base path prefix for matching active state */
-  pathPrefix?: string;
-}
-
-/**
- * Project navigation groups configuration (legacy format for backward compatibility)
+ * Project navigation groups configuration
  *
  * Structure:
  * - Overview (standalone)
+ * - Edit Story (standalone)
  * - Elements: Characters, World
- * - Story: Plot, Outline
- * - Novel: Chapters, Analytics, Follow-up
- * - Editorial: Editorial Board, Follow-up
+ * - Story: Plot, Outline, Prose Style
+ * - Novel: Chapters, Versions, Analytics, Follow-up
+ * - Editorial: Editorial Board, Word Count, Outline Review
+ * - Publishing (standalone)
  */
 export const PROJECT_NAV_GROUPS: NavGroup[] = [
   {
@@ -292,72 +273,6 @@ export const PROJECT_NAV_GROUPS: NavGroup[] = [
 ];
 
 /**
- * Hierarchical navigation sections configuration
- *
- * This is the new structure with collapsible top-level sections:
- * - Stories (collapsed when viewing a project)
- * - Draft Novels (expanded when viewing a project, contains all project pages)
- * - Completed Novels (collapsed when viewing a draft project)
- */
-export const PROJECT_NAV_SECTIONS: NavSection[] = [
-  {
-    id: 'stories',
-    label: 'Stories',
-    icon: '📖',
-    pathPrefix: '/story-',
-    groups: [
-      {
-        id: 'quick-start',
-        label: 'Quick Start',
-        icon: '⚡',
-        isStandalone: true,
-        route: '/quick-start',
-        tabs: [],
-      },
-      {
-        id: 'full-customization',
-        label: 'Full Customisation',
-        icon: '🎨',
-        isStandalone: true,
-        route: '/full-customization',
-        tabs: [],
-      },
-      {
-        id: 'ideas',
-        label: 'Ideas',
-        icon: '💡',
-        isStandalone: true,
-        route: '/story-ideas',
-        tabs: [],
-      },
-      {
-        id: 'concepts',
-        label: 'Concepts',
-        icon: '📝',
-        isStandalone: true,
-        route: '/saved-concepts',
-        tabs: [],
-      },
-    ],
-  },
-  {
-    id: 'draft-novels',
-    label: 'Draft Novels',
-    icon: '✏️',
-    pathPrefix: '/projects/',
-    groups: PROJECT_NAV_GROUPS,
-  },
-  {
-    id: 'completed-novels',
-    label: 'Completed Novels',
-    icon: '✅',
-    isStandalone: true,
-    route: '/completed',
-    groups: [],
-  },
-];
-
-/**
  * Flat list of all tabs for backward compatibility
  * Maps to PROJECT_NAV_TABS format used by existing code
  */
@@ -471,46 +386,3 @@ export function getActiveGroupFromPath(pathname: string, projectId: string): str
   return 'overview';
 }
 
-/**
- * Get the active section ID from current pathname
- * Used for determining which top-level section should be expanded
- */
-export function getActiveSectionIdFromPath(pathname: string): string | null {
-  for (const section of PROJECT_NAV_SECTIONS) {
-    // Check standalone sections first
-    if (section.isStandalone && section.route) {
-      if (pathname === section.route || pathname.startsWith(section.route + '/')) {
-        return section.id;
-      }
-    }
-    // Check sections with path prefixes
-    if (section.pathPrefix && pathname.startsWith(section.pathPrefix)) {
-      return section.id;
-    }
-    // Check groups within the section
-    for (const group of section.groups) {
-      if (group.isStandalone && group.route) {
-        if (pathname === group.route || pathname.startsWith(group.route + '/')) {
-          return section.id;
-        }
-      }
-    }
-  }
-  return null;
-}
-
-/**
- * Get section by ID
- */
-export function getSectionById(sectionId: string): NavSection | undefined {
-  return PROJECT_NAV_SECTIONS.find(section => section.id === sectionId);
-}
-
-/**
- * Get all section IDs except the active one (for collapsing)
- */
-export function getInactiveSectionIds(activeSectionId: string | null): string[] {
-  return PROJECT_NAV_SECTIONS
-    .filter(section => section.id !== activeSectionId)
-    .map(section => section.id);
-}
