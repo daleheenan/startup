@@ -203,13 +203,20 @@ export default function SidebarNavGroup({
 
   // ---- Group mode: header + collapsible children ----
 
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log(`[SidebarNavGroup] Toggle clicked for group: ${id}, current expanded: ${expanded}`);
+    onToggle?.();
+  };
+
   return (
     <div style={{ width: '100%' }}>
       {/* Group header button */}
       <button
         type="button"
         style={headerStyle}
-        onClick={onToggle}
+        onClick={handleClick}
         aria-expanded={expanded}
         aria-controls={`nav-group-${id}-children`}
         id={`nav-group-${id}-header`}
