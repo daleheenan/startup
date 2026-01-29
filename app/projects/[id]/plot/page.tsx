@@ -2082,6 +2082,157 @@ export default function PlotStructurePage() {
             </div>
           </div>
         )}
+
+        {/* Regenerate Confirmation Modal */}
+        {showRegenerateModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}>
+            <div style={{
+              background: '#FFFFFF',
+              borderRadius: '12px',
+              padding: '2rem',
+              maxWidth: '500px',
+              width: '90%',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: '1.5rem' }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '50%',
+                  background: '#FEF2F2',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                  <span style={{ fontSize: '1.5rem' }}>⚠️</span>
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#DC2626', margin: '0 0 0.5rem 0' }}>
+                    Regenerate Plot Structure?
+                  </h3>
+                  <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
+                    This will <strong>permanently delete</strong> all existing plot layers and plot points.
+                  </p>
+                </div>
+              </div>
+
+              <div style={{
+                background: '#F8FAFC',
+                borderRadius: '8px',
+                padding: '1rem',
+                marginBottom: '1.5rem',
+              }}>
+                <h4 style={{ fontSize: '0.875rem', fontWeight: 600, color: colors.text, margin: '0 0 0.75rem 0' }}>
+                  New plots will be generated based on:
+                </h4>
+                <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.813rem', color: colors.textSecondary }}>
+                  <li>Your story concept (synopsis, logline, hook)</li>
+                  <li>Story DNA (genre, tone, themes)</li>
+                  <li>Characters from your Story Bible</li>
+                  <li>Lessons from VEB &amp; Outline reviews</li>
+                  <li>Best practices for bestselling novels</li>
+                </ul>
+              </div>
+
+              <div style={{
+                background: '#FEF3C7',
+                border: '1px solid #F59E0B',
+                borderRadius: '8px',
+                padding: '0.75rem 1rem',
+                marginBottom: '1.5rem',
+                fontSize: '0.813rem',
+                color: '#92400E',
+              }}>
+                <strong>Current structure:</strong> {structure.plot_layers?.length || 0} plot layers with{' '}
+                {structure.plot_layers?.reduce((sum, l) => sum + (l.points?.length || 0), 0) || 0} plot points will be deleted.
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setShowRegenerateModal(false)}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    background: '#FFFFFF',
+                    border: '1px solid #E2E8F0',
+                    borderRadius: '8px',
+                    color: '#64748B',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleRegeneratePlotStructure}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    background: '#DC2626',
+                    border: 'none',
+                    borderRadius: '8px',
+                    color: '#FFFFFF',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                  }}
+                >
+                  Delete &amp; Regenerate
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Regenerating Overlay */}
+        {regenerating && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1001,
+          }}>
+            <div style={{
+              background: '#FFFFFF',
+              borderRadius: '12px',
+              padding: '2rem',
+              textAlign: 'center',
+              maxWidth: '400px',
+            }}>
+              <div style={{
+                width: '48px',
+                height: '48px',
+                border: '3px solid #E2E8F0',
+                borderTopColor: '#667eea',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+                margin: '0 auto 1rem',
+              }} />
+              <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#1A1A2E', marginBottom: '0.5rem' }}>
+                Regenerating Plot Structure
+              </h3>
+              <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
+                AI is analysing your story elements and creating a comprehensive plot structure with best practices for {project?.genre || 'your genre'}...
+              </p>
+            </div>
+            <style jsx>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          </div>
+        )}
           </>
         )}
       </div>

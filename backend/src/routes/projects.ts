@@ -8,6 +8,9 @@ import { generateWorldElements } from '../services/world-generator.js';
 import { metricsService } from '../services/metrics.service.js';
 import { createLogger } from '../services/logger.service.js';
 import { universeService } from '../services/universe.service.js';
+import { detectIntent } from '../services/editorial-intent-detector.js';
+import { generateEditorialResponse } from '../services/editorial-response-generator.js';
+import type { ConversationMessage } from '../services/editorial-response-generator.js';
 import {
   createProjectSchema,
   updateProjectSchema,
@@ -5223,6 +5226,170 @@ Respond with a JSON object in this exact format:
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack }, 'Error refining story');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * POST /api/projects/:id/editorial-assistant
+ * Conversational AI assistant for story concept and DNA refinement
+ *
+ * Request body:
+ * - userQuery: string - User's natural language query
+ * - currentConcept: StoryConcept - Current story concept values
+ * - currentDNA: StoryDNA - Current story DNA values
+ * - conversationHistory: ConversationMessage[] - Previous conversation messages
+ *
+ * Returns:
+ * - responseType: 'answer' | 'change_applied' | 'recommendation'
+ * - content: string - AI's response message
+ * - appliedChanges: object (if responseType is 'change_applied')
+ * - recommendedChanges: object (if responseType is 'recommendation')
+ * - intent: IntentType - Detected intent
+ * - confidence: 'high' | 'medium' | 'low' - Intent detection confidence
+ */
+router.post('/:id/editorial-assistant', async (req, res) => {
+  try {
+    const projectId = req.params.id;
+    const { userQuery, currentConcept, currentDNA, conversationHistory } = req.body;
+
+    // Validate request body
+    if (!userQuery || typeof userQuery !== 'string' || userQuery.trim().length === 0) {
+      return res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'User query is required and cannot be empty' },
+      });
+    }
+
+    if (userQuery.length > 2000) {
+      return res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'User query must be 2000 characters or less' },
+      });
+    }
+
+    if (!currentConcept || typeof currentConcept !== 'object') {
+      return res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'Current concept is required' },
+      });
+    }
+
+    if (!currentDNA || typeof currentDNA !== 'object') {
+      return res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'Current DNA is required' },
+      });
+    }
+
+    // Validate and limit conversation history
+    let history: ConversationMessage[] = [];
+    if (conversationHistory && Array.isArray(conversationHistory)) {
+      // Limit to 20 messages to prevent token overflow
+      history = conversationHistory.slice(-20);
+    }
+
+    // Get project to validate it exists
+    const projectStmt = db.prepare(`
+      SELECT id, title FROM projects WHERE id = ?
+    `);
+    const project = projectStmt.get(projectId) as any;
+
+    if (!project) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project not found' },
+      });
+    }
+
+    logger.info(
+      { projectId, queryLength: userQuery.length, historyLength: history.length },
+      'Processing editorial assistant request'
+    );
+
+    // Step 1: Detect intent
+    const intentResult = await detectIntent(userQuery, currentConcept, currentDNA);
+
+    logger.info(
+      { projectId, intent: intentResult.intent, confidence: intentResult.confidence },
+      'Intent detected'
+    );
+
+    // Step 2: Generate response based on intent
+    const editorialResponse = await generateEditorialResponse(
+      intentResult,
+      userQuery,
+      currentConcept,
+      currentDNA,
+      history
+    );
+
+    // Calculate total token usage from both AI calls
+    const totalInputTokens = intentResult.usage.input_tokens + editorialResponse.usage.input_tokens;
+    const totalOutputTokens = intentResult.usage.output_tokens + editorialResponse.usage.output_tokens;
+
+    // Log AI request for cost tracking
+    metricsService.logAIRequest({
+      requestType: 'editorial_assistant',
+      projectId,
+      inputTokens: totalInputTokens,
+      outputTokens: totalOutputTokens,
+      model: 'claude-sonnet-4-20250514',
+      success: true,
+      contextSummary: `Intent: ${intentResult.intent}, Response: ${editorialResponse.responseType}`,
+    });
+
+    logger.info(
+      {
+        projectId,
+        responseType: editorialResponse.responseType,
+        intent: intentResult.intent,
+        totalInputTokens,
+        totalOutputTokens,
+      },
+      'Editorial assistant response generated'
+    );
+
+    res.json({
+      success: true,
+      data: {
+        responseType: editorialResponse.responseType,
+        content: editorialResponse.content,
+        appliedChanges: editorialResponse.appliedChanges,
+        recommendedChanges: editorialResponse.recommendedChanges,
+        intent: intentResult.intent,
+        confidence: intentResult.confidence,
+      },
+      usage: {
+        input_tokens: totalInputTokens,
+        output_tokens: totalOutputTokens,
+      },
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error in editorial assistant');
+
+    // Log failed AI request
+    try {
+      metricsService.logAIRequest({
+        requestType: 'editorial_assistant',
+        projectId: req.params.id,
+        inputTokens: 0,
+        outputTokens: 0,
+        model: 'claude-sonnet-4-20250514',
+        success: false,
+        errorMessage: error.message,
+        contextSummary: 'Failed editorial assistant request',
+      });
+    } catch (logError) {
+      // Ignore logging errors
+    }
+
+    // Determine appropriate error code
+    let errorCode = 'INTERNAL_ERROR';
+    if (error.message?.includes('API key') || error.message?.includes('authentication')) {
+      errorCode = 'AI_ERROR';
+    }
+
+    res.status(500).json({
+      error: {
+        code: errorCode,
+        message: 'An error occurred while processing your request'
+      }
+    });
   }
 });
 
