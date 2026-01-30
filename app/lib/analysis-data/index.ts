@@ -1,8 +1,13 @@
 /**
- * Analysis Data Module
- * Barrel export for analysis types and utilities
+ * Analysis Data - Barrel Export
+ * Re-exports all types and utilities from the analysis-data module
  */
 
+// Export all types
 export * from './types';
+
+// Export severity utilities
 export * from './severity-levels';
+
+// Export report helpers
 export * from './report-helpers';

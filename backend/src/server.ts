@@ -150,6 +150,7 @@ import proseReportsRouter from './routes/prose-reports.js';
 import publishingRouter from './routes/publishing.js';
 import bestsellerRouter from './routes/bestseller.js';
 import penNamesRouter from './routes/pen-names/index.js';
+import analysisRouter from './routes/analysis/index.js';
 
 // Run database migrations
 try {
@@ -301,6 +302,7 @@ app.use('/api/prose-reports', apiLimiter, requireAuth, proseReportsRouter); // P
 app.use('/api/publishing', apiLimiter, requireAuth, publishingRouter); // Traditional publishing support (Sprint 39)
 app.use('/api/bestseller', apiLimiter, requireAuth, bestsellerRouter); // Bestseller formula analysis (Sprint 43-44)
 app.use('/api/pen-names', apiLimiter, requireAuth, penNamesRouter); // Pen name management and portfolio tracking
+app.use('/api/analysis', apiLimiter, requireAuth, analysisRouter); // Unified Analysis Engine - comprehensive manuscript analysis
 
 // Sentry error handler - must be BEFORE custom error handlers
 app.use(sentryErrorHandler());

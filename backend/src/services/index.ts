@@ -107,3 +107,6 @@ export * from './image-generation.service.js';
 export * from './romance-commercial.service.js';
 export * from './thriller-commercial.service.js';
 export * from './scifi-commercial.service.js';
+
+// Unified Analysis Engine
+export * from './unified-analysis.service.js';

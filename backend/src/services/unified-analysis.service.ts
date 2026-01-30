@@ -146,7 +146,7 @@ export interface UnifiedAnalysisReport {
   };
 
   // Genre-specific results
-  genre?: {
+  genreAnalysis?: {
     conventions: any;
     tropes?: any;
     commercialBeats?: any;
@@ -320,12 +320,8 @@ export class UnifiedAnalysisService {
       'comprehensive'
     ];
 
-    // We don't know the content hash, so we'll just delete by pattern
-    // Note: This is a simplified approach; production might need cache.deletePattern()
-    for (const type of allTypes) {
-      const key = `analysis:${bookId}:${type}`;
-      cache.delete(key);
-    }
+    // Invalidate all analysis caches for this book using pattern matching
+    cache.invalidate(`analysis:${bookId}:`);
   }
 
   // ============================================================================
@@ -584,7 +580,7 @@ export class UnifiedAnalysisService {
         metadata.bookId,
         'romance-beats',
         metadata.contentHash,
-        () => this.romanceService.validateBeats(metadata.projectId),
+        () => Promise.resolve(this.romanceService.validateBeats(metadata.projectId, metadata.chapterCount)),
         options.forceRefresh,
         cachedResults,
         freshResults
@@ -596,7 +592,7 @@ export class UnifiedAnalysisService {
         metadata.bookId,
         'thriller-pacing',
         metadata.contentHash,
-        () => this.thrillerService.validatePacing(metadata.projectId),
+        () => Promise.resolve(this.thrillerService.validatePacing(metadata.projectId, metadata.chapterCount)),
         options.forceRefresh,
         cachedResults,
         freshResults
@@ -608,7 +604,7 @@ export class UnifiedAnalysisService {
         metadata.bookId,
         'scifi-consistency',
         metadata.contentHash,
-        () => this.sciFiService.validateConsistency(metadata.projectId),
+        () => Promise.resolve(this.sciFiService.validateConsistency(metadata.projectId)),
         options.forceRefresh,
         cachedResults,
         freshResults
@@ -744,7 +740,7 @@ export class UnifiedAnalysisService {
         : undefined,
 
       // Genre-specific results
-      genre: results.genreConventions || results.romanceBeats || results.thrillerPacing || results.sciFiConsistency
+      genreAnalysis: results.genreConventions || results.romanceBeats || results.thrillerPacing || results.sciFiConsistency
         ? {
             conventions: results.genreConventions,
             tropes: undefined, // TODO: Add when implemented
