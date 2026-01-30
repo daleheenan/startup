@@ -40,10 +40,11 @@ export default function BookVersionSelector({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchVersions();
+    // Pass true to notify parent on initial load with the active version
+    fetchVersions(true);
   }, [bookId]);
 
-  const fetchVersions = async () => {
+  const fetchVersions = async (notifyParent = false) => {
     try {
       setIsLoading(true);
       const token = getToken();
@@ -63,6 +64,11 @@ export default function BookVersionSelector({
       // Find active version
       const active = data.versions?.find((v: BookVersion) => v.is_active === 1);
       setActiveVersion(active || null);
+
+      // Notify parent of active version on initial load so pages can filter data correctly
+      if (notifyParent && active && onVersionChange) {
+        onVersionChange(active);
+      }
     } catch (err: any) {
       console.error('Error fetching versions:', err);
       setError(err.message);

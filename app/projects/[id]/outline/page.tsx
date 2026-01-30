@@ -112,6 +112,7 @@ export default function OutlinePage() {
   // Version selection state - tracks the selected version for filtering data
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [selectedVersionHasNoData, setSelectedVersionHasNoData] = useState(false);
+  const [versionLoaded, setVersionLoaded] = useState(false);  // Track if version info has been loaded
 
   // Act management state
   const [editingActNumber, setEditingActNumber] = useState<number | null>(null);
@@ -132,18 +133,19 @@ export default function OutlinePage() {
 
   // IMPORTANT: All hooks must be called before any early returns
 
+  // Initial load only fetches project and book info, NOT chapter data
+  // Chapter data loading is deferred until BookVersionSelector reports the active version
   useEffect(() => {
     if (projectId) {
-      loadData();
+      loadProjectAndBookOnly();
     }
   }, [projectId]);
 
-  const loadData = async (versionId?: string | null) => {
+  // Separate function to load just project and book (without chapter data)
+  const loadProjectAndBookOnly = async () => {
     try {
       setIsLoading(true);
       const token = getToken();
-      // Use provided versionId or fall back to state
-      const effectiveVersionId = versionId !== undefined ? versionId : selectedVersionId;
 
       const projectRes = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
         headers: {
@@ -198,11 +200,106 @@ export default function OutlinePage() {
       const templatesData = await templatesRes.json();
       setTemplates(templatesData.templates);
 
-      if (booksData.books.length > 0) {
-        const bookId = booksData.books[0].id;
+      // Don't set isLoading to false yet - wait for version data
+    } catch (err: any) {
+      console.error('Error loading data:', err);
+      setError(err.message);
+      setIsLoading(false);
+    }
+  };
 
+  // Load version-specific data (outline, chapters, progress)
+  // This should only be called after we know which version is active
+  const loadVersionData = async (versionId: string | null, versionChapterCount: number) => {
+    if (!book) return;
+
+    try {
+      const token = getToken();
+
+      // If version has no chapters, show "no data" state
+      if (versionChapterCount === 0) {
+        setSelectedVersionHasNoData(true);
+        setOutline(null);
+        setChaptersExist(false);
+        setHasQueuedJobs(false);
+        setIsLoading(false);
+        return;
+      }
+
+      setSelectedVersionHasNoData(false);
+
+      // Fetch outline for the book
+      try {
+        const outlineRes = await fetch(`${API_BASE_URL}/api/outlines/book/${book.id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        if (outlineRes.ok) {
+          const outlineData = await outlineRes.json();
+          setOutline(outlineData);
+        }
+      } catch (err) {
+        // No outline yet
+      }
+
+      // Check if chapters already exist for this version
+      try {
+        let chaptersUrl = `${API_BASE_URL}/api/chapters/book/${book.id}`;
+        if (versionId) {
+          chaptersUrl += `?versionId=${versionId}`;
+        }
+        const chaptersRes = await fetch(chaptersUrl, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        if (chaptersRes.ok) {
+          const chaptersData = await chaptersRes.json();
+          const chapters = chaptersData.chapters || chaptersData || [];
+          setChaptersExist(chapters.length > 0);
+        }
+      } catch (err) {
+        // No chapters yet
+      }
+
+      // Check if there are queued jobs for this project
+      try {
+        const progressRes = await fetch(`${API_BASE_URL}/api/projects/${projectId}/progress`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        if (progressRes.ok) {
+          const progressData = await progressRes.json();
+          const hasJobs = (progressData.queue?.pending || 0) + (progressData.queue?.running || 0) > 0;
+          setHasQueuedJobs(hasJobs);
+        }
+      } catch (err) {
+        // No progress data
+      }
+    } catch (err: any) {
+      console.error('Error loading version data:', err);
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Legacy loadData function for use after generation/regeneration
+  const loadData = async (versionId?: string | null) => {
+    try {
+      setIsLoading(true);
+      const token = getToken();
+      const effectiveVersionId = versionId !== undefined ? versionId : selectedVersionId;
+
+      if (book) {
+        // Fetch outline
         try {
-          const outlineRes = await fetch(`${API_BASE_URL}/api/outlines/book/${bookId}`, {
+          const outlineRes = await fetch(`${API_BASE_URL}/api/outlines/book/${book.id}`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -216,10 +313,9 @@ export default function OutlinePage() {
           // No outline yet
         }
 
-        // Check if chapters already exist for this version
+        // Check chapters
         try {
-          // Build URL with optional version filter
-          let chaptersUrl = `${API_BASE_URL}/api/chapters/book/${bookId}`;
+          let chaptersUrl = `${API_BASE_URL}/api/chapters/book/${book.id}`;
           if (effectiveVersionId) {
             chaptersUrl += `?versionId=${effectiveVersionId}`;
           }
@@ -238,7 +334,7 @@ export default function OutlinePage() {
           // No chapters yet
         }
 
-        // Check if there are queued jobs for this project
+        // Check queued jobs
         try {
           const progressRes = await fetch(`${API_BASE_URL}/api/projects/${projectId}/progress`, {
             headers: {
@@ -666,24 +762,15 @@ export default function OutlinePage() {
                 <BookVersionSelector
                   bookId={book.id}
                   onVersionChange={(version) => {
-                    // Track selected version and check if it has data
+                    // Track selected version
                     setSelectedVersionId(version.id);
+                    setVersionLoaded(true);
 
-                    // Check if this version has any chapters (actual data)
+                    // Get the actual chapter count for this version
                     const actualChapterCount = (version as any).actual_chapter_count ?? (version as any).chapter_count ?? 0;
-                    const hasOutlineSnapshot = !!(version as any).outline_snapshot;
 
-                    // If version has no chapters and no outline snapshot, show "no data" message
-                    if (actualChapterCount === 0 && !hasOutlineSnapshot) {
-                      setSelectedVersionHasNoData(true);
-                      setOutline(null);
-                      setChaptersExist(false);
-                      setHasQueuedJobs(false);
-                    } else {
-                      setSelectedVersionHasNoData(false);
-                      // Reload data with the selected version ID
-                      loadData(version.id);
-                    }
+                    // Load version-specific data (this will show "no data" if version has 0 chapters)
+                    loadVersionData(version.id, actualChapterCount);
                   }}
                 />
               </div>

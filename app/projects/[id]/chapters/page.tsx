@@ -59,6 +59,8 @@ export default function ChaptersPage() {
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [project, setProject] = useState<any>(null);
   const [hasQueuedJobs, setHasQueuedJobs] = useState(false);
+  const [versionLoaded, setVersionLoaded] = useState(false);
+  const [selectedVersionHasNoData, setSelectedVersionHasNoData] = useState(false);
 
 
   // Fetch chapters for a specific book with optional version filter
@@ -74,24 +76,93 @@ export default function ChaptersPage() {
     return [];
   }, []);
 
-  // Initial data load
+  // Fetch chapters for a specific version (called when version is selected/loaded)
+  const fetchChaptersForVersion = async (versionId: string) => {
+    try {
+      setLoading(true);
+      const effectiveBookId = selectedBook === 'all' && books.length === 1
+        ? books[0].id
+        : selectedBook !== 'all' ? selectedBook : books[0]?.id;
+
+      if (effectiveBookId) {
+        const bookChapters = await fetchChaptersForBook(effectiveBookId, versionId);
+        setChapters(bookChapters);
+      }
+    } catch (err: any) {
+      console.error('Error fetching chapters for version:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Initial data load - fetch project and books only, defer chapter loading until version is known
   useEffect(() => {
-    fetchChaptersData();
+    fetchProjectAndBooksOnly();
   }, [projectId]);
 
-  // Refetch chapters when book or version selection changes
-  useEffect(() => {
-    if (books.length === 0) return;
+  // Fetch only project and book metadata (not chapters) on initial load
+  const fetchProjectAndBooksOnly = async () => {
+    try {
+      setLoading(true);
 
-    const refetchChapters = async () => {
+      // Fetch project info
+      const projectRes = await fetchWithAuth(`/api/projects/${projectId}`);
+      if (projectRes.ok) {
+        const projectData = await projectRes.json();
+        setProject(projectData);
+      }
+
+      // Fetch books (without chapters initially)
+      const booksRes = await fetchWithAuth(`/api/books/project/${projectId}`);
+      if (booksRes.ok) {
+        const booksData = await booksRes.json();
+        const booksArray: Book[] = (booksData.books || []).map((book: any) => ({
+          id: book.id,
+          project_id: book.project_id,
+          book_number: book.book_number,
+          title: book.title,
+          chapter_count: book.chapter_count || 0,
+        }));
+        setBooks(booksArray);
+      }
+
+      // Check if there are queued jobs for this project
       try {
-        // Determine the effective book ID - use first book if only one exists and 'all' is selected
+        const progressRes = await fetchWithAuth(`/api/projects/${projectId}/progress`);
+        if (progressRes.ok) {
+          const progressData = await progressRes.json();
+          const hasJobs = (progressData.queue?.pending || 0) + (progressData.queue?.running || 0) > 0;
+          setHasQueuedJobs(hasJobs);
+        }
+      } catch {
+        // No progress data
+      }
+
+      // Don't set loading to false yet - wait for version data from BookVersionSelector
+    } catch (err: any) {
+      console.error('Error fetching project/books:', err);
+      setError(err.message || 'Failed to load project');
+      setLoading(false);
+    }
+  };
+
+  // Refetch chapters when BOOK selection changes (not version - that's handled by onVersionChange)
+  // Only run after initial version load is complete
+  useEffect(() => {
+    if (books.length === 0 || !versionLoaded) return;
+
+    // Only refetch when book filter changes (not on initial load or version change)
+    const refetchChapters = async () => {
+      // Skip if we're still in "no data" state from version
+      if (selectedVersionHasNoData) return;
+
+      try {
         const effectiveBookId = selectedBook === 'all' && books.length === 1
           ? books[0].id
           : selectedBook;
 
         if (effectiveBookId === 'all') {
-          // Use optimised endpoint to fetch all chapters in a single request
+          // For multi-book "all" view, fetch all chapters
           const booksWithChaptersRes = await fetchWithAuth(`/api/projects/${projectId}/books-with-chapters`);
           if (booksWithChaptersRes.ok) {
             const data = await booksWithChaptersRes.json();
@@ -103,8 +174,8 @@ export default function ChaptersPage() {
             );
             setChapters(allChapters);
           }
-        } else {
-          // Fetch chapters for selected/single book with optional version
+        } else if (selectedVersionId) {
+          // Fetch chapters for selected book with version filter
           const bookChapters = await fetchChaptersForBook(effectiveBookId, selectedVersionId);
           setChapters(bookChapters);
         }
@@ -114,7 +185,7 @@ export default function ChaptersPage() {
     };
 
     refetchChapters();
-  }, [selectedBook, selectedVersionId, books, fetchChaptersForBook, projectId]);
+  }, [selectedBook]); // Only trigger on book selection change, not version
 
   const fetchChaptersData = async () => {
     try {
@@ -492,7 +563,24 @@ export default function ChaptersPage() {
               <BookVersionSelector
                 bookId={selectedBook !== 'all' ? selectedBook : books[0]?.id}
                 compact={true}
-                onVersionChange={(version) => setSelectedVersionId(version.id)}
+                onVersionChange={(version) => {
+                  setSelectedVersionId(version.id);
+                  setVersionLoaded(true);
+
+                  // Get the actual chapter count for this version
+                  const actualChapterCount = (version as any).actual_chapter_count ?? (version as any).chapter_count ?? 0;
+
+                  // If version has no chapters, show "no data" state
+                  if (actualChapterCount === 0) {
+                    setSelectedVersionHasNoData(true);
+                    setChapters([]);
+                    setLoading(false);
+                  } else {
+                    setSelectedVersionHasNoData(false);
+                    // Fetch chapters for this version
+                    fetchChaptersForVersion(version.id);
+                  }
+                }}
               />
             </div>
           )}
@@ -543,8 +631,44 @@ export default function ChaptersPage() {
         </div>
       </div>
 
+      {/* Message when selected version has no chapters yet */}
+      {selectedVersionHasNoData && (
+        <div style={{
+          background: '#FEF3C7',
+          border: '1px solid #FCD34D',
+          borderRadius: borderRadius.lg,
+          padding: spacing[8],
+          marginBottom: spacing[6],
+          textAlign: 'center',
+        }}>
+          <div style={{ fontSize: '3rem', marginBottom: spacing[4] }}>📝</div>
+          <h3 style={{ fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.semibold, color: '#92400E', marginBottom: spacing[2] }}>
+            No Chapters for This Version
+          </h3>
+          <p style={{ color: '#92400E', fontSize: typography.fontSize.base, marginBottom: spacing[4] }}>
+            This version hasn&apos;t been generated yet. You need to create an outline and start chapter generation first.
+          </p>
+          <Link
+            href={`/projects/${projectId}/outline`}
+            style={{
+              display: 'inline-block',
+              padding: `${spacing[3]} ${spacing[6]}`,
+              background: colors.brand.gradient,
+              color: colors.text.inverse,
+              border: 'none',
+              borderRadius: borderRadius.md,
+              cursor: 'pointer',
+              fontWeight: typography.fontWeight.semibold,
+              textDecoration: 'none',
+            }}
+          >
+            Go to Outline
+          </Link>
+        </div>
+      )}
+
       {/* Chapters List */}
-      {filteredChapters.length === 0 ? (
+      {!selectedVersionHasNoData && filteredChapters.length === 0 ? (
         <div
           style={{
             background: colors.background.surface,
@@ -580,7 +704,7 @@ export default function ChaptersPage() {
             </button>
           )}
         </div>
-      ) : (
+      ) : !selectedVersionHasNoData && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[4] }}>
           {filteredChapters.map((chapter) => {
             const statusInfo = getStatusInfo(chapter);
