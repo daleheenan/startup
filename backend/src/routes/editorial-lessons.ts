@@ -250,7 +250,7 @@ router.get('/reports-available', async (_req, res) => {
           er.completed_at,
           p.title as project_title,
           'veb' as report_type,
-          (SELECT COUNT(*) FROM editorial_lessons el WHERE el.project_id = er.project_id) as lesson_count,
+          (SELECT COUNT(*) FROM editorial_lessons el WHERE el.source_report_id = er.id) as lessons_from_report,
           CASE
             WHEN er.beta_swarm_results IS NOT NULL THEN 1 ELSE 0
           END +
@@ -281,7 +281,7 @@ router.get('/reports-available', async (_req, res) => {
           oer.completed_at,
           p.title as project_title,
           'outline_editorial' as report_type,
-          (SELECT COUNT(*) FROM editorial_lessons el WHERE el.project_id = oer.project_id) as lesson_count,
+          (SELECT COUNT(*) FROM editorial_lessons el WHERE el.source_report_id = oer.id) as lessons_from_report,
           CASE
             WHEN oer.structure_analyst_results IS NOT NULL THEN 1 ELSE 0
           END +
@@ -319,7 +319,8 @@ router.get('/reports-available', async (_req, res) => {
         createdAt: r.created_at,
         completedAt: r.completed_at,
         modulesCompleted: r.modules_completed,
-        existingLessonCount: r.lesson_count,
+        lessonsFromReport: r.lessons_from_report,
+        alreadyImported: r.lessons_from_report > 0,
       })),
       total: reports.length,
     });
@@ -517,11 +518,19 @@ router.post('/import-from-report/:reportId', async (req, res) => {
       return sendBadRequest(res, 'No book found for this project');
     }
 
-    // Check if lessons already exist for this project
-    const existingLessons = db.prepare(`
-      SELECT COUNT(*) as count FROM editorial_lessons
-      WHERE project_id = ? AND book_id = ?
-    `).get(report.project_id, bookRow.id) as any;
+    // Check if lessons have already been imported from this specific report
+    const existingFromReport = editorialLessonsService.getLessonCountFromReport(reportId);
+    if (existingFromReport > 0) {
+      return res.json({
+        success: false,
+        reportId,
+        reportType: report.report_type,
+        projectId: report.project_id,
+        lessonsImported: 0,
+        existingLessonsFromReport: existingFromReport,
+        message: `This report has already been imported (${existingFromReport} lessons). To re-import, delete existing lessons first.`,
+      });
+    }
 
     let lessons: any[] = [];
 
@@ -555,7 +564,8 @@ router.post('/import-from-report/:reportId', async (req, res) => {
       lessons = editorialLessonsService.extractLessonsFromVEB(
         report.project_id,
         bookRow.id,
-        vebReportData
+        vebReportData,
+        reportId // Pass report ID for tracking
       );
     } else if (report.report_type === 'outline_editorial') {
       // Parse Outline Editorial results
@@ -575,6 +585,7 @@ router.post('/import-from-report/:reportId', async (req, res) => {
           description: `${structureAnalyst.pacing_issues.length} pacing issues identified in outline structure. Review scene distribution and tension arc.`,
           sourceModule: 'ruthless_editor',
           severityLevel: 'moderate',
+          sourceReportId: reportId,
         }));
       }
 
@@ -588,6 +599,7 @@ router.post('/import-from-report/:reportId', async (req, res) => {
           description: `Character arc weaknesses identified: ${characterArc.weak_arcs.map((a: any) => a.character || a).join(', ')}. Ensure clear transformation and motivation.`,
           sourceModule: 'beta_swarm',
           severityLevel: 'major',
+          sourceReportId: reportId,
         }));
       }
 
@@ -601,6 +613,7 @@ router.post('/import-from-report/:reportId', async (req, res) => {
           description: `Genre alignment score is ${marketFit.genre_alignment_score}/10. Review genre conventions and reader expectations.`,
           sourceModule: 'market_analyst',
           severityLevel: 'moderate',
+          sourceReportId: reportId,
         }));
       }
 
@@ -617,6 +630,7 @@ router.post('/import-from-report/:reportId', async (req, res) => {
               description: recText,
               sourceModule: 'ruthless_editor',
               severityLevel: 'moderate',
+              sourceReportId: reportId,
             }));
           }
         }
@@ -629,7 +643,6 @@ router.post('/import-from-report/:reportId', async (req, res) => {
       projectId: report.project_id,
       bookId: bookRow.id,
       lessonsExtracted: lessons.length,
-      existingLessons: existingLessons.count
     }, 'Imported lessons from editorial report');
 
     res.json({
@@ -638,7 +651,6 @@ router.post('/import-from-report/:reportId', async (req, res) => {
       reportType: report.report_type,
       projectId: report.project_id,
       lessonsImported: lessons.length,
-      previousLessonsCount: existingLessons.count,
       message: lessons.length > 0
         ? `Successfully imported ${lessons.length} lessons from the ${report.report_type === 'veb' ? 'manuscript review' : 'outline review'}`
         : 'No lessons could be extracted from this report (thresholds not met)',

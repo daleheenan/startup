@@ -60,7 +60,8 @@ interface AvailableReport {
   createdAt: string;
   completedAt: string;
   modulesCompleted: number;
-  existingLessonCount: number;
+  lessonsFromReport: number;
+  alreadyImported: boolean;
 }
 
 const categoryLabels: Record<string, string> = {
@@ -814,7 +815,7 @@ export default function LessonsSettingsPage() {
                             Score: {report.overallScore}/100 | {report.modulesCompleted}/3 modules |{' '}
                             {formatDate(report.completedAt)}
                           </div>
-                          {report.existingLessonCount > 0 && (
+                          {report.alreadyImported && (
                             <div style={{
                               fontSize: '0.75rem',
                               color: '#059669',
@@ -822,26 +823,34 @@ export default function LessonsSettingsPage() {
                               alignItems: 'center',
                               gap: '0.25rem',
                             }}>
-                              <span>&#10003;</span> {report.existingLessonCount} lessons already imported
+                              <span>&#10003;</span> {report.lessonsFromReport} lessons imported
                             </div>
                           )}
                         </div>
                         <button
                           onClick={() => handleImportFromReport(report.id)}
-                          disabled={importingReportId === report.id}
+                          disabled={importingReportId === report.id || report.alreadyImported}
                           style={{
                             padding: '0.5rem 1rem',
-                            background: importingReportId === report.id ? '#9CA3AF' : '#667eea',
-                            color: 'white',
+                            background: report.alreadyImported
+                              ? '#D1FAE5'
+                              : importingReportId === report.id
+                                ? '#9CA3AF'
+                                : '#667eea',
+                            color: report.alreadyImported ? '#059669' : 'white',
                             border: 'none',
                             borderRadius: '6px',
-                            cursor: importingReportId === report.id ? 'not-allowed' : 'pointer',
+                            cursor: importingReportId === report.id || report.alreadyImported ? 'not-allowed' : 'pointer',
                             fontWeight: '500',
                             fontSize: '0.75rem',
                             whiteSpace: 'nowrap',
                           }}
                         >
-                          {importingReportId === report.id ? 'Importing...' : 'Import Lessons'}
+                          {report.alreadyImported
+                            ? 'Already Imported'
+                            : importingReportId === report.id
+                              ? 'Importing...'
+                              : 'Import Lessons'}
                         </button>
                       </div>
                     </div>

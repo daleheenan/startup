@@ -62,6 +62,7 @@ export interface CreateLessonInput {
   severityLevel?: SeverityLevel;
   appliesToGenre?: string;
   appliesToTone?: string;
+  sourceReportId?: string;
 }
 
 export interface LessonApplication {
@@ -158,8 +159,8 @@ class EditorialLessonsService {
       INSERT INTO editorial_lessons (
         id, project_id, book_id, category, title, description,
         source_module, original_issue, resolution, word_count_impact,
-        severity_level, applies_to_genre, applies_to_tone, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        severity_level, applies_to_genre, applies_to_tone, source_report_id, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -176,11 +177,12 @@ class EditorialLessonsService {
       input.severityLevel || null,
       input.appliesToGenre || null,
       input.appliesToTone || null,
+      input.sourceReportId || null,
       now,
       now
     );
 
-    logger.info({ id, projectId: input.projectId, category: input.category }, 'Editorial lesson created');
+    logger.info({ id, projectId: input.projectId, category: input.category, sourceReportId: input.sourceReportId }, 'Editorial lesson created');
 
     return this.getLesson(id);
   }
@@ -352,6 +354,28 @@ class EditorialLessonsService {
   }
 
   /**
+   * Check if lessons have already been imported from a specific report
+   */
+  hasLessonsFromReport(reportId: string): boolean {
+    const stmt = db.prepare(`
+      SELECT COUNT(*) as count FROM editorial_lessons WHERE source_report_id = ?
+    `);
+    const result = stmt.get(reportId) as { count: number } | undefined;
+    return (result?.count || 0) > 0;
+  }
+
+  /**
+   * Get count of lessons imported from a specific report
+   */
+  getLessonCountFromReport(reportId: string): number {
+    const stmt = db.prepare(`
+      SELECT COUNT(*) as count FROM editorial_lessons WHERE source_report_id = ?
+    `);
+    const result = stmt.get(reportId) as { count: number } | undefined;
+    return result?.count || 0;
+  }
+
+  /**
    * Extract lessons from VEB findings
    * Call this after a comprehensive rewrite to capture what was learned
    */
@@ -379,7 +403,7 @@ class EditorialLessonsService {
     };
     recommendations?: string[];
     summary?: string;
-  }): EditorialLesson[] {
+  }, sourceReportId?: string): EditorialLesson[] {
     const lessons: EditorialLesson[] = [];
 
     // Extract from Ruthless Editor
@@ -417,6 +441,7 @@ class EditorialLessonsService {
             sourceModule: 'ruthless_editor',
             originalIssue: issue,
             severityLevel: count >= 5 ? 'major' : 'moderate',
+            sourceReportId,
           }));
         }
       }
@@ -433,6 +458,7 @@ class EditorialLessonsService {
             sourceModule: 'ruthless_editor',
             originalIssue: issue,
             severityLevel: count >= 5 ? 'major' : 'moderate',
+            sourceReportId,
           }));
         }
       }
@@ -447,6 +473,7 @@ class EditorialLessonsService {
           description: `${sceneIssuesCount} scenes failed to justify their inclusion. Each scene should advance plot, develop character, or provide essential information.`,
           sourceModule: 'ruthless_editor',
           severityLevel: 'major',
+          sourceReportId,
         }));
       }
     }
@@ -468,6 +495,7 @@ class EditorialLessonsService {
           description: `${dnfRiskCount} DNF risk points identified. Focus on maintaining reader engagement and avoiding common put-down triggers.`,
           sourceModule: 'beta_swarm',
           severityLevel: 'major',
+          sourceReportId,
         }));
       }
     }
@@ -485,6 +513,7 @@ class EditorialLessonsService {
           description: `Multiple weaknesses identified in the opening hook. Focus on immediate engagement and clear genre signalling.`,
           sourceModule: 'market_analyst',
           severityLevel: 'major',
+          sourceReportId,
         }));
       }
 
@@ -497,6 +526,7 @@ class EditorialLessonsService {
           description: `${marketPositioning.potentialChallenges.length} market positioning challenges identified. Consider genre expectations and target audience preferences.`,
           sourceModule: 'market_analyst',
           severityLevel: 'moderate',
+          sourceReportId,
         }));
       }
 
@@ -510,6 +540,7 @@ class EditorialLessonsService {
           description: vebReport.marketAnalyst.agentNotes,
           sourceModule: 'market_analyst',
           severityLevel: 'major',
+          sourceReportId,
         }));
       }
     }
@@ -563,6 +594,7 @@ class EditorialLessonsService {
           description: rec,
           sourceModule,
           severityLevel: 'moderate',
+          sourceReportId,
         }));
       }
 
