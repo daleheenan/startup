@@ -22,7 +22,6 @@ const navItems = [
   { id: 'chapters', label: 'Chapters', href: '/chapters' },
   { id: 'editor', label: 'Editor', href: '/editor' },
   { id: 'versions', label: 'Versions', href: '/versions' },
-  { id: 'analytics', label: 'Analytics', href: '/analytics' },
   { id: 'follow-up', label: 'Follow-up', href: '/follow-up' },
 ];
 

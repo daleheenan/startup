@@ -31,55 +31,64 @@ interface BestsellerAnalysis {
   recommendations: string[];
 }
 
-interface Book {
-  id: string;
-  title: string;
-}
-
 interface BestsellerContentProps {
   projectId: string;
+  bookId?: string | null;
+  versionId?: string | null;
 }
 
-export default function BestsellerContent({ projectId }: BestsellerContentProps) {
+export default function BestsellerContent({ projectId, bookId, versionId }: BestsellerContentProps) {
   const [analysis, setAnalysis] = useState<BestsellerAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
   const [bestsellerModeEnabled, setBestsellerModeEnabled] = useState(false);
-  const [selectedBook, setSelectedBook] = useState<string>('');
-  const [books, setBooks] = useState<Book[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  // Fetch existing analysis when bookId changes
   useEffect(() => {
-    fetchBooks();
-  }, [projectId]);
+    if (bookId) {
+      fetchExistingAnalysis();
+    } else {
+      setAnalysis(null);
+    }
+  }, [bookId, versionId]);
 
-  const fetchBooks = async () => {
+  const fetchExistingAnalysis = async () => {
+    if (!bookId) return;
+
     try {
       const token = getToken();
-      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/books`, {
+      const url = versionId
+        ? `${API_BASE_URL}/api/bestseller/${bookId}/analysis?versionId=${versionId}`
+        : `${API_BASE_URL}/api/bestseller/${bookId}/analysis`;
+
+      const response = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch books');
-      }
-
-      const data = await response.json();
-      setBooks(data.books || []);
-      if (data.books?.length > 0) {
-        setSelectedBook(data.books[0].id);
+      if (response.ok) {
+        const data = await response.json();
+        setAnalysis(data);
+      } else if (response.status === 404) {
+        // No analysis yet - that's OK
+        setAnalysis(null);
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to load books');
+      // Silently ignore - user can run analysis manually
+      console.error('Error fetching existing analysis:', err);
     }
   };
 
   const runAnalysis = async () => {
-    if (!selectedBook) return;
+    if (!bookId) return;
     setLoading(true);
     setError(null);
     try {
       const token = getToken();
-      const response = await fetch(`${API_BASE_URL}/api/bestseller/${selectedBook}/analysis`, {
+      const url = versionId
+        ? `${API_BASE_URL}/api/bestseller/${bookId}/analysis?versionId=${versionId}`
+        : `${API_BASE_URL}/api/bestseller/${bookId}/analysis`;
+
+      const response = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -97,10 +106,10 @@ export default function BestsellerContent({ projectId }: BestsellerContentProps)
   };
 
   const toggleBestsellerMode = async (enabled: boolean) => {
-    if (!selectedBook) return;
+    if (!bookId) return;
     try {
       const token = getToken();
-      await fetch(`${API_BASE_URL}/api/bestseller/${selectedBook}/enable`, {
+      await fetch(`${API_BASE_URL}/api/bestseller/${bookId}/enable`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -114,6 +123,22 @@ export default function BestsellerContent({ projectId }: BestsellerContentProps)
     }
   };
 
+  // Show message when no book selected
+  if (!bookId) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '30vh',
+        color: colors.text.tertiary,
+        fontSize: typography.fontSize.base,
+      }}>
+        Select a book to view bestseller analysis
+      </div>
+    );
+  }
+
   const getScoreColor = (score: number): string => {
     if (score >= 80) return colors.semantic.successDark;
     if (score >= 60) return colors.semantic.warning;
@@ -126,40 +151,10 @@ export default function BestsellerContent({ projectId }: BestsellerContentProps)
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        justifyContent: 'flex-end',
         flexWrap: 'wrap',
         gap: spacing[4],
       }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: spacing[4],
-        }}>
-          <label style={{
-            fontSize: typography.fontSize.sm,
-            fontWeight: typography.fontWeight.medium,
-            color: colors.text.primary,
-          }}>
-            Book
-          </label>
-          <select
-            value={selectedBook}
-            onChange={(e) => setSelectedBook(e.target.value)}
-            style={{
-              padding: spacing[3],
-              border: `1px solid ${colors.border.default}`,
-              borderRadius: borderRadius.md,
-              fontSize: typography.fontSize.sm,
-              background: colors.background.surface,
-              minWidth: '200px',
-            }}
-          >
-            {books.map(book => (
-              <option key={book.id} value={book.id}>{book.title}</option>
-            ))}
-          </select>
-        </div>
-
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -214,16 +209,16 @@ export default function BestsellerContent({ projectId }: BestsellerContentProps)
       {/* Run Analysis Button */}
       <button
         onClick={runAnalysis}
-        disabled={loading || !selectedBook}
+        disabled={loading || !bookId}
         style={{
           padding: `${spacing[3]} ${spacing[6]}`,
-          background: loading || !selectedBook ? colors.text.disabled : colors.brand.gradient,
+          background: loading || !bookId ? colors.text.disabled : colors.brand.gradient,
           border: 'none',
           borderRadius: borderRadius.lg,
           color: colors.white,
           fontSize: typography.fontSize.base,
           fontWeight: typography.fontWeight.semibold,
-          cursor: loading || !selectedBook ? 'not-allowed' : 'pointer',
+          cursor: loading || !bookId ? 'not-allowed' : 'pointer',
           display: 'flex',
           alignItems: 'center',
           gap: spacing[2],

@@ -65,9 +65,11 @@ type TabType = 'overview' | 'betaSwarm' | 'ruthlessEditor' | 'marketAnalyst';
 
 interface EditorialReportContentProps {
   projectId: string;
+  bookId?: string | null;
+  versionId?: string | null;
 }
 
-export default function EditorialReportContent({ projectId }: EditorialReportContentProps) {
+export default function EditorialReportContent({ projectId, bookId, versionId }: EditorialReportContentProps) {
   const [status, setStatus] = useState<VEBStatus | null>(null);
   const [report, setReport] = useState<VEBReport | null>(null);
   const [loading, setLoading] = useState(true);

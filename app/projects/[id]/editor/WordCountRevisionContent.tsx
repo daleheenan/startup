@@ -1,19 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getToken, logout } from '@/app/lib/auth';
+import { getToken } from '@/app/lib/auth';
 import { colors, typography, spacing, borderRadius, shadows } from '@/app/lib/design-tokens';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
-interface Book {
-  id: string;
-  title: string;
-  book_number: number;
-  word_count: number;
-}
 
 interface WordCountRevision {
   id: string;
@@ -57,64 +49,29 @@ interface RevisionProgress {
 
 interface WordCountRevisionContentProps {
   projectId: string;
+  bookId?: string | null;
+  versionId?: string | null;
 }
 
-export default function WordCountRevisionContent({ projectId }: WordCountRevisionContentProps) {
-  const router = useRouter();
-  const [books, setBooks] = useState<Book[]>([]);
-  const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
+export default function WordCountRevisionContent({ projectId, bookId, versionId }: WordCountRevisionContentProps) {
   const [revision, setRevision] = useState<WordCountRevision | null>(null);
   const [proposals, setProposals] = useState<ChapterProposal[]>([]);
   const [progress, setProgress] = useState<RevisionProgress | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [targetWordCount, setTargetWordCount] = useState<number | ''>(80000);
   const [tolerancePercent, setTolerancePercent] = useState<number>(5);
   const [isStarting, setIsStarting] = useState(false);
 
-  // Fetch books
-  useEffect(() => {
-    const fetchBooks = async () => {
-      try {
-        const token = getToken();
-        const res = await fetch(`${API_BASE_URL}/api/books/project/${projectId}`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-
-        if (!res.ok) {
-          if (res.status === 401) {
-            logout();
-            router.push('/login');
-            return;
-          }
-          throw new Error('Failed to fetch books');
-        }
-
-        const data = await res.json();
-        setBooks(data.books || []);
-
-        if (data.books?.length > 0 && !selectedBookId) {
-          setSelectedBookId(data.books[0].id);
-        }
-      } catch (err) {
-        console.error('Error fetching books:', err);
-        setError('Failed to load books');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchBooks();
-  }, [projectId, router, selectedBookId]);
-
   // Fetch revision
   const fetchRevision = useCallback(async () => {
-    if (!selectedBookId) return;
+    if (!bookId) return;
 
+    setLoading(true);
     try {
       const token = getToken();
-      const res = await fetch(`${API_BASE_URL}/api/word-count-revision/books/${selectedBookId}/current`, {
+      const res = await fetch(`${API_BASE_URL}/api/word-count-revision/books/${bookId}/current`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
 
@@ -144,23 +101,29 @@ export default function WordCountRevisionContent({ projectId }: WordCountRevisio
       }
     } catch (err) {
       console.error('Error fetching revision:', err);
+    } finally {
+      setLoading(false);
     }
-  }, [selectedBookId]);
+  }, [bookId]);
 
   useEffect(() => {
-    if (selectedBookId) {
+    if (bookId) {
       fetchRevision();
+    } else {
+      setRevision(null);
+      setProposals([]);
+      setProgress(null);
     }
-  }, [selectedBookId, fetchRevision]);
+  }, [bookId, fetchRevision]);
 
   const handleStartRevision = async () => {
-    if (!selectedBookId) return;
+    if (!bookId) return;
 
     setIsStarting(true);
     setError(null);
     try {
       const token = getToken();
-      const res = await fetch(`${API_BASE_URL}/api/word-count-revision/books/${selectedBookId}/start`, {
+      const res = await fetch(`${API_BASE_URL}/api/word-count-revision/books/${bookId}/start`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -181,6 +144,22 @@ export default function WordCountRevisionContent({ projectId }: WordCountRevisio
       setIsStarting(false);
     }
   };
+
+  // Show message when no book selected
+  if (!bookId) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '30vh',
+        color: colors.text.tertiary,
+        fontSize: typography.fontSize.base,
+      }}>
+        Select a book to manage word count revision
+      </div>
+    );
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -229,37 +208,6 @@ export default function WordCountRevisionContent({ projectId }: WordCountRevisio
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[6], maxWidth: '1200px' }}>
-      {/* Book Selector */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: spacing[4],
-      }}>
-        <label style={{
-          fontSize: typography.fontSize.sm,
-          fontWeight: typography.fontWeight.medium,
-          color: colors.text.primary,
-        }}>
-          Book
-        </label>
-        <select
-          value={selectedBookId || ''}
-          onChange={(e) => setSelectedBookId(e.target.value)}
-          style={{
-            padding: spacing[3],
-            border: `1px solid ${colors.border.default}`,
-            borderRadius: borderRadius.md,
-            fontSize: typography.fontSize.sm,
-            background: colors.background.surface,
-            minWidth: '200px',
-          }}
-        >
-          {books.map(book => (
-            <option key={book.id} value={book.id}>{book.title}</option>
-          ))}
-        </select>
-      </div>
-
       {/* Error */}
       {error && (
         <div style={{
@@ -359,7 +307,7 @@ export default function WordCountRevisionContent({ projectId }: WordCountRevisio
 
           <button
             onClick={handleStartRevision}
-            disabled={isStarting || !selectedBookId}
+            disabled={isStarting || !bookId}
             style={{
               padding: `${spacing[3]} ${spacing[6]}`,
               background: isStarting ? colors.text.disabled : colors.brand.gradient,
