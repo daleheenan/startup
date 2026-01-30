@@ -111,6 +111,13 @@ export default function QualityPage() {
       if (!res.ok) return null;
 
       const data = await res.json();
+      console.log('[Quality] Coherence check API response:', {
+        status: data.status,
+        isStale: data.isStale,
+        versionId: data.versionId,
+        activeVersionId: data.activeVersionId,
+        checkedAt: data.checkedAt,
+      });
       return data;
     } catch (err) {
       console.error('Error fetching cached coherence result:', err);
@@ -618,6 +625,7 @@ export default function QualityPage() {
                 {coherenceResult?.checkedAt && (
                   <p style={{ fontSize: '0.75rem', color: '#9CA3AF', marginTop: '0.5rem' }}>
                     Last checked: {new Date(coherenceResult.checkedAt).toLocaleString()}
+                    {coherenceResult.isStale && ' (from previous version)'}
                   </p>
                 )}
               </div>
