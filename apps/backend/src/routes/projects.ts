@@ -4230,6 +4230,20 @@ Extract 3-6 plot threads total. Focus on the most important narrative arcs.`;
       messages: [{ role: 'user', content: prompt }],
     });
 
+    // Track AI cost
+    if (message.usage) {
+      metricsService.logAIRequest({
+        requestType: AI_REQUEST_TYPES.PLOT_ANALYSIS,
+        projectId: projectId,
+        bookId: null,
+        inputTokens: message.usage.input_tokens,
+        outputTokens: message.usage.output_tokens,
+        model: 'claude-sonnet-4-20250514',
+        success: true,
+        contextSummary: 'Extracting plot threads from story concept',
+      });
+    }
+
     const responseText = message.content[0].type === 'text'
       ? message.content[0].text
       : '';

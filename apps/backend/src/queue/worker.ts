@@ -1056,11 +1056,18 @@ Respond with a JSON object with this structure:
 
 Output only valid JSON, no commentary:`;
 
-      const response = await claudeService.createCompletion({
+      const response = await claudeService.createCompletionWithUsage({
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
         maxTokens: 1000,
         temperature: 0.5,
+        tracking: {
+          requestType: AI_REQUEST_TYPES.UPDATE_STATES,
+          projectId: data.project_id,
+          bookId: data.book_id,
+          chapterId: chapterId,
+          contextSummary: `Character state update for chapter ${data.chapter_number}`,
+        },
       });
 
       checkpointManager.saveCheckpoint(job.id, 'states_analyzed', { chapterId });
@@ -1068,9 +1075,9 @@ Output only valid JSON, no commentary:`;
       // Parse the response
       let stateUpdates: Record<string, any>;
       try {
-        stateUpdates = extractJsonObject(response);
+        stateUpdates = extractJsonObject(response.content);
       } catch (parseError: any) {
-        logger.error({ error: parseError.message, response: response.substring(0, 500) }, 'update_states: Failed to parse state updates');
+        logger.error({ error: parseError.message, response: response.content.substring(0, 500) }, 'update_states: Failed to parse state updates');
         // Don't fail the job, just skip the update and mark chapter complete
         this.markChapterComplete(chapterId);
         return;
