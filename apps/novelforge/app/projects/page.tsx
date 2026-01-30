@@ -278,7 +278,7 @@ export default function ProjectsPage() {
             borderRadius: '50%',
             animation: 'spin 1s linear infinite'
           }} />
-          <p style={{ marginTop: spacing[4], color: colors.text.tertiary }}>Loading...</p>
+          <p style={{ marginTop: spacing[4], color: colors.text.tertiary }}>Loading projects v2...</p>
         </div>
         <style>{`
           @keyframes spin {
