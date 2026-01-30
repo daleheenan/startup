@@ -8,8 +8,8 @@
  * - Edit Story (standalone)
  * - Elements: Characters, World, Images
  * - Story: Plot, Quality, Outline, Prose Style
- * - Novel: Chapters, Versions, Follow-up
- * - Editorial: Editorial Board, Analytics, Word Count, Outline Review, Prose Quality, Bestseller
+ * - Novel: Chapters, Versions
+ * - Editorial: Editorial Board, Analytics, Word Count, Outline Review, Prose Quality, Bestseller, Follow-up
  * - Publishing (standalone)
  */
 
@@ -129,8 +129,8 @@ export interface NavGroup {
  * - Edit Story (standalone)
  * - Elements: Characters, World, Images
  * - Story: Plot, Outline, Prose Style
- * - Novel: Chapters, Versions, Analytics, Follow-up
- * - Editorial: Editorial Board, Word Count, Outline Review
+ * - Novel: Chapters, Versions
+ * - Editorial: Editorial Board, Analytics, Word Count, Outline Review, Prose Quality, Bestseller, Follow-up
  * - Publishing (standalone)
  */
 export const PROJECT_NAV_GROUPS: NavGroup[] = [
@@ -234,13 +234,6 @@ export const PROJECT_NAV_GROUPS: NavGroup[] = [
         icon: '📑',
         workflowStep: 'versions',
       },
-      {
-        id: 'novel-follow-up',
-        label: 'Follow-up',
-        route: '/follow-up',
-        icon: '🚀',
-        workflowStep: 'follow-up',
-      },
     ],
   },
   {
@@ -289,6 +282,13 @@ export const PROJECT_NAV_GROUPS: NavGroup[] = [
         route: '/bestseller',
         icon: '⭐',
         workflowStep: 'bestseller',
+      },
+      {
+        id: 'novel-follow-up',
+        label: 'Follow-up',
+        route: '/follow-up',
+        icon: '🚀',
+        workflowStep: 'follow-up',
       },
     ],
   },
