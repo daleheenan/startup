@@ -197,10 +197,8 @@ export function DashboardProvider({
     }
   }, [state.sidebarCollapsed, isHydrated]);
 
-  const contextValue = useMemo(
-    () => ({ state, dispatch }),
-    [state]
-  );
+  // Temporarily removed useMemo to debug hooks error
+  const contextValue = { state, dispatch };
 
   return (
     <DashboardContext.Provider value={contextValue}>
