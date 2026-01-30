@@ -12,6 +12,7 @@ import {
 
 // ==================== STORAGE KEYS ====================
 
+// Force chunk rebuild v2
 const STORAGE_PREFIX = 'dashboard';
 const storageKeys = {
   expandedGroups: `${STORAGE_PREFIX}:expandedGroups`,
