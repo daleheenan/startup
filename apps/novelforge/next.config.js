@@ -42,7 +42,8 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
-  // Removed standalone for simpler Railway deployment
+  // Ensure packages that might have multiple React instances are transpiled
+  transpilePackages: ['@tanstack/react-query', '@tanstack/react-virtual'],
 
   // Security headers
   async headers() {
