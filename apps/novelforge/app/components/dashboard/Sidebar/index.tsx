@@ -247,22 +247,6 @@ function PenNamesIcon() {
  */
 const navigationGroups = [
   {
-    id: 'dashboard',
-    label: 'Dashboard',
-    icon: <DashboardIcon />,
-    isStandalone: true,
-    href: '/projects',
-    items: [] as { id: string; label: string; href: string; icon?: React.ReactNode }[],
-  },
-  {
-    id: 'analytics',
-    label: 'Analytics',
-    icon: <AnalyticsIcon />,
-    isStandalone: true,
-    href: '/analytics',
-    items: [] as { id: string; label: string; href: string; icon?: React.ReactNode }[],
-  },
-  {
     id: 'stories',
     label: 'Stories',
     icon: <StoriesIcon />,
@@ -296,9 +280,12 @@ const navigationGroups = [
     id: 'settings',
     label: 'Settings',
     icon: <SettingsIcon />,
-    isStandalone: true,
-    href: '/settings',
-    items: [] as { id: string; label: string; href: string; icon?: React.ReactNode }[],
+    isStandalone: false,
+    href: undefined,
+    items: [
+      { id: 'settings-general', label: 'General', href: '/settings', icon: <SettingsIcon /> },
+      { id: 'analytics', label: 'Analytics', href: '/analytics', icon: <AnalyticsIcon /> },
+    ],
   },
 ];
 
