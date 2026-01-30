@@ -70,6 +70,9 @@ export const AI_REQUEST_TYPES = {
   CHAPTER_BRIEF: 'chapter_brief',
   REGENERATION: 'regeneration',
   COMMERCIAL_BEAT_ANALYSIS: 'commercial_beat_analysis',
+
+  // Lesson Curation
+  LESSON_CURATION: 'lesson_curation',
 } as const;
 
 export type AIRequestType = (typeof AI_REQUEST_TYPES)[keyof typeof AI_REQUEST_TYPES];
@@ -143,6 +146,9 @@ export const AI_REQUEST_TYPE_LABELS: Record<AIRequestType, string> = {
   [AI_REQUEST_TYPES.CHAPTER_BRIEF]: 'Chapter Brief',
   [AI_REQUEST_TYPES.REGENERATION]: 'Regeneration',
   [AI_REQUEST_TYPES.COMMERCIAL_BEAT_ANALYSIS]: 'Commercial Beat Analysis',
+
+  // Lesson Curation
+  [AI_REQUEST_TYPES.LESSON_CURATION]: 'Lesson Curation',
 };
 
 /**
@@ -213,6 +219,7 @@ export const AI_REQUEST_TYPE_CATEGORIES = {
     AI_REQUEST_TYPES.PROSE_TIGHTENING,
   ],
   Analysis: [AI_REQUEST_TYPES.COMMERCIAL_BEAT_ANALYSIS],
+  'Lesson Management': [AI_REQUEST_TYPES.LESSON_CURATION],
 } as const;
 
 /**

@@ -575,14 +575,15 @@ router.post('/import-from-report/:reportId', async (req, res) => {
       const recommendations = report.recommendations ? JSON.parse(report.recommendations) : [];
 
       // Extract lessons from key findings in outline editorial
+      // All lessons are created as general (no bookId) so they apply to future books
       // Structure lessons
       if (structureAnalyst?.pacing_issues && structureAnalyst.pacing_issues.length >= 2) {
         lessons.push(editorialLessonsService.createLesson({
           projectId: report.project_id,
-          bookId: bookRow.id,
+          // bookId: null - General lesson applies to all books
           category: 'pacing',
           title: 'Address outline pacing issues',
-          description: `${structureAnalyst.pacing_issues.length} pacing issues identified in outline structure. Review scene distribution and tension arc.`,
+          description: `Pacing issues identified in outline structure. Review scene distribution and tension arc.`,
           sourceModule: 'ruthless_editor',
           severityLevel: 'moderate',
           sourceReportId: reportId,
@@ -593,10 +594,10 @@ router.post('/import-from-report/:reportId', async (req, res) => {
       if (characterArc?.weak_arcs && characterArc.weak_arcs.length > 0) {
         lessons.push(editorialLessonsService.createLesson({
           projectId: report.project_id,
-          bookId: bookRow.id,
+          // bookId: null - General lesson applies to all books
           category: 'character',
           title: 'Strengthen character arcs',
-          description: `Character arc weaknesses identified: ${characterArc.weak_arcs.map((a: any) => a.character || a).join(', ')}. Ensure clear transformation and motivation.`,
+          description: `Character arc weaknesses identified. Ensure clear transformation and motivation for main characters.`,
           sourceModule: 'beta_swarm',
           severityLevel: 'major',
           sourceReportId: reportId,
@@ -607,24 +608,29 @@ router.post('/import-from-report/:reportId', async (req, res) => {
       if (marketFit?.genre_alignment_score && marketFit.genre_alignment_score < 7) {
         lessons.push(editorialLessonsService.createLesson({
           projectId: report.project_id,
-          bookId: bookRow.id,
+          // bookId: null - General lesson applies to all books
           category: 'market',
           title: 'Improve genre alignment',
-          description: `Genre alignment score is ${marketFit.genre_alignment_score}/10. Review genre conventions and reader expectations.`,
+          description: `Genre alignment needs improvement. Review genre conventions and reader expectations.`,
           sourceModule: 'market_analyst',
           severityLevel: 'moderate',
           sourceReportId: reportId,
         }));
       }
 
-      // Add recommendations as lessons
+      // Add recommendations as lessons (skip book-specific ones)
       if (recommendations && recommendations.length > 0) {
         for (const rec of recommendations.slice(0, 3)) {
           const recText = typeof rec === 'string' ? rec : rec.text || rec.recommendation || '';
           if (recText) {
+            // Skip book-specific recommendations
+            if (/chapter\s+\d+|scene\s+\d+|page\s+\d+/i.test(recText)) {
+              logger.debug({ recommendation: recText }, 'Skipping book-specific recommendation');
+              continue;
+            }
             lessons.push(editorialLessonsService.createLesson({
               projectId: report.project_id,
-              bookId: bookRow.id,
+              // bookId: null - General lesson applies to all books
               category: 'other',
               title: 'Outline recommendation',
               description: recText,

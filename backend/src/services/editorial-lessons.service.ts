@@ -12,6 +12,56 @@ import { createLogger } from './logger.service.js';
 
 const logger = createLogger('services:editorial-lessons');
 
+/**
+ * Patterns that indicate book-specific content that shouldn't be stored as-is
+ */
+const BOOK_SPECIFIC_PATTERNS = [
+  // Chapter references with specific numbers
+  /chapter\s+\d+/gi,
+  /chapters?\s+[\d,\s]+(?:and\s+\d+)?/gi,
+  // Scene references
+  /scene\s+\d+/gi,
+  /scenes?\s+[\d,\s]+/gi,
+  // Page references
+  /page\s+\d+/gi,
+  /pages?\s+[\d-]+/gi,
+  // Specific "evaluate chapter X" patterns
+  /evaluate\s+(?:necessity\s+of\s+)?chapters?\s+[\d,\s]+/gi,
+  /review\s+chapters?\s+[\d,\s]+/gi,
+  /cut\s+chapters?\s+[\d,\s]+/gi,
+];
+
+/**
+ * Check if text contains book-specific references
+ */
+function containsBookSpecificContent(text: string): boolean {
+  return BOOK_SPECIFIC_PATTERNS.some(pattern => pattern.test(text));
+}
+
+/**
+ * Attempt to generalise book-specific content in a recommendation
+ * Returns null if the content is too book-specific to generalise automatically
+ */
+function tryGeneraliseRecommendation(text: string): string | null {
+  // If it's just about evaluating specific chapters, skip entirely
+  if (/^(?:evaluate|review|consider|cut|remove)\s+(?:necessity\s+of\s+)?chapters?\s+[\d,\s]+/i.test(text.trim())) {
+    return null; // Too book-specific, skip this lesson
+  }
+
+  // Replace specific chapter/scene numbers with generic references
+  let generalised = text
+    .replace(/chapters?\s+[\d,\s]+(?:and\s+\d+)?/gi, 'certain chapters')
+    .replace(/scenes?\s+[\d,\s]+(?:and\s+\d+)?/gi, 'certain scenes')
+    .replace(/pages?\s+[\d-]+/gi, 'certain pages');
+
+  // If we still have a meaningful lesson after generalisation, return it
+  if (generalised.length > 20) {
+    return generalised;
+  }
+
+  return null;
+}
+
 export type LessonCategory =
   | 'pacing'
   | 'exposition'
@@ -434,7 +484,7 @@ class EditorialLessonsService {
         if (count >= 3) {
           lessons.push(this.createLesson({
             projectId,
-            bookId,
+            // bookId omitted - General lesson applies to all books
             category: 'exposition',
             title: `Avoid ${issue.replace(/_/g, ' ')}`,
             description: `This issue appeared ${count} times across chapters. Focus on showing rather than telling and integrate information naturally into the narrative.`,
@@ -451,7 +501,7 @@ class EditorialLessonsService {
         if (count >= 3) {
           lessons.push(this.createLesson({
             projectId,
-            bookId,
+            // bookId omitted - General lesson applies to all books
             category: 'pacing',
             title: `Address ${issue.replace(/_/g, ' ')} issues`,
             description: `This pacing issue appeared ${count} times. Ensure each scene advances the plot and maintains reader engagement.`,
@@ -467,7 +517,7 @@ class EditorialLessonsService {
       if (sceneIssuesCount >= 3) {
         lessons.push(this.createLesson({
           projectId,
-          bookId,
+          // bookId omitted - General lesson applies to all books
           category: 'scene_structure',
           title: 'Ensure every scene earns its place',
           description: `${sceneIssuesCount} scenes failed to justify their inclusion. Each scene should advance plot, develop character, or provide essential information.`,
@@ -489,7 +539,7 @@ class EditorialLessonsService {
       if (dnfRiskCount >= 5) {
         lessons.push(this.createLesson({
           projectId,
-          bookId,
+          // bookId omitted - General lesson applies to all books
           category: 'pacing',
           title: 'Reduce DNF risk points',
           description: `${dnfRiskCount} DNF risk points identified. Focus on maintaining reader engagement and avoiding common put-down triggers.`,
@@ -507,7 +557,7 @@ class EditorialLessonsService {
       if (hookAnalysis?.weaknesses && hookAnalysis.weaknesses.length >= 2) {
         lessons.push(this.createLesson({
           projectId,
-          bookId,
+          // bookId omitted - General lesson applies to all books
           category: 'market',
           title: 'Strengthen opening hook',
           description: `Multiple weaknesses identified in the opening hook. Focus on immediate engagement and clear genre signalling.`,
@@ -520,7 +570,7 @@ class EditorialLessonsService {
       if (marketPositioning?.potentialChallenges && marketPositioning.potentialChallenges.length >= 2) {
         lessons.push(this.createLesson({
           projectId,
-          bookId,
+          // bookId omitted - General lesson applies to all books
           category: 'market',
           title: 'Address market positioning',
           description: `${marketPositioning.potentialChallenges.length} market positioning challenges identified. Consider genre expectations and target audience preferences.`,
@@ -534,7 +584,7 @@ class EditorialLessonsService {
       if (vebReport.marketAnalyst?.agentNotes) {
         lessons.push(this.createLesson({
           projectId,
-          bookId,
+          // bookId omitted - General lesson applies to all books
           category: 'market',
           title: 'Agent feedback on manuscript',
           description: vebReport.marketAnalyst.agentNotes,
@@ -547,8 +597,30 @@ class EditorialLessonsService {
 
     // Extract key recommendations as individual lessons
     // These are the prioritised action items from the full VEB report
+    // Skip or generalise book-specific recommendations (e.g., "Evaluate chapters 3, 12, 31")
     if (vebReport.recommendations && vebReport.recommendations.length > 0) {
+      let skippedCount = 0;
+      let generalisedCount = 0;
+
       for (const rec of vebReport.recommendations) {
+        // Check for book-specific content
+        let description = rec;
+        let title = rec;
+        const isBookSpecific = containsBookSpecificContent(rec);
+
+        if (isBookSpecific) {
+          // Try to generalise it
+          const generalised = tryGeneraliseRecommendation(rec);
+          if (!generalised) {
+            // Too book-specific, skip this lesson entirely
+            skippedCount++;
+            logger.debug({ recommendation: rec }, 'Skipping book-specific recommendation');
+            continue;
+          }
+          description = generalised;
+          generalisedCount++;
+        }
+
         // Parse the recommendation to determine category
         const recLower = rec.toLowerCase();
         let category: LessonCategory = 'other';
@@ -578,27 +650,35 @@ class EditorialLessonsService {
         }
 
         // Extract title from recommendation (first part before colon or first sentence)
-        let title = rec;
-        const colonIdx = rec.indexOf(':');
+        const colonIdx = description.indexOf(':');
         if (colonIdx > 0 && colonIdx < 60) {
-          title = rec.substring(0, colonIdx).trim();
-        } else if (title.length > 60) {
-          title = title.substring(0, 57) + '...';
+          title = description.substring(0, colonIdx).trim();
+        } else if (description.length > 60) {
+          title = description.substring(0, 57) + '...';
+        } else {
+          title = description;
         }
 
+        // Store without bookId to make it a general lesson
         lessons.push(this.createLesson({
           projectId,
-          bookId,
+          // bookId omitted - General lesson applies to all books
           category,
           title,
-          description: rec,
+          description,
           sourceModule,
           severityLevel: 'moderate',
           sourceReportId,
         }));
       }
 
-      logger.info({ projectId, bookId, keyRecommendations: vebReport.recommendations.length }, 'Extracted key recommendations from VEB');
+      logger.info({
+        projectId,
+        bookId,
+        keyRecommendations: vebReport.recommendations.length,
+        skipped: skippedCount,
+        generalised: generalisedCount,
+      }, 'Extracted key recommendations from VEB');
     }
 
     logger.info({ projectId, bookId, lessonsCreated: lessons.length }, 'Extracted lessons from VEB');
@@ -623,7 +703,7 @@ class EditorialLessonsService {
     if (percentReduction >= 10) {
       lessons.push(this.createLesson({
         projectId,
-        bookId,
+        // bookId omitted - General lesson applies to all books
         category: 'word_economy',
         title: `Aim for tighter prose (${percentReduction.toFixed(0)}% reduction achieved)`,
         description: `The book was reduced from ${revision.originalWordCount.toLocaleString()} to ${revision.finalWordCount.toLocaleString()} words. Future generations should be more economical from the start.`,
@@ -656,7 +736,7 @@ class EditorialLessonsService {
       if (stats.count >= 3 || stats.words >= 1000) {
         lessons.push(this.createLesson({
           projectId,
-          bookId,
+          // bookId omitted - General lesson applies to all books
           category: category as LessonCategory,
           title: `Reduce ${category.replace(/_/g, ' ')} bloat`,
           description: `${stats.words.toLocaleString()} words were cut from ${stats.count} instances of ${category} issues. Be more economical in future generations.`,

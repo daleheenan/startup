@@ -141,6 +141,7 @@ import editorialBoardRouter from './routes/editorial-board.js';
 import seriesRouter from './routes/series.js';
 import wordCountRevisionRouter from './routes/word-count-revision.js';
 import editorialLessonsRouter from './routes/editorial-lessons.js';
+import lessonCurationRouter from './routes/lesson-curation.js';
 import aiCostsRouter from './routes/ai-costs.js';
 import navigationRouter from './routes/navigation.js';
 import authorStylesRouter from './routes/author-styles.js';
@@ -290,6 +291,7 @@ app.use('/api/editorial', apiLimiter, requireAuth, editorialBoardRouter); // Edi
 app.use('/api/series', apiLimiter, requireAuth, seriesRouter); // Series management routes
 app.use('/api/word-count-revision', apiLimiter, requireAuth, wordCountRevisionRouter); // Word count revision routes
 app.use('/api/editorial-lessons', apiLimiter, requireAuth, editorialLessonsRouter); // Editorial lessons routes
+app.use('/api/lesson-curation', apiLimiter, requireAuth, lessonCurationRouter); // AI-assisted lesson curation (Sprint 45)
 app.use('/api/ai-costs', apiLimiter, requireAuth, aiCostsRouter); // AI cost tracking routes
 app.use('/api/navigation', apiLimiter, requireAuth, navigationRouter); // Navigation counts (optimised single-query endpoint)
 app.use('/api/author-styles', apiLimiter, requireAuth, authorStylesRouter); // Author writing style profiles (Sprint 21)

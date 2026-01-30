@@ -72,6 +72,10 @@ export * from './structure-templates';
 export * from './reflections';
 export * from './lessons';
 
+// Editorial lessons curation
+export * from './editorial-lessons.service';
+export * from './lesson-curation.service';
+
 // Story generation utilities
 export * from './story-dna-generator';
 export * from './story-ideas-generator';

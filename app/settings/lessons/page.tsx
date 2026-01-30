@@ -400,24 +400,44 @@ export default function LessonsSettingsPage() {
               Agent Lessons ({agentLessons.length})
             </button>
           </div>
-          <button
-            onClick={handleOpenImportModal}
-            style={{
-              padding: '0.5rem 1rem',
-              background: '#10B981',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: '500',
-              fontSize: '0.875rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-            }}
-          >
-            <span>+</span> Import from Report
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <Link
+              href="/settings/lessons/curation"
+              style={{
+                padding: '0.5rem 1rem',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                textDecoration: 'none',
+                fontWeight: '500',
+                fontSize: '0.875rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+              }}
+            >
+              Curate Lessons
+            </Link>
+            <button
+              onClick={handleOpenImportModal}
+              style={{
+                padding: '0.5rem 1rem',
+                background: '#10B981',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontWeight: '500',
+                fontSize: '0.875rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+              }}
+            >
+              <span>+</span> Import from Report
+            </button>
+          </div>
         </div>
 
         {/* Filters */}
