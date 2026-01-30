@@ -346,6 +346,17 @@ export function runMigrations() {
       '051_ai_request_log.sql',            // DB version 51 - AI request audit log for cost tracking
       '052_backfill_ai_request_log.sql',   // DB version 52 - backfill historical AI costs
       '053_add_show_ai_costs_menu.sql',    // DB version 53 - add show_ai_costs_menu to user_preferences
+      '054_agent_configuration.sql',       // DB version 54 - agent configuration and cost optimisation
+      '054_bestseller_mode.sql',           // DB version 55 - bestseller mode for commercial fiction
+      '054_collaboration_features.sql',    // DB version 56 - multi-user collaboration support
+      '054_publishing_support.sql',        // DB version 57 - publishing workflow support
+      '054_refresh_tokens.sql',            // DB version 58 - refresh token support
+      '055_author_styles.sql',             // DB version 59 - author style presets
+      '055_csrf_tokens.sql',               // DB version 60 - CSRF token support
+      '056_sse_tokens.sql',                // DB version 61 - SSE token support
+      '057_commercial_genre_enhancements.sql', // DB version 62 - commercial genre enhancements
+      '058_editorial_lessons_source_report.sql', // DB version 63 - editorial lessons source report
+      '059_editorial_lessons_curation.sql', // DB version 64 - editorial lessons curation
     ];
 
     for (let i = 0; i < migrationFiles.length; i++) {
@@ -475,6 +486,17 @@ export function getMigrationStatus(): {
     '051_ai_request_log.sql',
     '052_backfill_ai_request_log.sql',
     '053_add_show_ai_costs_menu.sql',
+    '054_agent_configuration.sql',
+    '054_bestseller_mode.sql',
+    '054_collaboration_features.sql',
+    '054_publishing_support.sql',
+    '054_refresh_tokens.sql',
+    '055_author_styles.sql',
+    '055_csrf_tokens.sql',
+    '056_sse_tokens.sql',
+    '057_commercial_genre_enhancements.sql',
+    '058_editorial_lessons_source_report.sql',
+    '059_editorial_lessons_curation.sql',
   ];
 
   const pendingMigrations: string[] = [];
