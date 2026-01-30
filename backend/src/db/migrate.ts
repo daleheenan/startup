@@ -357,6 +357,8 @@ export function runMigrations() {
       '057_commercial_genre_enhancements.sql', // DB version 62 - commercial genre enhancements
       '058_editorial_lessons_source_report.sql', // DB version 63 - editorial lessons source report
       '059_editorial_lessons_curation.sql', // DB version 64 - editorial lessons curation
+      '060_pen_names.sql',                   // DB version 65 - pen names management
+      '061_books_publishing.sql',            // DB version 66 - books publishing metadata
     ];
 
     for (let i = 0; i < migrationFiles.length; i++) {
@@ -497,6 +499,8 @@ export function getMigrationStatus(): {
     '057_commercial_genre_enhancements.sql',
     '058_editorial_lessons_source_report.sql',
     '059_editorial_lessons_curation.sql',
+    '060_pen_names.sql',
+    '061_books_publishing.sql',
   ];
 
   const pendingMigrations: string[] = [];
