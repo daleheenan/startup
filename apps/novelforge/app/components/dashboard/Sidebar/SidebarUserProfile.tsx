@@ -117,6 +117,12 @@ export default function SidebarUserProfile({
   const [isLogoutHovered, setIsLogoutHovered] = useState(false);
   const [isLogoutFocused, setIsLogoutFocused] = useState(false);
 
+  // IMPORTANT: All hooks must be called before any early returns to comply with
+  // React's Rules of Hooks. These memoised derivations are safe even when user
+  // is null - the values will just be unused in that case.
+  const initials = useMemo(() => user ? getInitials(user.name) : '', [user?.name]);
+  const avatarColour = useMemo(() => user ? getAvatarColour(user.name) : '', [user?.name]);
+
   // ---- shared container style (border-top divider + padding) ----
   const containerStyle: React.CSSProperties = {
     display: 'flex',
@@ -184,10 +190,6 @@ export default function SidebarUserProfile({
   }
 
   // ---- AUTHENTICATED USER STATE ----
-
-  // Memoised derivations so they do not recompute on every render
-  const initials = useMemo(() => getInitials(user.name), [user.name]);
-  const avatarColour = useMemo(() => getAvatarColour(user.name), [user.name]);
 
   const avatarBaseStyle: React.CSSProperties = {
     width: '40px',

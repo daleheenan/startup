@@ -12,7 +12,6 @@ import {
 
 // ==================== STORAGE KEYS ====================
 
-// Force chunk rebuild v2
 const STORAGE_PREFIX = 'dashboard';
 const storageKeys = {
   expandedGroups: `${STORAGE_PREFIX}:expandedGroups`,
@@ -197,8 +196,10 @@ export function DashboardProvider({
     }
   }, [state.sidebarCollapsed, isHydrated]);
 
-  // Temporarily removed useMemo to debug hooks error
-  const contextValue = { state, dispatch };
+  const contextValue = useMemo(
+    () => ({ state, dispatch }),
+    [state]
+  );
 
   return (
     <DashboardContext.Provider value={contextValue}>
