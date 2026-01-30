@@ -29,6 +29,11 @@ This workflow automates pre-commit checks to catch issues before they reach code
 │  │  │ Inspector    │  │    (Ray)     │  │   (Kenji)    │            │     │
 │  │  │   (Yuki)     │  │              │  │              │            │     │
 │  │  └──────────────┘  └──────────────┘  └──────────────┘            │     │
+│  │                                                                    │     │
+│  │  ┌──────────────────────────────────────────────────────────┐    │     │
+│  │  │            Integration Test Engineer (Priya)              │    │     │
+│  │  │         Verifies complete workflows with real database    │    │     │
+│  │  └──────────────────────────────────────────────────────────┘    │     │
 │  └───────────────────────────────────────────────────────────────────┘     │
 │                                    │                                        │
 │                                    ▼                                        │
@@ -113,6 +118,17 @@ Checks:
 - Verify no skipped tests (.skip, .only)
 
 **Output**: Test results with coverage metrics
+
+### 1d. Integration Test Engineer (Dr. Priya Sharma) - Full Mode Only
+
+Checks:
+- Complete workflow tests with real database
+- Database schema correctness (column names, indexes)
+- Foreign key constraint enforcement
+- API endpoint behaviour with real data
+- Cross-service data integrity
+
+**Output**: Integration test results with schema verification
 
 ---
 
@@ -258,6 +274,16 @@ Send a SINGLE message with multiple Task tool calls:
   4. Check coverage percentages
   5. Flag any .skip or .only in test files"
 - description: "Run test suite"
+
+[Task 4] (Full mode only)
+- subagent_type: "integration-test-engineer"
+- prompt: "Run integration tests for [target path]:
+  1. Execute integration tests: npm test -- --testPathPattern=integration
+  2. Verify database schema correctness
+  3. Check complete workflow tests pass
+  4. Verify foreign key constraints are working
+  5. Report any SQL errors or schema mismatches"
+- description: "Integration tests"
 ```
 
 ### WRONG Way - Never Do This
@@ -270,6 +296,7 @@ Bash: claude agent run --agent code-quality-inspector --prompt "check quality"
 - `code-quality-inspector` - Lint, compile, format checks
 - `bug-hunter` - Static analysis for bugs
 - `qa-test-engineer` - Test execution and coverage
+- `integration-test-engineer` - Integration tests with real database (full mode)
 
 ---
 

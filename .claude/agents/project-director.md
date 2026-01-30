@@ -88,6 +88,7 @@ Use these for focused domain work instead of general `developer`:
 | `code-quality-inspector` | Dr. Yuki Tanaka | Comprehensive quality checks |
 | `qa-tester` | Lisa Chen | Manual testing, exploratory testing |
 | `qa-test-engineer` | Kenji Watanabe | Automated testing, Playwright |
+| `integration-test-engineer` | Dr. Priya Sharma | Integration tests with real database, schema verification |
 | `test-architect` | Dr. Sarah Okonkwo | Test strategy, coverage design |
 | `bug-hunter` | Detective Ray Morrison | Proactive bug detection, logic errors |
 
@@ -117,8 +118,8 @@ Use these for focused domain work instead of general `developer`:
 | Workflow | Purpose | When to Use |
 |----------|---------|-------------|
 | `/feature-workflow` | PM → Architect → Dev → Review → QA | New features, significant changes |
-| `/qc-workflow` | Optimizer → Tester → Bug Hunter → Security | Quality control, pre-release validation |
-| `/ci-workflow` | Lint → Test → Security (parallel) | Pre-commit checks, quick validation |
+| `/qc-workflow` | Optimizer → Tester → Bug Hunter → Integration → Security | Quality control, pre-release validation |
+| `/ci-workflow` | Lint → Test → Integration → Security (parallel) | Pre-commit checks, quick validation |
 | `/deploy-workflow` | Commit → Deploy → Monitor → Remediate | Production deployments (supports canary) |
 | `/design-workflow` | UX design workflow | UI/UX focused work |
 | `/tech-request` | Technical request handling | Inbound technical requests |
@@ -153,8 +154,9 @@ Full-stack feature? → developer (spans multiple domains)
    - Full-stack → developer
 5. code-reviewer reviews
 6. qa-test-engineer runs automated tests
-7. security-hardener final review
-8. documentation-agent updates docs
+7. integration-test-engineer verifies workflows with real database
+8. security-hardener final review
+9. documentation-agent updates docs
 ```
 
 ### For Bug Fixes / Issues
@@ -201,8 +203,9 @@ Full-stack feature? → developer (spans multiple domains)
 2. code-quality-inspector analyses
 3. code-simplifier refactors
 4. test-architect improves coverage
-5. code-reviewer approves
-6. lessons-curator updates lessons if patterns emerge
+5. integration-test-engineer creates/runs integration tests
+6. code-reviewer approves
+7. lessons-curator updates lessons if patterns emerge
 ```
 
 ### For API Development
@@ -212,7 +215,8 @@ Full-stack feature? → developer (spans multiple domains)
 3. api-agent creates endpoints
 4. integration-agent handles external services
 5. qa-test-engineer writes API tests
-6. documentation-agent generates API docs
+6. integration-test-engineer writes integration tests (real DB)
+7. documentation-agent generates API docs
 ```
 
 ### For Frontend Development
@@ -274,10 +278,22 @@ POST-PROJECT:
 4. Handle blockers and issues
 
 ### Phase 4: Quality Gates
+**MANDATORY**: Run these checks on EVERY feature/change before deployment:
+
 1. Ensure all implementations pass review
-2. Verify all tests pass
-3. Confirm security requirements met
-4. Validate against original requirements
+2. **Run ALL tests** (unit, integration, E2E):
+   - Unit tests: `npm test`
+   - Integration tests: `npm test -- --testPathPattern=integration`
+   - E2E tests (if applicable): `npm run test:e2e`
+3. **integration-test-engineer** verifies:
+   - Database schema correctness
+   - Complete workflow tests with real database
+   - Foreign key constraints working
+   - No SQL errors or column mismatches
+4. Confirm security requirements met
+5. Validate against original requirements
+
+**CRITICAL**: Integration tests catch bugs that unit tests miss (e.g., `p.title` vs `p.name` column errors). NEVER skip them.
 
 ### Phase 5: Deployment
 1. Invoke `/deploy-workflow` to commit and deploy
@@ -583,6 +599,7 @@ Use these exact names with the Task tool:
 - `code-quality-inspector` - Comprehensive quality checks
 - `qa-tester` - Manual/exploratory testing
 - `qa-test-engineer` - Automated testing, Playwright
+- `integration-test-engineer` - Integration tests with real database
 - `test-architect` - Test strategy, coverage design
 - `bug-hunter` - Proactive bug detection
 

@@ -29,6 +29,12 @@ This workflow runs four specialized QC agents in sequence, each building on the 
 │         │                   │                   │               │
 │         ▼                   ▼                   ▼               │
 │  ┌──────────────────────────────────────────────────────┐      │
+│  │         Integration Test Engineer (Priya)            │      │
+│  │    Complete workflow tests with real database        │      │
+│  └──────────────────────────────────────────────────────┘      │
+│                            │                                    │
+│                            ▼                                    │
+│  ┌──────────────────────────────────────────────────────┐      │
 │  │              Security Hardener (Alex)                │      │
 │  │         Final security review of all findings        │      │
 │  └──────────────────────────────────────────────────────┘      │
@@ -100,7 +106,25 @@ Have the **bug-hunter** agent (Detective Ray Morrison) analyze the target code f
 
 ---
 
-## Phase 4: Security Hardening
+## Phase 4: Integration Testing
+
+Have the **integration-test-engineer** agent (Dr. Priya Sharma) verify:
+- Complete workflow tests with real database
+- Database schema correctness (all columns exist as expected)
+- Foreign key relationships and cascade behaviours
+- API endpoints with real data backing
+- Cross-service data integrity
+- SQL query correctness (catches `p.title` vs `p.name` errors)
+
+**Context**: Review findings from previous phases to focus integration tests.
+
+**Output**: `docs/qc/04_INTEGRATION_REPORT.md`
+
+**Wait for completion before proceeding.**
+
+---
+
+## Phase 5: Security Hardening
 
 Have the **security-hardener** agent (Commander Alex Volkov) analyze:
 - All code in target area
@@ -112,13 +136,13 @@ Have the **security-hardener** agent (Commander Alex Volkov) analyze:
 
 **Context**: Review all previous reports for security-relevant findings.
 
-**Output**: `docs/qc/04_SECURITY_REPORT.md`
+**Output**: `docs/qc/05_SECURITY_REPORT.md`
 
 **Wait for completion before proceeding.**
 
 ---
 
-## Phase 5: Consolidation
+## Phase 6: Consolidation
 
 Create a consolidated QC report that:
 
@@ -187,12 +211,13 @@ Create a consolidated QC report that:
 - [01_OPTIMIZATION_REPORT.md](./01_OPTIMIZATION_REPORT.md)
 - [02_TEST_REPORT.md](./02_TEST_REPORT.md)
 - [03_BUG_REPORT.md](./03_BUG_REPORT.md)
-- [04_SECURITY_REPORT.md](./04_SECURITY_REPORT.md)
+- [04_INTEGRATION_REPORT.md](./04_INTEGRATION_REPORT.md)
+- [05_SECURITY_REPORT.md](./05_SECURITY_REPORT.md)
 ```
 
 ---
 
-## Phase 6: Automatic Feature Workflow Launch
+## Phase 7: Automatic Feature Workflow Launch
 
 After the consolidated report is complete:
 
@@ -253,7 +278,7 @@ When this workflow says "Have the **agent** agent...", you MUST use the Task too
 
 **Run QC agents in parallel** by including multiple Task tool calls in a single message:
 
-**Example - Launch all 4 QC agents in parallel:**
+**Example - Launch all 5 QC agents in parallel:**
 ```
 [Task 1]
 - subagent_type: "code-optimizer"
@@ -271,8 +296,13 @@ When this workflow says "Have the **agent** agent...", you MUST use the Task too
 - description: "Bug detection analysis"
 
 [Task 4]
+- subagent_type: "integration-test-engineer"
+- prompt: "Create and run integration tests for [target path]. Verify complete workflows with real database, check schema correctness (all columns exist), test foreign key constraints, verify API endpoints return correct data. Write report to docs/qc/04_INTEGRATION_REPORT.md"
+- description: "Integration test verification"
+
+[Task 5]
 - subagent_type: "security-hardener"
-- prompt: "Security audit of [target path]. Check OWASP Top 10, dependency vulnerabilities, security misconfigurations, attack surface. Write report to docs/qc/04_SECURITY_REPORT.md"
+- prompt: "Security audit of [target path]. Check OWASP Top 10, dependency vulnerabilities, security misconfigurations, attack surface. Write report to docs/qc/05_SECURITY_REPORT.md"
 - description: "Security vulnerability scan"
 ```
 
@@ -289,7 +319,8 @@ Bash: npx claude --agent security-hardener --task "audit code"
 - `code-optimizer` - Phase 1: Performance & code quality
 - `test-architect` - Phase 2: Test strategy & coverage
 - `bug-hunter` - Phase 3: Bug detection & logic errors
-- `security-hardener` - Phase 4: Security assessment
+- `integration-test-engineer` - Phase 4: Integration tests with real database
+- `security-hardener` - Phase 5: Security assessment
 
 ---
 

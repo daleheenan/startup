@@ -85,6 +85,7 @@ Task involves multiple layers (frontend + backend + DB)?
 | [qa-tester.md](qa-tester.md) | Manual testing, edge cases | `Test [feature]` |
 | [qa-test-engineer.md](qa-test-engineer.md) | Automated tests, Playwright | `Write tests for [feature]` |
 | [test-architect.md](test-architect.md) | Test strategy design | `Design test strategy` |
+| [integration-test-engineer.md](integration-test-engineer.md) | Integration tests with real database | `Write integration tests for [feature]` |
 | [bug-hunter.md](bug-hunter.md) | Find bugs proactively | `Hunt bugs in [area]` |
 | [code-quality-inspector.md](code-quality-inspector.md) | Comprehensive quality checks | `Inspect [code]` |
 | [code-simplifier.md](code-simplifier.md) | Refactor for clarity | `Simplify [code]` |
@@ -175,7 +176,7 @@ Don't forget to create a corresponding `.claude/lessons/agent-name.lessons.md` f
 
 - **Orchestration**: project-director, sprint-orchestrator, progress-reporter, sprint-retrospective-facilitator
 - **Development**: developer, implementation-engineer, architect, api-agent, frontend-agent, schema-agent, service-agent, integration-agent, feature-builder
-- **Quality**: code-reviewer, qa-tester, qa-test-engineer, test-architect, bug-hunter, code-quality-inspector, code-simplifier, code-optimizer
+- **Quality**: code-reviewer, qa-tester, qa-test-engineer, test-architect, integration-test-engineer, bug-hunter, code-quality-inspector, code-simplifier, code-optimizer
 - **Security & Performance**: pen-test, security-hardener, performance-test-engineer, seo-architect
 - **Planning & Design**: pm-spec-writer, agile-product-strategist, software-architect-designer, ux-design-specialist, documentation-agent
 - **Deployment**: deployer, deployment-monitor, deployment-doctor
