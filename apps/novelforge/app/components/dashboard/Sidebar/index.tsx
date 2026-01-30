@@ -271,9 +271,7 @@ const navigationGroups = [
       { id: 'completed-novels', label: 'Completed Novels', href: '/completed', icon: <CompletedNovelsIcon /> },
       { id: 'series', label: 'Series Management', href: '/series', icon: <SeriesIcon /> },
       { id: 'books', label: 'Books', href: '/books', icon: <BooksIcon /> },
-      { id: 'pen-names', label: 'Pen Names', href: '/pen-names', icon: <PenNamesIcon /> },
       { id: 'editorial', label: 'Editorial Board', href: '/editorial', icon: <EditorialIcon /> },
-      { id: 'ai-costs', label: 'AI Costs', href: '/ai-costs', icon: <AICostsIcon /> },
     ],
   },
   {
@@ -284,6 +282,8 @@ const navigationGroups = [
     href: undefined,
     items: [
       { id: 'settings-general', label: 'General', href: '/settings', icon: <SettingsIcon /> },
+      { id: 'pen-names', label: 'Pen Names', href: '/pen-names', icon: <PenNamesIcon /> },
+      { id: 'ai-costs', label: 'AI Costs', href: '/ai-costs', icon: <AICostsIcon /> },
       { id: 'analytics', label: 'Analytics', href: '/analytics', icon: <AnalyticsIcon /> },
     ],
   },
