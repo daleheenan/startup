@@ -101,14 +101,9 @@ export default function BookVersionSelector({
         throw new Error(data.error?.message || 'Failed to switch version');
       }
 
-      // Refresh versions
-      await fetchVersions();
-
-      // Notify parent
-      const newActive = versions.find(v => v.id === versionId);
-      if (newActive && onVersionChange) {
-        onVersionChange(newActive);
-      }
+      // Refresh versions and notify parent with fresh data
+      // Pass true to notify parent so they get the updated version info with correct chapter counts
+      await fetchVersions(true);
     } catch (err: any) {
       setError(err.message);
     } finally {
