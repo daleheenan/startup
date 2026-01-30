@@ -445,33 +445,11 @@ export default function QualityPage() {
             }}>
               Version:
             </label>
-            {versions.length > 1 ? (
-              <select
-                value={activeVersionId}
-                disabled
-                style={{
-                  flex: 1,
-                  maxWidth: '300px',
-                  padding: '0.5rem 0.75rem',
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: borderRadius.md,
-                  fontSize: '0.875rem',
-                  backgroundColor: '#F9FAFB',
-                  color: colors.text,
-                  cursor: 'not-allowed',
-                }}
-              >
-                {versions.map(version => (
-                  <option key={version.id} value={version.id}>
-                    {version.version_name || `Version ${version.version_number}`}
-                    {version.is_active ? ' (Active)' : ''}
-                    {' - '}
-                    {(version.actual_chapter_count ?? version.chapter_count)} chapters
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <span style={{
+            <select
+              value={activeVersionId}
+              disabled
+              title="Quality checks use the active version. Change the active version on the Versions page."
+              style={{
                 flex: 1,
                 maxWidth: '300px',
                 padding: '0.5rem 0.75rem',
@@ -480,13 +458,18 @@ export default function QualityPage() {
                 fontSize: '0.875rem',
                 backgroundColor: '#F9FAFB',
                 color: colors.text,
-              }}>
-                {versions[0]?.version_name || `Version ${versions[0]?.version_number}`}
-                {versions[0]?.is_active ? ' (Active)' : ''}
-                {' - '}
-                {(versions[0]?.actual_chapter_count ?? versions[0]?.chapter_count)} chapters
-              </span>
-            )}
+                cursor: 'not-allowed',
+              }}
+            >
+              {versions.map(version => (
+                <option key={version.id} value={version.id}>
+                  {version.version_name || `Version ${version.version_number}`}
+                  {version.is_active ? ' (Active)' : ''}
+                  {' - '}
+                  {(version.actual_chapter_count ?? version.chapter_count)} chapters
+                </option>
+              ))}
+            </select>
             <span style={{ fontSize: '0.75rem', color: '#64748B' }}>
               Quality checks use the active version. Change the active version on the Plot page.
             </span>
@@ -560,20 +543,32 @@ export default function QualityPage() {
         )}
 
         {/* Coherence Status Card */}
-        {plotLayers.length > 0 && (
+        {plotLayers.length > 0 && (() => {
+          // Determine if results are stale
+          const activeVersion = versions.find(v => v.id === activeVersionId);
+          const activeChapterCount = activeVersion?.actual_chapter_count ?? activeVersion?.chapter_count ?? 0;
+          const isVersionMismatch = coherenceResult?.isStale || (activeVersionId && coherenceResult && (!coherenceResult.versionId || coherenceResult.versionId !== activeVersionId));
+          const hasZeroChaptersWithResults = activeChapterCount === 0 && coherenceResult?.status === 'completed';
+          const resultsAreStale = isVersionMismatch || hasZeroChaptersWithResults;
+
+          // Don't show positive/negative styling if results are stale
+          const showAsCoherent = coherenceResult?.isCoherent === true && !resultsAreStale;
+          const showAsIncoherent = coherenceResult?.isCoherent === false && !resultsAreStale;
+
+          return (
           <div style={{
             ...card,
             marginBottom: '1.5rem',
             padding: '1.5rem',
-            background: coherenceResult?.isCoherent
+            background: showAsCoherent
               ? '#ECFDF5'
-              : coherenceResult?.isCoherent === false
+              : showAsIncoherent
                 ? '#FEF2F2'
                 : '#F9FAFB',
             border: `2px solid ${
-              coherenceResult?.isCoherent
+              showAsCoherent
                 ? '#A7F3D0'
-                : coherenceResult?.isCoherent === false
+                : showAsIncoherent
                   ? '#FECACA'
                   : '#E5E7EB'
             }`,
@@ -583,9 +578,9 @@ export default function QualityPage() {
                 <h2 style={{
                   fontSize: '1.5rem',
                   fontWeight: 700,
-                  color: coherenceResult?.isCoherent
+                  color: showAsCoherent
                     ? '#047857'
-                    : coherenceResult?.isCoherent === false
+                    : showAsIncoherent
                       ? '#DC2626'
                       : colors.text,
                   marginBottom: '0.5rem',
@@ -593,8 +588,8 @@ export default function QualityPage() {
                   alignItems: 'center',
                   gap: '0.5rem',
                 }}>
-                  {coherenceResult?.isCoherent === true && '✓ '}
-                  {coherenceResult?.isCoherent === false && '⚠ '}
+                  {showAsCoherent && '✓ '}
+                  {showAsIncoherent && '⚠ '}
                   {checking && (
                     <span style={{
                       display: 'inline-block',
@@ -615,28 +610,29 @@ export default function QualityPage() {
                   </p>
                 )}
 
-                {!coherenceResult && !checking && (
+                {(!coherenceResult || resultsAreStale) && !checking && (
                   <p style={{ color: '#64748B', margin: 0 }}>
-                    No coherence check available. Click &quot;Run Check&quot; to validate your plot structure.
+                    {resultsAreStale
+                      ? 'Previous results are outdated. Click "Re-check" to validate your current plot structure.'
+                      : 'No coherence check available. Click "Run Check" to validate your plot structure.'}
                   </p>
                 )}
 
-                {coherenceResult?.isCoherent === true && (
+                {showAsCoherent && (
                   <p style={{ color: '#047857', margin: 0 }}>
                     Your plots are coherent with your story concept. Great work!
                   </p>
                 )}
 
-                {coherenceResult?.isCoherent === false && (
+                {showAsIncoherent && (
                   <p style={{ color: '#DC2626', margin: 0 }}>
                     Some coherence issues were detected. See recommendations below.
                   </p>
                 )}
 
-                {coherenceResult?.checkedAt && (
+                {coherenceResult?.checkedAt && !resultsAreStale && (
                   <p style={{ fontSize: '0.75rem', color: '#9CA3AF', marginTop: '0.5rem' }}>
                     Last checked: {new Date(coherenceResult.checkedAt).toLocaleString()}
-                    {coherenceResult.isStale && ' (from previous version)'}
                   </p>
                 )}
               </div>
@@ -665,7 +661,8 @@ export default function QualityPage() {
               @keyframes spin { to { transform: rotate(360deg); } }
             `}</style>
           </div>
-        )}
+          );
+        })()}
 
         {/* Plot Stats Summary */}
         {plotLayers.length > 0 && (
