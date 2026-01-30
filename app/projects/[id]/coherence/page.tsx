@@ -28,6 +28,7 @@ interface CoherenceResult {
   checkedAt?: string;
   status?: string;
   error?: string;
+  versionId?: string; // The version this check was performed against
 }
 
 // Helper to normalise suggestions to the new format
@@ -52,6 +53,19 @@ interface PlotLayer {
   description: string;
   type: 'main' | 'subplot' | 'mystery' | 'romance' | 'character-arc';
   points?: PlotPoint[];
+}
+
+interface BookVersion {
+  id: string;
+  book_id: string;
+  version_number: number;
+  version_name: string | null;
+  is_active: number;
+  word_count: number;
+  chapter_count: number;
+  actual_chapter_count?: number;
+  actual_word_count?: number;
+  created_at: string;
 }
 
 export default function CoherencePage() {
@@ -80,6 +94,11 @@ export default function CoherencePage() {
     changesMade: string[];
   }>({ isOpen: false, title: '', explanation: '', changesMade: [] });
 
+  // Version-related state
+  const [versions, setVersions] = useState<BookVersion[]>([]);
+  const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
+  const [bookId, setBookId] = useState<string | null>(null);
+
   // Fetch cached coherence check result
   const fetchCachedResult = useCallback(async () => {
     try {
@@ -103,12 +122,15 @@ export default function CoherencePage() {
       setLoading(true);
       const token = getToken();
 
-      // Fetch project, plot structure, and cached coherence result in parallel
-      const [projectRes, plotRes, cachedResult] = await Promise.all([
+      // Fetch project, plot structure, books, and cached coherence result in parallel
+      const [projectRes, plotRes, booksRes, cachedResult] = await Promise.all([
         fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
           headers: { 'Authorization': `Bearer ${token}` },
         }),
         fetch(`${API_BASE_URL}/api/projects/${projectId}/plot-structure`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        }),
+        fetch(`${API_BASE_URL}/api/books/project/${projectId}`, {
           headers: { 'Authorization': `Bearer ${token}` },
         }),
         fetchCachedResult(),
@@ -124,8 +146,38 @@ export default function CoherencePage() {
         setPlotLayers(plotData.plot_layers || []);
       }
 
-      // Handle cached result
+      // Fetch book versions if we have a book
+      if (booksRes.ok) {
+        const booksData = await booksRes.json();
+        if (booksData.books?.length > 0) {
+          const firstBookId = booksData.books[0].id;
+          setBookId(firstBookId);
+
+          // Fetch versions for the book
+          const versionsRes = await fetch(`${API_BASE_URL}/api/books/${firstBookId}/versions`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          if (versionsRes.ok) {
+            const versionsData = await versionsRes.json();
+            const bookVersions = versionsData.versions || [];
+            setVersions(bookVersions);
+
+            // Find active version
+            const active = bookVersions.find((v: BookVersion) => v.is_active === 1);
+            if (active) {
+              setActiveVersionId(active.id);
+            }
+          }
+        }
+      }
+
+      // Handle cached result and store activeVersionId from backend response
       if (cachedResult) {
+        // Store the active version ID from the backend
+        if (cachedResult.activeVersionId) {
+          setActiveVersionId(cachedResult.activeVersionId);
+        }
+
         if (cachedResult.status === 'pending' || cachedResult.status === 'running') {
           // Check is in progress, start polling
           setCheckStatus(cachedResult.status);
@@ -140,6 +192,7 @@ export default function CoherencePage() {
             plotAnalysis: cachedResult.plotAnalysis || [],
             checkedAt: cachedResult.checkedAt,
             status: 'completed',
+            versionId: cachedResult.versionId, // Track which version this check was for
           });
           setCheckStatus(null);
         } else if (cachedResult.status === 'failed') {
@@ -173,6 +226,7 @@ export default function CoherencePage() {
             plotAnalysis: result.plotAnalysis || [],
             checkedAt: result.checkedAt,
             status: 'completed',
+            versionId: result.versionId,
           });
           setChecking(false);
           setCheckStatus(null);
@@ -356,6 +410,99 @@ export default function CoherencePage() {
             marginBottom: '1.5rem',
           }}>
             {error}
+          </div>
+        )}
+
+        {/* Version Selector */}
+        {versions.length > 1 && (
+          <div style={{
+            ...card,
+            marginBottom: '1.5rem',
+            padding: '1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem',
+            background: '#F8FAFC',
+            border: '1px solid #E2E8F0',
+          }}>
+            <label style={{
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              color: '#64748B',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              whiteSpace: 'nowrap',
+            }}>
+              Version:
+            </label>
+            <select
+              value={activeVersionId || ''}
+              disabled
+              style={{
+                flex: 1,
+                maxWidth: '300px',
+                padding: '0.5rem 0.75rem',
+                border: `1px solid ${colors.border}`,
+                borderRadius: borderRadius.md,
+                fontSize: '0.875rem',
+                backgroundColor: '#F9FAFB',
+                color: colors.text,
+              }}
+            >
+              {versions.map(version => (
+                <option key={version.id} value={version.id}>
+                  {version.version_name || `Version ${version.version_number}`}
+                  {version.is_active ? ' (Active)' : ''}
+                  {' - '}
+                  {(version.actual_chapter_count || version.chapter_count)} chapters
+                </option>
+              ))}
+            </select>
+            <span style={{ fontSize: '0.75rem', color: '#64748B' }}>
+              Coherence checks use the active version. Change the active version on the Plot page.
+            </span>
+          </div>
+        )}
+
+        {/* Single version info */}
+        {versions.length === 1 && activeVersionId && (
+          <div style={{
+            marginBottom: '1rem',
+            padding: '0.5rem 1rem',
+            background: '#F0F9FF',
+            borderRadius: borderRadius.md,
+            fontSize: '0.75rem',
+            color: '#0369A1',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+          }}>
+            <span style={{ fontWeight: 600 }}>Version:</span>
+            {versions[0].version_name || `Version ${versions[0].version_number}`}
+            {' - '}
+            {(versions[0].actual_chapter_count || versions[0].chapter_count)} chapters
+          </div>
+        )}
+
+        {/* Version Mismatch Warning */}
+        {coherenceResult?.versionId && activeVersionId && coherenceResult.versionId !== activeVersionId && (
+          <div style={{
+            padding: '0.75rem 1rem',
+            background: '#FEF3C7',
+            border: '1px solid #FDE68A',
+            borderRadius: borderRadius.md,
+            marginBottom: '1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+          }}>
+            <span style={{ fontSize: '1.25rem' }}>⚠️</span>
+            <div style={{ flex: 1 }}>
+              <span style={{ fontWeight: 600, color: '#92400E' }}>Stale Results: </span>
+              <span style={{ color: '#B45309' }}>
+                This coherence check was run on a previous version. Click &quot;Re-check&quot; to analyse the current active version.
+              </span>
+            </div>
           </div>
         )}
 

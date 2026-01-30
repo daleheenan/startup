@@ -304,18 +304,29 @@ export default function LessonCurationPage() {
         }),
       });
 
+      const data = await res.json();
+
       if (res.ok) {
-        const data = await res.json();
-        setActionMessage({ type: 'success', text: data.message });
+        // Check if there were partial errors
+        if (data.errors && data.errors.length > 0) {
+          const errorSummary = data.errors.slice(0, 3).map((e: { action: string; error: string }) => `${e.action}: ${e.error}`).join('; ');
+          setActionMessage({
+            type: 'error',
+            text: `${data.message}. Errors: ${errorSummary}${data.errors.length > 3 ? ` (+${data.errors.length - 3} more)` : ''}`,
+          });
+        } else {
+          setActionMessage({ type: 'success', text: data.message });
+        }
         setAnalysisResult(null);
         fetchStats();
         fetchLessons();
       } else {
-        setActionMessage({ type: 'error', text: 'Failed to apply suggestions' });
+        const errorMsg = data.error?.message || data.message || 'Failed to apply suggestions';
+        setActionMessage({ type: 'error', text: errorMsg });
       }
     } catch (error) {
       console.error('Error applying suggestions:', error);
-      setActionMessage({ type: 'error', text: 'Failed to apply suggestions' });
+      setActionMessage({ type: 'error', text: 'Network error: Failed to apply suggestions' });
     } finally {
       setApplyingBulk(null);
     }

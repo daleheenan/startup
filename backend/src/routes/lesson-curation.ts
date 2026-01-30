@@ -398,10 +398,17 @@ router.post('/apply-suggestions', async (req, res) => {
       }
     }
 
+    // Check if there were any errors during processing
+    if (results.errors.length > 0) {
+      logger.warn({ errors: results.errors }, 'Some suggestions failed to apply');
+    }
+
     res.json({
-      success: true,
+      success: results.errors.length === 0,
       ...results,
-      message: `Applied suggestions: ${results.archived} archived, ${results.generalised} generalised, ${results.approved} approved`,
+      message: results.errors.length > 0
+        ? `Partially applied suggestions: ${results.archived} archived, ${results.generalised} generalised, ${results.approved} approved. ${results.errors.length} error(s) occurred.`
+        : `Applied suggestions: ${results.archived} archived, ${results.generalised} generalised, ${results.approved} approved`,
     });
   } catch (error) {
     logger.error({ error }, 'Failed to apply suggestions');
