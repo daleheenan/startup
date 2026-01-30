@@ -5,12 +5,8 @@ import Link from 'next/link';
 import { getToken } from '@/app/lib/auth';
 import { colors, typography, spacing, borderRadius, shadows, transitions, zIndex } from '@/app/lib/design-tokens';
 import SortableTableHeader, { SortColumn, SortConfig } from './SortableTableHeader';
-import dynamic from 'next/dynamic';
-
-const ExportDropdown = dynamic(() => import('./ExportDropdown'), {
-  ssr: false,
-  loading: () => <span style={{ width: '28px', height: '28px' }} />,
-});
+// Temporarily disabled for debugging
+// import ExportDropdown from './ExportDropdown';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -607,14 +603,14 @@ export default function ProjectsTable({
                         </svg>
                       </Link>
 
-                      {/* Export dropdown */}
-                      <ExportDropdown
+                      {/* Export dropdown - temporarily disabled for debugging */}
+                      {/* <ExportDropdown
                         projectId={project.id}
                         isPdfExporting={isPdfExporting}
                         isDocxExporting={isDocxExporting}
                         onExportPdf={handleExportPdf}
                         onExportDocx={handleExportDocx}
-                      />
+                      /> */}
 
                       {/* Edit */}
                       <Link
