@@ -142,7 +142,9 @@ export default function ChaptersPage() {
         // No progress data
       }
 
-      // Don't set loading to false yet - wait for version data from BookVersionSelector
+      // Set loading to false so the page renders and the BookVersionSelector can load
+      // The version selector will trigger chapter loading via onVersionChange callback
+      setLoading(false);
     } catch (err: any) {
       console.error('Error fetching project/books:', err);
       setError(err.message || 'Failed to load project');

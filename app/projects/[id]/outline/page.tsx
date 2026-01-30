@@ -200,7 +200,9 @@ export default function OutlinePage() {
       const templatesData = await templatesRes.json();
       setTemplates(templatesData.templates);
 
-      // Don't set isLoading to false yet - wait for version data
+      // Set loading to false so the page renders and the BookVersionSelector can load
+      // The version selector will trigger data loading via onVersionChange callback
+      setIsLoading(false);
     } catch (err: any) {
       console.error('Error loading data:', err);
       setError(err.message);
