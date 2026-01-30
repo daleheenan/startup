@@ -5,7 +5,7 @@ builder = "nixpacks"
 NIXPACKS_NODE_VERSION = "20"
 
 [deploy]
-startCommand = "npm start"
+startCommand = "pnpm start"
 healthcheckPath = "/"
 healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"

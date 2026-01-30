@@ -1,17 +1,18 @@
-# Nixpacks configuration for NovelForge frontend
-# Requires Node 20 for dependency compatibility
+# Nixpacks configuration for NovelForge monorepo
+# Uses pnpm for package management
 
 [variables]
 NODE_VERSION = "20"
+NIXPACKS_NODE_VERSION = "20"
 
 [phases.setup]
-nixPkgs = ["nodejs_20"]
+nixPkgs = ["nodejs_20", "nodePackages.pnpm"]
 
 [phases.install]
-cmds = ["npm ci"]
+cmds = ["pnpm install --frozen-lockfile"]
 
 [phases.build]
-cmds = ["npm run build"]
+cmds = ["pnpm run build"]
 
 [start]
-cmd = "npm start"
+cmd = "pnpm start"
