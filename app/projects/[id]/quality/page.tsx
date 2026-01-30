@@ -414,7 +414,7 @@ export default function QualityPage() {
         )}
 
         {/* Version Selector */}
-        {versions.length > 1 && (
+        {versions.length > 0 && activeVersionId && (
           <div style={{
             ...card,
             marginBottom: '1.5rem',
@@ -435,10 +435,33 @@ export default function QualityPage() {
             }}>
               Version:
             </label>
-            <select
-              value={activeVersionId || ''}
-              disabled
-              style={{
+            {versions.length > 1 ? (
+              <select
+                value={activeVersionId}
+                disabled
+                style={{
+                  flex: 1,
+                  maxWidth: '300px',
+                  padding: '0.5rem 0.75rem',
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: borderRadius.md,
+                  fontSize: '0.875rem',
+                  backgroundColor: '#F9FAFB',
+                  color: colors.text,
+                  cursor: 'not-allowed',
+                }}
+              >
+                {versions.map(version => (
+                  <option key={version.id} value={version.id}>
+                    {version.version_name || `Version ${version.version_number}`}
+                    {version.is_active ? ' (Active)' : ''}
+                    {' - '}
+                    {(version.actual_chapter_count ?? version.chapter_count)} chapters
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span style={{
                 flex: 1,
                 maxWidth: '300px',
                 padding: '0.5rem 0.75rem',
@@ -447,45 +470,21 @@ export default function QualityPage() {
                 fontSize: '0.875rem',
                 backgroundColor: '#F9FAFB',
                 color: colors.text,
-              }}
-            >
-              {versions.map(version => (
-                <option key={version.id} value={version.id}>
-                  {version.version_name || `Version ${version.version_number}`}
-                  {version.is_active ? ' (Active)' : ''}
-                  {' - '}
-                  {(version.actual_chapter_count || version.chapter_count)} chapters
-                </option>
-              ))}
-            </select>
+              }}>
+                {versions[0]?.version_name || `Version ${versions[0]?.version_number}`}
+                {versions[0]?.is_active ? ' (Active)' : ''}
+                {' - '}
+                {(versions[0]?.actual_chapter_count ?? versions[0]?.chapter_count)} chapters
+              </span>
+            )}
             <span style={{ fontSize: '0.75rem', color: '#64748B' }}>
               Quality checks use the active version. Change the active version on the Plot page.
             </span>
           </div>
         )}
 
-        {/* Single version info */}
-        {versions.length === 1 && activeVersionId && (
-          <div style={{
-            marginBottom: '1rem',
-            padding: '0.5rem 1rem',
-            background: '#F0F9FF',
-            borderRadius: borderRadius.md,
-            fontSize: '0.75rem',
-            color: '#0369A1',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-          }}>
-            <span style={{ fontWeight: 600 }}>Version:</span>
-            {versions[0].version_name || `Version ${versions[0].version_number}`}
-            {' - '}
-            {(versions[0].actual_chapter_count || versions[0].chapter_count)} chapters
-          </div>
-        )}
-
-        {/* Version Mismatch Warning */}
-        {coherenceResult?.versionId && activeVersionId && coherenceResult.versionId !== activeVersionId && (
+        {/* Version Mismatch Warning - show if: we have results AND active version AND (no versionId on result OR versionId doesn't match) */}
+        {coherenceResult && activeVersionId && (!coherenceResult.versionId || coherenceResult.versionId !== activeVersionId) && (
           <div style={{
             padding: '0.75rem 1rem',
             background: '#FEF3C7',
