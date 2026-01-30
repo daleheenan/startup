@@ -493,27 +493,38 @@ export default function QualityPage() {
           </div>
         )}
 
-        {/* Version Mismatch Warning - show if: backend marks as stale OR version IDs don't match */}
-        {coherenceResult && (coherenceResult.isStale || (activeVersionId && (!coherenceResult.versionId || coherenceResult.versionId !== activeVersionId))) && (
-          <div style={{
-            padding: '0.75rem 1rem',
-            background: '#FEF3C7',
-            border: '1px solid #FDE68A',
-            borderRadius: borderRadius.md,
-            marginBottom: '1rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
-          }}>
-            <span style={{ fontSize: '1.25rem' }}>⚠️</span>
-            <div style={{ flex: 1 }}>
-              <span style={{ fontWeight: 600, color: '#92400E' }}>Stale Results: </span>
-              <span style={{ color: '#B45309' }}>
-                This quality check was run on a previous version. Click &quot;Re-check&quot; to analyse the current active version.
-              </span>
+        {/* Version Mismatch Warning - show if: backend marks as stale OR version IDs don't match OR active version has 0 chapters but we have results */}
+        {coherenceResult && (() => {
+          const activeVersion = versions.find(v => v.id === activeVersionId);
+          const activeChapterCount = activeVersion?.actual_chapter_count ?? activeVersion?.chapter_count ?? 0;
+          const isVersionMismatch = coherenceResult.isStale || (activeVersionId && (!coherenceResult.versionId || coherenceResult.versionId !== activeVersionId));
+          const hasZeroChaptersWithResults = activeChapterCount === 0 && coherenceResult.status === 'completed';
+
+          if (!isVersionMismatch && !hasZeroChaptersWithResults) return null;
+
+          return (
+            <div style={{
+              padding: '0.75rem 1rem',
+              background: '#FEF3C7',
+              border: '1px solid #FDE68A',
+              borderRadius: borderRadius.md,
+              marginBottom: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+            }}>
+              <span style={{ fontSize: '1.25rem' }}>⚠️</span>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontWeight: 600, color: '#92400E' }}>Stale Results: </span>
+                <span style={{ color: '#B45309' }}>
+                  {hasZeroChaptersWithResults && !isVersionMismatch
+                    ? 'The active version has no chapters yet. These results are from when chapters existed. Click "Re-check" after adding chapters.'
+                    : 'This quality check was run on a previous version. Click "Re-check" to analyse the current active version.'}
+                </span>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* No Plots Warning */}
         {plotLayers.length === 0 && (
