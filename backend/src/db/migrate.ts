@@ -359,6 +359,8 @@ export function runMigrations() {
       '059_editorial_lessons_curation.sql', // DB version 64 - editorial lessons curation
       '060_pen_names.sql',                   // DB version 65 - pen names management
       '061_books_publishing.sql',            // DB version 66 - books publishing metadata
+      '062_ai_request_log_book_id.sql',      // DB version 67 - add book_id to ai_request_log
+      '063_storyscore_infrastructure.sql',   // DB version 68 - storyscore infrastructure
     ];
 
     for (let i = 0; i < migrationFiles.length; i++) {
@@ -501,6 +503,8 @@ export function getMigrationStatus(): {
     '059_editorial_lessons_curation.sql',
     '060_pen_names.sql',
     '061_books_publishing.sql',
+    '062_ai_request_log_book_id.sql',
+    '063_storyscore_infrastructure.sql',
   ];
 
   const pendingMigrations: string[] = [];

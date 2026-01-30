@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useCallback, useMemo, type CSSProperties } from 'react';
+import { useEffect, useCallback, type CSSProperties } from 'react';
 import { usePathname } from 'next/navigation';
 
 import { useDashboardContext } from '../DashboardContext';
@@ -8,7 +8,6 @@ import SidebarLogo from './SidebarLogo';
 import SidebarSearch from './SidebarSearch';
 import SidebarNavGroup from './SidebarNavGroup';
 import SidebarUserProfile from './SidebarUserProfile';
-import { useUserPreferences } from '@/app/hooks/useUserPreferences';
 
 import {
   colors,
@@ -289,6 +288,7 @@ const navigationGroups = [
       { id: 'books', label: 'Books', href: '/books', icon: <BooksIcon /> },
       { id: 'pen-names', label: 'Pen Names', href: '/pen-names', icon: <PenNamesIcon /> },
       { id: 'editorial', label: 'Editorial Board', href: '/editorial', icon: <EditorialIcon /> },
+      { id: 'ai-costs', label: 'AI Costs', href: '/ai-costs', icon: <AICostsIcon /> },
     ],
   },
   {
@@ -362,34 +362,15 @@ export default function Sidebar({ collapsed: collapsedProp, onCollapseToggle }: 
   // Prefer the explicit prop; fall back to context-driven state.
   const collapsed = collapsedProp ?? state.sidebarCollapsed;
 
-  // Fetch user preferences using the cached hook
-  const { data: preferences } = useUserPreferences();
-  const showAICosts = preferences?.showAICostsMenu || false;
-
-  // Build dynamic navigation groups based on preferences
-  // Use useMemo to prevent recreation on every render
-  const dynamicNavigationGroups = useMemo(() => {
-    return navigationGroups.map((group) => {
-      if (group.id === 'projects' && showAICosts) {
-        return {
-          ...group,
-          items: [
-            ...group.items,
-            { id: 'ai-costs', label: 'AI Costs', href: '/ai-costs', icon: <AICostsIcon /> },
-          ],
-        };
-      }
-      return group;
-    });
-  }, [showAICosts]);
+  // Navigation groups are now static - AI Costs is always visible
 
   // ---- Sync active nav item whenever the route changes ----
 
   useEffect(() => {
-    // Custom active item derivation that uses dynamic navigation groups
+    // Derive active item from pathname
     const deriveActiveItemIdFromGroups = (currentPath: string): string | null => {
       // First pass: check all nested items (higher priority)
-      for (const group of dynamicNavigationGroups) {
+      for (const group of navigationGroups) {
         for (const item of group.items) {
           if (item.href.startsWith('http://') || item.href.startsWith('https://')) {
             continue;
@@ -400,7 +381,7 @@ export default function Sidebar({ collapsed: collapsedProp, onCollapseToggle }: 
         }
       }
       // Second pass: check standalone groups (lower priority)
-      for (const group of dynamicNavigationGroups) {
+      for (const group of navigationGroups) {
         if (group.isStandalone && group.href) {
           if (currentPath === group.href || (group.href !== '/' && currentPath.startsWith(group.href))) {
             return group.id;
@@ -416,7 +397,7 @@ export default function Sidebar({ collapsed: collapsedProp, onCollapseToggle }: 
     // Find which group contains the active item
     let activeGroupId: string | null = null;
     if (activeId) {
-      for (const group of dynamicNavigationGroups) {
+      for (const group of navigationGroups) {
         if (group.items.some((item) => item.id === activeId)) {
           activeGroupId = group.id;
           break;
@@ -429,7 +410,7 @@ export default function Sidebar({ collapsed: collapsedProp, onCollapseToggle }: 
     if (activeGroupId) {
       dispatch({ type: 'EXPAND_NAV_GROUP', payload: activeGroupId });
     }
-  }, [pathname, dispatch, dynamicNavigationGroups]);
+  }, [pathname, dispatch]);
 
   // ---- Toggle handlers ----
 
@@ -517,7 +498,7 @@ export default function Sidebar({ collapsed: collapsedProp, onCollapseToggle }: 
 
       {/* Navigation groups — scrollable region */}
       <nav style={navSectionStyle} aria-label="Main navigation">
-        {dynamicNavigationGroups.map((group) => (
+        {navigationGroups.map((group) => (
           <SidebarNavGroup
             key={group.id}
             id={group.id}
