@@ -383,8 +383,9 @@ export default function ProjectsPage() {
           />
         </section>
 
-        {/* Right column: Recent activity */}
-        <RecentActivityFeed activities={activityItems} maxItems={6} />
+        {/* Right column: Recent activity - temporarily disabled */}
+        {/* <RecentActivityFeed activities={activityItems} maxItems={6} /> */}
+        <div style={{ padding: '1rem', background: '#f0f0f0' }}>Activity feed disabled for debug</div>
       </div>
     </DashboardLayout>
   );
