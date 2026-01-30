@@ -5,7 +5,12 @@ import Link from 'next/link';
 import { getToken } from '@/app/lib/auth';
 import { colors, typography, spacing, borderRadius, shadows, transitions, zIndex } from '@/app/lib/design-tokens';
 import SortableTableHeader, { SortColumn, SortConfig } from './SortableTableHeader';
-import ExportDropdown from './ExportDropdown';
+import dynamic from 'next/dynamic';
+
+const ExportDropdown = dynamic(() => import('./ExportDropdown'), {
+  ssr: false,
+  loading: () => <span style={{ width: '28px', height: '28px' }} />,
+});
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
