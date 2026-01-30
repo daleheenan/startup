@@ -28,7 +28,10 @@ export interface BooksDashboardStatsProps {
  * - In Progress count
  */
 export default function BooksDashboardStats({ stats }: BooksDashboardStatsProps) {
-  const formatWords = (words: number): string => {
+  const formatWords = (words: number | undefined | null): string => {
+    if (words == null) {
+      return '0';
+    }
     if (words >= 1000000) {
       return `${(words / 1000000).toFixed(1)}M`;
     }

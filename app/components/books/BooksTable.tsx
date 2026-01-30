@@ -56,7 +56,10 @@ export default function BooksTable({
     onSort?.(column, newDirection);
   };
 
-  const formatWords = (words: number): string => {
+  const formatWords = (words: number | undefined | null): string => {
+    if (words == null) {
+      return '0';
+    }
     if (words >= 1000) {
       return `${Math.floor(words / 1000)}K`;
     }
