@@ -1,0 +1,135 @@
+import dotenv from 'dotenv';
+import { createLogger } from './logger.service.js';
+import { extractJsonObject } from '../utils/json-extractor.js';
+import { claudeService } from './claude.service.js';
+import { AI_REQUEST_TYPES } from '../constants/ai-request-types.js';
+
+dotenv.config();
+
+const logger = createLogger('services:story-dna-generator');
+
+export interface StoryDNA {
+  genre: string;
+  subgenre: string;
+  tone: string;
+  themes: string[];
+  proseStyle: {
+    sentenceStructure: string;
+    vocabularyLevel: string;
+    dialogueStyle: string;
+    descriptionDensity: string;
+    pacing: string;
+    pointOfView: string;
+  };
+  targetAudience: string;
+  contentRating: string;
+}
+
+export interface ConceptInput {
+  title: string;
+  logline: string;
+  synopsis: string;
+  genre: string;
+  subgenre: string;
+  tone: string;
+  themes: string[];
+}
+
+/**
+ * Generate Story DNA based on selected concept
+ * This defines the writing style, tone, and technical approach for the entire novel
+ */
+export async function generateStoryDNA(concept: ConceptInput): Promise<StoryDNA> {
+  const prompt = buildStoryDNAPrompt(concept);
+
+  logger.info('[StoryDNAGenerator] Generating Story DNA...');
+
+  try {
+    const response = await claudeService.createCompletionWithUsage({
+      system: '',
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 2000,
+      temperature: 0.7,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.STORY_DNA_GENERATION,
+        contextSummary: `Generating Story DNA for: ${concept.title}`,
+      },
+    });
+
+    const storyDNA = parseStoryDNAResponse(response.content);
+
+    logger.info('[StoryDNAGenerator] Story DNA generated successfully');
+
+    return storyDNA;
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Story DNA generation error');
+    throw error;
+  }
+}
+
+function buildStoryDNAPrompt(concept: ConceptInput): string {
+  const { title, logline, synopsis, genre, subgenre, tone, themes } = concept;
+
+  return `You are a master writing coach and literary analyst. Based on this story concept, generate a comprehensive "Story DNA" that defines the precise writing style and approach for this novel.
+
+**Story Concept:**
+Title: ${title}
+Logline: ${logline}
+Synopsis: ${synopsis}
+
+**Genre:** ${genre}
+**Subgenre:** ${subgenre}
+**Tone:** ${tone}
+**Themes:** ${themes.join(', ')}
+
+Generate a detailed Story DNA that will guide the Author Agent in writing this novel. The Story DNA should be SPECIFIC to this story, not generic genre advice.
+
+Provide:
+
+1. **Prose Style:**
+   - sentenceStructure: How should sentences be constructed? (e.g., "Short, punchy sentences with occasional complex structures for emotional beats" or "Lyrical, flowing prose with nested clauses")
+   - vocabularyLevel: What vocabulary is appropriate? (e.g., "Accessible literary with occasional elevated language" or "Sharp, contemporary with minimal pretension")
+   - dialogueStyle: How should characters speak? (e.g., "Naturalistic with subtext, sparse dialogue tags" or "Stylized, witty banter with period-appropriate formality")
+   - descriptionDensity: How much description? (e.g., "Sparse, impressionistic details focused on emotional resonance" or "Rich, immersive world-building with all five senses")
+   - pacing: What's the rhythm? (e.g., "Fast-paced with short scenes and frequent cuts" or "Deliberate, contemplative with long scenes")
+   - pointOfView: What POV and tense? (e.g., "Close third-person, past tense, single POV" or "Deep first-person present, multiple POVs")
+
+2. **Target Audience:** Who is this for? (e.g., "Adult readers who enjoy character-driven literary fiction" or "YA readers 14-18 who love fast-paced fantasy")
+
+3. **Content Rating:** What's appropriate? (e.g., "PG-13: Some violence, no explicit content" or "R: Mature themes, graphic violence, adult situations")
+
+Return ONLY a JSON object in this format:
+{
+  "genre": "${genre}",
+  "subgenre": "${subgenre}",
+  "tone": "${tone}",
+  "themes": ${JSON.stringify(themes)},
+  "proseStyle": {
+    "sentenceStructure": "...",
+    "vocabularyLevel": "...",
+    "dialogueStyle": "...",
+    "descriptionDensity": "...",
+    "pacing": "...",
+    "pointOfView": "..."
+  },
+  "targetAudience": "...",
+  "contentRating": "..."
+}`;
+}
+
+function parseStoryDNAResponse(responseText: string): StoryDNA {
+  try {
+    const storyDNA = extractJsonObject<StoryDNA>(responseText);
+
+    // Validate required fields
+    if (!storyDNA.proseStyle || !storyDNA.targetAudience || !storyDNA.contentRating) {
+      throw new Error('Story DNA missing required fields');
+    }
+
+    return storyDNA;
+  } catch (error: any) {
+    logger.error({ error: error.message }, 'Story DNA parse error');
+    logger.error({ responseText: responseText.substring(0, 500) }, 'Story DNA response text (truncated)');
+    throw new Error(`Failed to parse Story DNA: ${error.message}`);
+  }
+}

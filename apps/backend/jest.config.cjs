@@ -1,0 +1,48 @@
+/** @type {import('jest').Config} */
+module.exports = {
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  roots: ['<rootDir>/src'],
+  testMatch: ['**/__tests__/**/*.test.ts', '**/*.test.ts'],
+  moduleFileExtensions: ['ts', 'js', 'json'],
+  transform: {
+    '^.+\\.ts$': ['ts-jest', {
+      tsconfig: {
+        module: 'commonjs',
+        moduleResolution: 'node',
+        esModuleInterop: true,
+        allowSyntheticDefaultImports: true,
+      },
+      diagnostics: {
+        ignoreCodes: [1343], // Ignore "import.meta" errors in tests
+      },
+    }],
+  },
+  globals: {
+    'import.meta': {
+      url: 'file:///fake/path/db/migrate.ts'
+    }
+  },
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+  },
+  // Transform ESM packages that don't play well with Jest's CommonJS environment
+  transformIgnorePatterns: [
+    '/node_modules/(?!(uuid)/)',
+  ],
+  collectCoverageFrom: [
+    'src/services/**/*.ts',
+    '!src/services/**/*.test.ts',
+    '!src/services/__tests__/**',
+  ],
+  coverageThreshold: {
+    global: {
+      branches: 70,
+      functions: 70,
+      lines: 70,
+      statements: 70,
+    },
+  },
+  setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.cjs'],
+  testPathIgnorePatterns: ['/node_modules/', '/dist/'],
+};

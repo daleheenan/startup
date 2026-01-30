@@ -3,6 +3,10 @@ node_modules
 .pnp
 .pnp.js
 
+# Monorepo
+apps/*/node_modules
+packages/*/node_modules
+
 # Testing
 coverage
 test-results/

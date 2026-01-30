@@ -1,48 +1,22 @@
 {
-  "name": "novelforge",
-  "version": "2.0.0",
+  "name": "novelforge-monorepo",
   "private": true,
+  "version": "2.0.0",
   "engines": {
     "node": ">=20.0.0"
   },
+  "packageManager": "pnpm@9.0.0",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start -p ${PORT:-3000}",
-    "lint": "next lint",
-    "test": "vitest",
-    "test:ui": "vitest --ui",
-    "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed",
-    "test:e2e:ui": "playwright test --ui",
-    "test:e2e:debug": "playwright test --debug",
-    "test:e2e:report": "playwright show-report"
-  },
-  "dependencies": {
-    "@tanstack/react-query": "^5.90.20",
-    "@tanstack/react-virtual": "^3.13.18",
-    "lucide-react": "^0.563.0",
-    "next": "^14.2.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
-  },
-  "devDependencies": {
-    "@next/bundle-analyzer": "^16.1.4",
-    "@playwright/test": "^1.58.0",
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.1",
-    "@types/node": "^20.19.30",
-    "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0",
-    "@vitejs/plugin-react": "^5.1.2",
-    "@vitest/coverage-v8": "^4.0.18",
-    "fake-indexeddb": "^6.2.5",
-    "happy-dom": "^20.3.7",
-    "jsdom": "^27.4.0",
-    "typescript": "^5.0.0",
-    "vitest": "^4.0.18"
+    "dev": "pnpm -r --parallel dev",
+    "dev:novelforge": "pnpm --filter @novelforge/frontend dev",
+    "dev:storyscore": "pnpm --filter @novelforge/storyscore dev",
+    "dev:backend": "pnpm --filter @novelforge/backend dev",
+    "build": "pnpm -r build",
+    "build:novelforge": "pnpm --filter @novelforge/frontend build",
+    "build:storyscore": "pnpm --filter @novelforge/storyscore build",
+    "build:backend": "pnpm --filter @novelforge/backend build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "clean": "pnpm -r clean"
   }
 }
