@@ -1275,9 +1275,13 @@ Output ONLY valid JSON, no additional commentary:`;
       existingLayersMap.set(layer.id, layer);
     }
 
+    // Track which existing layers were updated by the AI
+    const updatedLayerIds = new Set<string>();
+
     const mergedPlotLayers = revisedPlots.plot_layers.map((revisedLayer: any) => {
       const existingLayer = existingLayersMap.get(revisedLayer.id);
       if (existingLayer) {
+        updatedLayerIds.add(revisedLayer.id);
         return {
           ...existingLayer,
           name: revisedLayer.name,
@@ -1291,6 +1295,14 @@ Output ONLY valid JSON, no additional commentary:`;
         status: 'active',
       };
     });
+
+    // Preserve any existing layers that the AI didn't include in its response
+    // This prevents accidental data loss when AI returns fewer layers
+    for (const layer of plotStructure.plot_layers) {
+      if (!updatedLayerIds.has(layer.id)) {
+        mergedPlotLayers.push(layer);
+      }
+    }
 
     const updatedPlotStructure = {
       ...plotStructure,
@@ -1481,9 +1493,13 @@ Return ONLY valid JSON, no markdown formatting.`;
       existingLayersMap.set(layer.id, layer);
     }
 
+    // Track which existing layers were updated by the AI
+    const updatedLayerIds = new Set<string>();
+
     const mergedPlotLayers = fixResult.fixed_plot_layers.map((fixedLayer: any) => {
       const existingLayer = existingLayersMap.get(fixedLayer.id);
       if (existingLayer) {
+        updatedLayerIds.add(fixedLayer.id);
         return {
           ...existingLayer,
           name: fixedLayer.name,
@@ -1497,6 +1513,14 @@ Return ONLY valid JSON, no markdown formatting.`;
         status: 'active',
       };
     });
+
+    // Preserve any existing layers that the AI didn't include in its response
+    // This prevents accidental data loss when AI returns fewer layers
+    for (const layer of plotStructure.plot_layers) {
+      if (!updatedLayerIds.has(layer.id)) {
+        mergedPlotLayers.push(layer);
+      }
+    }
 
     const updatedPlotStructure = {
       ...plotStructure,
