@@ -5,8 +5,7 @@ import Link from 'next/link';
 import { getToken } from '@/app/lib/auth';
 import { colors, typography, spacing, borderRadius, shadows, transitions, zIndex } from '@/app/lib/design-tokens';
 import SortableTableHeader, { SortColumn, SortConfig } from './SortableTableHeader';
-// Temporarily disabled for debugging
-// import ExportDropdown from './ExportDropdown';
+import ExportDropdown from './ExportDropdown';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -603,14 +602,14 @@ export default function ProjectsTable({
                         </svg>
                       </Link>
 
-                      {/* Export dropdown - temporarily disabled for debugging */}
-                      {/* <ExportDropdown
+                      {/* Export dropdown */}
+                      <ExportDropdown
                         projectId={project.id}
                         isPdfExporting={isPdfExporting}
                         isDocxExporting={isDocxExporting}
                         onExportPdf={handleExportPdf}
                         onExportDocx={handleExportDocx}
-                      /> */}
+                      />
 
                       {/* Edit */}
                       <Link
