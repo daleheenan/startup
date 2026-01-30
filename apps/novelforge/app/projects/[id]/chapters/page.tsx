@@ -240,7 +240,11 @@ export default function ChaptersPage() {
         bg: colors.background.surfaceHover,
       };
     }
-    switch (chapter.status) {
+
+    // Normalise status - treat null/undefined as 'draft'
+    const status = chapter.status || 'draft';
+
+    switch (status) {
       case 'completed':
         return {
           colour: colors.semantic.successDark,
@@ -256,18 +260,13 @@ export default function ChaptersPage() {
           bg: colors.semantic.infoLight,
         };
       case 'draft':
+      default:
+        // Treat any unknown status as draft
         return {
           colour: colors.semantic.warning,
           label: 'Draft',
           icon: '○',
           bg: colors.semantic.warningLight,
-        };
-      default:
-        return {
-          colour: colors.text.tertiary,
-          label: 'Unknown',
-          icon: '?',
-          bg: colors.background.surfaceHover,
         };
     }
   };

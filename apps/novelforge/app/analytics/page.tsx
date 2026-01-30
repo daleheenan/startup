@@ -72,30 +72,70 @@ export default function AnalyticsPage() {
 
         const token = localStorage.getItem('token');
         const headers = { Authorization: `Bearer ${token}` };
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-        const [overviewRes, penNameRes, genreRes, statusRes, yearRes] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analytics/overview`, { headers }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analytics/by-pen-name`, { headers }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analytics/by-genre`, { headers }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analytics/by-status`, { headers }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analytics/by-year`, { headers }),
+        // Fetch all analytics in parallel, handling individual failures gracefully
+        const results = await Promise.allSettled([
+          fetch(`${API_URL}/api/analytics/overview`, { headers }),
+          fetch(`${API_URL}/api/analytics/by-pen-name`, { headers }),
+          fetch(`${API_URL}/api/analytics/by-genre`, { headers }),
+          fetch(`${API_URL}/api/analytics/by-status`, { headers }),
+          fetch(`${API_URL}/api/analytics/by-year`, { headers }),
         ]);
 
-        if (!overviewRes.ok || !penNameRes.ok || !genreRes.ok || !statusRes.ok || !yearRes.ok) {
-          throw new Error('Failed to fetch analytics data');
+        // Process overview - this is the most important endpoint
+        const overviewResult = results[0];
+        if (overviewResult.status === 'fulfilled' && overviewResult.value.ok) {
+          const overviewData = await overviewResult.value.json();
+          setOverview(overviewData);
+        } else {
+          // If overview fails, show error but continue loading other data
+          console.error('Failed to fetch overview analytics');
+          setOverview({
+            total_books: 0,
+            total_words: 0,
+            total_projects: 0,
+            total_series: 0,
+            total_pen_names: 0,
+            published_books: 0,
+          });
         }
 
-        const overviewData = await overviewRes.json();
-        const penNameResult = await penNameRes.json();
-        const genreResult = await genreRes.json();
-        const statusResult = await statusRes.json();
-        const yearResult = await yearRes.json();
+        // Process pen name data
+        const penNameResult = results[1];
+        if (penNameResult.status === 'fulfilled' && penNameResult.value.ok) {
+          const penNameData = await penNameResult.value.json();
+          setPenNameData(penNameData.data || []);
+        }
 
-        setOverview(overviewData);
-        setPenNameData(penNameResult.data || []);
-        setGenreData(genreResult.data || []);
-        setStatusData(statusResult.data || []);
-        setYearData(yearResult.data || []);
+        // Process genre data
+        const genreResult = results[2];
+        if (genreResult.status === 'fulfilled' && genreResult.value.ok) {
+          const genreData = await genreResult.value.json();
+          setGenreData(genreData.data || []);
+        }
+
+        // Process status data
+        const statusResult = results[3];
+        if (statusResult.status === 'fulfilled' && statusResult.value.ok) {
+          const statusData = await statusResult.value.json();
+          setStatusData(statusData.data || []);
+        }
+
+        // Process year data
+        const yearResult = results[4];
+        if (yearResult.status === 'fulfilled' && yearResult.value.ok) {
+          const yearData = await yearResult.value.json();
+          setYearData(yearData.data || []);
+        }
+
+        // Only set error if ALL requests failed
+        const allFailed = results.every(
+          (r) => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok)
+        );
+        if (allFailed) {
+          throw new Error('Unable to connect to server. Please check your connection and try again.');
+        }
       } catch (err) {
         console.error('Error fetching analytics:', err);
         setError(err instanceof Error ? err.message : 'Failed to load analytics');

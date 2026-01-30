@@ -181,14 +181,21 @@ export default function SidebarNavGroup({
   // ---- Standalone mode: render as a simple link ----
 
   if (isStandalone && href) {
+    const isCurrentPage = activeItemId === id;
     const standaloneStyle: CSSProperties = {
       ...headerStyle,
-      backgroundColor: activeItemId === id
+      backgroundColor: isCurrentPage
         ? colors.sidebar.backgroundActive
         : hasActiveChild
           ? 'rgba(102, 126, 234, 0.12)'
           : 'transparent',
-      color: activeItemId === id ? colors.sidebar.textActive : colors.sidebar.text,
+      color: isCurrentPage ? colors.sidebar.textActive : colors.sidebar.text,
+      // Add box shadow glow for active standalone items
+      boxShadow: isCurrentPage
+        ? '0 0 10px rgba(102, 126, 234, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.15)'
+        : 'none',
+      borderRadius: isCurrentPage ? borderRadius.full : borderRadius.md,
+      fontWeight: isCurrentPage ? 600 : 500,
     };
 
     return (

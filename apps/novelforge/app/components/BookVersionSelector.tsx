@@ -25,6 +25,7 @@ interface BookVersionSelectorProps {
   onVersionChange?: (version: BookVersion) => void;
   showCreateButton?: boolean;
   compact?: boolean;
+  showEmptyWarning?: boolean;
 }
 
 export default function BookVersionSelector({
@@ -32,6 +33,7 @@ export default function BookVersionSelector({
   onVersionChange,
   showCreateButton = false,
   compact = false,
+  showEmptyWarning = false,
 }: BookVersionSelectorProps) {
   const [versions, setVersions] = useState<BookVersion[]>([]);
   const [activeVersion, setActiveVersion] = useState<BookVersion | null>(null);
@@ -63,15 +65,34 @@ export default function BookVersionSelector({
       }
 
       const data = await response.json();
-      setVersions(data.versions || []);
+      const allVersions = data.versions || [];
+      setVersions(allVersions);
 
-      // Find active version
-      const active = data.versions?.find((v: BookVersion) => v.is_active === 1);
-      setActiveVersion(active || null);
+      // Find the best version to display:
+      // 1. First, check the active version
+      // 2. If active version has no content, prefer a version with content
+      const activeVersion = allVersions.find((v: BookVersion) => v.is_active === 1);
+      const versionWithContent = allVersions.find((v: BookVersion) => {
+        const chapterCount = v.actual_chapter_count ?? v.chapter_count ?? 0;
+        return chapterCount > 0;
+      });
 
-      // Notify parent of active version on initial load so pages can filter data correctly
-      if (notifyParent && active && onVersionChange) {
-        onVersionChange(active);
+      // On initial load only, auto-select version with content if active version is empty
+      let selectedVersion = activeVersion;
+      if (notifyParent && activeVersion) {
+        const activeChapterCount = activeVersion.actual_chapter_count ?? activeVersion.chapter_count ?? 0;
+        if (activeChapterCount === 0 && versionWithContent) {
+          // Active version is empty but there's a version with content
+          // Auto-select the version with content instead
+          selectedVersion = versionWithContent;
+        }
+      }
+
+      setActiveVersion(selectedVersion || null);
+
+      // Notify parent of the selected version on initial load
+      if (notifyParent && selectedVersion && onVersionChange) {
+        onVersionChange(selectedVersion);
       }
     } catch (err: any) {
       console.error('Error fetching versions:', err);
@@ -232,15 +253,18 @@ export default function BookVersionSelector({
           cursor: isChanging ? 'not-allowed' : 'pointer',
         }}
       >
-        {versions.map(version => (
-          <option key={version.id} value={version.id}>
-            {version.version_name || `Version ${version.version_number}`}
-            {version.is_active ? ' (Active)' : ''}
-            {' - '}
-            {(version.actual_chapter_count || version.chapter_count)} chapters,{' '}
-            {((version.actual_word_count || version.word_count) / 1000).toFixed(1)}k words
-          </option>
-        ))}
+        {versions.map(version => {
+          const chapterCount = version.actual_chapter_count ?? version.chapter_count ?? 0;
+          const wordCount = version.actual_word_count ?? version.word_count ?? 0;
+          const isEmpty = chapterCount === 0;
+          return (
+            <option key={version.id} value={version.id}>
+              {version.version_name || `Version ${version.version_number}`}
+              {version.is_active ? ' (Active)' : ''}
+              {isEmpty ? ' - No content' : ` - ${chapterCount} chapters, ${(wordCount / 1000).toFixed(1)}k words`}
+            </option>
+          );
+        })}
       </select>
 
       {showCreateButton && (
@@ -269,6 +293,19 @@ export default function BookVersionSelector({
           color: colors.error,
         }}>
           {error}
+        </span>
+      )}
+
+      {/* Warning when selected version has no content */}
+      {showEmptyWarning && activeVersion && (
+        (activeVersion.actual_chapter_count ?? activeVersion.chapter_count ?? 0) === 0
+      ) && (
+        <span style={{
+          fontSize: '0.75rem',
+          color: '#B45309',
+          fontStyle: 'italic',
+        }}>
+          This version has no chapters
         </span>
       )}
     </div>

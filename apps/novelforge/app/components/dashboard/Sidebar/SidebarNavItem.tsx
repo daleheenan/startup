@@ -97,6 +97,11 @@ export default function SidebarNavItem({
           ? colors.sidebar.backgroundHover
           : 'transparent',
 
+    // Active indicator - adds box shadow glow for more prominence
+    boxShadow: isActive
+      ? '0 0 10px rgba(102, 126, 234, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.15)'
+      : 'none',
+
     // Disabled state removes interactivity at the CSS level
     pointerEvents: disabled ? 'none' : 'auto',
     opacity: disabled ? 0.5 : 1,

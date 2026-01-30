@@ -8,6 +8,7 @@ import SidebarLogo from './SidebarLogo';
 import SidebarSearch from './SidebarSearch';
 import SidebarNavGroup from './SidebarNavGroup';
 import SidebarUserProfile from './SidebarUserProfile';
+import { useAuth } from '@/app/lib/useAuth';
 
 import {
   colors,
@@ -358,6 +359,7 @@ function deriveActiveItemId(pathname: string): string | null {
 export default function Sidebar({ collapsed: collapsedProp, onCollapseToggle }: SidebarProps) {
   const { state, dispatch } = useDashboardContext();
   const pathname = usePathname();
+  const { user, isLoading: authLoading, logout } = useAuth();
 
   // Prefer the explicit prop; fall back to context-driven state.
   const collapsed = collapsedProp ?? state.sidebarCollapsed;
@@ -539,9 +541,13 @@ export default function Sidebar({ collapsed: collapsedProp, onCollapseToggle }: 
         </svg>
       </button>
 
-      {/* User profile — pinned to the bottom. user={null} renders the
-          "Sign in" state; replace with real auth context when available. */}
-      <SidebarUserProfile user={null} collapsed={collapsed} />
+      {/* User profile — pinned to the bottom */}
+      <SidebarUserProfile
+        user={user}
+        isLoading={authLoading}
+        collapsed={collapsed}
+        onLogout={logout}
+      />
     </aside>
   );
 }

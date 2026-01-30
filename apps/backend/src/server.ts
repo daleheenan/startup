@@ -189,7 +189,10 @@ app.use(cors({
     FRONTEND_URL,
     'https://novelforge.daleheenan.com',
     'https://novelforge-production.up.railway.app',
-    'http://localhost:3000'
+    'https://storyscore.daleheenan.com',
+    'https://storyscore-frontend-production.up.railway.app',
+    'http://localhost:3000',
+    'http://localhost:3002'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

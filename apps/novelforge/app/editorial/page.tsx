@@ -835,7 +835,16 @@ function ReviewQueueTab({ queue, filters, onFiltersChange, projects }: ReviewQue
       {/* Queue List */}
       <div style={listContainerStyle}>
         {queue.map((item) => {
-          const progress = Math.round((item.modulesCompleted / item.modulesTotal) * 100);
+          // Calculate progress, ensuring completed status shows 100%
+          // and handling edge cases where modulesTotal might be 0
+          let progress = 0;
+          if (item.status === 'completed') {
+            // If overall status is completed, show 100% regardless of module count
+            progress = 100;
+          } else if (item.modulesTotal > 0) {
+            progress = Math.round((item.modulesCompleted / item.modulesTotal) * 100);
+          }
+
           const viewUrl = item.reportType === 'veb'
             ? `/projects/${item.projectId}/editorial-report`
             : `/projects/${item.projectId}/outline-review`;

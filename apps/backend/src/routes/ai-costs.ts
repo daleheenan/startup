@@ -33,7 +33,14 @@ router.get('/', (req, res) => {
     res.json({
       entries: entriesWithLabels,
       total: result.total,
-      summary: result.summary,
+      summary: {
+        ...result.summary,
+        // Add formatted values for display
+        formattedCostUSD: `$${result.summary.totalCostUSD.toFixed(2)}`,
+        formattedCostGBP: `£${result.summary.totalCostGBP.toFixed(2)}`,
+        formattedInputTokens: formatTokenCount(result.summary.totalInputTokens),
+        formattedOutputTokens: formatTokenCount(result.summary.totalOutputTokens),
+      },
       pagination: {
         limit: filters.limit,
         offset: filters.offset,
