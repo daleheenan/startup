@@ -12,9 +12,9 @@ MAINTENANCE RULES:
 
 ## Summary Statistics
 
-- **Total tasks completed**: 35
-- **Total lessons recorded**: 34
-- **Last updated**: 2026-01-28
+- **Total tasks completed**: 37
+- **Total lessons recorded**: 36
+- **Last updated**: 2026-01-30
 - **Proven lessons** (score >= 5): 0
 - **Top themes**: #typescript #testing #patterns #frontend #backend #database #migrations #third-party-integration #performance #caching #mocking #jest #logging #structured-logging #pino #fullstack #prompts #claude-api #deployment #railway #ci-cd #ui-components #ux #react #accessibility #api-routes #express #rest-api #crud-operations #state-management #confirmation-dialogs #act-management #outline-routes #manual-testing #api-documentation #auto-population #default-values #constants #workflow #react-query #virtualization #optimization #inventory #vitest #dom-testing #test-selectors #codebase-simplification #documentation #refactoring #hook-extraction #form-labels #wcag #keyboard-navigation #focus-trap #aria-live
 
@@ -29,6 +29,68 @@ MAINTENANCE RULES:
 ---
 
 ## Active Lessons (Most Recent First)
+
+### 2026-01-30 | Task: Create Author Styles Management UI
+
+**Date**: 2026-01-30
+**Task**: Build Author Styles settings page to manage writing style profiles extracted from manuscript samples
+**Context**: Sprint 21 Custom AI Training - frontend UI for author-styles API routes that already existed
+
+**What Worked Well**:
+- Read existing backend routes first to understand the exact API interface (endpoints, request/response shapes)
+- Examined similar settings pages (prose-style) to match layout patterns (sidebar navigation, inline styles)
+- Used inline CSSProperties objects matching existing codebase patterns instead of CSS modules
+- Implemented modal dialog with overlay click-outside detection using stopPropagation pattern
+- Added navigation link to main settings page by inserting into settingsSections array between Prose Style and Exclusions
+- Handled pre-existing build errors (missing lucide-react dependency, untracked files) by installing dependencies without breaking existing code
+- Created comprehensive form with analyse-before-save workflow (analyse manuscript → show results → save style)
+- Used word count calculation for validation (minimum 500 words to enable analyse button)
+- Rendered analysis results in a summary card before allowing save to provide user feedback
+- Followed UK spelling conventions throughout (analysing, analysed, not analyzing/analyzed)
+
+**What Didn't Work**:
+- Build initially failed due to untracked files (images page) importing lucide-react which wasn't installed - had to install missing dependency
+- Another pre-existing TypeScript error in styles.ts (backgroundSecondary property) - linter auto-fixed it during development
+- Pre-existing error in ProjectNavigation.tsx prevented clean build but was unrelated to my changes
+
+**Lesson**: When adding new settings pages to existing dashboards: (1) Read backend API routes FIRST to understand exact request/response interfaces, (2) Examine similar settings pages to extract layout patterns (sidebar nav structure, inline styles vs modules), (3) Match styling approach of existing pages exactly (inline CSSProperties if that's the pattern), (4) For forms with AI analysis, use staged workflow (analyse → show results → save) rather than single-step submission, (5) Handle pre-existing build errors pragmatically - install missing dependencies if they're clearly needed by untracked files, (6) When build fails on unrelated files, verify your specific files have no errors before claiming task complete, (7) Use modal overlays with onClick={(e) => e.stopPropagation()} on inner content to prevent accidental dismissal, (8) For UK English projects, use British spelling consistently (analyse not analyze, colour not color).
+
+**Application Score**: 0
+
+**Tags**: #react #ui-components #settings-page #inline-styles #modal-dialog #forms #author-styles #uk-spelling #api-integration #pre-existing-errors #dependencies
+
+---
+
+### 2026-01-30 | Task: Backend Service Integration - Routes and Barrel Exports
+
+**Date**: 2026-01-30
+**Task**: Integrate new backend services by creating barrel exports, route files, and mounting routers in server.ts
+**Context**: Adding prose-reports, publishing, bestseller, and images routes to Express backend; creating module index files for service directories
+
+**What Worked Well**:
+- Read existing services first to understand actual export signatures before writing routes (many services use static methods, not instance methods)
+- Checked for TypeScript compilation errors after each major change rather than waiting until the end
+- Used grep to find actual method names (`analyseOpeningHook`, `analyseTensionArc`, `analyseCharacterArc`) instead of assuming
+- For services with function exports (not classes), imported the functions directly: `import { generateQueryLetter } from ...`
+- When barrel re-exports caused conflicts (STYLE_PRESETS exported from both export.service.ts and export/style-presets.ts), simplified by adding a comment pointing to direct imports instead of complex selective re-exports
+- Created simple, focused routes that match actual service capabilities rather than inventing methods that don't exist
+- Extracted story DNA with null-safe parsing: `const storyDna = project.story_dna ? (typeof project.story_dna === 'string' ? JSON.parse(project.story_dna) : project.story_dna) : null;`
+- All prose-report services use static methods: `ReadabilityService.generateReport(text)` not `new ReadabilityService().analyse(text)`
+- Build passed on final attempt with zero compilation errors
+
+**What Didn't Work**:
+- Initially assumed services followed a consistent pattern (classes with instance methods) - needed to check each service individually
+- First version tried to import a QueryLetterGenerator class that doesn't exist - the module exports standalone functions
+- Initially exported complex type re-exports from services/index.ts that failed because some types don't exist - simplified to just a comment
+- Tried to call non-existent methods like `validate()` on validator services when actual method is `analyseOpeningHook()`
+
+**Lesson**: When integrating existing services into new routes: (1) Read each service file first to understand its actual API (static vs instance, method names, return types), (2) Use grep to find method signatures rather than guessing: `grep -n "async.*analyse" service.ts`, (3) Check actual exports with `grep "^export"` to see if it exports functions, classes, or both, (4) For barrel exports (index.ts), keep them simple - if re-exporting causes TypeScript conflicts, document direct import paths instead, (5) Match route implementation to actual service capabilities - don't invent methods that would be nice to have, (6) When multiple services are similar but not identical, check each one individually, (7) Build incrementally and fix errors immediately rather than writing all code first, (8) For static method services, use `Promise.resolve(Service.method())` in Promise.all rather than creating instances.
+
+**Application Score**: 0
+
+**Tags**: #backend #routes #express #services #barrel-exports #typescript #service-integration #api-design #static-methods #function-exports
+
+---
 
 ### 2026-01-28 | Task: Migrate Standalone Pages to DashboardLayout
 

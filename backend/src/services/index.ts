@@ -22,11 +22,21 @@ export * from './context-assembly.service';
 
 // Editorial and quality services
 export * from './specialist-agents.service';
+export * from './agent-configuration.service';
 export * from './veb.service';
 export * from './outline-editorial.service';
 export * from './editing.service';
 export * from './follow-up.service';
 export * from './regeneration.service';
+
+// Bestseller formula validators
+export * from './opening-hook-validator.service';
+export * from './tension-arc-validator.service';
+export {
+  CharacterArcValidatorService,
+  type CharacterArcAnalysis,
+  type CharacterArcResult
+} from './character-arc-validator.service';
 
 // Book management services
 export * from './book-transition.service';
@@ -65,3 +75,25 @@ export * from './lessons';
 // Story generation utilities
 export * from './story-dna-generator';
 export * from './story-ideas-generator';
+
+// Prose analysis reports (ProWritingAid-style)
+export * from './prose-reports';
+
+// Publishing support
+export * from './publishing';
+
+// Enhanced export services (KDP/Publishing - Sprint 41)
+// Note: Export subdirectory exports are available via direct import
+// e.g., import { TRIM_SIZES } from './services/export/trim-sizes'
+
+// Token optimization
+export * from './token.service';
+
+// Voice extraction
+export * from './voice-extraction.service';
+
+// Bestseller mode
+export * from './bestseller-mode.service';
+
+// Image generation
+export * from './image-generation.service';

@@ -63,6 +63,15 @@ const settingsSections: SettingsSection[] = [
     countLabel: '',
   },
   {
+    title: 'Author Styles',
+    description: 'Train the AI to write in your unique voice by analysing samples of your existing work.',
+    href: '/settings/author-styles',
+    icon: 'S',
+    iconBg: 'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)',
+    count: null,
+    countLabel: 'styles',
+  },
+  {
     title: 'Exclusions',
     description: 'Manage blacklisted names, words, themes, and tropes that should be avoided in your stories.',
     href: '/settings/exclusions',

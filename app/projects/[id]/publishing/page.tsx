@@ -50,6 +50,13 @@ export default function PublishingSettingsPage() {
   const [includeDramatisPersonae, setIncludeDramatisPersonae] = useState(true);
   const [includeAboutAuthor, setIncludeAboutAuthor] = useState(true);
 
+  // Query Letter & Synopsis state
+  const [activeTab, setActiveTab] = useState<'settings' | 'query-letter' | 'synopsis'>('settings');
+  const [queryLetter, setQueryLetter] = useState('');
+  const [synopsis, setSynopsis] = useState('');
+  const [generatingQueryLetter, setGeneratingQueryLetter] = useState(false);
+  const [generatingSynopsis, setGeneratingSynopsis] = useState(false);
+
   useEffect(() => {
     fetchProject();
   }, [projectId]);
@@ -192,6 +199,62 @@ export default function PublishingSettingsPage() {
     }
   };
 
+  const generateQueryLetter = async () => {
+    setGeneratingQueryLetter(true);
+    setError(null);
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/publishing/${projectId}/query-letter`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate query letter');
+      }
+
+      const data = await response.json();
+      setQueryLetter(data.queryLetter);
+      setSuccessMessage('Query letter generated successfully!');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to generate query letter');
+    } finally {
+      setGeneratingQueryLetter(false);
+    }
+  };
+
+  const generateSynopsis = async () => {
+    setGeneratingSynopsis(true);
+    setError(null);
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/api/publishing/${projectId}/synopsis`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate synopsis');
+      }
+
+      const data = await response.json();
+      setSynopsis(data.synopsis);
+      setSuccessMessage('Synopsis generated successfully!');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to generate synopsis');
+    } finally {
+      setGeneratingSynopsis(false);
+    }
+  };
+
   const isCompleted = project?.status === 'completed' || project?.status === 'published';
 
   return (
@@ -203,8 +266,60 @@ export default function PublishingSettingsPage() {
       projectId={projectId}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[6] }}>
-        {/* Navigation - full width across top */}
-        <div style={{ width: '100%' }}>
+        {/* Tab Navigation */}
+        <div style={{
+          display: 'flex',
+          gap: spacing[2],
+          borderBottom: `2px solid ${colors.border.default}`,
+        }}>
+          <button
+            onClick={() => setActiveTab('settings')}
+            style={{
+              padding: `${spacing[3]} ${spacing[4]}`,
+              border: 'none',
+              borderBottom: `3px solid ${activeTab === 'settings' ? colors.brand.primary : 'transparent'}`,
+              background: activeTab === 'settings' ? 'rgba(102, 126, 234, 0.08)' : 'transparent',
+              color: activeTab === 'settings' ? colors.brand.primary : colors.text.secondary,
+              fontSize: typography.fontSize.sm,
+              fontWeight: activeTab === 'settings' ? typography.fontWeight.semibold : typography.fontWeight.medium,
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            📄 Settings
+          </button>
+          <button
+            onClick={() => setActiveTab('query-letter')}
+            style={{
+              padding: `${spacing[3]} ${spacing[4]}`,
+              border: 'none',
+              borderBottom: `3px solid ${activeTab === 'query-letter' ? colors.brand.primary : 'transparent'}`,
+              background: activeTab === 'query-letter' ? 'rgba(102, 126, 234, 0.08)' : 'transparent',
+              color: activeTab === 'query-letter' ? colors.brand.primary : colors.text.secondary,
+              fontSize: typography.fontSize.sm,
+              fontWeight: activeTab === 'query-letter' ? typography.fontWeight.semibold : typography.fontWeight.medium,
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            ✉️ Query Letter
+          </button>
+          <button
+            onClick={() => setActiveTab('synopsis')}
+            style={{
+              padding: `${spacing[3]} ${spacing[4]}`,
+              border: 'none',
+              borderBottom: `3px solid ${activeTab === 'synopsis' ? colors.brand.primary : 'transparent'}`,
+              background: activeTab === 'synopsis' ? 'rgba(102, 126, 234, 0.08)' : 'transparent',
+              color: activeTab === 'synopsis' ? colors.brand.primary : colors.text.secondary,
+              fontSize: typography.fontSize.sm,
+              fontWeight: activeTab === 'synopsis' ? typography.fontWeight.semibold : typography.fontWeight.medium,
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            📋 Synopsis
+          </button>
         </div>
 
         {/* Main Content */}
@@ -244,7 +359,7 @@ export default function PublishingSettingsPage() {
             </div>
           )}
 
-          {!loading && (
+          {!loading && activeTab === 'settings' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[6] }}>
 
               {/* Ready for Publishing Card - First Card */}
@@ -711,6 +826,148 @@ export default function PublishingSettingsPage() {
                 >
                   {saving ? 'Saving...' : 'Save Settings'}
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Query Letter Tab */}
+          {!loading && activeTab === 'query-letter' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[6] }}>
+              <div style={{
+                background: colors.background.surface,
+                border: `1px solid ${colors.border.default}`,
+                borderRadius: borderRadius.xl,
+                padding: spacing[6],
+              }}>
+                <h2 style={{
+                  fontSize: typography.fontSize.lg,
+                  fontWeight: typography.fontWeight.semibold,
+                  color: colors.text.primary,
+                  margin: 0,
+                  marginBottom: spacing[4],
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: spacing[2],
+                }}>
+                  <span>✉️</span> Query Letter
+                </h2>
+
+                <p style={{
+                  fontSize: typography.fontSize.sm,
+                  color: colors.text.tertiary,
+                  margin: 0,
+                  marginBottom: spacing[4],
+                  lineHeight: typography.lineHeight.relaxed,
+                }}>
+                  Generate a professional query letter for literary agents. The letter will include a compelling hook, brief synopsis, author bio, and genre/word count details.
+                </p>
+
+                <button
+                  onClick={generateQueryLetter}
+                  disabled={generatingQueryLetter}
+                  style={{
+                    padding: `${spacing[3]} ${spacing[6]}`,
+                    background: generatingQueryLetter ? colors.text.disabled : colors.brand.gradient,
+                    border: 'none',
+                    borderRadius: borderRadius.lg,
+                    color: colors.white,
+                    fontSize: typography.fontSize.sm,
+                    fontWeight: typography.fontWeight.semibold,
+                    cursor: generatingQueryLetter ? 'not-allowed' : 'pointer',
+                    marginBottom: spacing[4],
+                  }}
+                >
+                  {generatingQueryLetter ? 'Generating...' : 'Generate Query Letter'}
+                </button>
+
+                {queryLetter && (
+                  <textarea
+                    value={queryLetter}
+                    onChange={(e) => setQueryLetter(e.target.value)}
+                    rows={20}
+                    style={{
+                      width: '100%',
+                      padding: spacing[4],
+                      border: `1px solid ${colors.border.default}`,
+                      borderRadius: borderRadius.md,
+                      fontSize: typography.fontSize.sm,
+                      fontFamily: typography.fontFamily.base,
+                      lineHeight: typography.lineHeight.relaxed,
+                      resize: 'vertical',
+                    }}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Synopsis Tab */}
+          {!loading && activeTab === 'synopsis' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[6] }}>
+              <div style={{
+                background: colors.background.surface,
+                border: `1px solid ${colors.border.default}`,
+                borderRadius: borderRadius.xl,
+                padding: spacing[6],
+              }}>
+                <h2 style={{
+                  fontSize: typography.fontSize.lg,
+                  fontWeight: typography.fontWeight.semibold,
+                  color: colors.text.primary,
+                  margin: 0,
+                  marginBottom: spacing[4],
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: spacing[2],
+                }}>
+                  <span>📋</span> Synopsis
+                </h2>
+
+                <p style={{
+                  fontSize: typography.fontSize.sm,
+                  color: colors.text.tertiary,
+                  margin: 0,
+                  marginBottom: spacing[4],
+                  lineHeight: typography.lineHeight.relaxed,
+                }}>
+                  Generate a comprehensive 1-2 page synopsis of your novel. This includes the full story arc, character development, major plot points, and ending.
+                </p>
+
+                <button
+                  onClick={generateSynopsis}
+                  disabled={generatingSynopsis}
+                  style={{
+                    padding: `${spacing[3]} ${spacing[6]}`,
+                    background: generatingSynopsis ? colors.text.disabled : colors.brand.gradient,
+                    border: 'none',
+                    borderRadius: borderRadius.lg,
+                    color: colors.white,
+                    fontSize: typography.fontSize.sm,
+                    fontWeight: typography.fontWeight.semibold,
+                    cursor: generatingSynopsis ? 'not-allowed' : 'pointer',
+                    marginBottom: spacing[4],
+                  }}
+                >
+                  {generatingSynopsis ? 'Generating...' : 'Generate Synopsis'}
+                </button>
+
+                {synopsis && (
+                  <textarea
+                    value={synopsis}
+                    onChange={(e) => setSynopsis(e.target.value)}
+                    rows={25}
+                    style={{
+                      width: '100%',
+                      padding: spacing[4],
+                      border: `1px solid ${colors.border.default}`,
+                      borderRadius: borderRadius.md,
+                      fontSize: typography.fontSize.sm,
+                      fontFamily: typography.fontFamily.base,
+                      lineHeight: typography.lineHeight.relaxed,
+                      resize: 'vertical',
+                    }}
+                  />
+                )}
               </div>
             </div>
           )}

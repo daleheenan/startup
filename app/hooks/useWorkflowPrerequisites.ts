@@ -26,6 +26,7 @@ export type WorkflowStep =
   | 'edit-story'  // Edit story concept and DNA with AI feedback
   | 'characters'
   | 'world'
+  | 'images'  // Image generation for characters, locations, and covers
   | 'plots'
   | 'coherence'
   | 'originality'
@@ -39,6 +40,8 @@ export type WorkflowStep =
   | 'follow-up'
   | 'series'
   | 'prose-style'  // Per-book prose style configuration
+  | 'prose-reports'  // Prose quality analysis
+  | 'bestseller'  // Bestseller analysis
   | 'publishing';
 
 // Project data structure expected by the hook
@@ -295,6 +298,7 @@ const STEP_NAMES: Record<WorkflowStep, string> = {
   'edit-story': 'Edit Story',
   characters: 'Characters',
   world: 'World Building',
+  images: 'Images',
   plots: 'Plot Structure',
   coherence: 'Coherence Check',
   originality: 'Originality Check',
@@ -308,6 +312,8 @@ const STEP_NAMES: Record<WorkflowStep, string> = {
   'follow-up': 'Follow-Up Ideas',
   series: 'Series Management',
   'prose-style': 'Prose Style',
+  'prose-reports': 'Prose Quality',
+  bestseller: 'Bestseller Analysis',
   publishing: 'Publishing Settings',
 };
 
@@ -352,6 +358,12 @@ export function useWorkflowPrerequisites(
         isComplete: false,
         isRequired: true,
         requiresPrevious: 'characters',
+        missingItems: [],
+      },
+      images: {
+        isComplete: true,  // Images are optional - always accessible
+        isRequired: false,
+        requiresPrevious: null,  // Can generate images anytime after characters/world exist
         missingItems: [],
       },
       plots: {
@@ -430,6 +442,18 @@ export function useWorkflowPrerequisites(
         isComplete: true, // Prose style is always accessible (can be configured anytime)
         isRequired: false, // Prose style is optional
         requiresPrevious: null, // No prerequisites - always accessible
+        missingItems: [],
+      },
+      'prose-reports': {
+        isComplete: false,
+        isRequired: false, // Prose reports are optional
+        requiresPrevious: 'chapters', // Requires chapters with content
+        missingItems: [],
+      },
+      bestseller: {
+        isComplete: false,
+        isRequired: false, // Bestseller analysis is optional
+        requiresPrevious: 'chapters', // Requires chapters with content
         missingItems: [],
       },
       publishing: {
@@ -515,6 +539,14 @@ export function useWorkflowPrerequisites(
     // Series management is always accessible (no prerequisites)
     checks.series.missingItems = getMissingItemsForStep('series', project, outline, chapters);
     checks.series.isComplete = true; // Always accessible
+
+    // Prose reports - accessible after chapters with content exist
+    checks['prose-reports'].missingItems = [];
+    checks['prose-reports'].isComplete = chaptersWithContent.length > 0;
+
+    // Bestseller analysis - accessible after chapters with content exist
+    checks.bestseller.missingItems = [];
+    checks.bestseller.isComplete = chaptersWithContent.length > 0;
 
     // Publishing settings - accessible after chapters exist
     checks.publishing.missingItems = getMissingItemsForStep('publishing', project, outline, chapters);

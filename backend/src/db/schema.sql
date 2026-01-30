@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS projects (
     copyright_year INTEGER,      -- Copyright year (defaults to current year)
     include_dramatis_personae INTEGER DEFAULT 1,  -- Include character list in back matter
     include_about_author INTEGER DEFAULT 1,       -- Include about author in back matter
+    bestseller_mode INTEGER DEFAULT 0,            -- Premium mode: enforce bestseller criteria
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -225,14 +226,202 @@ VALUES ('owner');
 -- Author Profile table (shared user-level settings for all books)
 CREATE TABLE IF NOT EXISTS author_profile (
     id TEXT PRIMARY KEY DEFAULT 'owner',
+    author_name TEXT,               -- Full name for title pages
+    pen_name TEXT,                  -- Pen name if different from legal name
     author_bio TEXT,
+    author_bio_short TEXT,          -- Short bio for query letters (50-100 words)
     author_photo TEXT,              -- base64-encoded image
     author_photo_type TEXT,         -- MIME type (image/jpeg, image/png, etc.)
     author_website TEXT,
     author_social_media TEXT,       -- JSON: { twitter, instagram, facebook, etc. }
+    -- Contact information for title pages and submissions
+    contact_email TEXT,
+    contact_phone TEXT,
+    contact_address TEXT,           -- Mailing address
+    contact_city TEXT,
+    contact_postcode TEXT,
+    contact_country TEXT,
+    -- Writing credentials for query letters
+    writing_credentials TEXT,       -- JSON: Array of publications, awards, etc.
+    -- Preferences
+    preferred_pronouns TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
 );
 
 -- Insert default row for owner
 INSERT OR IGNORE INTO author_profile (id) VALUES ('owner');
+
+-- Agent Submissions table (track query letters sent to literary agents)
+CREATE TABLE IF NOT EXISTS agent_submissions (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    agent_name TEXT NOT NULL,
+    agency_name TEXT,
+    agent_email TEXT,
+    agent_website TEXT,
+    query_letter TEXT,              -- Generated query letter text
+    synopsis TEXT,                  -- Generated synopsis text
+    submission_date TEXT DEFAULT (datetime('now')),
+    status TEXT NOT NULL CHECK(status IN ('pending', 'sent', 'responded', 'rejected', 'requested_partial', 'requested_full', 'offer')) DEFAULT 'pending',
+    response_date TEXT,
+    response_notes TEXT,
+    materials_sent TEXT,            -- JSON: Array of materials sent (query, synopsis, first_3_chapters, full_manuscript)
+    personalisation_notes TEXT,     -- Notes for personalising the query letter
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_submissions_project ON agent_submissions(project_id);
+CREATE INDEX IF NOT EXISTS idx_agent_submissions_status ON agent_submissions(status);
+CREATE INDEX IF NOT EXISTS idx_agent_submissions_date ON agent_submissions(submission_date);
+
+-- Comp Titles table (comparable published titles for query letters)
+CREATE TABLE IF NOT EXISTS comp_titles (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    author TEXT NOT NULL,
+    publication_year INTEGER,
+    publisher TEXT,
+    why_comparable TEXT,            -- Why this title is comparable to the project
+    target_audience TEXT,
+    genre TEXT,
+    is_active INTEGER DEFAULT 1,    -- Can be deactivated without deleting
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_comp_titles_project ON comp_titles(project_id);
+CREATE INDEX IF NOT EXISTS idx_comp_titles_active ON comp_titles(is_active);
+
+-- Query Letter Templates table (genre-specific query letter templates)
+CREATE TABLE IF NOT EXISTS query_letter_templates (
+    id TEXT PRIMARY KEY,
+    genre TEXT NOT NULL,
+    template_name TEXT NOT NULL,
+    structure TEXT NOT NULL,        -- JSON: Template structure with placeholders
+    example_text TEXT,              -- Example query letter for this genre
+    tips TEXT,                      -- JSON: Array of genre-specific tips
+    is_default INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_query_templates_genre ON query_letter_templates(genre);
+
+-- Bestseller Mode tables (Sprint 44: Premium commercial fiction features)
+-- Bestseller criteria table (pre-generation checklist)
+CREATE TABLE IF NOT EXISTS bestseller_criteria (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+
+    -- Pre-writing checklist
+    has_strong_premise INTEGER DEFAULT 0,
+    premise_hook TEXT,
+    genre_conventions_identified INTEGER DEFAULT 0,
+    genre_conventions TEXT,  -- JSON array of identified conventions
+    target_tropes TEXT,  -- JSON array of tropes (min 3 required)
+    comp_titles TEXT,  -- JSON array of comparable titles (min 2 required)
+    word_count_target INTEGER,
+
+    -- Structure checklist (Save the Cat beats)
+    save_the_cat_beats_mapped INTEGER DEFAULT 0,
+    beats_data TEXT,  -- JSON: beat placements with chapter numbers
+    inciting_incident_chapter INTEGER,
+    midpoint_chapter INTEGER,
+    all_is_lost_chapter INTEGER,
+    resolution_planned INTEGER DEFAULT 0,
+    resolution_notes TEXT,
+
+    -- Character checklist
+    protagonist_want TEXT,
+    protagonist_need TEXT,
+    protagonist_lie TEXT,
+    character_arc_complete INTEGER DEFAULT 0,
+    voice_samples TEXT,  -- JSON array of character voice examples
+
+    -- Checklist validation status
+    checklist_complete INTEGER DEFAULT 0,
+    checklist_passed INTEGER DEFAULT 0,
+    validation_errors TEXT,  -- JSON array of validation error messages
+
+    -- Timestamps
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_bestseller_criteria_project ON bestseller_criteria(project_id);
+
+-- Bestseller reports table (post-generation analysis)
+CREATE TABLE IF NOT EXISTS bestseller_reports (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    book_id TEXT,
+    generated_at TEXT DEFAULT (datetime('now')),
+
+    -- Commercial viability scoring (1-100 scale)
+    overall_score REAL,
+    opening_hook_score REAL,  -- 20% weight
+    genre_compliance_score REAL,  -- 20% weight
+    tension_arc_score REAL,  -- 15% weight
+    character_arc_score REAL,  -- 15% weight
+    trope_effectiveness_score REAL,  -- 10% weight
+    prose_quality_score REAL,  -- 10% weight (VEB-based)
+    market_positioning_score REAL,  -- 10% weight
+
+    -- Detailed analysis
+    strengths TEXT,  -- JSON array of identified strengths
+    weaknesses TEXT,  -- JSON array of identified weaknesses
+    recommendations TEXT,  -- JSON array of improvement suggestions
+
+    -- Marketing package
+    blurb TEXT,  -- Auto-generated back cover blurb
+    tagline TEXT,  -- Catchy one-liner for marketing
+    amazon_keywords TEXT,  -- JSON array of SEO-optimised keywords
+    target_audience TEXT,  -- Identified primary readership
+    comp_titles_analysis TEXT,  -- JSON: comparative title analysis
+
+    -- Metadata
+    created_at TEXT DEFAULT (datetime('now')),
+
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_bestseller_reports_project ON bestseller_reports(project_id);
+CREATE INDEX IF NOT EXISTS idx_bestseller_reports_book ON bestseller_reports(book_id);
+CREATE INDEX IF NOT EXISTS idx_bestseller_reports_score ON bestseller_reports(overall_score);
+
+-- Chapter validation results (real-time validation during generation)
+CREATE TABLE IF NOT EXISTS bestseller_chapter_validations (
+    id TEXT PRIMARY KEY,
+    chapter_id TEXT NOT NULL,
+    validated_at TEXT DEFAULT (datetime('now')),
+
+    -- Validation results
+    is_valid INTEGER DEFAULT 0,
+    word_count INTEGER,
+    target_word_count INTEGER,
+    word_count_deviation REAL,  -- Percentage deviation
+
+    -- Beat tracking
+    commercial_beats_hit TEXT,  -- JSON array of beats successfully hit
+    commercial_beats_missed TEXT,  -- JSON array of expected but missing beats
+
+    -- Issues and warnings
+    warnings TEXT,  -- JSON array of ChapterDeviationWarning objects
+    critical_issues_count INTEGER DEFAULT 0,
+
+    -- Metadata
+    created_at TEXT DEFAULT (datetime('now')),
+
+    FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_bestseller_chapter_validations_chapter ON bestseller_chapter_validations(chapter_id);
+CREATE INDEX IF NOT EXISTS idx_bestseller_chapter_validations_valid ON bestseller_chapter_validations(is_valid);

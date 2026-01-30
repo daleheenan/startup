@@ -6,7 +6,7 @@
  * Navigation structure:
  * - Overview (standalone)
  * - Edit Story (standalone)
- * - Elements: Characters, World
+ * - Elements: Characters, World, Images
  * - Story: Plot, Outline, Prose Style
  * - Novel: Chapters, Versions, Analytics, Follow-up
  * - Editorial: Editorial Board, Word Count, Outline Review
@@ -76,6 +76,7 @@ export type WorkflowStep =
   | 'edit-story'
   | 'characters'
   | 'world'
+  | 'images'
   | 'plots'
   | 'coherence'
   | 'originality'
@@ -89,6 +90,8 @@ export type WorkflowStep =
   | 'follow-up'
   | 'series'
   | 'prose-style'
+  | 'prose-reports'
+  | 'bestseller'
   | 'publishing';
 
 /**
@@ -124,7 +127,7 @@ export interface NavGroup {
  * Structure:
  * - Overview (standalone)
  * - Edit Story (standalone)
- * - Elements: Characters, World
+ * - Elements: Characters, World, Images
  * - Story: Plot, Outline, Prose Style
  * - Novel: Chapters, Versions, Analytics, Follow-up
  * - Editorial: Editorial Board, Word Count, Outline Review
@@ -167,6 +170,13 @@ export const PROJECT_NAV_GROUPS: NavGroup[] = [
         route: '/world',
         icon: '🌍',
         workflowStep: 'world',
+      },
+      {
+        id: 'images',
+        label: 'Images',
+        route: '/images',
+        icon: '🖼️',
+        workflowStep: 'images',
       },
     ],
   },
@@ -265,6 +275,20 @@ export const PROJECT_NAV_GROUPS: NavGroup[] = [
         route: '/outline-review',
         icon: '🔍',
         workflowStep: 'outline-review',
+      },
+      {
+        id: 'prose-reports',
+        label: 'Prose Quality',
+        route: '/prose-reports',
+        icon: '📖',
+        workflowStep: 'prose-reports',
+      },
+      {
+        id: 'bestseller',
+        label: 'Bestseller',
+        route: '/bestseller',
+        icon: '⭐',
+        workflowStep: 'bestseller',
       },
     ],
   },

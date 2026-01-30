@@ -97,6 +97,9 @@ export const buttonSecondary: CSSProperties = {
 };
 
 export const buttonDisabled: CSSProperties = {
+  ...button,
+  background: colors.border,
+  color: colors.textSecondary,
   opacity: 0.5,
   cursor: 'not-allowed',
 };

@@ -143,6 +143,11 @@ import wordCountRevisionRouter from './routes/word-count-revision.js';
 import editorialLessonsRouter from './routes/editorial-lessons.js';
 import aiCostsRouter from './routes/ai-costs.js';
 import navigationRouter from './routes/navigation.js';
+import authorStylesRouter from './routes/author-styles.js';
+import imagesRouter from './routes/images/index.js';
+import proseReportsRouter from './routes/prose-reports.js';
+import publishingRouter from './routes/publishing.js';
+import bestsellerRouter from './routes/bestseller.js';
 
 // Run database migrations
 try {
@@ -287,6 +292,11 @@ app.use('/api/word-count-revision', apiLimiter, requireAuth, wordCountRevisionRo
 app.use('/api/editorial-lessons', apiLimiter, requireAuth, editorialLessonsRouter); // Editorial lessons routes
 app.use('/api/ai-costs', apiLimiter, requireAuth, aiCostsRouter); // AI cost tracking routes
 app.use('/api/navigation', apiLimiter, requireAuth, navigationRouter); // Navigation counts (optimised single-query endpoint)
+app.use('/api/author-styles', apiLimiter, requireAuth, authorStylesRouter); // Author writing style profiles (Sprint 21)
+app.use('/api/images', apiLimiter, requireAuth, imagesRouter); // Image generation and management (Sprint 24)
+app.use('/api/prose-reports', apiLimiter, requireAuth, proseReportsRouter); // ProWritingAid-style prose analysis (Sprint 40)
+app.use('/api/publishing', apiLimiter, requireAuth, publishingRouter); // Traditional publishing support (Sprint 39)
+app.use('/api/bestseller', apiLimiter, requireAuth, bestsellerRouter); // Bestseller formula analysis (Sprint 43-44)
 
 // Sentry error handler - must be BEFORE custom error handlers
 app.use(sentryErrorHandler());
