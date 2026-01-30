@@ -541,7 +541,7 @@ class MetricsService {
           l.*,
           p.title as project_name,
           p.series_id,
-          s.name as series_name
+          s.title as series_name
         FROM ai_request_log l
         LEFT JOIN projects p ON l.project_id = p.id
         LEFT JOIN series s ON p.series_id = s.id
@@ -792,7 +792,7 @@ class MetricsService {
           l.project_id,
           p.title as project_name,
           p.series_id,
-          s.name as series_name,
+          s.title as series_name,
           COALESCE(SUM(l.cost_usd), 0) as total_cost_usd,
           COALESCE(SUM(l.cost_gbp), 0) as total_cost_gbp,
           COUNT(*) as request_count
