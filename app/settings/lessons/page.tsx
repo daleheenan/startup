@@ -53,6 +53,8 @@ interface AvailableReport {
   id: string;
   projectId: string;
   projectTitle: string;
+  reportType: 'veb' | 'outline_editorial';
+  reportTypeLabel: string;
   overallScore: number;
   summary: string;
   createdAt: string;
@@ -804,6 +806,9 @@ export default function LessonsSettingsPage() {
                         <div style={{ flex: 1 }}>
                           <div style={{ fontWeight: '600', color: '#1A1A2E', marginBottom: '0.25rem' }}>
                             {report.projectTitle}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: '#9333EA', marginBottom: '0.25rem' }}>
+                            {report.reportTypeLabel}
                           </div>
                           <div style={{ fontSize: '0.75rem', color: '#64748B', marginBottom: '0.5rem' }}>
                             Score: {report.overallScore}/100 | {report.modulesCompleted}/3 modules |{' '}

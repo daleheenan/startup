@@ -375,7 +375,7 @@ router.post('/extract/revision', async (req, res) => {
 
 /**
  * POST /api/editorial-lessons/import-from-report/:reportId
- * Import lessons from an existing editorial report
+ * Import lessons from an existing editorial report (VEB or Outline Editorial)
  * Used for retroactively extracting lessons from reports that were created
  * before automatic lesson extraction was implemented
  */
@@ -383,10 +383,21 @@ router.post('/import-from-report/:reportId', async (req, res) => {
   const { reportId } = req.params;
 
   try {
-    // Fetch the editorial report
-    const report = db.prepare(`
-      SELECT * FROM editorial_reports WHERE id = ?
+    // Try to find as VEB report first
+    let report = db.prepare(`
+      SELECT *, 'veb' as report_type FROM editorial_reports WHERE id = ?
     `).get(reportId) as any;
+
+    // If not found, try outline editorial report
+    if (!report) {
+      try {
+        report = db.prepare(`
+          SELECT *, 'outline_editorial' as report_type FROM outline_editorial_reports WHERE id = ?
+        `).get(reportId) as any;
+      } catch (e) {
+        // Table may not exist
+      }
+    }
 
     if (!report) {
       return sendNotFound(res, 'Editorial report');
@@ -405,46 +416,115 @@ router.post('/import-from-report/:reportId', async (req, res) => {
       return sendBadRequest(res, 'No book found for this project');
     }
 
-    // Check if lessons already exist for this report
+    // Check if lessons already exist for this project
     const existingLessons = db.prepare(`
       SELECT COUNT(*) as count FROM editorial_lessons
       WHERE project_id = ? AND book_id = ?
     `).get(report.project_id, bookRow.id) as any;
 
-    // Parse the stored results
-    const betaSwarm = report.beta_swarm_results ? JSON.parse(report.beta_swarm_results) : null;
-    const ruthlessEditor = report.ruthless_editor_results ? JSON.parse(report.ruthless_editor_results) : null;
-    const marketAnalyst = report.market_analyst_results ? JSON.parse(report.market_analyst_results) : null;
-    const recommendations = report.recommendations ? JSON.parse(report.recommendations) : [];
+    let lessons: any[] = [];
 
-    // Build the VEB report structure for extraction
-    const vebReportData = {
-      ruthlessEditor: ruthlessEditor ? {
-        chapterResults: ruthlessEditor.chapterResults,
-        summaryVerdict: ruthlessEditor.summaryVerdict,
-      } : undefined,
-      betaSwarm: betaSwarm ? {
-        chapterResults: betaSwarm.chapterResults,
-        summaryReaction: betaSwarm.summaryReaction,
-      } : undefined,
-      marketAnalyst: marketAnalyst ? {
-        hookAnalysis: marketAnalyst.hookAnalysis,
-        marketPositioning: marketAnalyst.marketPositioning,
-        agentNotes: marketAnalyst.summaryPitch,
-      } : undefined,
-      recommendations,
-      summary: report.summary,
-    };
+    if (report.report_type === 'veb') {
+      // Parse VEB results
+      const betaSwarm = report.beta_swarm_results ? JSON.parse(report.beta_swarm_results) : null;
+      const ruthlessEditor = report.ruthless_editor_results ? JSON.parse(report.ruthless_editor_results) : null;
+      const marketAnalyst = report.market_analyst_results ? JSON.parse(report.market_analyst_results) : null;
+      const recommendations = report.recommendations ? JSON.parse(report.recommendations) : [];
 
-    // Extract lessons
-    const lessons = editorialLessonsService.extractLessonsFromVEB(
-      report.project_id,
-      bookRow.id,
-      vebReportData
-    );
+      // Build the VEB report structure for extraction
+      const vebReportData = {
+        ruthlessEditor: ruthlessEditor ? {
+          chapterResults: ruthlessEditor.chapterResults,
+          summaryVerdict: ruthlessEditor.summaryVerdict,
+        } : undefined,
+        betaSwarm: betaSwarm ? {
+          chapterResults: betaSwarm.chapterResults,
+          summaryReaction: betaSwarm.summaryReaction,
+        } : undefined,
+        marketAnalyst: marketAnalyst ? {
+          hookAnalysis: marketAnalyst.hookAnalysis,
+          marketPositioning: marketAnalyst.marketPositioning,
+          agentNotes: marketAnalyst.summaryPitch,
+        } : undefined,
+        recommendations,
+        summary: report.summary,
+      };
+
+      // Extract lessons from VEB
+      lessons = editorialLessonsService.extractLessonsFromVEB(
+        report.project_id,
+        bookRow.id,
+        vebReportData
+      );
+    } else if (report.report_type === 'outline_editorial') {
+      // Parse Outline Editorial results
+      const structureAnalyst = report.structure_analyst_results ? JSON.parse(report.structure_analyst_results) : null;
+      const characterArc = report.character_arc_results ? JSON.parse(report.character_arc_results) : null;
+      const marketFit = report.market_fit_results ? JSON.parse(report.market_fit_results) : null;
+      const recommendations = report.recommendations ? JSON.parse(report.recommendations) : [];
+
+      // Extract lessons from key findings in outline editorial
+      // Structure lessons
+      if (structureAnalyst?.pacing_issues && structureAnalyst.pacing_issues.length >= 2) {
+        lessons.push(editorialLessonsService.createLesson({
+          projectId: report.project_id,
+          bookId: bookRow.id,
+          category: 'pacing',
+          title: 'Address outline pacing issues',
+          description: `${structureAnalyst.pacing_issues.length} pacing issues identified in outline structure. Review scene distribution and tension arc.`,
+          sourceModule: 'ruthless_editor',
+          severityLevel: 'moderate',
+        }));
+      }
+
+      // Character arc lessons
+      if (characterArc?.weak_arcs && characterArc.weak_arcs.length > 0) {
+        lessons.push(editorialLessonsService.createLesson({
+          projectId: report.project_id,
+          bookId: bookRow.id,
+          category: 'character',
+          title: 'Strengthen character arcs',
+          description: `Character arc weaknesses identified: ${characterArc.weak_arcs.map((a: any) => a.character || a).join(', ')}. Ensure clear transformation and motivation.`,
+          sourceModule: 'beta_swarm',
+          severityLevel: 'major',
+        }));
+      }
+
+      // Market fit lessons
+      if (marketFit?.genre_alignment_score && marketFit.genre_alignment_score < 7) {
+        lessons.push(editorialLessonsService.createLesson({
+          projectId: report.project_id,
+          bookId: bookRow.id,
+          category: 'market',
+          title: 'Improve genre alignment',
+          description: `Genre alignment score is ${marketFit.genre_alignment_score}/10. Review genre conventions and reader expectations.`,
+          sourceModule: 'market_analyst',
+          severityLevel: 'moderate',
+        }));
+      }
+
+      // Add recommendations as lessons
+      if (recommendations && recommendations.length > 0) {
+        for (const rec of recommendations.slice(0, 3)) {
+          const recText = typeof rec === 'string' ? rec : rec.text || rec.recommendation || '';
+          if (recText) {
+            lessons.push(editorialLessonsService.createLesson({
+              projectId: report.project_id,
+              bookId: bookRow.id,
+              category: 'other',
+              title: 'Outline recommendation',
+              description: recText,
+              sourceModule: 'ruthless_editor',
+              severityLevel: 'moderate',
+            }));
+          }
+        }
+      }
+    }
 
     logger.info({
       reportId,
+      reportType: report.report_type,
       projectId: report.project_id,
       bookId: bookRow.id,
       lessonsExtracted: lessons.length,
@@ -454,11 +534,12 @@ router.post('/import-from-report/:reportId', async (req, res) => {
     res.json({
       success: true,
       reportId,
+      reportType: report.report_type,
       projectId: report.project_id,
       lessonsImported: lessons.length,
       previousLessonsCount: existingLessons.count,
       message: lessons.length > 0
-        ? `Successfully imported ${lessons.length} lessons from the editorial report`
+        ? `Successfully imported ${lessons.length} lessons from the ${report.report_type === 'veb' ? 'manuscript review' : 'outline review'}`
         : 'No lessons could be extracted from this report (thresholds not met)',
     });
   } catch (error) {
@@ -470,40 +551,88 @@ router.post('/import-from-report/:reportId', async (req, res) => {
 /**
  * GET /api/editorial-lessons/reports-available
  * Get list of editorial reports that can have lessons imported
+ * Includes both VEB (manuscript) and Outline Editorial reports
  */
 router.get('/reports-available', async (_req, res) => {
   try {
-    // Get all completed editorial reports with their lesson counts
-    const reports = db.prepare(`
-      SELECT
-        er.id,
-        er.project_id,
-        er.overall_score,
-        er.summary,
-        er.created_at,
-        er.completed_at,
-        p.title as project_title,
-        (SELECT COUNT(*) FROM editorial_lessons el WHERE el.project_id = er.project_id) as lesson_count,
-        CASE
-          WHEN er.beta_swarm_results IS NOT NULL THEN 1 ELSE 0
-        END +
-        CASE
-          WHEN er.ruthless_editor_results IS NOT NULL THEN 1 ELSE 0
-        END +
-        CASE
-          WHEN er.market_analyst_results IS NOT NULL THEN 1 ELSE 0
-        END as modules_completed
-      FROM editorial_reports er
-      JOIN projects p ON er.project_id = p.id
-      WHERE er.status = 'completed'
-      ORDER BY er.completed_at DESC
-    `).all() as any[];
+    const reports: any[] = [];
+
+    // Get VEB (manuscript review) reports
+    try {
+      const vebReports = db.prepare(`
+        SELECT
+          er.id,
+          er.project_id,
+          er.overall_score,
+          er.summary,
+          er.created_at,
+          er.completed_at,
+          p.title as project_title,
+          'veb' as report_type,
+          (SELECT COUNT(*) FROM editorial_lessons el WHERE el.project_id = er.project_id) as lesson_count,
+          CASE
+            WHEN er.beta_swarm_results IS NOT NULL THEN 1 ELSE 0
+          END +
+          CASE
+            WHEN er.ruthless_editor_results IS NOT NULL THEN 1 ELSE 0
+          END +
+          CASE
+            WHEN er.market_analyst_results IS NOT NULL THEN 1 ELSE 0
+          END as modules_completed
+        FROM editorial_reports er
+        JOIN projects p ON er.project_id = p.id
+        WHERE er.status = 'completed'
+      `).all() as any[];
+      reports.push(...vebReports);
+    } catch (e) {
+      logger.warn({ error: e }, 'Could not fetch VEB reports - table may not exist');
+    }
+
+    // Get Outline Editorial reports
+    try {
+      const outlineReports = db.prepare(`
+        SELECT
+          oer.id,
+          oer.project_id,
+          oer.overall_score,
+          oer.summary,
+          oer.created_at,
+          oer.completed_at,
+          p.title as project_title,
+          'outline_editorial' as report_type,
+          (SELECT COUNT(*) FROM editorial_lessons el WHERE el.project_id = oer.project_id) as lesson_count,
+          CASE
+            WHEN oer.structure_analyst_results IS NOT NULL THEN 1 ELSE 0
+          END +
+          CASE
+            WHEN oer.character_arc_results IS NOT NULL THEN 1 ELSE 0
+          END +
+          CASE
+            WHEN oer.market_fit_results IS NOT NULL THEN 1 ELSE 0
+          END as modules_completed
+        FROM outline_editorial_reports oer
+        JOIN projects p ON oer.project_id = p.id
+        WHERE oer.status = 'completed'
+      `).all() as any[];
+      reports.push(...outlineReports);
+    } catch (e) {
+      logger.warn({ error: e }, 'Could not fetch outline editorial reports - table may not exist');
+    }
+
+    // Sort by completed_at descending
+    reports.sort((a, b) => {
+      const dateA = new Date(a.completed_at || a.created_at).getTime();
+      const dateB = new Date(b.completed_at || b.created_at).getTime();
+      return dateB - dateA;
+    });
 
     res.json({
       reports: reports.map(r => ({
         id: r.id,
         projectId: r.project_id,
         projectTitle: r.project_title,
+        reportType: r.report_type,
+        reportTypeLabel: r.report_type === 'veb' ? 'Manuscript Review (VEB)' : 'Outline Review',
         overallScore: r.overall_score,
         summary: r.summary,
         createdAt: r.created_at,
