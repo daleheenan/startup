@@ -29,6 +29,7 @@ interface CoherenceResult {
   status?: string;
   error?: string;
   versionId?: string; // The version this check was performed against
+  isStale?: boolean; // True if this check is from a different version than the active one
 }
 
 interface BookVersion {
@@ -193,6 +194,7 @@ export default function QualityPage() {
             checkedAt: cachedResult.checkedAt,
             status: 'completed',
             versionId: cachedResult.versionId, // Track which version this check was for
+            isStale: cachedResult.isStale || false, // Backend marks stale results
           });
           setCheckStatus(null);
         } else if (cachedResult.status === 'failed') {
@@ -227,6 +229,7 @@ export default function QualityPage() {
             checkedAt: result.checkedAt,
             status: 'completed',
             versionId: result.versionId,
+            isStale: result.isStale || false,
           });
           setChecking(false);
           setCheckStatus(null);
@@ -483,8 +486,8 @@ export default function QualityPage() {
           </div>
         )}
 
-        {/* Version Mismatch Warning - show if: we have results AND active version AND (no versionId on result OR versionId doesn't match) */}
-        {coherenceResult && activeVersionId && (!coherenceResult.versionId || coherenceResult.versionId !== activeVersionId) && (
+        {/* Version Mismatch Warning - show if: backend marks as stale OR version IDs don't match */}
+        {coherenceResult && (coherenceResult.isStale || (activeVersionId && (!coherenceResult.versionId || coherenceResult.versionId !== activeVersionId))) && (
           <div style={{
             padding: '0.75rem 1rem',
             background: '#FEF3C7',

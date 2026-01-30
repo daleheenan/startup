@@ -307,7 +307,8 @@ router.get('/:id/coherence-check', (req, res) => {
       });
     }
 
-    const latestCheck = db.prepare<[string, string | null, string | null], any>(`
+    // First, try to find a check for the current active version
+    const matchingCheck = db.prepare<[string, string | null, string | null], any>(`
       SELECT * FROM coherence_checks
       WHERE project_id = ?
         AND (version_id = ? OR (version_id IS NULL AND ? IS NULL))
@@ -315,14 +316,39 @@ router.get('/:id/coherence-check', (req, res) => {
       LIMIT 1
     `).get(projectId, activeVersionId, activeVersionId);
 
-    if (!latestCheck) {
+    if (matchingCheck) {
+      // Found a check for the current version
       return res.json({
-        status: 'none',
-        message: 'No coherence check has been run for this project version',
+        status: matchingCheck.status,
+        checkedAt: matchingCheck.checked_at,
+        isCoherent: matchingCheck.is_coherent === 1,
+        warnings: safeJsonParse(matchingCheck.warnings, []),
+        suggestions: safeJsonParse(matchingCheck.suggestions, []),
+        plotAnalysis: safeJsonParse(matchingCheck.plot_analysis, []),
+        error: matchingCheck.error,
+        versionId: matchingCheck.version_id,
         activeVersionId,
       });
     }
 
+    // No check for current version - look for most recent check from any version
+    // This allows the frontend to show "stale results" warning
+    const latestCheck = db.prepare<[string], any>(`
+      SELECT * FROM coherence_checks
+      WHERE project_id = ?
+      ORDER BY checked_at DESC
+      LIMIT 1
+    `).get(projectId);
+
+    if (!latestCheck) {
+      return res.json({
+        status: 'none',
+        message: 'No coherence check has been run for this project',
+        activeVersionId,
+      });
+    }
+
+    // Return the stale check with isStale flag so frontend knows it's from a different version
     res.json({
       status: latestCheck.status,
       checkedAt: latestCheck.checked_at,
@@ -333,6 +359,7 @@ router.get('/:id/coherence-check', (req, res) => {
       error: latestCheck.error,
       versionId: latestCheck.version_id,
       activeVersionId,
+      isStale: true, // Explicitly mark as stale since it's from a different version
     });
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack }, 'Error fetching coherence check');
