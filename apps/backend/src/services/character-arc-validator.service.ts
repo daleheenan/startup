@@ -81,9 +81,9 @@ export class CharacterArcValidatorService {
   async analyseCharacterArc(bookId: string, characterId?: string): Promise<CharacterArcResult> {
     logger.info({ bookId, characterId }, '[CharacterArcValidator] Analysing character arcs');
 
-    // Get book info
+    // Get book info including project_id for cost tracking
     const bookStmt = db.prepare(`
-      SELECT id, title, genre FROM books WHERE id = ?
+      SELECT id, title, genre, project_id FROM books WHERE id = ?
     `);
     const book = bookStmt.get(bookId) as any;
 
@@ -199,7 +199,9 @@ Provide your character arc analysis as JSON.`;
         temperature: 0.7,
         tracking: {
           requestType: AI_REQUEST_TYPES.COHERENCE_CHECK,
-          contextSummary: `Character arc analysis for ${character.name}`,
+          projectId: book.project_id,
+          bookId: bookId,
+          contextSummary: `Character arc analysis for ${character.name} in "${book.title}"`,
         },
       });
 
@@ -228,7 +230,7 @@ Provide your character arc analysis as JSON.`;
     }
 
     // Detect inciting incident timing
-    const incitingIncidentAnalysis = await this.detectIncitingIncident(bookId, chapters.slice(0, 5)); // Check first 5 chapters
+    const incitingIncidentAnalysis = await this.detectIncitingIncident(bookId, book.project_id, chapters.slice(0, 5)); // Check first 5 chapters
 
     logger.info({
       bookId,
@@ -279,7 +281,7 @@ Provide your character arc analysis as JSON.`;
   /**
    * Detect inciting incident and verify it occurs by Chapter 3
    */
-  private async detectIncitingIncident(bookId: string, earlyChapters: any[]): Promise<{ chapter?: number }> {
+  private async detectIncitingIncident(bookId: string, projectId: string, earlyChapters: any[]): Promise<{ chapter?: number }> {
     logger.info({ bookId }, '[CharacterArcValidator] Detecting inciting incident');
 
     if (earlyChapters.length === 0) {
@@ -325,6 +327,8 @@ Provide your analysis as JSON.`;
       temperature: 0.5,
       tracking: {
         requestType: AI_REQUEST_TYPES.COHERENCE_CHECK,
+        projectId: projectId,
+        bookId: bookId,
         contextSummary: `Inciting incident detection for book ${bookId}`,
       },
     });

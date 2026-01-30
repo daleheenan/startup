@@ -57,10 +57,10 @@ export class OpeningHookValidatorService {
   async analyseOpeningHook(bookId: string): Promise<OpeningHookResult> {
     logger.info({ bookId }, '[OpeningHookValidator] Analysing opening hook');
 
-    // Get the first chapter content
+    // Get the first chapter content along with project ID for cost tracking
     const chapterStmt = db.prepare(`
       SELECT c.id, c.chapter_number, c.content, c.title,
-             b.title as book_title, b.genre
+             b.title as book_title, b.genre, b.project_id
       FROM chapters c
       JOIN books b ON c.book_id = b.id
       WHERE c.book_id = ?
@@ -135,7 +135,10 @@ Provide your analysis as JSON.`;
       temperature: 0.7,
       tracking: {
         requestType: AI_REQUEST_TYPES.OPENING_REVIEW,
-        contextSummary: 'Opening hook analysis',
+        projectId: firstChapter.project_id,
+        bookId: bookId,
+        chapterId: firstChapter.id,
+        contextSummary: `Opening hook analysis for "${firstChapter.book_title}"`,
       },
     });
 

@@ -63,6 +63,11 @@ export class TensionArcValidatorService {
   async analyseTensionArc(bookId: string): Promise<TensionArcResult> {
     logger.info({ bookId }, '[TensionArcValidator] Analysing tension arc');
 
+    // Get project ID for cost tracking
+    const bookStmt = db.prepare(`SELECT project_id FROM books WHERE id = ?`);
+    const book = bookStmt.get(bookId) as { project_id: string } | undefined;
+    const projectId = book?.project_id;
+
     // Get all chapters for the book
     const chaptersStmt = db.prepare(`
       SELECT c.id, c.chapter_number, c.content, c.title,
@@ -122,6 +127,9 @@ Provide your analysis as JSON.`;
         temperature: 0.5,
         tracking: {
           requestType: AI_REQUEST_TYPES.COHERENCE_CHECK,
+          projectId: projectId,
+          bookId: bookId,
+          chapterId: chapter.id,
           contextSummary: `Tension analysis for chapter ${chapter.chapter_number}`,
         },
       });
