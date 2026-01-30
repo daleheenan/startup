@@ -51,7 +51,8 @@ export default function ChaptersPage() {
 
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);  // Initial page load
+  const [chaptersLoading, setChaptersLoading] = useState(false);  // Chapters being fetched
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -93,14 +94,14 @@ export default function ChaptersPage() {
         return;
       }
 
-      setLoading(true);
+      setChaptersLoading(true);
       const bookChapters = await fetchChaptersForBook(effectiveBookId, versionId);
       console.log('[Chapters] Fetched chapters:', bookChapters.length);
       setChapters(bookChapters);
     } catch (err: any) {
       console.error('Error fetching chapters for version:', err);
     } finally {
-      setLoading(false);
+      setChaptersLoading(false);
     }
   };
 
@@ -112,7 +113,7 @@ export default function ChaptersPage() {
   // Fetch only project and book metadata (not chapters) on initial load
   const fetchProjectAndBooksOnly = async () => {
     try {
-      setLoading(true);
+      setInitialLoading(true);
 
       // Fetch project info
       const projectRes = await fetchWithAuth(`/api/projects/${projectId}`);
@@ -147,20 +148,20 @@ export default function ChaptersPage() {
         // No progress data
       }
 
-      // Set loading to false so the page renders and the BookVersionSelector can load
+      // Set initialLoading to false so the page renders and the BookVersionSelector can load
       // The version selector will trigger chapter loading via onVersionChange callback
-      setLoading(false);
+      setInitialLoading(false);
     } catch (err: any) {
       console.error('Error fetching project/books:', err);
       setError(err.message || 'Failed to load project');
-      setLoading(false);
+      setInitialLoading(false);
     }
   };
 
   // Refetch chapters when BOOK selection changes (not version - that's handled by onVersionChange)
   const fetchChaptersData = async () => {
     try {
-      setLoading(true);
+      setChaptersLoading(true);
 
       // Use optimised endpoint to fetch project, books, and chapters in a single request
       // This fixes the N+1 query problem (was making N API calls for N books)
@@ -210,7 +211,7 @@ export default function ChaptersPage() {
       console.error('Error fetching chapters:', err);
       setError(err.message || 'Failed to load chapters');
     } finally {
-      setLoading(false);
+      setChaptersLoading(false);
     }
   };
 
@@ -281,14 +282,15 @@ export default function ChaptersPage() {
     return book ? `${book.title} (Book ${book.book_number})` : 'Unknown Book';
   };
 
-  if (loading) {
+  // Only show full-page loading during initial load (before version selector can mount)
+  if (initialLoading) {
     return (
       <DashboardLayout
         header={{ title: project?.title || 'Loading...', subtitle: 'Chapters' }}
         projectId={projectId}
       >
         <div style={{ padding: spacing[8], textAlign: 'center' }}>
-          <p style={{ color: colors.text.secondary }}>Loading chapters...</p>
+          <p style={{ color: colors.text.secondary }}>Loading project...</p>
         </div>
       </DashboardLayout>
     );
@@ -502,7 +504,7 @@ export default function ChaptersPage() {
                     console.log('[Chapters] Version has no chapters, showing no data state');
                     setSelectedVersionHasNoData(true);
                     setChapters([]);
-                    setLoading(false);
+                    setChaptersLoading(false);
                   } else {
                     console.log('[Chapters] Version has chapters, fetching...');
                     setSelectedVersionHasNoData(false);
@@ -594,8 +596,15 @@ export default function ChaptersPage() {
         </div>
       )}
 
+      {/* Loading indicator for chapters */}
+      {chaptersLoading && (
+        <div style={{ padding: spacing[8], textAlign: 'center' }}>
+          <p style={{ color: colors.text.secondary }}>Loading chapters...</p>
+        </div>
+      )}
+
       {/* Chapters List */}
-      {!selectedVersionHasNoData && filteredChapters.length === 0 ? (
+      {!chaptersLoading && !selectedVersionHasNoData && filteredChapters.length === 0 ? (
         <div
           style={{
             background: colors.background.surface,
@@ -630,7 +639,7 @@ export default function ChaptersPage() {
             </button>
           )}
         </div>
-      ) : !selectedVersionHasNoData && (
+      ) : !chaptersLoading && !selectedVersionHasNoData && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[4] }}>
           {filteredChapters.map((chapter) => {
             const statusInfo = getStatusInfo(chapter);
