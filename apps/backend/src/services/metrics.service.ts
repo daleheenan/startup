@@ -52,7 +52,6 @@ export interface AIRequestLogRecord {
   id: string;
   request_type: string;
   project_id: string | null;
-  book_id: string | null;
   chapter_id: string | null;
   input_tokens: number;
   output_tokens: number;
@@ -65,14 +64,12 @@ export interface AIRequestLogRecord {
   created_at: string;
   // Joined fields
   project_name?: string;
-  book_name?: string;
   series_id?: string;
   series_name?: string;
 }
 
 export interface AIRequestLogFilters {
   projectId?: string;
-  bookId?: string;
   seriesId?: string;
   requestType?: string;
   startDate?: string;
@@ -419,19 +416,19 @@ class MetricsService {
       const totalCostGBP = totalCostUSD * PRICING.USD_TO_GBP;
 
       // Insert log entry
+      // Note: book_id column doesn't exist in migration 051 - only project_id and chapter_id
       const insertStmt = db.prepare(`
         INSERT INTO ai_request_log (
-          id, request_type, project_id, book_id, chapter_id,
+          id, request_type, project_id, chapter_id,
           input_tokens, output_tokens, cost_usd, cost_gbp,
           model_used, success, error_message, context_summary, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       insertStmt.run(
         id,
         entry.requestType,
         entry.projectId || null,
-        entry.bookId || null,
         entry.chapterId || null,
         entry.inputTokens,
         entry.outputTokens,
@@ -590,8 +587,12 @@ class MetricsService {
           totalRequests: summaryRow?.total_requests || 0,
         },
       };
-    } catch (error) {
-      logger.error({ error, filters }, 'Error getting AI request log');
+    } catch (error: any) {
+      logger.error({
+        error: error?.message || error,
+        code: error?.code,
+        filters
+      }, 'Error getting AI request log');
       return {
         entries: [],
         total: 0,
