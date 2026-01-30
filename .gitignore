@@ -30,9 +30,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# npm lockfiles (this is a pnpm monorepo)
-package-lock.json
-**/package-lock.json
+# npm lockfiles at root (this is a pnpm monorepo)
+# But allow app-specific lockfiles for Railway deployment
+/package-lock.json
 
 # Local env files
 .env
