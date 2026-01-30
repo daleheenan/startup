@@ -229,6 +229,107 @@ router.get('/projects/:projectId/prompt', (req, res) => {
 });
 
 /**
+ * GET /api/editorial-lessons/reports-available
+ * Get list of editorial reports that can have lessons imported
+ * Includes both VEB (manuscript) and Outline Editorial reports
+ * NOTE: This route MUST be defined before /:lessonId to avoid matching "reports-available" as a lessonId
+ */
+router.get('/reports-available', async (_req, res) => {
+  try {
+    const reports: any[] = [];
+
+    // Get VEB (manuscript review) reports
+    try {
+      const vebReports = db.prepare(`
+        SELECT
+          er.id,
+          er.project_id,
+          er.overall_score,
+          er.summary,
+          er.created_at,
+          er.completed_at,
+          p.title as project_title,
+          'veb' as report_type,
+          (SELECT COUNT(*) FROM editorial_lessons el WHERE el.project_id = er.project_id) as lesson_count,
+          CASE
+            WHEN er.beta_swarm_results IS NOT NULL THEN 1 ELSE 0
+          END +
+          CASE
+            WHEN er.ruthless_editor_results IS NOT NULL THEN 1 ELSE 0
+          END +
+          CASE
+            WHEN er.market_analyst_results IS NOT NULL THEN 1 ELSE 0
+          END as modules_completed
+        FROM editorial_reports er
+        JOIN projects p ON er.project_id = p.id
+        WHERE er.status = 'completed'
+      `).all() as any[];
+      reports.push(...vebReports);
+    } catch (e) {
+      logger.warn({ error: e }, 'Could not fetch VEB reports - table may not exist');
+    }
+
+    // Get Outline Editorial reports
+    try {
+      const outlineReports = db.prepare(`
+        SELECT
+          oer.id,
+          oer.project_id,
+          oer.overall_score,
+          oer.summary,
+          oer.created_at,
+          oer.completed_at,
+          p.title as project_title,
+          'outline_editorial' as report_type,
+          (SELECT COUNT(*) FROM editorial_lessons el WHERE el.project_id = oer.project_id) as lesson_count,
+          CASE
+            WHEN oer.structure_analyst_results IS NOT NULL THEN 1 ELSE 0
+          END +
+          CASE
+            WHEN oer.character_arc_results IS NOT NULL THEN 1 ELSE 0
+          END +
+          CASE
+            WHEN oer.market_fit_results IS NOT NULL THEN 1 ELSE 0
+          END as modules_completed
+        FROM outline_editorial_reports oer
+        JOIN projects p ON oer.project_id = p.id
+        WHERE oer.status = 'completed'
+      `).all() as any[];
+      reports.push(...outlineReports);
+    } catch (e) {
+      logger.warn({ error: e }, 'Could not fetch outline editorial reports - table may not exist');
+    }
+
+    // Sort by completed_at descending
+    reports.sort((a, b) => {
+      const dateA = new Date(a.completed_at || a.created_at).getTime();
+      const dateB = new Date(b.completed_at || b.created_at).getTime();
+      return dateB - dateA;
+    });
+
+    res.json({
+      reports: reports.map(r => ({
+        id: r.id,
+        projectId: r.project_id,
+        projectTitle: r.project_title,
+        reportType: r.report_type,
+        reportTypeLabel: r.report_type === 'veb' ? 'Manuscript Review (VEB)' : 'Outline Review',
+        overallScore: r.overall_score,
+        summary: r.summary,
+        createdAt: r.created_at,
+        completedAt: r.completed_at,
+        modulesCompleted: r.modules_completed,
+        existingLessonCount: r.lesson_count,
+      })),
+      total: reports.length,
+    });
+  } catch (error) {
+    logger.error({ error }, 'Failed to get available reports');
+    return sendInternalError(res, error, 'get available reports');
+  }
+});
+
+/**
  * GET /api/editorial-lessons/:lessonId
  * Get a specific lesson
  */
@@ -545,106 +646,6 @@ router.post('/import-from-report/:reportId', async (req, res) => {
   } catch (error) {
     logger.error({ error, reportId }, 'Failed to import lessons from report');
     return sendInternalError(res, error, 'import lessons from report');
-  }
-});
-
-/**
- * GET /api/editorial-lessons/reports-available
- * Get list of editorial reports that can have lessons imported
- * Includes both VEB (manuscript) and Outline Editorial reports
- */
-router.get('/reports-available', async (_req, res) => {
-  try {
-    const reports: any[] = [];
-
-    // Get VEB (manuscript review) reports
-    try {
-      const vebReports = db.prepare(`
-        SELECT
-          er.id,
-          er.project_id,
-          er.overall_score,
-          er.summary,
-          er.created_at,
-          er.completed_at,
-          p.title as project_title,
-          'veb' as report_type,
-          (SELECT COUNT(*) FROM editorial_lessons el WHERE el.project_id = er.project_id) as lesson_count,
-          CASE
-            WHEN er.beta_swarm_results IS NOT NULL THEN 1 ELSE 0
-          END +
-          CASE
-            WHEN er.ruthless_editor_results IS NOT NULL THEN 1 ELSE 0
-          END +
-          CASE
-            WHEN er.market_analyst_results IS NOT NULL THEN 1 ELSE 0
-          END as modules_completed
-        FROM editorial_reports er
-        JOIN projects p ON er.project_id = p.id
-        WHERE er.status = 'completed'
-      `).all() as any[];
-      reports.push(...vebReports);
-    } catch (e) {
-      logger.warn({ error: e }, 'Could not fetch VEB reports - table may not exist');
-    }
-
-    // Get Outline Editorial reports
-    try {
-      const outlineReports = db.prepare(`
-        SELECT
-          oer.id,
-          oer.project_id,
-          oer.overall_score,
-          oer.summary,
-          oer.created_at,
-          oer.completed_at,
-          p.title as project_title,
-          'outline_editorial' as report_type,
-          (SELECT COUNT(*) FROM editorial_lessons el WHERE el.project_id = oer.project_id) as lesson_count,
-          CASE
-            WHEN oer.structure_analyst_results IS NOT NULL THEN 1 ELSE 0
-          END +
-          CASE
-            WHEN oer.character_arc_results IS NOT NULL THEN 1 ELSE 0
-          END +
-          CASE
-            WHEN oer.market_fit_results IS NOT NULL THEN 1 ELSE 0
-          END as modules_completed
-        FROM outline_editorial_reports oer
-        JOIN projects p ON oer.project_id = p.id
-        WHERE oer.status = 'completed'
-      `).all() as any[];
-      reports.push(...outlineReports);
-    } catch (e) {
-      logger.warn({ error: e }, 'Could not fetch outline editorial reports - table may not exist');
-    }
-
-    // Sort by completed_at descending
-    reports.sort((a, b) => {
-      const dateA = new Date(a.completed_at || a.created_at).getTime();
-      const dateB = new Date(b.completed_at || b.created_at).getTime();
-      return dateB - dateA;
-    });
-
-    res.json({
-      reports: reports.map(r => ({
-        id: r.id,
-        projectId: r.project_id,
-        projectTitle: r.project_title,
-        reportType: r.report_type,
-        reportTypeLabel: r.report_type === 'veb' ? 'Manuscript Review (VEB)' : 'Outline Review',
-        overallScore: r.overall_score,
-        summary: r.summary,
-        createdAt: r.created_at,
-        completedAt: r.completed_at,
-        modulesCompleted: r.modules_completed,
-        existingLessonCount: r.lesson_count,
-      })),
-      total: reports.length,
-    });
-  } catch (error) {
-    logger.error({ error }, 'Failed to get available reports');
-    return sendInternalError(res, error, 'get available reports');
   }
 });
 
