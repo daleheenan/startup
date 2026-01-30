@@ -50,7 +50,9 @@ export default function BookVersionSelector({
     fetchVersions(true);
   }, [bookId]);
 
-  const fetchVersions = async (notifyParent = false) => {
+  // explicitVersionId: when provided, use this version instead of auto-selecting
+  // This is used when user explicitly changes version via dropdown
+  const fetchVersions = async (notifyParent = false, explicitVersionId?: string) => {
     try {
       setIsLoading(true);
       const token = getToken();
@@ -68,29 +70,22 @@ export default function BookVersionSelector({
       const allVersions = data.versions || [];
       setVersions(allVersions);
 
-      // Find the best version to display:
-      // 1. First, check the active version
-      // 2. If active version has no content, prefer a version with content
-      const activeVersion = allVersions.find((v: BookVersion) => v.is_active === 1);
-      const versionWithContent = allVersions.find((v: BookVersion) => {
-        const chapterCount = v.actual_chapter_count ?? v.chapter_count ?? 0;
-        return chapterCount > 0;
-      });
+      // Find the active version (marked in DB)
+      const dbActiveVersion = allVersions.find((v: BookVersion) => v.is_active === 1);
 
-      // On initial load only, auto-select version with content if active version is empty
-      let selectedVersion = activeVersion;
-      if (notifyParent && activeVersion) {
-        const activeChapterCount = activeVersion.actual_chapter_count ?? activeVersion.chapter_count ?? 0;
-        if (activeChapterCount === 0 && versionWithContent) {
-          // Active version is empty but there's a version with content
-          // Auto-select the version with content instead
-          selectedVersion = versionWithContent;
-        }
+      let selectedVersion: BookVersion | null = null;
+
+      if (explicitVersionId) {
+        // User explicitly selected a version - respect their choice
+        selectedVersion = allVersions.find((v: BookVersion) => v.id === explicitVersionId) || dbActiveVersion;
+      } else {
+        // No explicit selection - use the database's active version
+        selectedVersion = dbActiveVersion;
       }
 
       setActiveVersion(selectedVersion || null);
 
-      // Notify parent of the selected version on initial load
+      // Notify parent of the selected version
       if (notifyParent && selectedVersion && onVersionChange) {
         onVersionChange(selectedVersion);
       }
@@ -126,9 +121,9 @@ export default function BookVersionSelector({
         throw new Error(data.error?.message || 'Failed to switch version');
       }
 
-      // Refresh versions and notify parent with fresh data
-      // Pass true to notify parent so they get the updated version info with correct chapter counts
-      await fetchVersions(true);
+      // Refresh versions and notify parent with the explicitly selected version
+      // Pass the versionId to ensure user's selection is respected
+      await fetchVersions(true, versionId);
     } catch (err: any) {
       setError(err.message);
     } finally {
