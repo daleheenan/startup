@@ -476,40 +476,27 @@ export default function QualityPage() {
           </div>
         )}
 
-        {/* Version Mismatch Warning - show if: backend marks as stale OR version IDs don't match */}
-        {coherenceResult && (() => {
-          const activeVersion = versions.find(v => v.id === activeVersionId);
-          const activeChapterCount = activeVersion?.actual_chapter_count ?? activeVersion?.chapter_count ?? 0;
-          // Only consider results stale if backend says so OR if version IDs genuinely don't match
-          const isVersionMismatch = coherenceResult.isStale || (activeVersionId && coherenceResult.versionId && coherenceResult.versionId !== activeVersionId);
-          // Only show zero chapters warning if results are from a DIFFERENT version (i.e., already stale)
-          const hasZeroChaptersWithResults = isVersionMismatch && activeChapterCount === 0 && coherenceResult.status === 'completed';
-
-          if (!isVersionMismatch) return null;
-
-          return (
-            <div style={{
-              padding: '0.75rem 1rem',
-              background: '#FEF3C7',
-              border: '1px solid #FDE68A',
-              borderRadius: borderRadius.md,
-              marginBottom: '1rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-            }}>
-              <span style={{ fontSize: '1.25rem' }}>⚠️</span>
-              <div style={{ flex: 1 }}>
-                <span style={{ fontWeight: 600, color: '#92400E' }}>Stale Results: </span>
-                <span style={{ color: '#B45309' }}>
-                  {hasZeroChaptersWithResults
-                    ? 'The active version has no chapters yet. These results are from a previous version. Click "Re-check" after adding chapters.'
-                    : 'This quality check was run on a previous version. Click "Re-check" to analyse the current active version.'}
-                </span>
-              </div>
+        {/* Version Mismatch Warning - show only when backend marks results as stale */}
+        {coherenceResult?.isStale && (
+          <div style={{
+            padding: '0.75rem 1rem',
+            background: '#FEF3C7',
+            border: '1px solid #FDE68A',
+            borderRadius: borderRadius.md,
+            marginBottom: '1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+          }}>
+            <span style={{ fontSize: '1.25rem' }}>⚠️</span>
+            <div style={{ flex: 1 }}>
+              <span style={{ fontWeight: 600, color: '#92400E' }}>Stale Results: </span>
+              <span style={{ color: '#B45309' }}>
+                This quality check was run on a previous version. Click &quot;Re-check&quot; to analyse the current active version.
+              </span>
             </div>
-          );
-        })()}
+          </div>
+        )}
 
         {/* No Plots Warning */}
         {plotLayers.length === 0 && (
@@ -546,10 +533,8 @@ export default function QualityPage() {
 
         {/* Coherence Status Card */}
         {plotLayers.length > 0 && (() => {
-          // Determine if results are stale - only based on version mismatch, not chapter count alone
-          // Only consider results stale if backend says so OR if version IDs genuinely don't match
-          const isVersionMismatch = coherenceResult?.isStale || (activeVersionId && coherenceResult?.versionId && coherenceResult.versionId !== activeVersionId);
-          const resultsAreStale = isVersionMismatch;
+          // Only trust the backend's isStale flag - it knows if the check was run on a different version
+          const resultsAreStale = coherenceResult?.isStale === true;
 
           // Don't show positive/negative styling if results are stale
           const showAsCoherent = coherenceResult?.isCoherent === true && !resultsAreStale;
