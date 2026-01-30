@@ -83,14 +83,20 @@ export default function ChaptersPage() {
   // bookIdOverride allows passing the book ID directly to avoid race conditions with state
   const fetchChaptersForVersion = async (versionId: string, bookIdOverride?: string) => {
     try {
-      setLoading(true);
       // Use override if provided, otherwise use first book
       const effectiveBookId = bookIdOverride || books[0]?.id;
 
-      if (effectiveBookId) {
-        const bookChapters = await fetchChaptersForBook(effectiveBookId, versionId);
-        setChapters(bookChapters);
+      console.log('[Chapters] fetchChaptersForVersion called:', { versionId, bookIdOverride, effectiveBookId, booksCount: books.length });
+
+      if (!effectiveBookId) {
+        console.warn('[Chapters] No effective book ID, cannot fetch chapters');
+        return;
       }
+
+      setLoading(true);
+      const bookChapters = await fetchChaptersForBook(effectiveBookId, versionId);
+      console.log('[Chapters] Fetched chapters:', bookChapters.length);
+      setChapters(bookChapters);
     } catch (err: any) {
       console.error('Error fetching chapters for version:', err);
     } finally {
@@ -483,6 +489,8 @@ export default function ChaptersPage() {
                 bookId={books[0]?.id}
                 compact={true}
                 onVersionChange={(version) => {
+                  console.log('[Chapters] onVersionChange called:', { versionId: version.id, versionNumber: version.version_number, actualChapterCount: (version as any).actual_chapter_count, chapterCount: version.chapter_count, bookId: books[0]?.id });
+
                   setSelectedVersionId(version.id);
                   setVersionLoaded(true);
 
@@ -491,10 +499,12 @@ export default function ChaptersPage() {
 
                   // If version has no chapters, show "no data" state
                   if (actualChapterCount === 0) {
+                    console.log('[Chapters] Version has no chapters, showing no data state');
                     setSelectedVersionHasNoData(true);
                     setChapters([]);
                     setLoading(false);
                   } else {
+                    console.log('[Chapters] Version has chapters, fetching...');
                     setSelectedVersionHasNoData(false);
                     // Fetch chapters for this version
                     fetchChaptersForVersion(version.id, books[0]?.id);
