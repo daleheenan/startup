@@ -49,6 +49,18 @@ interface LessonStats {
   avgEffectiveness: number;
 }
 
+interface AvailableReport {
+  id: string;
+  projectId: string;
+  projectTitle: string;
+  overallScore: number;
+  summary: string;
+  createdAt: string;
+  completedAt: string;
+  modulesCompleted: number;
+  existingLessonCount: number;
+}
+
 const categoryLabels: Record<string, string> = {
   pacing: 'Pacing',
   exposition: 'Exposition',
@@ -98,6 +110,10 @@ export default function LessonsSettingsPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [expandedLesson, setExpandedLesson] = useState<string | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [availableReports, setAvailableReports] = useState<AvailableReport[]>([]);
+  const [importingReportId, setImportingReportId] = useState<string | null>(null);
+  const [importResult, setImportResult] = useState<{ success: boolean; message: string } | null>(null);
 
   useEffect(() => {
     fetchLessons();
@@ -129,6 +145,66 @@ export default function LessonsSettingsPage() {
       console.error('Error fetching lessons:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAvailableReports = async () => {
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE_URL}/api/editorial-lessons/reports-available`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAvailableReports(data.reports || []);
+      }
+    } catch (error) {
+      console.error('Error fetching available reports:', error);
+    }
+  };
+
+  const handleOpenImportModal = async () => {
+    setImportResult(null);
+    await fetchAvailableReports();
+    setShowImportModal(true);
+  };
+
+  const handleImportFromReport = async (reportId: string) => {
+    setImportingReportId(reportId);
+    setImportResult(null);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE_URL}/api/editorial-lessons/import-from-report/${reportId}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setImportResult({
+          success: true,
+          message: data.message || `Imported ${data.lessonsImported} lessons`,
+        });
+        // Refresh lessons and reports
+        await fetchLessons();
+        await fetchAvailableReports();
+      } else {
+        setImportResult({
+          success: false,
+          message: data.error || 'Failed to import lessons',
+        });
+      }
+    } catch (error) {
+      setImportResult({
+        success: false,
+        message: 'Network error while importing lessons',
+      });
+    } finally {
+      setImportingReportId(null);
     }
   };
 
@@ -282,41 +358,62 @@ export default function LessonsSettingsPage() {
           </div>
         </div>
 
-        {/* Tabs */}
+        {/* Tabs and Import Button */}
         <div style={{
           display: 'flex',
-          gap: '0.5rem',
+          justifyContent: 'space-between',
+          alignItems: 'center',
           marginBottom: '1rem',
           borderBottom: '1px solid #E2E8F0',
           paddingBottom: '0.5rem',
         }}>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              onClick={() => { setActiveTab('editorial'); setCategoryFilter('all'); setSourceFilter('all'); }}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: activeTab === 'editorial' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'transparent',
+                color: activeTab === 'editorial' ? 'white' : '#64748B',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontWeight: activeTab === 'editorial' ? '600' : '400',
+              }}
+            >
+              Editorial Lessons ({editorialLessons.length})
+            </button>
+            <button
+              onClick={() => { setActiveTab('agent'); setCategoryFilter('all'); setSourceFilter('all'); }}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: activeTab === 'agent' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'transparent',
+                color: activeTab === 'agent' ? 'white' : '#64748B',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontWeight: activeTab === 'agent' ? '600' : '400',
+              }}
+            >
+              Agent Lessons ({agentLessons.length})
+            </button>
+          </div>
           <button
-            onClick={() => { setActiveTab('editorial'); setCategoryFilter('all'); setSourceFilter('all'); }}
+            onClick={handleOpenImportModal}
             style={{
-              padding: '0.75rem 1.5rem',
-              background: activeTab === 'editorial' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'transparent',
-              color: activeTab === 'editorial' ? 'white' : '#64748B',
+              padding: '0.5rem 1rem',
+              background: '#10B981',
+              color: 'white',
               border: 'none',
               borderRadius: '6px',
               cursor: 'pointer',
-              fontWeight: activeTab === 'editorial' ? '600' : '400',
+              fontWeight: '500',
+              fontSize: '0.875rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
             }}
           >
-            Editorial Lessons ({editorialLessons.length})
-          </button>
-          <button
-            onClick={() => { setActiveTab('agent'); setCategoryFilter('all'); setSourceFilter('all'); }}
-            style={{
-              padding: '0.75rem 1.5rem',
-              background: activeTab === 'agent' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'transparent',
-              color: activeTab === 'agent' ? 'white' : '#64748B',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: activeTab === 'agent' ? '600' : '400',
-            }}
-          >
-            Agent Lessons ({agentLessons.length})
+            <span>+</span> Import from Report
           </button>
         </div>
 
@@ -627,6 +724,145 @@ export default function LessonsSettingsPage() {
             The system learns from each book to improve the next one&apos;s first draft quality.
           </p>
         </div>
+
+        {/* Import from Report Modal */}
+        {showImportModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}>
+            <div style={{
+              background: 'white',
+              borderRadius: '12px',
+              padding: '1.5rem',
+              maxWidth: '600px',
+              width: '90%',
+              maxHeight: '80vh',
+              overflow: 'auto',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#1A1A2E' }}>
+                  Import Lessons from Editorial Report
+                </h2>
+                <button
+                  onClick={() => setShowImportModal(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    fontSize: '1.5rem',
+                    cursor: 'pointer',
+                    color: '#64748B',
+                  }}
+                >
+                  &times;
+                </button>
+              </div>
+
+              <p style={{ color: '#64748B', fontSize: '0.875rem', marginBottom: '1rem' }}>
+                Select an editorial report to extract lessons from. This is useful for reports created before
+                automatic lesson extraction was implemented.
+              </p>
+
+              {importResult && (
+                <div style={{
+                  padding: '0.75rem 1rem',
+                  borderRadius: '6px',
+                  marginBottom: '1rem',
+                  background: importResult.success ? '#D1FAE5' : '#FEE2E2',
+                  color: importResult.success ? '#059669' : '#DC2626',
+                  fontSize: '0.875rem',
+                }}>
+                  {importResult.message}
+                </div>
+              )}
+
+              {availableReports.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#64748B' }}>
+                  No completed editorial reports found.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {availableReports.map((report) => (
+                    <div
+                      key={report.id}
+                      style={{
+                        border: '1px solid #E2E8F0',
+                        borderRadius: '8px',
+                        padding: '1rem',
+                        background: '#FAFAFA',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: '600', color: '#1A1A2E', marginBottom: '0.25rem' }}>
+                            {report.projectTitle}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: '#64748B', marginBottom: '0.5rem' }}>
+                            Score: {report.overallScore}/100 | {report.modulesCompleted}/3 modules |{' '}
+                            {formatDate(report.completedAt)}
+                          </div>
+                          {report.existingLessonCount > 0 && (
+                            <div style={{
+                              fontSize: '0.75rem',
+                              color: '#059669',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                            }}>
+                              <span>&#10003;</span> {report.existingLessonCount} lessons already imported
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleImportFromReport(report.id)}
+                          disabled={importingReportId === report.id}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            background: importingReportId === report.id ? '#9CA3AF' : '#667eea',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: importingReportId === report.id ? 'not-allowed' : 'pointer',
+                            fontWeight: '500',
+                            fontSize: '0.75rem',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {importingReportId === report.id ? 'Importing...' : 'Import Lessons'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setShowImportModal(false)}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: '#E2E8F0',
+                    color: '#475569',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: '500',
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

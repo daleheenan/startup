@@ -1298,6 +1298,51 @@ Output only valid JSON, no commentary:`;
         status: report.status
       }, 'veb_finalize: Completed report finalization');
 
+      // Extract lessons learned from the VEB report for future book generation
+      try {
+        const { editorialLessonsService } = await import('../services/editorial-lessons.service.js');
+
+        // Get book ID for this project
+        const bookRow = db.prepare<[string], { id: string }>(`
+          SELECT b.id FROM books b WHERE b.project_id = ? ORDER BY b.book_number LIMIT 1
+        `).get(report.projectId);
+
+        if (bookRow) {
+          const vebReportData = {
+            ruthlessEditor: report.ruthlessEditor ? {
+              chapterResults: report.ruthlessEditor.chapterResults,
+              summaryVerdict: report.ruthlessEditor.summaryVerdict,
+            } : undefined,
+            betaSwarm: report.betaSwarm ? {
+              chapterResults: report.betaSwarm.chapterResults,
+              summaryReaction: report.betaSwarm.summaryReaction,
+            } : undefined,
+            marketAnalyst: report.marketAnalyst ? {
+              hookAnalysis: report.marketAnalyst.hookAnalysis,
+              marketPositioning: report.marketAnalyst.marketPositioning,
+              agentNotes: report.marketAnalyst.summaryPitch,
+            } : undefined,
+            recommendations: report.recommendations,
+            summary: report.summary,
+          };
+
+          const lessons = editorialLessonsService.extractLessonsFromVEB(
+            report.projectId,
+            bookRow.id,
+            vebReportData
+          );
+
+          logger.info({
+            reportId,
+            projectId: report.projectId,
+            lessonsExtracted: lessons.length
+          }, 'veb_finalize: Extracted lessons from VEB report');
+        }
+      } catch (lessonError) {
+        // Log but don't fail the job if lesson extraction fails
+        logger.warn({ error: lessonError, reportId }, 'veb_finalize: Failed to extract lessons (non-fatal)');
+      }
+
       checkpointManager.saveCheckpoint(job.id, 'completed', { reportId });
     } catch (error) {
       logger.error({ error, reportId }, 'veb_finalize: Error finalizing report');
