@@ -112,6 +112,7 @@ export default function LessonCurationPage() {
     description: string;
   } | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [applyingBulk, setApplyingBulk] = useState<string | null>(null);
 
   useEffect(() => {
     fetchStats();
@@ -283,6 +284,124 @@ export default function LessonCurationPage() {
     }
   };
 
+  const applyAllSuggestions = async (action: 'all' | 'duplicates' | 'book-specific' | 'approve') => {
+    if (!analysisResult) return;
+
+    setApplyingBulk(action);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE_URL}/api/lesson-curation/apply-suggestions`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          suggestions: analysisResult.suggestions,
+          archiveDuplicates: action === 'all' || action === 'duplicates',
+          generaliseBookSpecific: action === 'all' || action === 'book-specific',
+          approveClean: action === 'all' || action === 'approve',
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setActionMessage({ type: 'success', text: data.message });
+        setAnalysisResult(null);
+        fetchStats();
+        fetchLessons();
+      } else {
+        setActionMessage({ type: 'error', text: 'Failed to apply suggestions' });
+      }
+    } catch (error) {
+      console.error('Error applying suggestions:', error);
+      setActionMessage({ type: 'error', text: 'Failed to apply suggestions' });
+    } finally {
+      setApplyingBulk(null);
+    }
+  };
+
+  const bulkArchiveDuplicates = async () => {
+    if (!analysisResult) return;
+
+    const duplicateIds = analysisResult.suggestions
+      .filter(s => s.suggestedStatus === 'duplicate')
+      .map(s => s.lessonId);
+
+    if (duplicateIds.length === 0) {
+      setActionMessage({ type: 'error', text: 'No duplicates to archive' });
+      return;
+    }
+
+    setApplyingBulk('duplicates');
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE_URL}/api/lesson-curation/bulk-archive`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          lessonIds: duplicateIds,
+          notes: 'Bulk archived as duplicate',
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setActionMessage({ type: 'success', text: data.message });
+        setAnalysisResult(null);
+        fetchStats();
+        fetchLessons();
+      }
+    } catch (error) {
+      console.error('Error bulk archiving duplicates:', error);
+      setActionMessage({ type: 'error', text: 'Failed to archive duplicates' });
+    } finally {
+      setApplyingBulk(null);
+    }
+  };
+
+  const bulkGeneraliseBookSpecific = async () => {
+    if (!analysisResult) return;
+
+    const bookSpecificIds = analysisResult.suggestions
+      .filter(s => s.isBookSpecific)
+      .map(s => s.lessonId);
+
+    if (bookSpecificIds.length === 0) {
+      setActionMessage({ type: 'error', text: 'No book-specific lessons to generalise' });
+      return;
+    }
+
+    setApplyingBulk('book-specific');
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE_URL}/api/lesson-curation/bulk-generalise`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ lessonIds: bookSpecificIds }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setActionMessage({ type: 'success', text: data.message });
+        setAnalysisResult(null);
+        fetchStats();
+        fetchLessons();
+      }
+    } catch (error) {
+      console.error('Error bulk generalising:', error);
+      setActionMessage({ type: 'error', text: 'Failed to generalise lessons' });
+    } finally {
+      setApplyingBulk(null);
+    }
+  };
+
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return 'Never';
     return new Date(dateStr).toLocaleDateString('en-GB', {
@@ -447,9 +566,26 @@ export default function LessonCurationPage() {
               marginBottom: '1.5rem',
             }}
           >
-            <h3 style={{ margin: '0 0 1rem 0', color: '#0369A1', fontSize: '1rem' }}>
-              Analysis Results
-            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, color: '#0369A1', fontSize: '1rem' }}>
+                Analysis Results
+              </h3>
+              <button
+                onClick={() => setAnalysisResult(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '1.25rem',
+                  color: '#64748B',
+                  padding: '0',
+                  lineHeight: 1,
+                }}
+              >
+                &times;
+              </button>
+            </div>
+
             <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
               <div>
                 <strong>{analysisResult.totalLessons}</strong> lessons analysed
@@ -463,6 +599,88 @@ export default function LessonCurationPage() {
               <div>
                 <strong>{analysisResult.readyForApproval}</strong> ready to approve
               </div>
+            </div>
+
+            {/* Bulk Action Buttons */}
+            <div
+              style={{
+                display: 'flex',
+                gap: '0.75rem',
+                flexWrap: 'wrap',
+                marginBottom: '1rem',
+                padding: '1rem',
+                background: 'white',
+                borderRadius: '8px',
+                border: '1px solid #BAE6FD',
+              }}
+            >
+              <button
+                onClick={() => applyAllSuggestions('all')}
+                disabled={applyingBulk !== null || analysisResult.suggestions.length === 0}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: applyingBulk === 'all' ? '#9CA3AF' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: applyingBulk !== null ? 'not-allowed' : 'pointer',
+                  fontWeight: '600',
+                  fontSize: '0.875rem',
+                }}
+              >
+                {applyingBulk === 'all' ? 'Applying...' : 'Apply All Recommendations'}
+              </button>
+
+              <button
+                onClick={bulkArchiveDuplicates}
+                disabled={applyingBulk !== null || analysisResult.duplicateGroups.length === 0}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: applyingBulk === 'duplicates' ? '#9CA3AF' : '#FEE2E2',
+                  color: applyingBulk === 'duplicates' ? 'white' : '#DC2626',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: applyingBulk !== null || analysisResult.duplicateGroups.length === 0 ? 'not-allowed' : 'pointer',
+                  fontWeight: '500',
+                  fontSize: '0.875rem',
+                }}
+              >
+                {applyingBulk === 'duplicates' ? 'Archiving...' : `Archive ${analysisResult.suggestions.filter(s => s.suggestedStatus === 'duplicate').length} Duplicates`}
+              </button>
+
+              <button
+                onClick={bulkGeneraliseBookSpecific}
+                disabled={applyingBulk !== null || analysisResult.bookSpecificCount === 0}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: applyingBulk === 'book-specific' ? '#9CA3AF' : '#EDE9FE',
+                  color: applyingBulk === 'book-specific' ? 'white' : '#7C3AED',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: applyingBulk !== null || analysisResult.bookSpecificCount === 0 ? 'not-allowed' : 'pointer',
+                  fontWeight: '500',
+                  fontSize: '0.875rem',
+                }}
+              >
+                {applyingBulk === 'book-specific' ? 'Generalising...' : `Generalise ${analysisResult.bookSpecificCount} Book-Specific`}
+              </button>
+
+              <button
+                onClick={() => applyAllSuggestions('approve')}
+                disabled={applyingBulk !== null || analysisResult.readyForApproval === 0}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: applyingBulk === 'approve' ? '#9CA3AF' : '#D1FAE5',
+                  color: applyingBulk === 'approve' ? 'white' : '#059669',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: applyingBulk !== null || analysisResult.readyForApproval === 0 ? 'not-allowed' : 'pointer',
+                  fontWeight: '500',
+                  fontSize: '0.875rem',
+                }}
+              >
+                {applyingBulk === 'approve' ? 'Approving...' : `Approve ${analysisResult.readyForApproval} Clean Lessons`}
+              </button>
             </div>
 
             {analysisResult.suggestions.length > 0 && (

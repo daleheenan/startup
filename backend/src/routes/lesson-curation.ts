@@ -253,4 +253,160 @@ router.post('/detect-book-specific', (req, res) => {
   }
 });
 
+/**
+ * POST /api/lesson-curation/bulk-archive
+ * Archive multiple lessons at once
+ */
+router.post('/bulk-archive', (req, res) => {
+  const { lessonIds, notes } = req.body;
+
+  if (!lessonIds || !Array.isArray(lessonIds) || lessonIds.length === 0) {
+    return sendBadRequest(res, 'lessonIds array is required');
+  }
+
+  try {
+    let archived = 0;
+    for (const id of lessonIds) {
+      try {
+        lessonCurationService.applyCurationDecision(id, {
+          status: 'archived',
+          notes: notes || 'Bulk archived',
+        });
+        archived++;
+      } catch (err) {
+        logger.warn({ lessonId: id, error: err }, 'Failed to archive lesson in bulk operation');
+      }
+    }
+
+    res.json({
+      success: true,
+      requested: lessonIds.length,
+      archived,
+      message: `Archived ${archived} of ${lessonIds.length} lessons`,
+    });
+  } catch (error) {
+    logger.error({ error, count: lessonIds.length }, 'Failed to bulk archive');
+    return sendInternalError(res, error, 'bulk archive');
+  }
+});
+
+/**
+ * POST /api/lesson-curation/bulk-generalise
+ * Generalise multiple book-specific lessons at once
+ */
+router.post('/bulk-generalise', async (req, res) => {
+  const { lessonIds } = req.body;
+
+  if (!lessonIds || !Array.isArray(lessonIds) || lessonIds.length === 0) {
+    return sendBadRequest(res, 'lessonIds array is required');
+  }
+
+  try {
+    let generalised = 0;
+    const errors: Array<{ lessonId: string; error: string }> = [];
+
+    for (const id of lessonIds) {
+      try {
+        await lessonCurationService.applyGeneralisation(id);
+        generalised++;
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : 'Unknown error';
+        logger.warn({ lessonId: id, error: err }, 'Failed to generalise lesson in bulk operation');
+        errors.push({ lessonId: id, error: errMsg });
+      }
+    }
+
+    res.json({
+      success: true,
+      requested: lessonIds.length,
+      generalised,
+      errors: errors.length > 0 ? errors : undefined,
+      message: `Generalised ${generalised} of ${lessonIds.length} lessons`,
+    });
+  } catch (error) {
+    logger.error({ error, count: lessonIds.length }, 'Failed to bulk generalise');
+    return sendInternalError(res, error, 'bulk generalise');
+  }
+});
+
+/**
+ * POST /api/lesson-curation/apply-suggestions
+ * Apply all suggestions from analysis results
+ */
+router.post('/apply-suggestions', async (req, res) => {
+  const { suggestions, archiveDuplicates, generaliseBookSpecific, approveClean } = req.body;
+
+  if (!suggestions || !Array.isArray(suggestions)) {
+    return sendBadRequest(res, 'suggestions array is required');
+  }
+
+  try {
+    const results = {
+      archived: 0,
+      generalised: 0,
+      approved: 0,
+      errors: [] as Array<{ lessonId: string; action: string; error: string }>,
+    };
+
+    // Process duplicates first (archive them)
+    if (archiveDuplicates) {
+      const duplicates = suggestions.filter(s => s.suggestedStatus === 'duplicate');
+      for (const dup of duplicates) {
+        try {
+          lessonCurationService.applyCurationDecision(dup.lessonId, {
+            status: 'archived',
+            duplicateOfId: dup.duplicateOfId,
+            similarityScore: dup.similarityScore,
+            notes: `Duplicate of ${dup.duplicateOfId} (${((dup.similarityScore || 0) * 100).toFixed(0)}% match)`,
+          });
+          results.archived++;
+        } catch (err) {
+          results.errors.push({
+            lessonId: dup.lessonId,
+            action: 'archive',
+            error: err instanceof Error ? err.message : 'Unknown error',
+          });
+        }
+      }
+    }
+
+    // Process book-specific lessons (generalise them)
+    if (generaliseBookSpecific) {
+      const bookSpecific = suggestions.filter(s => s.isBookSpecific && s.suggestedStatus === 'needs_generalisation');
+      for (const bs of bookSpecific) {
+        try {
+          await lessonCurationService.applyGeneralisation(bs.lessonId);
+          results.generalised++;
+        } catch (err) {
+          results.errors.push({
+            lessonId: bs.lessonId,
+            action: 'generalise',
+            error: err instanceof Error ? err.message : 'Unknown error',
+          });
+        }
+      }
+    }
+
+    // Approve clean lessons (not flagged)
+    if (approveClean) {
+      const cleanIds = suggestions
+        .filter(s => s.suggestedStatus === 'approved')
+        .map(s => s.lessonId);
+
+      if (cleanIds.length > 0) {
+        results.approved = lessonCurationService.batchApprove(cleanIds);
+      }
+    }
+
+    res.json({
+      success: true,
+      ...results,
+      message: `Applied suggestions: ${results.archived} archived, ${results.generalised} generalised, ${results.approved} approved`,
+    });
+  } catch (error) {
+    logger.error({ error }, 'Failed to apply suggestions');
+    return sendInternalError(res, error, 'apply suggestions');
+  }
+});
+
 export default router;
