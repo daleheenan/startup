@@ -55,7 +55,7 @@ export default function ChaptersPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [selectedBook, setSelectedBook] = useState<string>('all');
+  // Note: Book selector removed - page always uses first book (projects are single-book)
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [project, setProject] = useState<any>(null);
   const [hasQueuedJobs, setHasQueuedJobs] = useState(false);
@@ -65,13 +65,16 @@ export default function ChaptersPage() {
 
   // Fetch chapters for a specific book with optional version filter
   const fetchChaptersForBook = useCallback(async (bookId: string, versionId?: string | null) => {
-    let url = `/api/books/${bookId}/chapters`;
+    // Use the correct endpoint: /api/chapters/book/:bookId
+    let url = `/api/chapters/book/${bookId}`;
     if (versionId) {
       url += `?versionId=${versionId}`;
     }
     const chaptersRes = await fetchWithAuth(url);
     if (chaptersRes.ok) {
-      return await chaptersRes.json() as Chapter[];
+      const data = await chaptersRes.json();
+      // API returns { chapters: [...] } or just an array
+      return (data.chapters || data) as Chapter[];
     }
     return [];
   }, []);
@@ -81,12 +84,8 @@ export default function ChaptersPage() {
   const fetchChaptersForVersion = async (versionId: string, bookIdOverride?: string) => {
     try {
       setLoading(true);
-      // Use override if provided, otherwise calculate from state
-      const effectiveBookId = bookIdOverride || (
-        selectedBook === 'all' && books.length === 1
-          ? books[0].id
-          : selectedBook !== 'all' ? selectedBook : books[0]?.id
-      );
+      // Use override if provided, otherwise use first book
+      const effectiveBookId = bookIdOverride || books[0]?.id;
 
       if (effectiveBookId) {
         const bookChapters = await fetchChaptersForBook(effectiveBookId, versionId);
@@ -153,46 +152,6 @@ export default function ChaptersPage() {
   };
 
   // Refetch chapters when BOOK selection changes (not version - that's handled by onVersionChange)
-  // Only run after initial version load is complete
-  useEffect(() => {
-    if (books.length === 0 || !versionLoaded) return;
-
-    // Only refetch when book filter changes (not on initial load or version change)
-    const refetchChapters = async () => {
-      // Skip if we're still in "no data" state from version
-      if (selectedVersionHasNoData) return;
-
-      try {
-        const effectiveBookId = selectedBook === 'all' && books.length === 1
-          ? books[0].id
-          : selectedBook;
-
-        if (effectiveBookId === 'all') {
-          // For multi-book "all" view, fetch all chapters
-          const booksWithChaptersRes = await fetchWithAuth(`/api/projects/${projectId}/books-with-chapters`);
-          if (booksWithChaptersRes.ok) {
-            const data = await booksWithChaptersRes.json();
-            const allChapters: Chapter[] = data.books.flatMap((book: any) =>
-              book.chapters.map((ch: any) => ({
-                ...ch,
-                book_id: book.id,
-              }))
-            );
-            setChapters(allChapters);
-          }
-        } else if (selectedVersionId) {
-          // Fetch chapters for selected book with version filter
-          const bookChapters = await fetchChaptersForBook(effectiveBookId, selectedVersionId);
-          setChapters(bookChapters);
-        }
-      } catch (err: any) {
-        console.error('Error refetching chapters:', err);
-      }
-    };
-
-    refetchChapters();
-  }, [selectedBook]); // Only trigger on book selection change, not version
-
   const fetchChaptersData = async () => {
     try {
       setLoading(true);
@@ -263,11 +222,6 @@ export default function ChaptersPage() {
     if (statusFilter !== 'all') {
       if (chapter.is_locked && statusFilter !== 'locked') return false;
       if (!chapter.is_locked && chapter.status !== statusFilter) return false;
-    }
-
-    // Book filter
-    if (selectedBook !== 'all' && chapter.book_id !== selectedBook) {
-      return false;
     }
 
     return true;
@@ -511,49 +465,8 @@ export default function ChaptersPage() {
             </select>
           </div>
 
-          {/* Book Filter */}
-          {books.length > 1 && (
-            <div>
-              <label
-                htmlFor="book-filter"
-                style={{
-                  display: 'block',
-                  fontSize: typography.fontSize.sm,
-                  fontWeight: typography.fontWeight.medium,
-                  color: colors.text.secondary,
-                  marginBottom: spacing[2],
-                }}
-              >
-                Book
-              </label>
-              <select
-                id="book-filter"
-                value={selectedBook}
-                onChange={(e) => {
-                  setSelectedBook(e.target.value);
-                  setSelectedVersionId(null); // Reset version when changing book
-                }}
-                style={{
-                  width: '100%',
-                  padding: spacing[3],
-                  border: `1px solid ${colors.border.default}`,
-                  borderRadius: borderRadius.md,
-                  fontSize: typography.fontSize.base,
-                  color: colors.text.primary,
-                }}
-              >
-                <option value="all">All Books</option>
-                {books.map((book) => (
-                  <option key={book.id} value={book.id}>
-                    Book {book.book_number}: {book.title}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Version Selector - show when a specific book is selected OR when there's only one book */}
-          {(selectedBook !== 'all' || books.length === 1) && books.length > 0 && (
+          {/* Version Selector - always show when we have books */}
+          {books.length > 0 && (
             <div>
               <label
                 style={{
@@ -567,7 +480,7 @@ export default function ChaptersPage() {
                 Version
               </label>
               <BookVersionSelector
-                bookId={selectedBook !== 'all' ? selectedBook : books[0]?.id}
+                bookId={books[0]?.id}
                 compact={true}
                 onVersionChange={(version) => {
                   setSelectedVersionId(version.id);
@@ -576,9 +489,6 @@ export default function ChaptersPage() {
                   // Get the actual chapter count for this version
                   const actualChapterCount = (version as any).actual_chapter_count ?? (version as any).chapter_count ?? 0;
 
-                  // Determine the book ID directly to avoid state race conditions
-                  const effectiveBookId = selectedBook !== 'all' ? selectedBook : books[0]?.id;
-
                   // If version has no chapters, show "no data" state
                   if (actualChapterCount === 0) {
                     setSelectedVersionHasNoData(true);
@@ -586,8 +496,8 @@ export default function ChaptersPage() {
                     setLoading(false);
                   } else {
                     setSelectedVersionHasNoData(false);
-                    // Fetch chapters for this version, passing book ID directly
-                    fetchChaptersForVersion(version.id, effectiveBookId);
+                    // Fetch chapters for this version
+                    fetchChaptersForVersion(version.id, books[0]?.id);
                   }
                 }}
               />
@@ -595,14 +505,12 @@ export default function ChaptersPage() {
           )}
 
           {/* Clear Filters */}
-          {(searchQuery || statusFilter !== 'all' || selectedBook !== 'all') && (
+          {(searchQuery || statusFilter !== 'all') && (
             <div style={{ display: 'flex', alignItems: 'flex-end' }}>
               <button
                 onClick={() => {
                   setSearchQuery('');
                   setStatusFilter('all');
-                  setSelectedBook('all');
-                  setSelectedVersionId(null);
                 }}
                 style={{
                   padding: `${spacing[3]} ${spacing[5]}`,
@@ -688,16 +596,15 @@ export default function ChaptersPage() {
           }}
         >
           <p style={{ color: colors.text.secondary, marginBottom: spacing[4] }}>
-            {searchQuery || statusFilter !== 'all' || selectedBook !== 'all'
+            {searchQuery || statusFilter !== 'all'
               ? 'No chapters match your filters'
               : 'No chapters found'}
           </p>
-          {(searchQuery || statusFilter !== 'all' || selectedBook !== 'all') && (
+          {(searchQuery || statusFilter !== 'all') && (
             <button
               onClick={() => {
                 setSearchQuery('');
                 setStatusFilter('all');
-                setSelectedBook('all');
               }}
               style={{
                 padding: `${spacing[3]} ${spacing[6]}`,
