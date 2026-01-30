@@ -16,6 +16,7 @@ const navItems = [
   { id: 'characters', label: 'Characters', href: '/characters' },
   { id: 'world', label: 'World', href: '/world' },
   { id: 'plot', label: 'Plot', href: '/plot' },
+  { id: 'quality', label: 'Quality', href: '/quality' },
   { id: 'outline', label: 'Outline', href: '/outline' },
   { id: 'chapters', label: 'Chapters', href: '/chapters' },
   { id: 'versions', label: 'Versions', href: '/versions' },
