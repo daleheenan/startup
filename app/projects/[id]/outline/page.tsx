@@ -109,6 +109,10 @@ export default function OutlinePage() {
     existingWordCount: number;
   } | null>(null);
 
+  // Version selection state - tracks the selected version for filtering data
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const [selectedVersionHasNoData, setSelectedVersionHasNoData] = useState(false);
+
   // Act management state
   const [editingActNumber, setEditingActNumber] = useState<number | null>(null);
   const [editedActData, setEditedActData] = useState<{ name: string; description: string } | null>(null);
@@ -134,10 +138,12 @@ export default function OutlinePage() {
     }
   }, [projectId]);
 
-  const loadData = async () => {
+  const loadData = async (versionId?: string | null) => {
     try {
       setIsLoading(true);
       const token = getToken();
+      // Use provided versionId or fall back to state
+      const effectiveVersionId = versionId !== undefined ? versionId : selectedVersionId;
 
       const projectRes = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
         headers: {
@@ -210,9 +216,14 @@ export default function OutlinePage() {
           // No outline yet
         }
 
-        // Check if chapters already exist
+        // Check if chapters already exist for this version
         try {
-          const chaptersRes = await fetch(`${API_BASE_URL}/api/chapters/book/${bookId}`, {
+          // Build URL with optional version filter
+          let chaptersUrl = `${API_BASE_URL}/api/chapters/book/${bookId}`;
+          if (effectiveVersionId) {
+            chaptersUrl += `?versionId=${effectiveVersionId}`;
+          }
+          const chaptersRes = await fetch(chaptersUrl, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -654,9 +665,25 @@ export default function OutlinePage() {
               }}>
                 <BookVersionSelector
                   bookId={book.id}
-                  onVersionChange={() => {
-                    // Reload data when version changes
-                    loadData();
+                  onVersionChange={(version) => {
+                    // Track selected version and check if it has data
+                    setSelectedVersionId(version.id);
+
+                    // Check if this version has any chapters (actual data)
+                    const actualChapterCount = (version as any).actual_chapter_count ?? (version as any).chapter_count ?? 0;
+                    const hasOutlineSnapshot = !!(version as any).outline_snapshot;
+
+                    // If version has no chapters and no outline snapshot, show "no data" message
+                    if (actualChapterCount === 0 && !hasOutlineSnapshot) {
+                      setSelectedVersionHasNoData(true);
+                      setOutline(null);
+                      setChaptersExist(false);
+                      setHasQueuedJobs(false);
+                    } else {
+                      setSelectedVersionHasNoData(false);
+                      // Reload data with the selected version ID
+                      loadData(version.id);
+                    }
                   }}
                 />
               </div>
@@ -672,6 +699,29 @@ export default function OutlinePage() {
                 color: '#DC2626',
               }}>
                 {error}
+              </div>
+            )}
+
+            {/* Message when selected version has no outline data yet */}
+            {selectedVersionHasNoData && (
+              <div style={{
+                background: '#FEF3C7',
+                border: '1px solid #FCD34D',
+                borderRadius: '12px',
+                padding: '2rem',
+                marginBottom: '1.5rem',
+                textAlign: 'center',
+              }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📝</div>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#92400E', marginBottom: '0.5rem' }}>
+                  No Outline Data for This Version
+                </h3>
+                <p style={{ color: '#92400E', fontSize: '0.875rem', marginBottom: '1rem' }}>
+                  This version hasn&apos;t been generated yet. You need to select a story structure and generate the outline before chapter content can be created.
+                </p>
+                <p style={{ color: '#92400E', fontSize: '0.813rem', opacity: 0.8 }}>
+                  Use the options below to configure and generate your story outline.
+                </p>
               </div>
             )}
 

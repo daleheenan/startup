@@ -7,9 +7,9 @@
  * - Overview (standalone)
  * - Edit Story (standalone)
  * - Elements: Characters, World, Images
- * - Story: Plot, Outline, Prose Style
- * - Novel: Chapters, Versions, Analytics, Follow-up
- * - Editorial: Editorial Board, Word Count, Outline Review
+ * - Story: Plot, Quality, Outline, Prose Style
+ * - Novel: Chapters, Versions, Follow-up
+ * - Editorial: Editorial Board, Analytics, Word Count, Outline Review, Prose Quality, Bestseller
  * - Publishing (standalone)
  */
 
@@ -235,13 +235,6 @@ export const PROJECT_NAV_GROUPS: NavGroup[] = [
         workflowStep: 'versions',
       },
       {
-        id: 'analytics',
-        label: 'Analytics',
-        route: '/analytics',
-        icon: '📊',
-        workflowStep: 'analytics',
-      },
-      {
         id: 'novel-follow-up',
         label: 'Follow-up',
         route: '/follow-up',
@@ -261,6 +254,13 @@ export const PROJECT_NAV_GROUPS: NavGroup[] = [
         route: '/editorial-report',
         icon: '📋',
         workflowStep: 'editorial-report',
+      },
+      {
+        id: 'analytics',
+        label: 'Analytics',
+        route: '/analytics',
+        icon: '📊',
+        workflowStep: 'analytics',
       },
       {
         id: 'word-count-revision',

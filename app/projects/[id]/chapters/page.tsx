@@ -85,7 +85,12 @@ export default function ChaptersPage() {
 
     const refetchChapters = async () => {
       try {
-        if (selectedBook === 'all') {
+        // Determine the effective book ID - use first book if only one exists and 'all' is selected
+        const effectiveBookId = selectedBook === 'all' && books.length === 1
+          ? books[0].id
+          : selectedBook;
+
+        if (effectiveBookId === 'all') {
           // Use optimised endpoint to fetch all chapters in a single request
           const booksWithChaptersRes = await fetchWithAuth(`/api/projects/${projectId}/books-with-chapters`);
           if (booksWithChaptersRes.ok) {
@@ -99,8 +104,8 @@ export default function ChaptersPage() {
             setChapters(allChapters);
           }
         } else {
-          // Fetch chapters for selected book with optional version
-          const bookChapters = await fetchChaptersForBook(selectedBook, selectedVersionId);
+          // Fetch chapters for selected/single book with optional version
+          const bookChapters = await fetchChaptersForBook(effectiveBookId, selectedVersionId);
           setChapters(bookChapters);
         }
       } catch (err: any) {
@@ -470,8 +475,8 @@ export default function ChaptersPage() {
             </div>
           )}
 
-          {/* Version Selector - only show when a specific book is selected */}
-          {selectedBook !== 'all' && (
+          {/* Version Selector - show when a specific book is selected OR when there's only one book */}
+          {(selectedBook !== 'all' || books.length === 1) && books.length > 0 && (
             <div>
               <label
                 style={{
@@ -485,7 +490,7 @@ export default function ChaptersPage() {
                 Version
               </label>
               <BookVersionSelector
-                bookId={selectedBook}
+                bookId={selectedBook !== 'all' ? selectedBook : books[0]?.id}
                 compact={true}
                 onVersionChange={(version) => setSelectedVersionId(version.id)}
               />

@@ -128,6 +128,48 @@ export default function PlotLayersVisualization({
     return before.impact_level + (after.impact_level - before.impact_level) * ratio;
   };
 
+  // Check if there's any data to display
+  const hasNoData = plotLayers.length === 0;
+  const hasNoPoints = plotLayers.length > 0 && plotLayers.every(layer => !layer.points || layer.points.length === 0);
+
+  if (hasNoData) {
+    return (
+      <div style={{
+        width: '100%',
+        padding: '3rem 2rem',
+        background: '#F8FAFC',
+        borderRadius: '12px',
+        border: '1px solid #E2E8F0',
+        textAlign: 'center',
+      }}>
+        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📊</div>
+        <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#1A1A2E', marginBottom: '0.5rem' }}>
+          No Plot Layers Defined
+        </h3>
+        <p style={{ color: '#64748B', fontSize: '0.875rem', marginBottom: '1rem' }}>
+          Add plot layers to visualise your story structure across chapters.
+        </p>
+        {!readOnly && onAddLayer && (
+          <button
+            onClick={onAddLayer}
+            style={{
+              padding: '0.5rem 1rem',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              border: 'none',
+              borderRadius: '8px',
+              color: '#FFFFFF',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            + Add First Plot Layer
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div style={{ width: '100%' }}>
       {/* Legend */}
