@@ -542,7 +542,7 @@ class MetricsService {
       const entriesSql = `
         SELECT
           l.*,
-          p.name as project_name,
+          p.title as project_name,
           p.series_id,
           s.name as series_name
         FROM ai_request_log l
@@ -789,7 +789,7 @@ class MetricsService {
       const sql = `
         SELECT
           l.project_id,
-          p.name as project_name,
+          p.title as project_name,
           p.series_id,
           s.name as series_name,
           COALESCE(SUM(l.cost_usd), 0) as total_cost_usd,
