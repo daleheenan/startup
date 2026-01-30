@@ -42,20 +42,24 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: backend/package-lock.json
+          cache-dependency-path: apps/backend/package-lock.json
 
       - name: Install dependencies
-        working-directory: backend
+        working-directory: apps/backend
         run: npm ci
 
       - name: Build
-        working-directory: backend
+        working-directory: apps/backend
         run: npm run build
 
-      - name: Run tests
-        working-directory: backend
+      - name: Run unit tests
+        working-directory: apps/backend
         run: npm test
         continue-on-error: true
+
+      - name: Run integration tests
+        working-directory: apps/backend
+        run: npm run test:integration
 
   node-version-check:
     name: Verify Node Version Config
@@ -78,11 +82,11 @@ jobs:
             exit 1
           fi
           
-          if [ ! -f "backend/.nvmrc" ]; then
-            echo "ERROR: Missing backend/.nvmrc"
+          if [ ! -f "apps/backend/.nvmrc" ]; then
+            echo "ERROR: Missing apps/backend/.nvmrc"
             exit 1
           fi
-          BACKEND_NODE=$(cat backend/.nvmrc | tr -d '[:space:]')
+          BACKEND_NODE=$(cat apps/backend/.nvmrc | tr -d '[:space:]')
           if [ "$BACKEND_NODE" -lt 20 ]; then
             echo "ERROR: Backend .nvmrc must specify Node >= 20"
             exit 1
@@ -93,25 +97,25 @@ jobs:
       - name: Check package.json engines
         run: |
           echo "Checking package.json engine requirements..."
-          
+
           FRONTEND_ENGINE=$(node -e "console.log(require('./package.json').engines?.node || 'not set')")
           echo "Frontend engine: $FRONTEND_ENGINE"
-          
-          BACKEND_ENGINE=$(node -e "console.log(require('./backend/package.json').engines?.node || 'not set')")
+
+          BACKEND_ENGINE=$(node -e "console.log(require('./apps/backend/package.json').engines?.node || 'not set')")
           echo "Backend engine: $BACKEND_ENGINE"
 
       - name: Check nixpacks.toml
         run: |
           echo "Checking nixpacks.toml files..."
-          
+
           if [ ! -f "nixpacks.toml" ]; then
             echo "ERROR: Missing nixpacks.toml in root"
             exit 1
           fi
-          
-          if [ ! -f "backend/nixpacks.toml" ]; then
-            echo "ERROR: Missing backend/nixpacks.toml"
+
+          if [ ! -f "apps/backend/nixpacks.toml" ]; then
+            echo "ERROR: Missing apps/backend/nixpacks.toml"
             exit 1
           fi
-          
+
           echo "OK: nixpacks.toml files present"

@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc && cp src/db/schema.sql dist/db/ && cp -r src/db/migrations dist/db/",
+    "test:integration": "jest --config jest.config.cjs --testPathPattern=integration",
+    "test:ci": "jest --config jest.config.cjs --ci --passWithNoTests",
     "start": "node dist/server.js",
     "cli": "tsx src/cli.ts",
     "migrate": "tsx src/db/migrate.ts",
