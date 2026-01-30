@@ -210,8 +210,10 @@ export default function OutlinePage() {
 
   // Load version-specific data (outline, chapters, progress)
   // This should only be called after we know which version is active
-  const loadVersionData = async (versionId: string | null, versionChapterCount: number) => {
-    if (!book) return;
+  // bookIdOverride allows passing the book ID directly to avoid race conditions with state
+  const loadVersionData = async (versionId: string | null, versionChapterCount: number, bookIdOverride?: string) => {
+    const effectiveBookId = bookIdOverride || book?.id;
+    if (!effectiveBookId) return;
 
     try {
       const token = getToken();
@@ -230,7 +232,7 @@ export default function OutlinePage() {
 
       // Fetch outline for the book
       try {
-        const outlineRes = await fetch(`${API_BASE_URL}/api/outlines/book/${book.id}`, {
+        const outlineRes = await fetch(`${API_BASE_URL}/api/outlines/book/${effectiveBookId}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -246,7 +248,7 @@ export default function OutlinePage() {
 
       // Check if chapters already exist for this version
       try {
-        let chaptersUrl = `${API_BASE_URL}/api/chapters/book/${book.id}`;
+        let chaptersUrl = `${API_BASE_URL}/api/chapters/book/${effectiveBookId}`;
         if (versionId) {
           chaptersUrl += `?versionId=${versionId}`;
         }
@@ -770,7 +772,8 @@ export default function OutlinePage() {
                     const actualChapterCount = (version as any).actual_chapter_count ?? (version as any).chapter_count ?? 0;
 
                     // Load version-specific data (this will show "no data" if version has 0 chapters)
-                    loadVersionData(version.id, actualChapterCount);
+                    // Pass book.id directly to avoid race condition with React state
+                    loadVersionData(version.id, actualChapterCount, book.id);
                   }}
                 />
               </div>

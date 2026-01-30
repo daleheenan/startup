@@ -77,12 +77,16 @@ export default function ChaptersPage() {
   }, []);
 
   // Fetch chapters for a specific version (called when version is selected/loaded)
-  const fetchChaptersForVersion = async (versionId: string) => {
+  // bookIdOverride allows passing the book ID directly to avoid race conditions with state
+  const fetchChaptersForVersion = async (versionId: string, bookIdOverride?: string) => {
     try {
       setLoading(true);
-      const effectiveBookId = selectedBook === 'all' && books.length === 1
-        ? books[0].id
-        : selectedBook !== 'all' ? selectedBook : books[0]?.id;
+      // Use override if provided, otherwise calculate from state
+      const effectiveBookId = bookIdOverride || (
+        selectedBook === 'all' && books.length === 1
+          ? books[0].id
+          : selectedBook !== 'all' ? selectedBook : books[0]?.id
+      );
 
       if (effectiveBookId) {
         const bookChapters = await fetchChaptersForBook(effectiveBookId, versionId);
@@ -570,6 +574,9 @@ export default function ChaptersPage() {
                   // Get the actual chapter count for this version
                   const actualChapterCount = (version as any).actual_chapter_count ?? (version as any).chapter_count ?? 0;
 
+                  // Determine the book ID directly to avoid state race conditions
+                  const effectiveBookId = selectedBook !== 'all' ? selectedBook : books[0]?.id;
+
                   // If version has no chapters, show "no data" state
                   if (actualChapterCount === 0) {
                     setSelectedVersionHasNoData(true);
@@ -577,8 +584,8 @@ export default function ChaptersPage() {
                     setLoading(false);
                   } else {
                     setSelectedVersionHasNoData(false);
-                    // Fetch chapters for this version
-                    fetchChaptersForVersion(version.id);
+                    // Fetch chapters for this version, passing book ID directly
+                    fetchChaptersForVersion(version.id, effectiveBookId);
                   }
                 }}
               />

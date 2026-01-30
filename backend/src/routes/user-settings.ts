@@ -803,6 +803,28 @@ interface UserPreferences {
 }
 
 /**
+ * Ensure user_preferences table exists (handles edge case where table may be missing)
+ */
+function ensureUserPreferencesTable() {
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS user_preferences (
+        user_id TEXT PRIMARY KEY DEFAULT 'owner',
+        prose_style TEXT,
+        show_ai_costs_menu INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+    // Create default entry for owner user
+    db.exec(`INSERT OR IGNORE INTO user_preferences (user_id) VALUES ('owner')`);
+  } catch (e) {
+    // Table already exists or creation failed - log but don't throw
+    logger.warn({ error: (e as Error).message }, 'Could not ensure user_preferences table');
+  }
+}
+
+/**
  * GET /api/user-settings/preferences
  * Get all user preferences
  */
@@ -814,6 +836,9 @@ router.get('/preferences', (req, res) => {
     if (cached) {
       return res.json(cached);
     }
+
+    // Ensure table exists before querying
+    ensureUserPreferencesTable();
 
     const stmt = db.prepare<[string], { prose_style: string | null; show_ai_costs_menu: number | null }>(`
       SELECT prose_style, show_ai_costs_menu FROM user_preferences
