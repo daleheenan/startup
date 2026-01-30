@@ -12,8 +12,8 @@ MAINTENANCE RULES:
 
 ## Summary Statistics
 
-- **Total tasks completed**: 37
-- **Total lessons recorded**: 36
+- **Total tasks completed**: 38
+- **Total lessons recorded**: 37
 - **Last updated**: 2026-01-30
 - **Proven lessons** (score >= 5): 0
 - **Top themes**: #typescript #testing #patterns #frontend #backend #database #migrations #third-party-integration #performance #caching #mocking #jest #logging #structured-logging #pino #fullstack #prompts #claude-api #deployment #railway #ci-cd #ui-components #ux #react #accessibility #api-routes #express #rest-api #crud-operations #state-management #confirmation-dialogs #act-management #outline-routes #manual-testing #api-documentation #auto-population #default-values #constants #workflow #react-query #virtualization #optimization #inventory #vitest #dom-testing #test-selectors #codebase-simplification #documentation #refactoring #hook-extraction #form-labels #wcag #keyboard-navigation #focus-trap #aria-live
@@ -29,6 +29,38 @@ MAINTENANCE RULES:
 ---
 
 ## Active Lessons (Most Recent First)
+
+### 2026-01-30 | Task: Integrate Commercial Genre Validation into Bestseller Mode Service
+
+**Date**: 2026-01-30
+**Task**: Update bestseller-mode.service.ts to include commercial genre validation for Romance, Thriller, and Sci-Fi projects
+**Context**: Bestseller mode premium feature integration with genre-specific commercial services for market-ready validation
+
+**What Worked Well**:
+- Read all four existing services first (bestseller-mode, romance-commercial, thriller-commercial, scifi-commercial) to understand patterns and APIs
+- Created new interface CommercialGenreReadiness for structured validation results (ready, warnings, recommendations)
+- Added validateCommercialGenreReadiness() method that branches by genre using normalized lowercase comparison
+- Integrated commercial validation into existing validateChecklist() method by calling genre-specific checks
+- Enhanced getBestsellerPromptEnhancements() to include genre-specific data (heat levels, pacing styles, hardness levels) in prompt context
+- Used barrel export (./index.js) for importing commercial services to avoid circular dependency issues
+- Added genre detection via database query once at the start of validation methods
+- Structured validation by genre with clear comment sections (Romance, Thriller, Sci-Fi) for readability
+- Filtered errors vs warnings properly (CRITICAL or "not configured" → errors, everything else → warnings)
+- Added helper method getHeatLevelDescription() for human-readable romance heat level labels
+
+**What Didn't Work**:
+- Initial attempt to import services directly (./ thriller-commercial.service.js) caused TypeScript module resolution errors
+- Linter initially reverted import changes - had to use Write tool to persist full file content
+- TypeScript flagged possibly undefined contentWarnings array - needed null check before accessing length property
+- Implicit 'any' type error on forEach callback parameter - needed explicit type annotation (clock: any)
+
+**Lesson**: When integrating multiple genre-specific services into a central validation service: (1) Use barrel exports (./index.js) to import multiple related services and avoid circular dependencies, (2) Normalise genre strings (toLowerCase()) before comparison to handle variations like "Sci-Fi" vs "science fiction", (3) Structure validation methods with clear comment sections for each genre branch for maintainability, (4) Separate validation results into errors (blockers) vs warnings (recommendations) using filter logic, (5) Query database for genre once at method start rather than repeatedly, (6) Add null/undefined checks for array properties before accessing length or methods, (7) Explicitly type forEach callback parameters to avoid implicit 'any' errors, (8) When enhancing prompts with genre data, check for data existence before accessing nested properties, (9) Create helper methods for reused formatting logic (like heat level descriptions). Commercial genre integration requires validating genre-specific configuration (romance heat levels, thriller pacing, sci-fi hardness) exists before allowing bestseller mode generation.
+
+**Application Score**: 0
+
+**Tags**: #backend #service-integration #commercial-genres #romance #thriller #scifi #validation #bestseller-mode #genre-specific #typescript #barrel-exports #prompt-enhancement #null-checks
+
+---
 
 ### 2026-01-30 | Task: Create Author Styles Management UI
 

@@ -298,7 +298,7 @@ export class QueueWorker {
 
       // Step 2: Assemble context
       logger.info('generate_chapter: Assembling context');
-      const context = contextAssemblyService.assembleChapterContext(chapterId);
+      const context = await contextAssemblyService.assembleChapterContext(chapterId);
       logger.info({ estimatedTokens: context.estimatedTokens }, 'generate_chapter: Context assembled');
 
       checkpointManager.saveCheckpoint(job.id, 'context_assembled', {

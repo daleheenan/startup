@@ -9,6 +9,16 @@ import type {
 } from '../shared/types/index.js';
 import { editorialLessonsService } from './editorial-lessons.service.js';
 import { getCompactStylePrinciples } from '../shared/style-principles.js';
+import { romanceCommercialService, type RomanceHeatLevel, type RomanceBeat } from './romance-commercial.service.js';
+import { thrillerCommercialService, type ThrillerPacing, type ChapterHook, type TickingClock } from './thriller-commercial.service.js';
+import { sciFiCommercialService, type SciFiClassification, HARDNESS_EXPECTATIONS } from './scifi-commercial.service.js';
+import { BestsellerModeService } from './bestseller-mode.service.js';
+import { createLogger } from './logger.service.js';
+
+// Bestseller mode singleton instance
+const bestsellerModeService = new BestsellerModeService();
+
+const logger = createLogger('services:context-assembly');
 
 /**
  * ContextAssemblyService builds minimal, targeted prompts for chapter generation.
@@ -21,9 +31,35 @@ import { getCompactStylePrinciples } from '../shared/style-principles.js';
  * - Other Characters: ~450 tokens
  * - Last Chapter Summary: ~200 tokens
  * - System Prompts: ~500 tokens
+ * - Commercial Genre Guidance: ~200 tokens (when applicable)
  *
  * BUG-008 FIX: Added comprehensive null safety checks
+ *
+ * Commercial Genre Integration:
+ * - Romance: Heat level, sensuality focus, beat expectations
+ * - Thriller: Pacing style, tension curve, hook requirements
+ * - Sci-Fi: Hardness level, tech explanation depth, accuracy priority
  */
+
+// ============================================================================
+// Types for Commercial Genre Settings
+// ============================================================================
+
+interface CommercialGenreContext {
+  romance?: {
+    heatLevel: RomanceHeatLevel;
+    trackedBeats: RomanceBeat[];
+    beatsDueThisChapter: RomanceBeat[];
+  };
+  thriller?: {
+    pacing: ThrillerPacing;
+    activeClocks: TickingClock[];
+    chapterHooks: ChapterHook[];
+  };
+  scifi?: {
+    classification: SciFiClassification;
+  };
+}
 
 /**
  * Safely join an array, returning a fallback if undefined/empty
@@ -105,8 +141,21 @@ export class ContextAssemblyService {
       storyDNA.tone
     );
 
+    // Get commercial genre settings (romance, thriller, sci-fi)
+    const commercialContext = this.getCommercialGenreContext(
+      project.id,
+      storyDNA.genre,
+      chapter.chapter_number
+    );
+
     // Build system prompt (Author Agent persona)
-    const systemPrompt = this.buildAuthorAgentPrompt(storyDNA, povCharacter, lessonsSummary);
+    const systemPrompt = this.buildAuthorAgentPrompt(
+      storyDNA,
+      povCharacter,
+      lessonsSummary,
+      commercialContext,
+      project.id
+    );
 
     // Build user prompt (context + instructions)
     const userPrompt = this.buildUserPrompt(
@@ -116,7 +165,8 @@ export class ContextAssemblyService {
       otherCharacters,
       lastChapterSummary,
       chapter.chapter_number,
-      chapter.title || `Chapter ${chapter.chapter_number}`
+      chapter.title || `Chapter ${chapter.chapter_number}`,
+      commercialContext
     );
 
     // Estimate token count (rough approximation: 1 token ≈ 4 characters)
@@ -132,7 +182,13 @@ export class ContextAssemblyService {
   /**
    * Build Author Agent system prompt with genre-specific persona
    */
-  private buildAuthorAgentPrompt(storyDNA: StoryDNA, povCharacter: Character, lessonsSummary?: string): string {
+  private buildAuthorAgentPrompt(
+    storyDNA: StoryDNA,
+    povCharacter: Character,
+    lessonsSummary?: string,
+    commercialContext?: CommercialGenreContext,
+    projectId?: string
+  ): string {
     const { genre, subgenre, tone, themes, proseStyle, timeframe } = storyDNA;
 
     let prompt = `AUTHOR AGENT - ${genre.toUpperCase()} SPECIALIST
@@ -198,6 +254,21 @@ AVOID AI WRITING TELLS (CRITICAL):
 
 ${getCompactStylePrinciples()}`;
 
+    // Append commercial genre guidance if available
+    const commercialGuidance = this.buildCommercialGenreGuidance(commercialContext);
+    if (commercialGuidance) {
+      prompt += `\n\n${commercialGuidance}`;
+    }
+
+    // Append bestseller mode enhancements if enabled
+    if (projectId) {
+      const bestsellerEnhancements = bestsellerModeService.getBestsellerPromptEnhancements(projectId);
+      if (bestsellerEnhancements) {
+        prompt += bestsellerEnhancements;
+        logger.debug({ projectId }, 'Added bestseller mode prompt enhancements');
+      }
+    }
+
     // Append lessons learned from editorial reviews if available
     if (lessonsSummary && lessonsSummary.trim().length > 0) {
       prompt += `\n\n${lessonsSummary}`;
@@ -216,7 +287,8 @@ ${getCompactStylePrinciples()}`;
     otherCharacters: Character[],
     lastChapterSummary: string | null,
     chapterNumber: number,
-    chapterTitle: string
+    chapterTitle: string,
+    commercialContext?: CommercialGenreContext
   ): string {
     let prompt = `Write ${chapterTitle}.
 
@@ -286,6 +358,12 @@ ${char.currentState ? `Current state: ${char.currentState.emotionalState} in ${c
 
 `;
       });
+    }
+
+    // Commercial-specific chapter requirements
+    const chapterCommercialReqs = this.buildChapterCommercialRequirements(commercialContext);
+    if (chapterCommercialReqs) {
+      prompt += chapterCommercialReqs + '\n\n';
     }
 
     // Writing Instructions (~300 tokens)
@@ -404,6 +482,200 @@ Begin writing now. Output ONLY the chapter prose - no meta-commentary, no explan
 
     const row = stmt.get(bookId, currentChapterNumber - 1);
     return row?.summary || null;
+  }
+
+  // ============================================================================
+  // Commercial Genre Integration Methods
+  // ============================================================================
+
+  /**
+   * Get commercial genre context for a project based on genre type
+   */
+  private getCommercialGenreContext(
+    projectId: string,
+    genre: string,
+    chapterNumber: number
+  ): CommercialGenreContext {
+    const context: CommercialGenreContext = {};
+    const genreLower = genre.toLowerCase();
+
+    try {
+      // Romance genre settings
+      if (genreLower.includes('romance') || genreLower.includes('romantic')) {
+        const heatLevel = romanceCommercialService.getHeatLevel(projectId);
+        if (heatLevel) {
+          const trackedBeats = romanceCommercialService.getBeatTracking(projectId);
+          // Find beats that are scheduled for this chapter
+          const beatsDueThisChapter = trackedBeats.filter(
+            (beat: RomanceBeat) => beat.chapterNumber === chapterNumber
+          );
+          context.romance = {
+            heatLevel,
+            trackedBeats,
+            beatsDueThisChapter,
+          };
+          logger.debug({ projectId, heatLevel: heatLevel.heatLevel }, 'Loaded romance commercial context');
+        }
+      }
+
+      // Thriller genre settings
+      if (genreLower.includes('thriller') || genreLower.includes('suspense') || genreLower.includes('mystery')) {
+        const pacing = thrillerCommercialService.getPacingConfig(projectId);
+        if (pacing) {
+          const activeClocks = thrillerCommercialService.getActiveTimePressure(projectId);
+          const chapterHooks = thrillerCommercialService.getChapterHooks(projectId);
+          context.thriller = {
+            pacing,
+            activeClocks,
+            chapterHooks: chapterHooks.filter((h: ChapterHook) => h.chapterNumber <= chapterNumber),
+          };
+          logger.debug({ projectId, pacingStyle: pacing.pacingStyle }, 'Loaded thriller commercial context');
+        }
+      }
+
+      // Sci-Fi genre settings
+      if (genreLower.includes('sci-fi') || genreLower.includes('science fiction') || genreLower.includes('scifi')) {
+        const classification = sciFiCommercialService.getClassification(projectId);
+        if (classification) {
+          context.scifi = { classification };
+          logger.debug({ projectId, hardnessLevel: classification.hardnessLevel }, 'Loaded sci-fi commercial context');
+        }
+      }
+    } catch (error) {
+      // Log but don't fail - commercial settings are optional enhancements
+      logger.warn({ error, projectId }, 'Failed to load commercial genre context');
+    }
+
+    return context;
+  }
+
+  /**
+   * Build commercial genre guidance section for system prompt
+   */
+  private buildCommercialGenreGuidance(context?: CommercialGenreContext): string | null {
+    if (!context) return null;
+
+    const sections: string[] = [];
+
+    // Romance guidance
+    if (context.romance) {
+      const { heatLevel } = context.romance;
+      const heatDescriptions: Record<number, string> = {
+        1: 'Sweet/Clean (no explicit content, closed-door intimacy)',
+        2: 'Warm (fade to black, sensuality through tension and anticipation)',
+        3: 'Steamy (tasteful explicit content, emotional connection emphasised)',
+        4: 'Hot (detailed intimate scenes, physical and emotional depth)',
+        5: 'Scorching (erotica-adjacent, explicit and frequent intimate content)',
+      };
+
+      let romanceSection = `ROMANCE COMMERCIAL GUIDANCE:
+- Heat Level: ${heatLevel.heatLevel}/5 - ${heatDescriptions[heatLevel.heatLevel] || 'Standard romance'}
+- Sensuality Focus: ${heatLevel.sensualityFocus} (${heatLevel.sensualityFocus === 'emotional' ? 'prioritise emotional connection over physical' : heatLevel.sensualityFocus === 'physical' ? 'emphasise physical attraction and chemistry' : 'balance emotional and physical intimacy'})`;
+
+      if (heatLevel.fadeToBlack) {
+        romanceSection += '\n- Intimate scenes: Fade to black before explicit content';
+      }
+      if (heatLevel.onPageIntimacy) {
+        romanceSection += '\n- Intimate scenes: On-page intimacy expected, write with appropriate detail for heat level';
+      }
+      if (heatLevel.contentWarnings && heatLevel.contentWarnings.length > 0) {
+        romanceSection += `\n- Content warnings to include: ${heatLevel.contentWarnings.join(', ')}`;
+      }
+
+      sections.push(romanceSection);
+    }
+
+    // Thriller guidance
+    if (context.thriller) {
+      const { pacing, activeClocks } = context.thriller;
+      const pacingDescriptions: Record<string, string> = {
+        relentless: 'Constant high tension (8/10 base). Short chapters, frequent reveals, no breathing room.',
+        escalating: 'Steady build from 3-5 to 9-10. Each chapter ratchets up the stakes.',
+        rollercoaster: 'Alternating peaks and valleys. Intense scenes followed by brief respite.',
+        slow_burn: 'Gradual build with explosive finale. Suspense through atmosphere and dread.',
+      };
+
+      let thrillerSection = `THRILLER COMMERCIAL GUIDANCE:
+- Pacing Style: ${pacing.pacingStyle.replace('_', ' ')} - ${pacingDescriptions[pacing.pacingStyle] || 'Standard thriller pacing'}
+- Target Chapter Tension: ${pacing.averageChapterTension}/10
+- Action Scene Ratio: ${pacing.actionSceneRatio}% of scenes should be action-oriented`;
+
+      if (pacing.chapterHookRequired) {
+        thrillerSection += '\n- MANDATORY: End this chapter with a strong hook (cliffhanger, revelation, or unanswered question)';
+      }
+      if (pacing.cliffhangerFrequency === 'every') {
+        thrillerSection += '\n- Every chapter must end on a cliffhanger or dramatic hook';
+      }
+      if (activeClocks.length > 0) {
+        thrillerSection += '\n- Active ticking clocks to reference: ' +
+          activeClocks.map(c => `"${c.description}" (${c.clockType})`).join('; ');
+      }
+
+      sections.push(thrillerSection);
+    }
+
+    // Sci-Fi guidance
+    if (context.scifi) {
+      const { classification } = context.scifi;
+      const expectations = HARDNESS_EXPECTATIONS[classification.hardnessLevel];
+
+      let scifiSection = `SCI-FI COMMERCIAL GUIDANCE:
+- Hardness Level: ${classification.hardnessLevel.replace('_', ' ')} - ${expectations?.description || 'Standard sci-fi'}
+- Reader Expectations: ${expectations?.readerExpectation || 'Consistent internal logic'}
+- Tech Explanation Depth: ${classification.techExplanationDepth} - ${classification.techExplanationDepth === 'detailed' ? 'explain technology thoroughly' : classification.techExplanationDepth === 'moderate' ? 'explain key tech, handwave minor details' : classification.techExplanationDepth === 'minimal' ? 'technology just works, minimal exposition' : 'no explanations needed'}
+- Scientific Accuracy Priority: ${classification.scientificAccuracyPriority}/10`;
+
+      if (classification.handwaveAllowed && classification.handwaveAllowed.length > 0) {
+        scifiSection += `\n- Handwave allowed for: ${classification.handwaveAllowed.join(', ')}`;
+      }
+      if (classification.realScienceBasis && classification.realScienceBasis.length > 0) {
+        scifiSection += `\n- Ground in real science: ${classification.realScienceBasis.join(', ')}`;
+      }
+
+      sections.push(scifiSection);
+    }
+
+    return sections.length > 0 ? sections.join('\n\n') : null;
+  }
+
+  /**
+   * Build chapter-specific commercial requirements for user prompt
+   */
+  private buildChapterCommercialRequirements(context?: CommercialGenreContext): string | null {
+    if (!context) return null;
+
+    const requirements: string[] = [];
+
+    // Romance beat requirements for this chapter
+    if (context.romance && context.romance.beatsDueThisChapter.length > 0) {
+      const beatNames = context.romance.beatsDueThisChapter.map(b => {
+        const displayName = b.beatType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        const intensity = b.emotionalIntensity ? ` (intensity ${b.emotionalIntensity}/10)` : '';
+        return displayName + intensity;
+      });
+      requirements.push(`ROMANCE BEATS FOR THIS CHAPTER:
+Include these emotional beats: ${beatNames.join(', ')}
+These are key romance genre moments that readers expect at this point in the story.`);
+    }
+
+    // Thriller-specific chapter requirements
+    if (context.thriller) {
+      const { pacing, activeClocks, chapterHooks } = context.thriller;
+      const relevantHooks = chapterHooks.filter(h => h.chapterNumber === chapterHooks.length);
+
+      if (pacing.chapterHookRequired) {
+        requirements.push(`CHAPTER ENDING REQUIREMENT:
+End with a compelling hook - a cliffhanger, revelation, or unanswered question that compels the reader to continue.`);
+      }
+
+      if (activeClocks.length > 0) {
+        requirements.push(`ACTIVE TIME PRESSURE:
+Reference the following ticking clocks to maintain urgency:
+${activeClocks.map(c => `- ${c.description} (remind readers ${c.reminderFrequency})`).join('\n')}`);
+      }
+    }
+
+    return requirements.length > 0 ? requirements.join('\n\n') : null;
   }
 }
 
