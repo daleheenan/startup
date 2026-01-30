@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { metricsService } from '../services/metrics.service.js';
 import { createLogger } from '../services/logger.service.js';
 import { AI_REQUEST_TYPE_LABELS, AI_REQUEST_TYPE_CATEGORIES, getAllRequestTypes, getRequestTypesByCategory } from '../constants/ai-request-types.js';
+import db from '../db/connection.js';
 
 const router = Router();
 const logger = createLogger('routes:ai-costs');
@@ -162,6 +163,57 @@ router.get('/request-types', (_req, res) => {
     });
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack }, 'Error fetching request types');
+    res.status(500).json({
+      error: { code: 'INTERNAL_ERROR', message: error.message },
+    });
+  }
+});
+
+/**
+ * GET /api/ai-costs/debug
+ * Debug endpoint to check database state and diagnose tracking issues
+ */
+router.get('/debug', (_req, res) => {
+  try {
+    // Check if table exists
+    const tableExists = db.prepare(`
+      SELECT name FROM sqlite_master WHERE type='table' AND name='ai_request_log'
+    `).get();
+
+    // Get record count
+    const recordCount = db.prepare('SELECT COUNT(*) as count FROM ai_request_log').get() as { count: number };
+
+    // Get most recent 5 records
+    const recentRecords = db.prepare(`
+      SELECT id, request_type, project_id, input_tokens, output_tokens, cost_gbp, created_at
+      FROM ai_request_log
+      ORDER BY created_at DESC
+      LIMIT 5
+    `).all();
+
+    // Get database path info
+    const dbInfo = db.prepare('PRAGMA database_list').all();
+
+    // Check project_metrics AI columns
+    const metricsWithCosts = db.prepare(`
+      SELECT project_id, total_ai_cost_gbp, total_ai_requests
+      FROM project_metrics
+      WHERE total_ai_requests > 0
+      LIMIT 5
+    `).all();
+
+    res.json({
+      status: 'ok',
+      tableExists: !!tableExists,
+      recordCount: recordCount?.count || 0,
+      recentRecords,
+      databaseInfo: dbInfo,
+      projectsWithAICosts: metricsWithCosts,
+      serverTime: new Date().toISOString(),
+      nodeEnv: process.env.NODE_ENV,
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error in AI costs debug endpoint');
     res.status(500).json({
       error: { code: 'INTERNAL_ERROR', message: error.message },
     });
