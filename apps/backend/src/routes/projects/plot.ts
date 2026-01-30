@@ -1199,11 +1199,19 @@ ${plotLayersContext}
 COHERENCE SUGGESTION TO IMPLEMENT:
 "${suggestion}"
 
-Your task is to revise the plot layers to address this coherence suggestion while:
+Your task is to revise the EXISTING plot layers to address this coherence suggestion while:
 1. Maintaining the core story elements and character arcs
 2. Ensuring all plots connect meaningfully to the main story concept
 3. Making changes that create better narrative cohesion
-4. Keeping the same plot layer IDs (these are immutable)
+4. Keeping the EXACT SAME plot layer IDs (these are immutable)
+
+CRITICAL RULES:
+- You MUST NOT create new plot layers. Only modify existing ones.
+- You MUST include ALL existing plot layer IDs in your response.
+- You MUST NOT add any new IDs that don't exist in the current plot layers.
+- Prefer SIMPLIFYING and CONSOLIDATING plots over adding complexity.
+- If plots can be merged or streamlined, do so rather than expanding.
+- A focused story with 4-6 well-developed plots is better than 12+ scattered plots.
 
 Respond with a JSON object containing the revised plot_layers array:
 {
@@ -1219,7 +1227,7 @@ Respond with a JSON object containing the revised plot_layers array:
 }
 
 Important:
-- Keep all existing layer IDs unchanged
+- Use ONLY the existing layer IDs listed above
 - You may modify names, types, or descriptions
 - Focus changes on the layers that need better alignment
 - The main plot should clearly connect to the story's central concept
@@ -1275,26 +1283,38 @@ Output ONLY valid JSON, no additional commentary:`;
       existingLayersMap.set(layer.id, layer);
     }
 
+    // Track original count for logging
+    const originalPlotCount = plotStructure.plot_layers.length;
+
     // Track which existing layers were updated by the AI
     const updatedLayerIds = new Set<string>();
 
-    const mergedPlotLayers = revisedPlots.plot_layers.map((revisedLayer: any) => {
+    // DEFENSIVE: Filter out any new plot IDs that AI tried to create
+    // Only process layers that have existing IDs
+    const rejectedNewLayers: string[] = [];
+    const mergedPlotLayers: any[] = [];
+
+    for (const revisedLayer of revisedPlots.plot_layers) {
       const existingLayer = existingLayersMap.get(revisedLayer.id);
       if (existingLayer) {
+        // Valid existing layer - update it
         updatedLayerIds.add(revisedLayer.id);
-        return {
+        mergedPlotLayers.push({
           ...existingLayer,
           name: revisedLayer.name,
           type: revisedLayer.type,
           description: revisedLayer.description,
-        };
+        });
+      } else {
+        // AI tried to create a new layer - REJECT IT
+        rejectedNewLayers.push(revisedLayer.name || revisedLayer.id);
+        logger.warn({
+          projectId,
+          rejectedLayerId: revisedLayer.id,
+          rejectedLayerName: revisedLayer.name,
+        }, 'Rejected AI-created plot layer (new plots not allowed in coherence fixes)');
       }
-      return {
-        ...revisedLayer,
-        points: [],
-        status: 'active',
-      };
-    });
+    }
 
     // Preserve any existing layers that the AI didn't include in its response
     // This prevents accidental data loss when AI returns fewer layers
@@ -1308,6 +1328,27 @@ Output ONLY valid JSON, no additional commentary:`;
       ...plotStructure,
       plot_layers: mergedPlotLayers,
     };
+
+    // Log plot count changes for monitoring
+    const finalPlotCount = mergedPlotLayers.length;
+    if (finalPlotCount !== originalPlotCount) {
+      logger.warn({
+        projectId,
+        originalCount: originalPlotCount,
+        finalCount: finalPlotCount,
+        change: finalPlotCount - originalPlotCount,
+      }, 'Plot count changed during coherence suggestion implementation');
+    }
+
+    // Save to history for undo capability
+    savePlotChangeHistory(
+      projectId,
+      'suggestion_impl',
+      `Implemented suggestion: ${suggestion.substring(0, 100)}`,
+      plotStructure,
+      updatedPlotStructure,
+      rejectedNewLayers
+    );
 
     const updateStmt = db.prepare(`
       UPDATE projects SET plot_structure = ?, updated_at = ? WHERE id = ?
@@ -1334,7 +1375,8 @@ Output ONLY valid JSON, no additional commentary:`;
 
     logger.info({
       projectId,
-      layersUpdated: revisedPlots.plot_layers.length,
+      layersUpdated: updatedLayerIds.size,
+      layersRejected: rejectedNewLayers.length,
       suggestion: suggestion.substring(0, 50),
     }, 'Coherence suggestion implemented');
 
@@ -1417,24 +1459,37 @@ ${i + 1}. ${p.name} (${p.type})
     const { default: Anthropic } = await import('@anthropic-ai/sdk');
     const anthropic = new Anthropic();
 
+    // Get existing layer IDs for the prompt
+    const existingLayerIds = plotStructure.plot_layers.map((p: any) => p.id);
+
     const prompt = `You are a story structure consultant fixing a coherence warning.
 
 ${conceptContext}
 ${dnaContext}
 ${currentPlotsContext}
 
+EXISTING PLOT LAYER IDs (you MUST use only these): ${existingLayerIds.join(', ')}
+
 WARNING TO FIX:
 "${warning}"
 
-Your task is to revise the plot layers to FIX this warning. You should:
+Your task is to revise the EXISTING plot layers to FIX this warning. You should:
 1. Identify the root cause of the warning
-2. Make specific changes to address it
+2. Make specific changes to EXISTING plots to address it
 3. Ensure the fix doesn't break other plot elements
 4. Keep changes minimal but effective
 
+CRITICAL RULES:
+- You MUST NOT create new plot layers. Only modify existing ones.
+- You MUST use ONLY the layer IDs listed above.
+- You MUST NOT invent new IDs or add new plot layers.
+- Prefer SIMPLIFYING plots over adding complexity.
+- A focused story with fewer well-developed plots is better than many scattered plots.
+- If the warning suggests adding something, find a way to address it within EXISTING plots.
+
 Return a JSON object with:
 {
-  "fixed_plot_layers": [...], // The complete revised plot_layers array
+  "fixed_plot_layers": [...], // Array containing ONLY modifications to existing layers (use existing IDs only)
   "changes_made": ["Description of change 1", "Description of change 2"],
   "explanation": "Brief explanation of the fix"
 }
@@ -1493,26 +1548,38 @@ Return ONLY valid JSON, no markdown formatting.`;
       existingLayersMap.set(layer.id, layer);
     }
 
+    // Track original count for logging
+    const originalPlotCount = plotStructure.plot_layers.length;
+
     // Track which existing layers were updated by the AI
     const updatedLayerIds = new Set<string>();
 
-    const mergedPlotLayers = fixResult.fixed_plot_layers.map((fixedLayer: any) => {
+    // DEFENSIVE: Filter out any new plot IDs that AI tried to create
+    // Only process layers that have existing IDs
+    const rejectedNewLayers: string[] = [];
+    const mergedPlotLayers: any[] = [];
+
+    for (const fixedLayer of fixResult.fixed_plot_layers) {
       const existingLayer = existingLayersMap.get(fixedLayer.id);
       if (existingLayer) {
+        // Valid existing layer - update it
         updatedLayerIds.add(fixedLayer.id);
-        return {
+        mergedPlotLayers.push({
           ...existingLayer,
           name: fixedLayer.name,
           type: fixedLayer.type,
           description: fixedLayer.description,
-        };
+        });
+      } else {
+        // AI tried to create a new layer - REJECT IT
+        rejectedNewLayers.push(fixedLayer.name || fixedLayer.id);
+        logger.warn({
+          projectId,
+          rejectedLayerId: fixedLayer.id,
+          rejectedLayerName: fixedLayer.name,
+        }, 'Rejected AI-created plot layer (new plots not allowed in coherence fixes)');
       }
-      return {
-        ...fixedLayer,
-        points: [],
-        status: 'active',
-      };
-    });
+    }
 
     // Preserve any existing layers that the AI didn't include in its response
     // This prevents accidental data loss when AI returns fewer layers
@@ -1526,6 +1593,27 @@ Return ONLY valid JSON, no markdown formatting.`;
       ...plotStructure,
       plot_layers: mergedPlotLayers,
     };
+
+    // Log plot count changes for monitoring
+    const finalPlotCount = mergedPlotLayers.length;
+    if (finalPlotCount !== originalPlotCount) {
+      logger.warn({
+        projectId,
+        originalCount: originalPlotCount,
+        finalCount: finalPlotCount,
+        change: finalPlotCount - originalPlotCount,
+      }, 'Plot count changed during coherence warning fix');
+    }
+
+    // Save to history for undo capability
+    savePlotChangeHistory(
+      projectId,
+      'coherence_fix',
+      `Fixed warning: ${warning.substring(0, 100)}`,
+      plotStructure,
+      updatedPlotStructure,
+      rejectedNewLayers
+    );
 
     const updateStmt = db.prepare(`
       UPDATE projects
@@ -1556,6 +1644,8 @@ Return ONLY valid JSON, no markdown formatting.`;
       projectId,
       warning: warning.substring(0, 100),
       changesCount: fixResult.changes_made?.length || 0,
+      layersUpdated: updatedLayerIds.size,
+      layersRejected: rejectedNewLayers.length,
     }, 'Coherence warning fixed');
 
     res.json({
@@ -1795,6 +1885,349 @@ Generate a rich, detailed plot structure:`;
     });
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack }, 'Error regenerating plot structure');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * Helper function to save plot change to history for undo capability
+ */
+function savePlotChangeHistory(
+  projectId: string,
+  changeType: 'coherence_fix' | 'suggestion_impl' | 'manual' | 'regenerate' | 'extract',
+  changeDescription: string,
+  previousStructure: any,
+  newStructure: any,
+  rejectedNewPlots: string[] = []
+): string {
+  const historyId = randomUUID();
+  const plotsBefore = previousStructure?.plot_layers?.length || 0;
+  const plotsAfter = newStructure?.plot_layers?.length || 0;
+
+  try {
+    db.prepare(`
+      INSERT INTO plot_change_history (
+        id, project_id, change_type, change_description,
+        previous_plot_structure, new_plot_structure,
+        plots_before, plots_after, rejected_new_plots
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      historyId,
+      projectId,
+      changeType,
+      changeDescription,
+      JSON.stringify(previousStructure),
+      JSON.stringify(newStructure),
+      plotsBefore,
+      plotsAfter,
+      rejectedNewPlots.length > 0 ? JSON.stringify(rejectedNewPlots) : null
+    );
+
+    logger.info({
+      projectId,
+      historyId,
+      changeType,
+      plotsBefore,
+      plotsAfter,
+    }, 'Plot change saved to history');
+
+    return historyId;
+  } catch (error: any) {
+    // Table might not exist yet, log but don't fail
+    logger.warn({ error: error.message, projectId }, 'Failed to save plot change history (table may not exist)');
+    return '';
+  }
+}
+
+/**
+ * GET /api/projects/:id/plot-change-history
+ * Get plot change history for undo capability
+ */
+router.get('/:id/plot-change-history', (req, res) => {
+  try {
+    const { id: projectId } = req.params;
+    const limit = parseInt(req.query.limit as string) || 10;
+
+    const history = db.prepare<[string, number], any>(`
+      SELECT id, changed_at, change_type, change_description,
+             plots_before, plots_after, rejected_new_plots,
+             can_undo, undone_at
+      FROM plot_change_history
+      WHERE project_id = ?
+      ORDER BY changed_at DESC
+      LIMIT ?
+    `).all(projectId, limit);
+
+    const formattedHistory = history.map((h: any) => ({
+      id: h.id,
+      changedAt: h.changed_at,
+      changeType: h.change_type,
+      changeDescription: h.change_description,
+      plotsBefore: h.plots_before,
+      plotsAfter: h.plots_after,
+      rejectedNewPlots: safeJsonParse(h.rejected_new_plots, []),
+      canUndo: h.can_undo === 1 && !h.undone_at,
+      undoneAt: h.undone_at,
+    }));
+
+    res.json({ history: formattedHistory });
+  } catch (error: any) {
+    // Table might not exist
+    if (error.message?.includes('no such table')) {
+      return res.json({ history: [], message: 'Plot history not available yet' });
+    }
+    logger.error({ error: error.message, stack: error.stack }, 'Error fetching plot change history');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * POST /api/projects/:id/undo-plot-change
+ * Undo a specific plot change by restoring previous structure
+ */
+router.post('/:id/undo-plot-change', (req, res) => {
+  try {
+    const { id: projectId } = req.params;
+    const { historyId } = req.body;
+
+    if (!historyId) {
+      return res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'historyId is required' },
+      });
+    }
+
+    // Get the history entry
+    const historyEntry = db.prepare<[string, string], any>(`
+      SELECT * FROM plot_change_history
+      WHERE id = ? AND project_id = ? AND can_undo = 1 AND undone_at IS NULL
+    `).get(historyId, projectId);
+
+    if (!historyEntry) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'History entry not found or cannot be undone' },
+      });
+    }
+
+    const previousStructure = safeJsonParse(historyEntry.previous_plot_structure, null);
+
+    if (!previousStructure) {
+      return res.status(400).json({
+        error: { code: 'INVALID_DATA', message: 'Previous plot structure is invalid' },
+      });
+    }
+
+    // Restore the previous structure
+    db.prepare(`
+      UPDATE projects SET plot_structure = ?, updated_at = ? WHERE id = ?
+    `).run(JSON.stringify(previousStructure), new Date().toISOString(), projectId);
+
+    // Mark the history entry as undone
+    db.prepare(`
+      UPDATE plot_change_history SET undone_at = ? WHERE id = ?
+    `).run(new Date().toISOString(), historyId);
+
+    // Sync to active versions
+    syncPlotStructureToActiveVersions(projectId, previousStructure);
+
+    logger.info({
+      projectId,
+      historyId,
+      changeType: historyEntry.change_type,
+      restoredPlotCount: previousStructure.plot_layers?.length,
+    }, 'Plot change undone');
+
+    res.json({
+      success: true,
+      restoredPlotStructure: previousStructure,
+      message: `Undone: ${historyEntry.change_description || historyEntry.change_type}`,
+    });
+  } catch (error: any) {
+    if (error.message?.includes('no such table')) {
+      return res.status(400).json({
+        error: { code: 'NOT_AVAILABLE', message: 'Undo feature not available yet - migration pending' },
+      });
+    }
+    logger.error({ error: error.message, stack: error.stack }, 'Error undoing plot change');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * GET /api/projects/:id/plot-cleanup-analysis
+ * Analyse plots to identify potential cleanup candidates (empty plots, duplicates, etc.)
+ */
+router.get('/:id/plot-cleanup-analysis', (req, res) => {
+  try {
+    const { id: projectId } = req.params;
+
+    const projectStmt = db.prepare<[string], any>(`
+      SELECT plot_structure FROM projects WHERE id = ?
+    `);
+    const project = projectStmt.get(projectId);
+
+    if (!project) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project not found' },
+      });
+    }
+
+    const plotStructure = safeJsonParse(project.plot_structure, { plot_layers: [] });
+    const plots = plotStructure.plot_layers || [];
+
+    // Analyse plots
+    const emptyPlots = plots.filter((p: any) => !p.points || p.points.length === 0);
+    const mainPlots = plots.filter((p: any) => p.type === 'main');
+    const duplicateNames = plots.filter((p: any, i: number, arr: any[]) =>
+      arr.findIndex((x: any) => x.name.toLowerCase() === p.name.toLowerCase()) !== i
+    );
+
+    // Check for plots with very similar descriptions (potential duplicates)
+    const similarPlots: Array<{ plot1: string; plot2: string; similarity: string }> = [];
+    for (let i = 0; i < plots.length; i++) {
+      for (let j = i + 1; j < plots.length; j++) {
+        const desc1 = (plots[i].description || '').toLowerCase();
+        const desc2 = (plots[j].description || '').toLowerCase();
+        if (desc1 && desc2 && calculateStringSimilarity(desc1, desc2) > 0.7) {
+          similarPlots.push({
+            plot1: plots[i].name,
+            plot2: plots[j].name,
+            similarity: 'High description similarity',
+          });
+        }
+      }
+    }
+
+    // Recommendations
+    const recommendations: string[] = [];
+    const RECOMMENDED_MAX_PLOTS = 6;
+
+    if (plots.length > RECOMMENDED_MAX_PLOTS) {
+      recommendations.push(`You have ${plots.length} plots. Consider consolidating to ${RECOMMENDED_MAX_PLOTS} or fewer for a tighter narrative.`);
+    }
+
+    if (emptyPlots.length > 0) {
+      recommendations.push(`${emptyPlots.length} plot(s) have no plot points. Consider deleting or adding points to: ${emptyPlots.map((p: any) => p.name).join(', ')}`);
+    }
+
+    if (mainPlots.length > 1) {
+      recommendations.push(`You have ${mainPlots.length} main plots. A novel typically needs only one main plot (golden thread).`);
+    }
+
+    if (mainPlots.length === 0) {
+      recommendations.push('No main plot defined. Every novel needs a central narrative arc.');
+    }
+
+    if (similarPlots.length > 0) {
+      recommendations.push(`Found ${similarPlots.length} potentially duplicate plot pair(s). Consider merging similar plots.`);
+    }
+
+    res.json({
+      totalPlots: plots.length,
+      recommendedMaxPlots: RECOMMENDED_MAX_PLOTS,
+      emptyPlots: emptyPlots.map((p: any) => ({ id: p.id, name: p.name, type: p.type })),
+      mainPlots: mainPlots.map((p: any) => ({ id: p.id, name: p.name })),
+      duplicateNames: duplicateNames.map((p: any) => ({ id: p.id, name: p.name })),
+      similarPlots,
+      recommendations,
+      plotsByType: {
+        main: plots.filter((p: any) => p.type === 'main').length,
+        subplot: plots.filter((p: any) => p.type === 'subplot').length,
+        characterArc: plots.filter((p: any) => p.type === 'character-arc').length,
+        mystery: plots.filter((p: any) => p.type === 'mystery').length,
+        romance: plots.filter((p: any) => p.type === 'romance').length,
+      },
+      plotSummary: plots.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        type: p.type,
+        pointCount: p.points?.length || 0,
+        hasDescription: !!p.description,
+      })),
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error analysing plots for cleanup');
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+/**
+ * DELETE /api/projects/:id/plots/bulk-delete
+ * Delete multiple plot layers at once (for cleanup)
+ */
+router.delete('/:id/plots/bulk-delete', (req, res) => {
+  try {
+    const { id: projectId } = req.params;
+    const { plotIds } = req.body;
+
+    if (!plotIds || !Array.isArray(plotIds) || plotIds.length === 0) {
+      return res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'plotIds array is required' },
+      });
+    }
+
+    const projectStmt = db.prepare<[string], any>(`
+      SELECT plot_structure FROM projects WHERE id = ?
+    `);
+    const project = projectStmt.get(projectId);
+
+    if (!project) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Project not found' },
+      });
+    }
+
+    const plotStructure = safeJsonParse(project.plot_structure, { plot_layers: [] });
+    const previousStructure = { ...plotStructure };
+    const plotIdsToDelete = new Set(plotIds);
+
+    // Filter out the plots to delete
+    const remainingPlots = plotStructure.plot_layers.filter(
+      (p: any) => !plotIdsToDelete.has(p.id)
+    );
+
+    const deletedCount = plotStructure.plot_layers.length - remainingPlots.length;
+
+    if (deletedCount === 0) {
+      return res.status(400).json({
+        error: { code: 'NOT_FOUND', message: 'None of the specified plots were found' },
+      });
+    }
+
+    const newPlotStructure = {
+      ...plotStructure,
+      plot_layers: remainingPlots,
+    };
+
+    // Save to history for undo
+    savePlotChangeHistory(
+      projectId,
+      'manual',
+      `Bulk deleted ${deletedCount} plot(s)`,
+      previousStructure,
+      newPlotStructure
+    );
+
+    // Update the database
+    db.prepare(`
+      UPDATE projects SET plot_structure = ?, updated_at = ? WHERE id = ?
+    `).run(JSON.stringify(newPlotStructure), new Date().toISOString(), projectId);
+
+    syncPlotStructureToActiveVersions(projectId, newPlotStructure);
+
+    logger.info({
+      projectId,
+      deletedCount,
+      remainingCount: remainingPlots.length,
+    }, 'Bulk deleted plots');
+
+    res.json({
+      success: true,
+      deletedCount,
+      remainingPlotCount: remainingPlots.length,
+      message: `Deleted ${deletedCount} plot(s). ${remainingPlots.length} plots remaining.`,
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, 'Error bulk deleting plots');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
