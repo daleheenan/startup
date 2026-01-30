@@ -1492,7 +1492,7 @@ Return ONLY a JSON object:
       if (message.usage) {
         const { metricsService } = await import('../services/metrics.service.js');
         metricsService.logAIRequest({
-          requestType: AI_REQUEST_TYPES.CHAPTER_PROCESSING,
+          requestType: AI_REQUEST_TYPES.COHERENCE_CHECK,
           projectId: projectId,
           bookId: bookId || null,
           chapterId: null,
