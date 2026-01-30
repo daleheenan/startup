@@ -26,6 +26,9 @@ import editorialRouter from './editorial.js';
 import metricsRouter from './metrics.js';
 import storyDnaRouter from './story-dna.js';
 import searchReplaceRouter from './search-replace.js';
+import romanceRouter from './romance.js';
+import thrillerRouter from './thriller.js';
+import scifiRouter from './scifi.js';
 
 const router = Router();
 
@@ -56,5 +59,10 @@ router.use('/', storyDnaRouter);
 
 // Search/Replace routes (/api/projects/:id/search-replace)
 router.use('/', searchReplaceRouter);
+
+// Commercial genre routes (Romance, Thriller, Sci-Fi)
+router.use('/', romanceRouter);
+router.use('/', thrillerRouter);
+router.use('/', scifiRouter);
 
 export default router;

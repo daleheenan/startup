@@ -11,8 +11,10 @@ import SearchReplace from '../../components/SearchReplace';
 import BookVersionSelector from '../../components/BookVersionSelector';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
 import LoadingState from '../../components/shared/LoadingState';
+import { RomanceSettings, ThrillerSettings, SciFiSettings } from '../../components/genre-settings';
 import { fetchJson } from '../../lib/fetch-utils';
 import { getToken } from '../../lib/auth';
+import { detectApplicableGenreSettings } from '../../lib/genre-utils';
 import { colors, gradients, borderRadius } from '../../lib/constants';
 import { card } from '../../lib/styles';
 
@@ -855,6 +857,35 @@ export default function ProjectDetailPage() {
           isOpen={showDuplicateDialog}
           onClose={() => setShowDuplicateDialog(false)}
         />
+
+        {/* Genre-Specific Settings */}
+        {(() => {
+          const genreSettings = detectApplicableGenreSettings(
+            project.genre,
+            project.story_dna?.subgenre
+          );
+          const hasAnyGenreSettings = genreSettings.showRomance || genreSettings.showThriller || genreSettings.showSciFi;
+
+          if (!hasAnyGenreSettings) return null;
+
+          return (
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h2 style={{
+                fontSize: '1.125rem',
+                color: colors.text,
+                fontWeight: 700,
+                margin: '0 0 1rem 0'
+              }}>
+                Commercial Genre Settings
+              </h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {genreSettings.showRomance && <RomanceSettings projectId={projectId} />}
+                {genreSettings.showThriller && <ThrillerSettings projectId={projectId} />}
+                {genreSettings.showSciFi && <SciFiSettings projectId={projectId} />}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Generation Progress Indicator */}
         {isGeneratingContent && (

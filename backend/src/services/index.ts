@@ -101,3 +101,8 @@ export * from './bestseller-mode.service';
 
 // Image generation
 export * from './image-generation.service';
+
+// Commercial genre services (Romance, Thriller, Sci-Fi)
+export * from './romance-commercial.service';
+export * from './thriller-commercial.service';
+export * from './scifi-commercial.service';
