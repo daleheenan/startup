@@ -42,7 +42,6 @@ export default function BookVersionSelector({
   useEffect(() => {
     // Guard against undefined bookId - don't fetch if bookId is not valid
     if (!bookId) {
-      console.warn('BookVersionSelector: bookId is undefined or empty, skipping fetch');
       return;
     }
     // Pass true to notify parent on initial load with the active version
@@ -72,12 +71,7 @@ export default function BookVersionSelector({
 
       // Notify parent of active version on initial load so pages can filter data correctly
       if (notifyParent && active && onVersionChange) {
-        console.log('[BookVersionSelector] Notifying parent of active version:', { versionId: active.id, versionNumber: active.version_number, actualChapterCount: active.actual_chapter_count, chapterCount: active.chapter_count });
         onVersionChange(active);
-      } else if (notifyParent && !active) {
-        console.warn('[BookVersionSelector] notifyParent=true but no active version found');
-      } else if (notifyParent && !onVersionChange) {
-        console.warn('[BookVersionSelector] notifyParent=true but no onVersionChange callback provided');
       }
     } catch (err: any) {
       console.error('Error fetching versions:', err);
