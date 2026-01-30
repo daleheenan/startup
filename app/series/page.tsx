@@ -7,6 +7,8 @@ import type { CSSProperties } from 'react';
 
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
 import MetricCard from '@/app/components/dashboard/MetricCard';
+import PenNameSelect from '@/app/components/pen-names/PenNameSelect';
+import { usePenNames } from '@/app/hooks/usePenNames';
 import {
   colors,
   typography,
@@ -166,6 +168,7 @@ function ArrowRightIcon() {
 
 export default function SeriesManagementPage() {
   const router = useRouter();
+  const { data: penNames } = usePenNames();
 
   // State
   const [activeTab, setActiveTab] = useState<TabId>('overview');
@@ -179,6 +182,7 @@ export default function SeriesManagementPage() {
   const [selectedStandalone, setSelectedStandalone] = useState<Project | null>(null);
   const [newSeriesTitle, setNewSeriesTitle] = useState('');
   const [newSeriesDescription, setNewSeriesDescription] = useState('');
+  const [newSeriesPenNameId, setNewSeriesPenNameId] = useState('');
   const [creating, setCreating] = useState(false);
   const [converting, setConverting] = useState(false);
 
@@ -442,6 +446,7 @@ export default function SeriesManagementPage() {
         body: JSON.stringify({
           title: newSeriesTitle.trim(),
           description: newSeriesDescription.trim() || null,
+          penNameId: newSeriesPenNameId || null,
         }),
       });
 
@@ -457,6 +462,7 @@ export default function SeriesManagementPage() {
 
       setNewSeriesTitle('');
       setNewSeriesDescription('');
+      setNewSeriesPenNameId('');
       setShowCreateModal(false);
 
       // Navigate to the new series management page
@@ -1567,9 +1573,24 @@ export default function SeriesManagementPage() {
               disabled={creating}
             />
 
+            <label style={{
+              display: 'block',
+              fontSize: typography.fontSize.sm,
+              fontWeight: typography.fontWeight.medium,
+              color: colors.text.primary,
+              marginBottom: spacing[2],
+            }}>
+              Pen Name (optional)
+            </label>
+            <PenNameSelect
+              value={newSeriesPenNameId}
+              onChange={setNewSeriesPenNameId}
+            />
+
             <p style={{
               fontSize: typography.fontSize.sm,
               color: colors.text.tertiary,
+              marginTop: spacing[4],
               marginBottom: spacing[4],
             }}>
               After creating the series, you can add existing books or create new ones.
@@ -1581,6 +1602,7 @@ export default function SeriesManagementPage() {
                   setShowCreateModal(false);
                   setNewSeriesTitle('');
                   setNewSeriesDescription('');
+                  setNewSeriesPenNameId('');
                   setError(null);
                 }}
                 style={secondaryButtonStyle}

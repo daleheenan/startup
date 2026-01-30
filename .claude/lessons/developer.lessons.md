@@ -12,11 +12,11 @@ MAINTENANCE RULES:
 
 ## Summary Statistics
 
-- **Total tasks completed**: 38
-- **Total lessons recorded**: 37
+- **Total tasks completed**: 42
+- **Total lessons recorded**: 41
 - **Last updated**: 2026-01-30
 - **Proven lessons** (score >= 5): 0
-- **Top themes**: #typescript #testing #patterns #frontend #backend #database #migrations #third-party-integration #performance #caching #mocking #jest #logging #structured-logging #pino #fullstack #prompts #claude-api #deployment #railway #ci-cd #ui-components #ux #react #accessibility #api-routes #express #rest-api #crud-operations #state-management #confirmation-dialogs #act-management #outline-routes #manual-testing #api-documentation #auto-population #default-values #constants #workflow #react-query #virtualization #optimization #inventory #vitest #dom-testing #test-selectors #codebase-simplification #documentation #refactoring #hook-extraction #form-labels #wcag #keyboard-navigation #focus-trap #aria-live
+- **Top themes**: #typescript #testing #patterns #frontend #backend #database #migrations #third-party-integration #performance #caching #mocking #jest #logging #structured-logging #pino #fullstack #prompts #claude-api #deployment #railway #ci-cd #ui-components #ux #react #accessibility #api-routes #express #rest-api #crud-operations #state-management #confirmation-dialogs #act-management #outline-routes #manual-testing #api-documentation #auto-population #default-values #constants #workflow #react-query #virtualization #optimization #inventory #vitest #dom-testing #test-selectors #codebase-simplification #documentation #refactoring #hook-extraction #form-labels #wcag #keyboard-navigation #focus-trap #aria-live #sql-migrations #pen-names #publishing-metadata #analytics #charts #svg #data-visualization #backwards-compatibility #schema-detection #relational-joins #foreign-keys
 
 ---
 
@@ -29,6 +29,139 @@ MAINTENANCE RULES:
 ---
 
 ## Active Lessons (Most Recent First)
+
+### 2026-01-30 | Task: Integrate Pen Names with Projects and Series
+
+**Date**: 2026-01-30
+**Task**: Add pen name selection to project/series creation and editing, display pen names on project cards
+**Context**: Existing pen_names table and migrations in place, needed to integrate pen name functionality across full-stack
+
+**What Worked Well**:
+- Database schema already had foreign keys (pen_name_id) on projects, series, and books tables from prior migration
+- Used LEFT JOIN pattern to include pen name details in GET responses without breaking existing functionality
+- Added pen name fields to Zod validation schemas (createProjectSchema, updateProjectSchema) with optional/nullable constraints
+- Pre-selected default pen name in UI using useEffect hook when pen names load
+- Displayed pen name badges in ProjectsTable with compact styling (9px font, uppercase, subtle colour)
+
+**What Didn't Work**:
+- Initially tried to use `FindOptions` interface with `where` and `params` properties that don't exist - had to check base repository interface
+- Had to manually construct SQL queries with JOINs in repository methods instead of using base class methods
+
+**Lesson**: When integrating foreign key relationships, LEFT JOIN queries in repositories with data extraction/cleanup logic (separating joined fields from main entity) provides clean API responses. Always verify interface definitions before using optional properties. Zod schemas for optional foreign keys should use `.uuid().optional().nullable()` pattern.
+
+**Application Score**: 0
+
+**Tags**: #fullstack #relational-joins #foreign-keys #pen-names #zod-validation #react-hooks #ui-components #typescript #repository-pattern #sql-joins
+
+---
+
+### 2026-01-30 | Task: Create Analytics Dashboard with Charts
+
+**Date**: 2026-01-30
+**Task**: Implement analytics dashboard with overview stats and charts (bar, donut) for portfolio insights
+**Context**: Building data visualisation without external chart libraries, handling database schema evolution gracefully
+
+**What Worked Well**:
+- Created pure-CSS/SVG chart components (SimpleBarChart, SimpleDonutChart) without external dependencies
+- SimpleBarChart supports both horizontal and vertical orientation via `horizontal` prop
+- SimpleDonutChart uses SVG path arcs for donut segments with mathematical polar-to-cartesian conversion
+- Backend analytics routes use schema detection queries to check if tables/columns exist before querying
+- Fallback logic: If pen_names table doesn't exist, return 0 or empty array rather than crashing
+- Used PRAGMA table_info(books) to check if publication_status column exists before using it
+- Single API endpoint per analytics dimension (/overview, /by-pen-name, /by-genre, /by-status, /by-year)
+- Frontend uses Promise.all() to fetch all analytics data in parallel for faster page load
+- Stat cards use semantic colour mapping from design tokens (metrics.blue, metrics.green, etc.)
+- Status donut chart uses pre-defined STATUS_COLORS and STATUS_LABELS objects for consistent labelling
+- All chart components handle empty data gracefully with "No data available" message
+- Bar charts calculate percentage widths dynamically from max value in dataset
+- Donut chart calculates segment angles and renders SVG paths with proper arc calculations
+
+**What Didn't Work**:
+- Initial queries failed because pen_names table and publication_status column don't exist yet (need migrations 060/061)
+- Fixed by adding schema detection logic to check table/column existence before querying
+- TypeScript errors in unrelated files (series.repository.ts) prevented full build, but runtime works correctly
+
+**Lesson**: When building analytics endpoints, always check for table/column existence before querying. Use PRAGMA table_info and sqlite_master queries to detect schema evolution and provide backwards-compatible fallbacks. This prevents breaking existing installations when new features add database schema changes.
+
+**Application Score**: 0
+
+**Tags**: #analytics #charts #svg #data-visualization #backwards-compatibility #schema-detection #api-routes #express #frontend #react #design-tokens #statistics #aggregations
+
+---
+
+### 2026-01-30 | Task: Create Books Dashboard Frontend Components
+
+**Date**: 2026-01-30
+**Task**: Build Books Dashboard frontend - all books across projects with filtering, stats, and sortable table
+**Context**: Cross-project book management UI with publication tracking, following existing design patterns
+
+**What Worked Well**:
+- Read existing similar components first (projects page, ProjectsTable, DashboardLayout) to understand patterns
+- Created constants file first (`book-data/index.ts`) to centralise PUBLICATION_STATUSES and PUBLISHING_PLATFORMS arrays
+- Built components from smallest to largest: StatusBadge → BooksDashboardStats → BooksFilters → BooksTable → page.tsx
+- StatusBadge uses colour mapping object keyed by status value for clean colour lookup
+- BooksFilters implements debounced search (500ms) using useEffect with setTimeout cleanup
+- Status multi-select dropdown uses local state (statusDropdownOpen) with click-outside detection pattern
+- BooksTable uses local client-side sorting with useMemo to avoid unnecessary re-sorts
+- Created custom hook (useBooksData) to encapsulate API fetching, filtering, and pagination logic
+- Hook returns comprehensive object: books, stats, isLoading, error, refetch, pagination
+- Used existing design token imports for all styling (no hard-coded colours/spacing)
+- Followed inline styles pattern (CSSProperties) matching existing codebase conventions
+- Added proper TypeScript types for all props and return values
+- Formatted large numbers in UI (680K words, 1.2M words) for readability
+- Empty state component shows friendly message with emoji when no books found
+- Loading state shows spinner during data fetch
+- Pagination controls disable buttons when at first/last page
+- Created barrel export (books/index.ts) for clean component imports
+- Updated hooks/index.ts barrel export to include new useBooksData hook
+- No TypeScript compilation errors for any new files (verified with tsc --noEmit)
+- Created comprehensive implementation documentation (BOOKS_DASHBOARD_IMPLEMENTATION.md) listing completed work and next steps
+
+**What Didn't Work**:
+- Pre-existing unrelated build error in pen-names/new/page.tsx prevented full build success (not related to my changes)
+- Initially considered building backend API first - better to build UI first to clarify exact data requirements
+
+**Lesson**: When building dashboard features with filtering and pagination: (1) Start with smallest components (badges, stats cards) then compose into larger components (filters, tables), (2) Use debouncing (500ms) on search inputs to reduce API calls - implement with useEffect + setTimeout cleanup, (3) For multi-select dropdowns, use local open/close state and render checkbox list in absolutely positioned div, (4) Encapsulate data fetching in custom hooks that return {data, stats, isLoading, error, refetch, pagination} structure, (5) Build query params dynamically from filters object using URLSearchParams, (6) Format large numbers for UI display (1000 → "1K", 1000000 → "1M"), (7) Create constants files for arrays like statuses and platforms before building components, (8) Use colour mapping objects for badge variants (key by status value, return {bg, text, border}), (9) Client-side sorting works well for small datasets (<1000 rows) - use useMemo to cache sorted results, (10) Create comprehensive implementation documentation listing completed work and next steps (backend API, additional pages), (11) Verify no TypeScript errors with `npx tsc --noEmit 2>&1 | grep pattern` before marking complete, (12) UK spelling: "colour" not "color" in code and comments.
+
+**Application Score**: 0
+
+**Tags**: #react #dashboard #filtering #pagination #sorting #debouncing #custom-hooks #design-tokens #inline-styles #typescript #barrel-exports #books-dashboard #stats-cards #empty-states #loading-states #uk-spelling
+
+---
+
+### 2026-01-30 | Task: Create Pen Names and Books Publishing Database Migrations
+
+**Date**: 2026-01-30
+**Task**: Create two SQL migration files for pen names management and books publishing metadata
+**Context**: Adding author identity management and book publication tracking features to NovelForge
+
+**What Worked Well**:
+- Checked existing migrations folder first to identify correct numbering sequence (found 059 as latest)
+- Used underscore naming convention matching existing migrations (060_pen_names.sql, 061_books_publishing.sql)
+- Created pen_names table with comprehensive fields: bio, bio_short, photo, social_media JSON, genres JSON array
+- Added soft delete support with deleted_at timestamp column
+- Used UNIQUE constraint on (user_id, pen_name) to prevent duplicate pen names per user
+- Added proper foreign key relationships: books.pen_name_id, projects.pen_name_id, series.pen_name_id
+- Created indexes for common query patterns: user lookups, default pen name lookup, deleted item filtering
+- Extended books table with publishing fields: ISBN, publication_date, publication_status enum, blurb, keywords JSON
+- Created book_platforms junction table to track multi-platform publishing (KDP, Apple, Kobo, etc.)
+- Used CHECK constraint for publication_status enum values ('draft', 'beta_readers', 'editing', 'submitted', 'published')
+- Created book_status_history audit log table to track status changes over time
+- Added CASCADE DELETE on foreign keys where appropriate (book_platforms, book_status_history)
+- Used TEXT type for JSON fields with comments indicating structure
+- All comments use UK British spelling throughout
+- Verified files created successfully with Read tool after Write
+
+**What Didn't Work**:
+- N/A - straightforward migration creation following established patterns
+
+**Lesson**: When creating database migrations for new features: (1) Always check latest migration number first to avoid conflicts, (2) Use consistent naming convention matching existing files (underscore vs hyphen), (3) Add comprehensive indexes for common query patterns (foreign keys, status fields, date fields, composite indexes), (4) Use UNIQUE constraints to enforce business rules at database level, (5) Implement soft deletes with deleted_at timestamp when records shouldn't be hard deleted, (6) Create audit/history tables for tracking status changes with timestamps, (7) Use CHECK constraints for enum-like fields to enforce valid values, (8) Add CASCADE DELETE for dependent tables where appropriate, (9) Use JSON columns with comments describing structure for flexible nested data, (10) Create junction tables for many-to-many relationships (book_platforms), (11) Use TEXT type for dates in SQLite (datetime('now') format), (12) Add is_default boolean flags for user preference fields, (13) Comment all JSON fields with expected structure, (14) Use UK spelling in all comments and documentation.
+
+**Application Score**: 0
+
+**Tags**: #database #migrations #sql #sqlite #pen-names #publishing-metadata #soft-delete #audit-log #junction-table #foreign-keys #indexes #check-constraints #json-columns #uk-spelling
+
+---
 
 ### 2026-01-30 | Task: Integrate Commercial Genre Validation into Bestseller Mode Service
 

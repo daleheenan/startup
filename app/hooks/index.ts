@@ -16,3 +16,5 @@ export type { CreateStoryIdeaParams, CreateStoryIdeaResponse } from './useStoryI
 export { useUserPreferences, useUpdateUserPreferences } from './useUserPreferences';
 export type { UserPreferences } from './useUserPreferences';
 export { useWorkflowPrerequisites } from './useWorkflowPrerequisites';
+export { useBooksData } from './useBooksData';
+export type { BooksDataResult, UseBooksDataParams } from './useBooksData';

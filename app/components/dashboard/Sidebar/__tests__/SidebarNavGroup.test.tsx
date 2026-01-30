@@ -1,38 +1,40 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { usePathname, useRouter } from 'next/navigation';
 import SidebarNavGroup from '../SidebarNavGroup';
 
 // Mock Next.js navigation hooks
-jest.mock('next/navigation', () => ({
-  usePathname: jest.fn(),
-  useRouter: jest.fn(),
+vi.mock('next/navigation', () => ({
+  usePathname: vi.fn(),
+  useRouter: vi.fn(),
 }));
 
 // Mock Next.js Link component
-jest.mock('next/link', () => {
-  return function MockLink({ children, href, ...props }: any) {
-    return (
-      <a href={href} {...props}>
-        {children}
-      </a>
-    );
+vi.mock('next/link', () => {
+  return {
+    default: function MockLink({ children, href, ...props }: any) {
+      return (
+        <a href={href} {...props}>
+          {children}
+        </a>
+      );
+    },
   };
 });
 
 describe('SidebarNavGroup', () => {
-  const mockUsePathname = usePathname as jest.MockedFunction<typeof usePathname>;
-  const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
+  const mockUsePathname = usePathname as ReturnType<typeof vi.fn>;
+  const mockUseRouter = useRouter as ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     mockUsePathname.mockReturnValue('/projects');
     mockUseRouter.mockReturnValue({
-      push: jest.fn(),
-      replace: jest.fn(),
-      refresh: jest.fn(),
-      back: jest.fn(),
-      forward: jest.fn(),
-      prefetch: jest.fn(),
+      push: vi.fn(),
+      replace: vi.fn(),
+      refresh: vi.fn(),
+      back: vi.fn(),
+      forward: vi.fn(),
+      prefetch: vi.fn(),
     } as any);
   });
 
@@ -149,7 +151,7 @@ describe('SidebarNavGroup', () => {
     });
 
     it('should toggle expansion when header is clicked', () => {
-      const mockOnToggle = jest.fn();
+      const mockOnToggle = vi.fn();
 
       render(
         <SidebarNavGroup

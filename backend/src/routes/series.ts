@@ -92,7 +92,7 @@ router.get('/:id', (req, res) => {
  */
 router.post('/', (req, res) => {
   try {
-    const { title, description } = req.body;
+    const { title, description, penNameId } = req.body;
 
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
       return res.status(400).json({
@@ -107,6 +107,7 @@ router.post('/', (req, res) => {
       id,
       title: title.trim(),
       description: description?.trim() || null,
+      pen_name_id: penNameId || null,
       series_bible: null,
       status: 'active' as SeriesStatus,
       created_at: now,
@@ -151,7 +152,7 @@ router.post('/', (req, res) => {
 router.put('/:id', (req, res) => {
   try {
     const seriesId = req.params.id;
-    const { title, description, status } = req.body;
+    const { title, description, status, penNameId } = req.body;
 
     const existing = seriesRepo.findByIdParsed(seriesId);
     if (!existing) {
@@ -184,6 +185,10 @@ router.put('/:id', (req, res) => {
         });
       }
       updates.status = status;
+    }
+
+    if (penNameId !== undefined) {
+      updates.pen_name_id = penNameId || null;
     }
 
     const updated = seriesRepo.update(seriesId, updates);

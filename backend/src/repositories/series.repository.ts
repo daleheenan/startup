@@ -92,19 +92,89 @@ export class SeriesRepository extends BaseRepository<SeriesRow> {
   }
 
   /**
-   * Find series by ID with parsed JSON fields
+   * Find series by ID with parsed JSON fields (includes pen name)
    */
   findByIdParsed(id: string): ParsedSeries | null {
-    const row = this.findById(id);
-    return this.parseSeries(row);
+    const sql = `
+      SELECT
+        s.*,
+        pn.id as pen_name_id_full,
+        pn.pen_name,
+        pn.display_name as pen_name_display,
+        pn.is_default as pen_name_is_default
+      FROM series s
+      LEFT JOIN pen_names pn ON s.pen_name_id = pn.id
+      WHERE s.id = ?
+    `;
+
+    const row = this.executeQuerySingle<any>(sql, [id]);
+    if (!row) return null;
+
+    // Extract pen name data
+    const penName = row.pen_name ? {
+      id: row.pen_name_id_full || row.pen_name_id,
+      pen_name: row.pen_name,
+      display_name: row.pen_name_display,
+      is_default: row.pen_name_is_default === 1,
+    } : null;
+
+    // Remove temporary pen_name fields
+    const { pen_name_id_full, pen_name, pen_name_display, pen_name_is_default, ...seriesData } = row;
+
+    const parsed = this.parseSeries(seriesData);
+    if (parsed && penName) {
+      (parsed as any).pen_name = penName;
+    }
+
+    return parsed;
   }
 
   /**
-   * Find all series with parsed JSON fields
+   * Find all series with parsed JSON fields (includes pen names)
    */
   findAllParsed(options: FindOptions = {}): ParsedSeries[] {
-    const rows = this.findAll(options);
-    return rows.map(row => this.parseSeries(row)!);
+    let sql = `
+      SELECT
+        s.*,
+        pn.id as pen_name_id_full,
+        pn.pen_name,
+        pn.display_name as pen_name_display,
+        pn.is_default as pen_name_is_default
+      FROM series s
+      LEFT JOIN pen_names pn ON s.pen_name_id = pn.id
+    `;
+
+    if (options.orderBy) {
+      sql += ` ORDER BY ${options.orderBy}`;
+    }
+    if (options.limit) {
+      sql += ` LIMIT ${options.limit}`;
+    }
+    if (options.offset) {
+      sql += ` OFFSET ${options.offset}`;
+    }
+
+    const rows = this.executeQuery<any>(sql, []);
+
+    return rows.map(row => {
+      // Extract pen name data
+      const penName = row.pen_name ? {
+        id: row.pen_name_id_full || row.pen_name_id,
+        pen_name: row.pen_name,
+        display_name: row.pen_name_display,
+        is_default: row.pen_name_is_default === 1,
+      } : null;
+
+      // Remove temporary pen_name fields
+      const { pen_name_id_full, pen_name, pen_name_display, pen_name_is_default, ...seriesData } = row;
+
+      const parsed = this.parseSeries(seriesData)!;
+      if (penName) {
+        (parsed as any).pen_name = penName;
+      }
+
+      return parsed;
+    });
   }
 
   /**

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import DashboardLayout from '@/app/components/dashboard/DashboardLayout';
+import PenNameSelect from '@/app/components/pen-names/PenNameSelect';
 import { getToken } from '../../../lib/auth';
 import { colors, typography, spacing, borderRadius } from '../../../lib/design-tokens';
 
@@ -40,6 +41,7 @@ export default function PublishingSettingsPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Form state
+  const [penNameId, setPenNameId] = useState<string>('');
   const [dedication, setDedication] = useState('');
   const [epigraph, setEpigraph] = useState('');
   const [epigraphAttribution, setEpigraphAttribution] = useState('');
@@ -78,6 +80,7 @@ export default function PublishingSettingsPage() {
       setProject(data);
 
       // Populate form with existing values
+      setPenNameId(data.pen_name_id || '');
       setDedication(data.dedication || '');
       setEpigraph(data.epigraph || '');
       setEpigraphAttribution(data.epigraph_attribution || '');
@@ -108,6 +111,7 @@ export default function PublishingSettingsPage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
+          penNameId: penNameId || null,
           dedication: dedication || null,
           epigraph: epigraph || null,
           epigraphAttribution: epigraphAttribution || null,
@@ -569,6 +573,30 @@ export default function PublishingSettingsPage() {
                 }}>
                   <span>©</span> Copyright Page
                 </h2>
+
+                {/* Pen Name Selection */}
+                <div style={{ marginBottom: spacing[6] }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: typography.fontSize.sm,
+                    fontWeight: typography.fontWeight.medium,
+                    color: colors.text.primary,
+                    marginBottom: spacing[2],
+                  }}>
+                    Pen Name (Optional)
+                  </label>
+                  <p style={{
+                    fontSize: typography.fontSize.xs,
+                    color: colors.text.tertiary,
+                    margin: `0 0 ${spacing[3]} 0`,
+                  }}>
+                    Choose which pen name to publish this book under
+                  </p>
+                  <PenNameSelect
+                    value={penNameId}
+                    onChange={setPenNameId}
+                  />
+                </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: spacing[4] }}>
                   <div>

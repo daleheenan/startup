@@ -52,6 +52,13 @@ interface ProjectProgress {
   generationQueuePosition?: number;
 }
 
+interface PenName {
+  id: string;
+  pen_name: string;
+  display_name?: string;
+  is_default: boolean;
+}
+
 interface Project {
   id: string;
   title: string;
@@ -60,6 +67,7 @@ interface Project {
   status: string;
   created_at: string;
   updated_at: string;
+  pen_name?: PenName | null;
   metrics?: ProjectMetrics | null;
   progress?: ProjectProgress | null;
 }
@@ -602,21 +610,41 @@ export default function ProjectsTable({
                       color: colors.text.primary,
                     }}
                   >
-                    <Link
-                      href={`/projects/${project.id}`}
-                      style={{
-                        color: 'inherit',
-                        textDecoration: 'none',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.color = colors.brand.primary;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.color = colors.text.primary;
-                      }}
-                    >
-                      {project.title}
-                    </Link>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: spacing[2] }}>
+                      <Link
+                        href={`/projects/${project.id}`}
+                        style={{
+                          color: 'inherit',
+                          textDecoration: 'none',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.color = colors.brand.primary;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.color = colors.text.primary;
+                        }}
+                      >
+                        {project.title}
+                      </Link>
+                      {project.pen_name && (
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            padding: '2px 6px',
+                            background: colors.semantic.infoLight,
+                            color: colors.semantic.info,
+                            borderRadius: borderRadius.sm,
+                            fontSize: '9px',
+                            fontWeight: typography.fontWeight.medium,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                          }}
+                          title={`Pen name: ${project.pen_name.pen_name}${project.pen_name.display_name ? ` (${project.pen_name.display_name})` : ''}`}
+                        >
+                          {project.pen_name.pen_name}
+                        </span>
+                      )}
+                    </div>
                   </td>
 
                   {/* Last Modified - Relative date */}

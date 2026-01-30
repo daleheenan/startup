@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ConceptCard from '../components/ConceptCard';
 import GenerationProgress from '../components/GenerationProgress';
+import PenNameSelect from '../components/pen-names/PenNameSelect';
+import { usePenNames } from '../hooks/usePenNames';
 import { getToken } from '../lib/auth';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -21,9 +23,11 @@ interface StoryConcept {
 
 export default function ConceptsPage() {
   const router = useRouter();
+  const { data: penNames } = usePenNames();
   const [concepts, setConcepts] = useState<StoryConcept[]>([]);
   const [preferences, setPreferences] = useState<any>(null);
   const [selectedConcept, setSelectedConcept] = useState<string | null>(null);
+  const [selectedPenName, setSelectedPenName] = useState<string>('');
   const [isCreating, setIsCreating] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +69,16 @@ export default function ConceptsPage() {
     }
   }, [router]);
 
+  // Set default pen name when pen names are loaded
+  useEffect(() => {
+    if (penNames && penNames.length > 0 && !selectedPenName) {
+      const defaultPenName = penNames.find(pn => pn.is_default);
+      if (defaultPenName) {
+        setSelectedPenName(defaultPenName.id);
+      }
+    }
+  }, [penNames, selectedPenName]);
+
   const handleSelectConcept = async () => {
     if (!selectedConcept) {
       setError('Please select a concept');
@@ -81,13 +95,20 @@ export default function ConceptsPage() {
       }
 
       const token = getToken();
+
+      // Add pen name to preferences if selected
+      const preferencesWithPenName = {
+        ...preferences,
+        penNameId: selectedPenName || null,
+      };
+
       const response = await fetch(`${API_BASE_URL}/api/projects`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ concept, preferences }),
+        body: JSON.stringify({ concept, preferences: preferencesWithPenName }),
       });
 
       if (!response.ok) {
@@ -343,6 +364,37 @@ export default function ConceptsPage() {
                   isSaved={savedConceptIds.has(concept.id)}
                 />
               ))}
+            </div>
+
+            {/* Pen Name Selection */}
+            <div style={{
+              maxWidth: '500px',
+              margin: '0 auto 2rem auto',
+              padding: '1.5rem',
+              background: '#FFFFFF',
+              border: '1px solid #E2E8F0',
+              borderRadius: '12px',
+            }}>
+              <label style={{
+                display: 'block',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                color: '#1A1A2E',
+                marginBottom: '0.5rem',
+              }}>
+                Pen Name (Optional)
+              </label>
+              <p style={{
+                fontSize: '0.75rem',
+                color: '#64748B',
+                margin: '0 0 1rem 0',
+              }}>
+                Choose a pen name for this project. You can change this later.
+              </p>
+              <PenNameSelect
+                value={selectedPenName}
+                onChange={setSelectedPenName}
+              />
             </div>
 
             {/* Action Buttons */}

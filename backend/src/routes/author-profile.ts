@@ -46,11 +46,22 @@ router.get('/', (req, res) => {
     const profile = db.prepare(`
       SELECT
         id,
+        author_name,
+        pen_name,
+        preferred_pronouns,
         author_bio,
+        author_bio_short,
         author_photo,
         author_photo_type,
         author_website,
         author_social_media,
+        contact_email,
+        contact_phone,
+        contact_address,
+        contact_city,
+        contact_postcode,
+        contact_country,
+        writing_credentials,
         created_at,
         updated_at
       FROM author_profile
@@ -62,17 +73,28 @@ router.get('/', (req, res) => {
       db.prepare(`INSERT OR IGNORE INTO author_profile (id) VALUES ('owner')`).run();
       return res.json({
         id: 'owner',
+        authorName: null,
+        penName: null,
+        preferredPronouns: null,
         authorBio: null,
+        authorBioShort: null,
         authorPhoto: null,
         authorPhotoType: null,
         authorWebsite: null,
         authorSocialMedia: null,
+        contactEmail: null,
+        contactPhone: null,
+        contactAddress: null,
+        contactCity: null,
+        contactPostcode: null,
+        contactCountry: null,
+        writingCredentials: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
     }
 
-    // Parse social media JSON if present
+    // Parse JSON fields if present
     let socialMedia = null;
     if (profile.author_social_media) {
       try {
@@ -82,13 +104,33 @@ router.get('/', (req, res) => {
       }
     }
 
+    let writingCredentials = [];
+    if (profile.writing_credentials) {
+      try {
+        writingCredentials = JSON.parse(profile.writing_credentials);
+      } catch {
+        writingCredentials = [];
+      }
+    }
+
     res.json({
       id: profile.id,
+      authorName: profile.author_name,
+      penName: profile.pen_name,
+      preferredPronouns: profile.preferred_pronouns,
       authorBio: profile.author_bio,
+      authorBioShort: profile.author_bio_short,
       authorPhoto: profile.author_photo,
       authorPhotoType: profile.author_photo_type,
       authorWebsite: profile.author_website,
       authorSocialMedia: socialMedia,
+      contactEmail: profile.contact_email,
+      contactPhone: profile.contact_phone,
+      contactAddress: profile.contact_address,
+      contactCity: profile.contact_city,
+      contactPostcode: profile.contact_postcode,
+      contactCountry: profile.contact_country,
+      writingCredentials: writingCredentials,
       createdAt: profile.created_at,
       updatedAt: profile.updated_at,
     });
@@ -104,16 +146,61 @@ router.get('/', (req, res) => {
  */
 router.put('/', (req, res) => {
   try {
-    const { authorBio, authorWebsite, authorSocialMedia } = req.body;
+    const {
+      authorName,
+      penName,
+      preferredPronouns,
+      authorBio,
+      authorBioShort,
+      authorWebsite,
+      authorSocialMedia,
+      contactEmail,
+      contactPhone,
+      contactAddress,
+      contactCity,
+      contactPostcode,
+      contactCountry,
+      writingCredentials,
+    } = req.body;
     const now = new Date().toISOString();
+
+    // Validate email format if provided
+    if (contactEmail !== undefined && contactEmail !== null && contactEmail !== '') {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(contactEmail)) {
+        return res.status(400).json({
+          error: { code: 'VALIDATION_ERROR', message: 'Invalid email format' },
+        });
+      }
+    }
 
     // Build update query dynamically
     const updates: string[] = [];
     const params: any[] = [];
 
+    if (authorName !== undefined) {
+      updates.push('author_name = ?');
+      params.push(authorName);
+    }
+
+    if (penName !== undefined) {
+      updates.push('pen_name = ?');
+      params.push(penName);
+    }
+
+    if (preferredPronouns !== undefined) {
+      updates.push('preferred_pronouns = ?');
+      params.push(preferredPronouns);
+    }
+
     if (authorBio !== undefined) {
       updates.push('author_bio = ?');
       params.push(authorBio);
+    }
+
+    if (authorBioShort !== undefined) {
+      updates.push('author_bio_short = ?');
+      params.push(authorBioShort);
     }
 
     if (authorWebsite !== undefined) {
@@ -124,6 +211,41 @@ router.put('/', (req, res) => {
     if (authorSocialMedia !== undefined) {
       updates.push('author_social_media = ?');
       params.push(authorSocialMedia ? JSON.stringify(authorSocialMedia) : null);
+    }
+
+    if (contactEmail !== undefined) {
+      updates.push('contact_email = ?');
+      params.push(contactEmail);
+    }
+
+    if (contactPhone !== undefined) {
+      updates.push('contact_phone = ?');
+      params.push(contactPhone);
+    }
+
+    if (contactAddress !== undefined) {
+      updates.push('contact_address = ?');
+      params.push(contactAddress);
+    }
+
+    if (contactCity !== undefined) {
+      updates.push('contact_city = ?');
+      params.push(contactCity);
+    }
+
+    if (contactPostcode !== undefined) {
+      updates.push('contact_postcode = ?');
+      params.push(contactPostcode);
+    }
+
+    if (contactCountry !== undefined) {
+      updates.push('contact_country = ?');
+      params.push(contactCountry);
+    }
+
+    if (writingCredentials !== undefined) {
+      updates.push('writing_credentials = ?');
+      params.push(writingCredentials ? JSON.stringify(writingCredentials) : null);
     }
 
     if (updates.length === 0) {
@@ -151,6 +273,7 @@ router.put('/', (req, res) => {
       SELECT * FROM author_profile WHERE id = 'owner'
     `).get() as any;
 
+    // Parse JSON fields
     let socialMedia = null;
     if (profile.author_social_media) {
       try {
@@ -160,13 +283,33 @@ router.put('/', (req, res) => {
       }
     }
 
+    let credentials = [];
+    if (profile.writing_credentials) {
+      try {
+        credentials = JSON.parse(profile.writing_credentials);
+      } catch {
+        credentials = [];
+      }
+    }
+
     res.json({
       id: profile.id,
+      authorName: profile.author_name,
+      penName: profile.pen_name,
+      preferredPronouns: profile.preferred_pronouns,
       authorBio: profile.author_bio,
+      authorBioShort: profile.author_bio_short,
       authorPhoto: profile.author_photo,
       authorPhotoType: profile.author_photo_type,
       authorWebsite: profile.author_website,
       authorSocialMedia: socialMedia,
+      contactEmail: profile.contact_email,
+      contactPhone: profile.contact_phone,
+      contactAddress: profile.contact_address,
+      contactCity: profile.contact_city,
+      contactPostcode: profile.contact_postcode,
+      contactCountry: profile.contact_country,
+      writingCredentials: credentials,
       createdAt: profile.created_at,
       updatedAt: profile.updated_at,
     });

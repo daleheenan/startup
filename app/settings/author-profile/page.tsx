@@ -8,9 +8,19 @@ import { colors, typography, spacing, borderRadius, transitions, shadows } from 
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+interface WritingCredential {
+  type: 'Publication' | 'Award' | 'Degree' | 'Membership' | 'Other';
+  description: string;
+  year?: string;
+}
+
 interface AuthorProfile {
   id: string;
+  authorName: string | null;
+  penName: string | null;
+  preferredPronouns: string | null;
   authorBio: string | null;
+  authorBioShort: string | null;
   authorPhoto: string | null;
   authorPhotoType: string | null;
   authorWebsite: string | null;
@@ -20,6 +30,13 @@ interface AuthorProfile {
     facebook?: string;
     goodreads?: string;
   } | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  contactAddress: string | null;
+  contactCity: string | null;
+  contactPostcode: string | null;
+  contactCountry: string | null;
+  writingCredentials: WritingCredential[];
   createdAt: string;
   updatedAt: string;
 }
@@ -34,7 +51,11 @@ export default function AuthorProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form state
+  const [authorName, setAuthorName] = useState('');
+  const [penName, setPenName] = useState('');
+  const [preferredPronouns, setPreferredPronouns] = useState('');
   const [authorBio, setAuthorBio] = useState('');
+  const [authorBioShort, setAuthorBioShort] = useState('');
   const [authorWebsite, setAuthorWebsite] = useState('');
   const [socialMedia, setSocialMedia] = useState({
     twitter: '',
@@ -42,7 +63,18 @@ export default function AuthorProfilePage() {
     facebook: '',
     goodreads: '',
   });
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [contactAddress, setContactAddress] = useState('');
+  const [contactCity, setContactCity] = useState('');
+  const [contactPostcode, setContactPostcode] = useState('');
+  const [contactCountry, setContactCountry] = useState('');
+  const [writingCredentials, setWritingCredentials] = useState<WritingCredential[]>([]);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+
+  // Collapsible sections state
+  const [contactSectionOpen, setContactSectionOpen] = useState(false);
+  const [credentialsSectionOpen, setCredentialsSectionOpen] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -66,7 +98,11 @@ export default function AuthorProfilePage() {
       if (response.ok) {
         const data = await response.json();
         setProfile(data);
+        setAuthorName(data.authorName || '');
+        setPenName(data.penName || '');
+        setPreferredPronouns(data.preferredPronouns || '');
         setAuthorBio(data.authorBio || '');
+        setAuthorBioShort(data.authorBioShort || '');
         setAuthorWebsite(data.authorWebsite || '');
         setSocialMedia({
           twitter: data.authorSocialMedia?.twitter || '',
@@ -74,6 +110,13 @@ export default function AuthorProfilePage() {
           facebook: data.authorSocialMedia?.facebook || '',
           goodreads: data.authorSocialMedia?.goodreads || '',
         });
+        setContactEmail(data.contactEmail || '');
+        setContactPhone(data.contactPhone || '');
+        setContactAddress(data.contactAddress || '');
+        setContactCity(data.contactCity || '');
+        setContactPostcode(data.contactPostcode || '');
+        setContactCountry(data.contactCountry || '');
+        setWritingCredentials(data.writingCredentials || []);
         if (data.authorPhoto && data.authorPhotoType) {
           setPhotoPreview(`data:${data.authorPhotoType};base64,${data.authorPhoto}`);
         }
@@ -100,9 +143,20 @@ export default function AuthorProfilePage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
+          authorName,
+          penName,
+          preferredPronouns,
           authorBio,
+          authorBioShort,
           authorWebsite,
           authorSocialMedia: socialMedia,
+          contactEmail,
+          contactPhone,
+          contactAddress,
+          contactCity,
+          contactPostcode,
+          contactCountry,
+          writingCredentials,
         }),
       });
 
@@ -268,6 +322,123 @@ export default function AuthorProfilePage() {
 
         {!loading && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[6] }}>
+            {/* Personal Information Section */}
+            <div style={{
+              background: colors.background.surface,
+              border: `1px solid ${colors.border.default}`,
+              borderRadius: borderRadius.xl,
+              padding: spacing[6],
+            }}>
+              <h2 style={{
+                fontSize: typography.fontSize.lg,
+                fontWeight: typography.fontWeight.semibold,
+                color: colors.text.primary,
+                margin: 0,
+                marginBottom: spacing[4],
+              }}>
+                Personal Information
+              </h2>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[4] }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: typography.fontSize.sm,
+                    fontWeight: typography.fontWeight.medium,
+                    color: colors.text.primary,
+                    marginBottom: spacing[2],
+                  }}>
+                    Legal Name
+                  </label>
+                  <input
+                    type="text"
+                    value={authorName}
+                    onChange={(e) => setAuthorName(e.target.value)}
+                    placeholder="Your full legal name"
+                    style={{
+                      width: '100%',
+                      padding: spacing[3],
+                      border: `1px solid ${colors.border.default}`,
+                      borderRadius: borderRadius.md,
+                      fontSize: typography.fontSize.sm,
+                    }}
+                  />
+                  <p style={{
+                    fontSize: typography.fontSize.xs,
+                    color: colors.text.disabled,
+                    margin: 0,
+                    marginTop: spacing[1],
+                  }}>
+                    Your legal name for contracts and copyright notices
+                  </p>
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: typography.fontSize.sm,
+                    fontWeight: typography.fontWeight.medium,
+                    color: colors.text.primary,
+                    marginBottom: spacing[2],
+                  }}>
+                    Primary Pen Name
+                  </label>
+                  <input
+                    type="text"
+                    value={penName}
+                    onChange={(e) => setPenName(e.target.value)}
+                    placeholder="Your default pen name"
+                    style={{
+                      width: '100%',
+                      padding: spacing[3],
+                      border: `1px solid ${colors.border.default}`,
+                      borderRadius: borderRadius.md,
+                      fontSize: typography.fontSize.sm,
+                    }}
+                  />
+                  <p style={{
+                    fontSize: typography.fontSize.xs,
+                    color: colors.text.disabled,
+                    margin: 0,
+                    marginTop: spacing[1],
+                  }}>
+                    Your default pen name
+                  </p>
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: typography.fontSize.sm,
+                    fontWeight: typography.fontWeight.medium,
+                    color: colors.text.primary,
+                    marginBottom: spacing[2],
+                  }}>
+                    Preferred Pronouns
+                  </label>
+                  <select
+                    value={preferredPronouns}
+                    onChange={(e) => setPreferredPronouns(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: spacing[3],
+                      border: `1px solid ${colors.border.default}`,
+                      borderRadius: borderRadius.md,
+                      fontSize: typography.fontSize.sm,
+                      background: colors.background.surface,
+                    }}
+                  >
+                    <option value="">Select pronouns</option>
+                    <option value="He/Him">He/Him</option>
+                    <option value="She/Her">She/Her</option>
+                    <option value="They/Them">They/Them</option>
+                    <option value="Other">Other</option>
+                    <option value="Prefer not to say">Prefer not to say</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
             {/* Author Photo Section */}
             <div style={{
               background: colors.background.surface,
@@ -400,42 +571,89 @@ export default function AuthorProfilePage() {
                 Author Biography
               </h2>
 
-              <p style={{
-                fontSize: typography.fontSize.sm,
-                color: colors.text.tertiary,
-                margin: 0,
-                marginBottom: spacing[4],
-              }}>
-                Write a compelling biography that will appear in the "About the Author" section of your books.
-                Third person is traditional (e.g., "Jane Smith is an award-winning author...").
-              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[4] }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: typography.fontSize.sm,
+                    fontWeight: typography.fontWeight.medium,
+                    color: colors.text.primary,
+                    marginBottom: spacing[2],
+                  }}>
+                    Short Bio
+                  </label>
+                  <textarea
+                    value={authorBioShort}
+                    onChange={(e) => setAuthorBioShort(e.target.value)}
+                    placeholder="Jane Smith is an award-winning author of commercial fiction..."
+                    rows={3}
+                    style={{
+                      width: '100%',
+                      padding: spacing[4],
+                      border: `1px solid ${colors.border.default}`,
+                      borderRadius: borderRadius.lg,
+                      fontSize: typography.fontSize.sm,
+                      lineHeight: typography.lineHeight.relaxed,
+                      resize: 'vertical',
+                      fontFamily: typography.fontFamily.base,
+                    }}
+                  />
+                  <p style={{
+                    fontSize: typography.fontSize.xs,
+                    color: colors.text.disabled,
+                    margin: 0,
+                    marginTop: spacing[2],
+                  }}>
+                    50-100 words for query letters ({authorBioShort.split(/\s+/).filter(w => w).length} words)
+                  </p>
+                </div>
 
-              <textarea
-                value={authorBio}
-                onChange={(e) => setAuthorBio(e.target.value)}
-                placeholder="Jane Smith is the author of several bestselling novels. When not writing, she can be found..."
-                rows={6}
-                style={{
-                  width: '100%',
-                  padding: spacing[4],
-                  border: `1px solid ${colors.border.default}`,
-                  borderRadius: borderRadius.lg,
-                  fontSize: typography.fontSize.sm,
-                  lineHeight: typography.lineHeight.relaxed,
-                  resize: 'vertical',
-                  fontFamily: typography.fontFamily.base,
-                }}
-              />
-
-              <p style={{
-                fontSize: typography.fontSize.xs,
-                color: colors.text.disabled,
-                margin: 0,
-                marginTop: spacing[2],
-                textAlign: 'right',
-              }}>
-                {authorBio.length} characters
-              </p>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: typography.fontSize.sm,
+                    fontWeight: typography.fontWeight.medium,
+                    color: colors.text.primary,
+                    marginBottom: spacing[2],
+                  }}>
+                    Full Biography
+                  </label>
+                  <p style={{
+                    fontSize: typography.fontSize.sm,
+                    color: colors.text.tertiary,
+                    margin: 0,
+                    marginBottom: spacing[2],
+                  }}>
+                    Write a compelling biography that will appear in the "About the Author" section of your books.
+                    Third person is traditional (e.g., "Jane Smith is an award-winning author...").
+                  </p>
+                  <textarea
+                    value={authorBio}
+                    onChange={(e) => setAuthorBio(e.target.value)}
+                    placeholder="Jane Smith is the author of several bestselling novels. When not writing, she can be found..."
+                    rows={6}
+                    style={{
+                      width: '100%',
+                      padding: spacing[4],
+                      border: `1px solid ${colors.border.default}`,
+                      borderRadius: borderRadius.lg,
+                      fontSize: typography.fontSize.sm,
+                      lineHeight: typography.lineHeight.relaxed,
+                      resize: 'vertical',
+                      fontFamily: typography.fontFamily.base,
+                    }}
+                  />
+                  <p style={{
+                    fontSize: typography.fontSize.xs,
+                    color: colors.text.disabled,
+                    margin: 0,
+                    marginTop: spacing[2],
+                    textAlign: 'right',
+                  }}>
+                    {authorBio.length} characters
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* Website & Social Media Section */}
@@ -592,6 +810,442 @@ export default function AuthorProfilePage() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Contact Information Section */}
+            <div style={{
+              background: colors.background.surface,
+              border: `1px solid ${colors.border.default}`,
+              borderRadius: borderRadius.xl,
+              padding: spacing[6],
+            }}>
+              <div
+                onClick={() => setContactSectionOpen(!contactSectionOpen)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  cursor: 'pointer',
+                  marginBottom: contactSectionOpen ? spacing[4] : 0,
+                }}
+              >
+                <h2 style={{
+                  fontSize: typography.fontSize.lg,
+                  fontWeight: typography.fontWeight.semibold,
+                  color: colors.text.primary,
+                  margin: 0,
+                }}>
+                  Contact Information
+                </h2>
+                <span style={{
+                  fontSize: typography.fontSize.xl,
+                  color: colors.text.secondary,
+                  transform: contactSectionOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.2s',
+                  display: 'inline-block',
+                }}>
+                  ▼
+                </span>
+              </div>
+
+              {contactSectionOpen && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[4] }}>
+                  <p style={{
+                    fontSize: typography.fontSize.sm,
+                    color: colors.text.tertiary,
+                    margin: 0,
+                  }}>
+                    Contact details for contracts, rights, and business correspondence
+                  </p>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: spacing[4] }}>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: typography.fontSize.sm,
+                        fontWeight: typography.fontWeight.medium,
+                        color: colors.text.primary,
+                        marginBottom: spacing[2],
+                      }}>
+                        Contact Email
+                      </label>
+                      <input
+                        type="email"
+                        value={contactEmail}
+                        onChange={(e) => setContactEmail(e.target.value)}
+                        placeholder="author@example.com"
+                        style={{
+                          width: '100%',
+                          padding: spacing[3],
+                          border: `1px solid ${colors.border.default}`,
+                          borderRadius: borderRadius.md,
+                          fontSize: typography.fontSize.sm,
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: typography.fontSize.sm,
+                        fontWeight: typography.fontWeight.medium,
+                        color: colors.text.primary,
+                        marginBottom: spacing[2],
+                      }}>
+                        Phone Number
+                      </label>
+                      <input
+                        type="tel"
+                        value={contactPhone}
+                        onChange={(e) => setContactPhone(e.target.value)}
+                        placeholder="+44 20 1234 5678"
+                        style={{
+                          width: '100%',
+                          padding: spacing[3],
+                          border: `1px solid ${colors.border.default}`,
+                          borderRadius: borderRadius.md,
+                          fontSize: typography.fontSize.sm,
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: typography.fontSize.sm,
+                      fontWeight: typography.fontWeight.medium,
+                      color: colors.text.primary,
+                      marginBottom: spacing[2],
+                    }}>
+                      Street Address
+                    </label>
+                    <textarea
+                      value={contactAddress}
+                      onChange={(e) => setContactAddress(e.target.value)}
+                      placeholder="123 Publishing Lane"
+                      rows={2}
+                      style={{
+                        width: '100%',
+                        padding: spacing[3],
+                        border: `1px solid ${colors.border.default}`,
+                        borderRadius: borderRadius.md,
+                        fontSize: typography.fontSize.sm,
+                        fontFamily: typography.fontFamily.base,
+                        resize: 'vertical',
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: spacing[4] }}>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: typography.fontSize.sm,
+                        fontWeight: typography.fontWeight.medium,
+                        color: colors.text.primary,
+                        marginBottom: spacing[2],
+                      }}>
+                        City
+                      </label>
+                      <input
+                        type="text"
+                        value={contactCity}
+                        onChange={(e) => setContactCity(e.target.value)}
+                        placeholder="London"
+                        style={{
+                          width: '100%',
+                          padding: spacing[3],
+                          border: `1px solid ${colors.border.default}`,
+                          borderRadius: borderRadius.md,
+                          fontSize: typography.fontSize.sm,
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: typography.fontSize.sm,
+                        fontWeight: typography.fontWeight.medium,
+                        color: colors.text.primary,
+                        marginBottom: spacing[2],
+                      }}>
+                        Postcode
+                      </label>
+                      <input
+                        type="text"
+                        value={contactPostcode}
+                        onChange={(e) => setContactPostcode(e.target.value)}
+                        placeholder="SW1A 1AA"
+                        style={{
+                          width: '100%',
+                          padding: spacing[3],
+                          border: `1px solid ${colors.border.default}`,
+                          borderRadius: borderRadius.md,
+                          fontSize: typography.fontSize.sm,
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: typography.fontSize.sm,
+                        fontWeight: typography.fontWeight.medium,
+                        color: colors.text.primary,
+                        marginBottom: spacing[2],
+                      }}>
+                        Country
+                      </label>
+                      <select
+                        value={contactCountry}
+                        onChange={(e) => setContactCountry(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: spacing[3],
+                          border: `1px solid ${colors.border.default}`,
+                          borderRadius: borderRadius.md,
+                          fontSize: typography.fontSize.sm,
+                          background: colors.background.surface,
+                        }}
+                      >
+                        <option value="">Select country</option>
+                        <option value="United Kingdom">United Kingdom</option>
+                        <option value="United States">United States</option>
+                        <option value="Canada">Canada</option>
+                        <option value="Australia">Australia</option>
+                        <option value="">---</option>
+                        <option value="Afghanistan">Afghanistan</option>
+                        <option value="Albania">Albania</option>
+                        <option value="Algeria">Algeria</option>
+                        <option value="Argentina">Argentina</option>
+                        <option value="Austria">Austria</option>
+                        <option value="Belgium">Belgium</option>
+                        <option value="Brazil">Brazil</option>
+                        <option value="China">China</option>
+                        <option value="Denmark">Denmark</option>
+                        <option value="Egypt">Egypt</option>
+                        <option value="Finland">Finland</option>
+                        <option value="France">France</option>
+                        <option value="Germany">Germany</option>
+                        <option value="Greece">Greece</option>
+                        <option value="India">India</option>
+                        <option value="Ireland">Ireland</option>
+                        <option value="Italy">Italy</option>
+                        <option value="Japan">Japan</option>
+                        <option value="Mexico">Mexico</option>
+                        <option value="Netherlands">Netherlands</option>
+                        <option value="New Zealand">New Zealand</option>
+                        <option value="Norway">Norway</option>
+                        <option value="Poland">Poland</option>
+                        <option value="Portugal">Portugal</option>
+                        <option value="Russia">Russia</option>
+                        <option value="South Africa">South Africa</option>
+                        <option value="South Korea">South Korea</option>
+                        <option value="Spain">Spain</option>
+                        <option value="Sweden">Sweden</option>
+                        <option value="Switzerland">Switzerland</option>
+                        <option value="Turkey">Turkey</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Writing Credentials Section */}
+            <div style={{
+              background: colors.background.surface,
+              border: `1px solid ${colors.border.default}`,
+              borderRadius: borderRadius.xl,
+              padding: spacing[6],
+            }}>
+              <div
+                onClick={() => setCredentialsSectionOpen(!credentialsSectionOpen)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  cursor: 'pointer',
+                  marginBottom: credentialsSectionOpen ? spacing[4] : 0,
+                }}
+              >
+                <h2 style={{
+                  fontSize: typography.fontSize.lg,
+                  fontWeight: typography.fontWeight.semibold,
+                  color: colors.text.primary,
+                  margin: 0,
+                }}>
+                  Writing Credentials
+                </h2>
+                <span style={{
+                  fontSize: typography.fontSize.xl,
+                  color: colors.text.secondary,
+                  transform: credentialsSectionOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.2s',
+                  display: 'inline-block',
+                }}>
+                  ▼
+                </span>
+              </div>
+
+              {credentialsSectionOpen && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[4] }}>
+                  <p style={{
+                    fontSize: typography.fontSize.sm,
+                    color: colors.text.tertiary,
+                    margin: 0,
+                  }}>
+                    Publications, awards, degrees, and memberships that strengthen your author platform
+                  </p>
+
+                  {writingCredentials.map((credential, index) => (
+                    <div
+                      key={index}
+                      style={{
+                        background: colors.background.primary,
+                        border: `1px solid ${colors.border.default}`,
+                        borderRadius: borderRadius.md,
+                        padding: spacing[4],
+                      }}
+                    >
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 100px auto', gap: spacing[3], alignItems: 'end' }}>
+                        <div>
+                          <label style={{
+                            display: 'block',
+                            fontSize: typography.fontSize.xs,
+                            fontWeight: typography.fontWeight.medium,
+                            color: colors.text.primary,
+                            marginBottom: spacing[1],
+                          }}>
+                            Type
+                          </label>
+                          <select
+                            value={credential.type}
+                            onChange={(e) => {
+                              const updated = [...writingCredentials];
+                              updated[index].type = e.target.value as WritingCredential['type'];
+                              setWritingCredentials(updated);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: spacing[2],
+                              border: `1px solid ${colors.border.default}`,
+                              borderRadius: borderRadius.md,
+                              fontSize: typography.fontSize.sm,
+                              background: colors.background.surface,
+                            }}
+                          >
+                            <option value="Publication">Publication</option>
+                            <option value="Award">Award</option>
+                            <option value="Degree">Degree</option>
+                            <option value="Membership">Membership</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label style={{
+                            display: 'block',
+                            fontSize: typography.fontSize.xs,
+                            fontWeight: typography.fontWeight.medium,
+                            color: colors.text.primary,
+                            marginBottom: spacing[1],
+                          }}>
+                            Description
+                          </label>
+                          <input
+                            type="text"
+                            value={credential.description}
+                            onChange={(e) => {
+                              const updated = [...writingCredentials];
+                              updated[index].description = e.target.value;
+                              setWritingCredentials(updated);
+                            }}
+                            placeholder="e.g., Published in The New Yorker"
+                            style={{
+                              width: '100%',
+                              padding: spacing[2],
+                              border: `1px solid ${colors.border.default}`,
+                              borderRadius: borderRadius.md,
+                              fontSize: typography.fontSize.sm,
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{
+                            display: 'block',
+                            fontSize: typography.fontSize.xs,
+                            fontWeight: typography.fontWeight.medium,
+                            color: colors.text.primary,
+                            marginBottom: spacing[1],
+                          }}>
+                            Year (optional)
+                          </label>
+                          <input
+                            type="text"
+                            value={credential.year || ''}
+                            onChange={(e) => {
+                              const updated = [...writingCredentials];
+                              updated[index].year = e.target.value;
+                              setWritingCredentials(updated);
+                            }}
+                            placeholder="2024"
+                            style={{
+                              width: '100%',
+                              padding: spacing[2],
+                              border: `1px solid ${colors.border.default}`,
+                              borderRadius: borderRadius.md,
+                              fontSize: typography.fontSize.sm,
+                            }}
+                          />
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            const updated = writingCredentials.filter((_, i) => i !== index);
+                            setWritingCredentials(updated);
+                          }}
+                          style={{
+                            padding: spacing[2],
+                            background: 'transparent',
+                            border: `1px solid ${colors.border.default}`,
+                            borderRadius: borderRadius.md,
+                            color: colors.text.secondary,
+                            fontSize: typography.fontSize.sm,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  <button
+                    onClick={() => {
+                      setWritingCredentials([
+                        ...writingCredentials,
+                        { type: 'Publication', description: '', year: '' },
+                      ]);
+                    }}
+                    style={{
+                      padding: `${spacing[2]} ${spacing[4]}`,
+                      background: 'transparent',
+                      border: `2px dashed ${colors.border.default}`,
+                      borderRadius: borderRadius.md,
+                      color: colors.text.secondary,
+                      fontSize: typography.fontSize.sm,
+                      cursor: 'pointer',
+                      width: '100%',
+                    }}
+                  >
+                    + Add Credential
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Info Box */}

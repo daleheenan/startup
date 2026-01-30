@@ -34,6 +34,7 @@ export const createProjectSchema = z.object({
     bookCount: z.number().int().positive().optional(),
     universeId: z.string().uuid().optional(),
     sourceProjectId: z.string().uuid().optional(),
+    penNameId: z.string().uuid('Invalid pen name ID').optional().nullable(),
     // Time period fields (Phase 4)
     timePeriod: timePeriodSchema,
     timePeriodType: timePeriodTypeSchema.optional(),
@@ -64,6 +65,8 @@ export const updateProjectSchema = z.object({
   // Series relationship fields (new series system)
   seriesId: z.string().uuid('Invalid series ID').optional().nullable(),
   seriesBookNumber: z.number().int().positive().optional().nullable(),
+  // Pen name field
+  penNameId: z.string().uuid('Invalid pen name ID').optional().nullable(),
   // Publishing fields
   dedication: z.string().max(2000, 'Dedication too long').optional().nullable(),
   epigraph: z.string().max(1000, 'Epigraph too long').optional().nullable(),

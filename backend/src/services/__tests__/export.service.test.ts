@@ -792,6 +792,202 @@ describe('ExportService', () => {
     });
   });
 
+  describe('getAuthorInfoForExport', () => {
+    const mockProject = {
+      id: 'project-1',
+      pen_name_id: null,
+      author_name: 'John Smith',
+    };
+
+    const mockPenName = {
+      id: 'pen-1',
+      pen_name: 'J.S. Writer',
+      display_name: 'J. S. Writer',
+      bio: 'Award-winning author with 5 bestsellers.',
+      bio_short: 'Award-winning author.',
+      photo: 'base64photodata',
+      photo_type: 'image/jpeg',
+      website: 'https://jswriter.com',
+      social_media: JSON.stringify({
+        twitter: '@jswriter',
+        instagram: '@jswriter',
+      }),
+    };
+
+    const mockAuthorProfile = {
+      id: 'owner',
+      author_bio: 'An aspiring writer.',
+      author_photo: 'base64authordata',
+      author_photo_type: 'image/png',
+      author_website: 'https://author.com',
+      author_social_media: JSON.stringify({
+        facebook: '@author',
+        goodreads: '@author',
+      }),
+    };
+
+    it('should return pen name info when project has pen_name_id', async () => {
+      getMockPrepare().mockReset();
+
+      const projectWithPenName = { ...mockProject, pen_name_id: 'pen-1' };
+      const projectStmt = { get: jest.fn().mockReturnValue(projectWithPenName) };
+      const penNameStmt = { get: jest.fn().mockReturnValue(mockPenName) };
+
+      getMockPrepare()
+        .mockReturnValueOnce(projectStmt)
+        .mockReturnValueOnce(penNameStmt);
+
+      const result = await service.getAuthorInfoForExport('project-1');
+
+      expect(result.name).toBe('J. S. Writer');
+      expect(result.bio).toBe('Award-winning author with 5 bestsellers.');
+      expect(result.photo).toBe('base64photodata');
+      expect(result.photoType).toBe('image/jpeg');
+      expect(result.website).toBe('https://jswriter.com');
+      expect(result.socialMedia).toEqual({
+        twitter: '@jswriter',
+        instagram: '@jswriter',
+      });
+    });
+
+    it('should use pen_name when display_name is null', async () => {
+      getMockPrepare().mockReset();
+
+      const penNameNoDisplay = { ...mockPenName, display_name: null };
+      const projectWithPenName = { ...mockProject, pen_name_id: 'pen-1' };
+      const projectStmt = { get: jest.fn().mockReturnValue(projectWithPenName) };
+      const penNameStmt = { get: jest.fn().mockReturnValue(penNameNoDisplay) };
+
+      getMockPrepare()
+        .mockReturnValueOnce(projectStmt)
+        .mockReturnValueOnce(penNameStmt);
+
+      const result = await service.getAuthorInfoForExport('project-1');
+
+      expect(result.name).toBe('J.S. Writer');
+    });
+
+    it('should check book pen_name_id when bookId is provided', async () => {
+      getMockPrepare().mockReset();
+
+      const projectStmt = { get: jest.fn().mockReturnValue(mockProject) };
+      const bookStmt = { get: jest.fn().mockReturnValue({ pen_name_id: 'pen-1' }) };
+      const penNameStmt = { get: jest.fn().mockReturnValue(mockPenName) };
+
+      getMockPrepare()
+        .mockReturnValueOnce(projectStmt)
+        .mockReturnValueOnce(bookStmt)
+        .mockReturnValueOnce(penNameStmt);
+
+      const result = await service.getAuthorInfoForExport('project-1', 'book-1');
+
+      expect(result.name).toBe('J. S. Writer');
+      expect(result.bio).toBe('Award-winning author with 5 bestsellers.');
+    });
+
+    it('should fall back to author profile when no pen name', async () => {
+      getMockPrepare().mockReset();
+
+      const projectStmt = { get: jest.fn().mockReturnValue(mockProject) };
+      const authorProfileStmt = { get: jest.fn().mockReturnValue(mockAuthorProfile) };
+
+      getMockPrepare()
+        .mockReturnValueOnce(projectStmt)
+        .mockReturnValueOnce(authorProfileStmt);
+
+      const result = await service.getAuthorInfoForExport('project-1');
+
+      expect(result.name).toBe('John Smith');
+      expect(result.bio).toBe('An aspiring writer.');
+      expect(result.photo).toBe('base64authordata');
+      expect(result.photoType).toBe('image/png');
+      expect(result.website).toBe('https://author.com');
+      expect(result.socialMedia).toEqual({
+        facebook: '@author',
+        goodreads: '@author',
+      });
+    });
+
+    it('should use default name when author_name is null', async () => {
+      getMockPrepare().mockReset();
+
+      const projectNoName = { ...mockProject, author_name: null };
+      const projectStmt = { get: jest.fn().mockReturnValue(projectNoName) };
+      const authorProfileStmt = { get: jest.fn().mockReturnValue(mockAuthorProfile) };
+
+      getMockPrepare()
+        .mockReturnValueOnce(projectStmt)
+        .mockReturnValueOnce(authorProfileStmt);
+
+      const result = await service.getAuthorInfoForExport('project-1');
+
+      expect(result.name).toBe('The Author');
+      expect(result.bio).toBe('An aspiring writer.');
+    });
+
+    it('should handle missing author profile gracefully', async () => {
+      getMockPrepare().mockReset();
+
+      const projectStmt = { get: jest.fn().mockReturnValue(mockProject) };
+      const authorProfileStmt = { get: jest.fn().mockReturnValue(undefined) };
+
+      getMockPrepare()
+        .mockReturnValueOnce(projectStmt)
+        .mockReturnValueOnce(authorProfileStmt);
+
+      const result = await service.getAuthorInfoForExport('project-1');
+
+      expect(result.name).toBe('John Smith');
+      expect(result.bio).toBe('');
+    });
+
+    it('should throw error when project not found', async () => {
+      getMockPrepare().mockReset();
+
+      const projectStmt = { get: jest.fn().mockReturnValue(undefined) };
+      getMockPrepare().mockReturnValueOnce(projectStmt);
+
+      await expect(service.getAuthorInfoForExport('non-existent')).rejects.toThrow(
+        'Project not found'
+      );
+    });
+
+    it('should handle pen name with empty social_media', async () => {
+      getMockPrepare().mockReset();
+
+      const penNameNoSocial = { ...mockPenName, social_media: null };
+      const projectWithPenName = { ...mockProject, pen_name_id: 'pen-1' };
+      const projectStmt = { get: jest.fn().mockReturnValue(projectWithPenName) };
+      const penNameStmt = { get: jest.fn().mockReturnValue(penNameNoSocial) };
+
+      getMockPrepare()
+        .mockReturnValueOnce(projectStmt)
+        .mockReturnValueOnce(penNameStmt);
+
+      const result = await service.getAuthorInfoForExport('project-1');
+
+      expect(result.socialMedia).toBeUndefined();
+    });
+
+    it('should handle book without pen_name_id', async () => {
+      getMockPrepare().mockReset();
+
+      const projectStmt = { get: jest.fn().mockReturnValue(mockProject) };
+      const bookStmt = { get: jest.fn().mockReturnValue({ pen_name_id: null }) };
+      const authorProfileStmt = { get: jest.fn().mockReturnValue(mockAuthorProfile) };
+
+      getMockPrepare()
+        .mockReturnValueOnce(projectStmt)
+        .mockReturnValueOnce(bookStmt)
+        .mockReturnValueOnce(authorProfileStmt);
+
+      const result = await service.getAuthorInfoForExport('project-1', 'book-1');
+
+      expect(result.name).toBe('John Smith');
+      expect(result.bio).toBe('An aspiring writer.');
+    });
+  });
+
   describe('Edge Cases', () => {
     it('should handle very long chapter content', () => {
       const longContent = 'A'.repeat(50000) + '\n\n' + 'B'.repeat(50000);

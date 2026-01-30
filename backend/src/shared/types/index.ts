@@ -45,6 +45,7 @@ export interface Project {
   source_concept_id?: string | null;   // Link to original saved_concept
   series_id?: string | null;           // Link to parent series (if part of a series)
   series_book_number?: number | null;  // Order within the series
+  pen_name_id?: string | null;         // Link to pen name (migration 060)
   created_at: string;
   updated_at: string;
 }

@@ -18,6 +18,7 @@ export interface Project {
   story_dna: any;
   story_bible: any;
   author_name?: string | null;
+  pen_name_id?: string | null;
   // Publishing fields
   dedication?: string | null;
   epigraph?: string | null;
@@ -41,6 +42,27 @@ export interface AuthorProfile {
   author_social_media: string | null;
 }
 
+export interface PenName {
+  id: string;
+  pen_name: string;
+  display_name: string | null;
+  bio: string | null;
+  bio_short: string | null;
+  photo: string | null;
+  photo_type: string | null;
+  website: string | null;
+  social_media: string | null;
+}
+
+export interface AuthorInfo {
+  name: string;
+  bio: string;
+  photo?: string;
+  photoType?: string;
+  website?: string;
+  socialMedia?: Record<string, string>;
+}
+
 interface Character {
   name: string;
   role?: string;
@@ -50,6 +72,74 @@ interface Character {
 }
 
 export class ExportService {
+  /**
+   * Get author information for export, preferring pen name if available
+   */
+  async getAuthorInfoForExport(projectId: string, bookId?: string): Promise<AuthorInfo> {
+    // Get the project
+    const project = db.prepare('SELECT pen_name_id, author_name FROM projects WHERE id = ?').get(projectId) as Pick<Project, 'pen_name_id' | 'author_name'> | undefined;
+
+    if (!project) {
+      throw new Error('Project not found');
+    }
+
+    // If book has a pen name, check book first
+    if (bookId) {
+      const book = db.prepare('SELECT pen_name_id FROM books WHERE id = ?').get(bookId) as { pen_name_id: string | null } | undefined;
+
+      if (book?.pen_name_id) {
+        const penName = db.prepare('SELECT * FROM pen_names WHERE id = ?').get(book.pen_name_id) as PenName | undefined;
+
+        if (penName) {
+          return {
+            name: penName.display_name || penName.pen_name,
+            bio: penName.bio || '',
+            photo: penName.photo || undefined,
+            photoType: penName.photo_type || undefined,
+            website: penName.website || undefined,
+            socialMedia: penName.social_media ? JSON.parse(penName.social_media) : undefined,
+          };
+        }
+      }
+    }
+
+    // Check project pen_name_id
+    if (project.pen_name_id) {
+      const penName = db.prepare('SELECT * FROM pen_names WHERE id = ?').get(project.pen_name_id) as PenName | undefined;
+
+      if (penName) {
+        return {
+          name: penName.display_name || penName.pen_name,
+          bio: penName.bio || '',
+          photo: penName.photo || undefined,
+          photoType: penName.photo_type || undefined,
+          website: penName.website || undefined,
+          socialMedia: penName.social_media ? JSON.parse(penName.social_media) : undefined,
+        };
+      }
+    }
+
+    // Fall back to author profile
+    const authorProfile = db.prepare('SELECT * FROM author_profile WHERE id = ?').get('owner') as AuthorProfile | undefined;
+
+    if (authorProfile) {
+      return {
+        name: project.author_name || 'The Author',
+        bio: authorProfile.author_bio || '',
+        photo: authorProfile.author_photo || undefined,
+        photoType: authorProfile.author_photo_type || undefined,
+        website: authorProfile.author_website || undefined,
+        socialMedia: authorProfile.author_social_media ? JSON.parse(authorProfile.author_social_media) : undefined,
+      };
+    }
+
+    // Final fallback
+    return {
+      name: project.author_name || 'The Author',
+      bio: '',
+    };
+  }
+
   /**
    * Clean content of any markdown artifacts, structural markers, and AI tells
    */
@@ -418,7 +508,7 @@ export class ExportService {
         // Get project with all publishing fields
         const project = db.prepare(`
           SELECT id, title, type, genre, story_dna, story_bible, author_name,
-                 cover_image, cover_image_type, dedication, epigraph,
+                 pen_name_id, cover_image, cover_image_type, dedication, epigraph,
                  epigraph_attribution, isbn, publisher, edition, copyright_year,
                  include_dramatis_personae, include_about_author
           FROM projects WHERE id = ?
@@ -428,14 +518,12 @@ export class ExportService {
           throw new Error('Project not found');
         }
 
-        // Get author profile for About the Author section
-        let authorProfile: AuthorProfile | null = null;
+        // Get author info (pen name or author profile)
+        let authorInfo: AuthorInfo | null = null;
         try {
-          authorProfile = db.prepare(`
-            SELECT * FROM author_profile WHERE id = 'owner'
-          `).get() as AuthorProfile | null;
+          authorInfo = await this.getAuthorInfoForExport(projectId);
         } catch (e) {
-          // Author profile table might not exist yet
+          // If getting author info fails, we'll skip About the Author section
         }
 
         // Get chapters with edited versions if available
@@ -789,7 +877,7 @@ export class ExportService {
         }
 
         // ABOUT THE AUTHOR
-        if (project.include_about_author !== 0 && authorProfile?.author_bio) {
+        if (project.include_about_author !== 0 && authorInfo?.bio) {
           doc.addPage();
           chapterPageStart++;
 
@@ -806,10 +894,10 @@ export class ExportService {
           doc.moveDown(2);
 
           // Author photo
-          if (authorProfile.author_photo && authorProfile.author_photo_type) {
+          if (authorInfo.photo && authorInfo.photoType) {
             try {
-              const photoBuffer = Buffer.from(authorProfile.author_photo, 'base64');
-              const photoX = (pageWidth - 150) / 2; // Center a 150pt wide image
+              const photoBuffer = Buffer.from(authorInfo.photo, 'base64');
+              const photoX = (pageWidth - 150) / 2; // Centre a 150pt wide image
               doc.image(photoBuffer, photoX, doc.y, {
                 width: 150,
                 height: 150,
@@ -822,41 +910,34 @@ export class ExportService {
           }
 
           // Author bio
-          doc.fontSize(12).font('Times-Roman').text(authorProfile.author_bio, {
+          doc.fontSize(12).font('Times-Roman').text(authorInfo.bio, {
             align: 'justify',
             lineGap: 4,
           });
 
           // Website/social media
-          if (authorProfile.author_website) {
+          if (authorInfo.website) {
             doc.moveDown(1);
             doc.fontSize(11).font('Times-Roman').text(
-              `Visit: ${authorProfile.author_website}`,
+              `Visit: ${authorInfo.website}`,
               { align: 'center' }
             );
           }
 
-          if (authorProfile.author_social_media) {
-            try {
-              const social = typeof authorProfile.author_social_media === 'string'
-                ? JSON.parse(authorProfile.author_social_media)
-                : authorProfile.author_social_media;
+          if (authorInfo.socialMedia) {
+            const social = authorInfo.socialMedia;
+            const socialLinks: string[] = [];
+            if (social.twitter) socialLinks.push(`Twitter: ${social.twitter}`);
+            if (social.instagram) socialLinks.push(`Instagram: ${social.instagram}`);
+            if (social.facebook) socialLinks.push(`Facebook: ${social.facebook}`);
+            if (social.goodreads) socialLinks.push(`Goodreads: ${social.goodreads}`);
 
-              const socialLinks: string[] = [];
-              if (social.twitter) socialLinks.push(`Twitter: ${social.twitter}`);
-              if (social.instagram) socialLinks.push(`Instagram: ${social.instagram}`);
-              if (social.facebook) socialLinks.push(`Facebook: ${social.facebook}`);
-              if (social.goodreads) socialLinks.push(`Goodreads: ${social.goodreads}`);
-
-              if (socialLinks.length > 0) {
-                doc.moveDown(0.5);
-                doc.fontSize(10).font('Times-Roman').text(
-                  socialLinks.join(' | '),
-                  { align: 'center' }
-                );
-              }
-            } catch (e) {
-              // Skip social media if parsing fails
+            if (socialLinks.length > 0) {
+              doc.moveDown(0.5);
+              doc.fontSize(10).font('Times-Roman').text(
+                socialLinks.join(' | '),
+                { align: 'center' }
+              );
             }
           }
 

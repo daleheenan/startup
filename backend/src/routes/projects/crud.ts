@@ -27,7 +27,15 @@ const logger = createLogger('routes:projects:crud');
 router.get('/', (req, res) => {
   try {
     const stmt = db.prepare<[], Project>(`
-      SELECT * FROM projects ORDER BY updated_at DESC
+      SELECT
+        p.*,
+        pn.id as pen_name_id_full,
+        pn.pen_name,
+        pn.display_name as pen_name_display,
+        pn.is_default as pen_name_is_default
+      FROM projects p
+      LEFT JOIN pen_names pn ON p.pen_name_id = pn.id
+      ORDER BY p.updated_at DESC
     `);
 
     const projects = stmt.all();
@@ -75,6 +83,14 @@ router.get('/', (req, res) => {
       const storyBible = safeJsonParse(p.story_bible as any, null);
       const plotStructure = safeJsonParse(p.plot_structure as any, null);
 
+      // Extract pen name data
+      const penName = (p as any).pen_name ? {
+        id: (p as any).pen_name_id_full || p.pen_name_id,
+        pen_name: (p as any).pen_name,
+        display_name: (p as any).pen_name_display,
+        is_default: (p as any).pen_name_is_default === 1,
+      } : null;
+
       let outline = null;
       let chapterCount = null;
       let genStatus = null;
@@ -109,12 +125,16 @@ router.get('/', (req, res) => {
         generationStatus = 'completed';
       }
 
+      // Remove temporary pen_name fields from response
+      const { pen_name_id_full, pen_name, pen_name_display, pen_name_is_default, ...projectData } = p as any;
+
       return {
-        ...p,
-        story_dna: safeJsonParse(p.story_dna as any, null),
+        ...projectData,
+        story_dna: safeJsonParse(projectData.story_dna as any, null),
         story_bible: storyBible,
         plot_structure: plotStructure,
-        metrics: (allMetrics instanceof Map) ? allMetrics.get(p.id) || null : null,
+        pen_name: penName,
+        metrics: (allMetrics instanceof Map) ? allMetrics.get(projectData.id) || null : null,
         progress: {
           characters: storyBible?.characters?.length || 0,
           worldElements: worldCount,
@@ -141,7 +161,15 @@ router.get('/', (req, res) => {
 router.get('/:id', (req, res) => {
   try {
     const stmt = db.prepare<[string], Project>(`
-      SELECT * FROM projects WHERE id = ?
+      SELECT
+        p.*,
+        pn.id as pen_name_id_full,
+        pn.pen_name,
+        pn.display_name as pen_name_display,
+        pn.is_default as pen_name_is_default
+      FROM projects p
+      LEFT JOIN pen_names pn ON p.pen_name_id = pn.id
+      WHERE p.id = ?
     `);
 
     const project = stmt.get(req.params.id);
@@ -152,13 +180,25 @@ router.get('/:id', (req, res) => {
       });
     }
 
+    // Extract pen name data
+    const penName = (project as any).pen_name ? {
+      id: (project as any).pen_name_id_full || project.pen_name_id,
+      pen_name: (project as any).pen_name,
+      display_name: (project as any).pen_name_display,
+      is_default: (project as any).pen_name_is_default === 1,
+    } : null;
+
+    // Remove temporary pen_name fields
+    const { pen_name_id_full, pen_name, pen_name_display, pen_name_is_default, ...projectData } = project as any;
+
     const parsedProject: any = {
-      ...project,
-      story_dna: safeJsonParse(project.story_dna as any, null),
-      story_bible: safeJsonParse(project.story_bible as any, null),
-      story_concept: safeJsonParse((project as any).story_concept, null),
-      plot_structure: safeJsonParse((project as any).plot_structure, null),
-      metrics: metricsService.getFormattedMetrics(project.id),
+      ...projectData,
+      story_dna: safeJsonParse(projectData.story_dna as any, null),
+      story_bible: safeJsonParse(projectData.story_bible as any, null),
+      story_concept: safeJsonParse(projectData.story_concept, null),
+      plot_structure: safeJsonParse(projectData.plot_structure, null),
+      pen_name: penName,
+      metrics: metricsService.getFormattedMetrics(projectData.id),
     };
 
     // Handle include query parameter for related data
@@ -248,6 +288,7 @@ router.post('/', (req, res) => {
 
     const timePeriodType = preferences.timePeriodType || preferences.timePeriod?.type || null;
     const specificYear = preferences.specificYear || preferences.timePeriod?.year || null;
+    const penNameId = preferences.penNameId || null;
 
     const storyConcept = {
       title: concept.title,
@@ -261,8 +302,8 @@ router.post('/', (req, res) => {
     const sourceConceptId = (concept as any).id || null;
 
     const stmt = db.prepare(`
-      INSERT INTO projects (id, title, type, genre, status, book_count, universe_id, time_period_type, specific_year, story_concept, source_concept_id, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO projects (id, title, type, genre, status, book_count, universe_id, time_period_type, specific_year, pen_name_id, story_concept, source_concept_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -275,6 +316,7 @@ router.post('/', (req, res) => {
       universeId,
       timePeriodType,
       specificYear,
+      penNameId,
       JSON.stringify(storyConcept),
       sourceConceptId,
       now,
@@ -319,7 +361,7 @@ router.put('/:id', (req, res) => {
 
     const {
       storyDNA, storyBible, storyConcept, status, title, authorName, type, bookCount,
-      seriesId, seriesBookNumber,
+      seriesId, seriesBookNumber, penNameId,
       dedication, epigraph, epigraphAttribution, isbn, publisher, edition,
       copyrightYear, includeDramatisPersonae, includeAboutAuthor
     } = validation.data;
@@ -375,6 +417,11 @@ router.put('/:id', (req, res) => {
     if (seriesBookNumber !== undefined) {
       updates.push('series_book_number = ?');
       params.push(seriesBookNumber);
+    }
+
+    if (penNameId !== undefined) {
+      updates.push('pen_name_id = ?');
+      params.push(penNameId);
     }
 
     if (dedication !== undefined) {

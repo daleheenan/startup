@@ -5,8 +5,212 @@ import { AnalyticsService } from '../services/analyticsService.js';
 import { bookVersioningService } from '../services/book-versioning.service.js';
 import type { ChapterAnalytics, BookAnalytics, GenreBenchmark } from '../shared/types/index.js';
 import { sendBadRequest, sendNotFound, sendInternalError } from '../utils/response-helpers.js';
+import { createLogger } from '../services/logger.service.js';
 
 const router = express.Router();
+const logger = createLogger('routes:analytics');
+
+/**
+ * GET /api/analytics/overview
+ * Returns aggregate statistics for the dashboard
+ */
+router.get('/overview', (req, res) => {
+  try {
+    // Check if pen_names table exists
+    const tableCheck = db.prepare(`
+      SELECT name FROM sqlite_master WHERE type='table' AND name='pen_names'
+    `).get() as { name: string } | undefined;
+
+    const hasPenNames = !!tableCheck;
+
+    // Check if publication_status column exists in books table
+    const columnCheck = db.prepare(`
+      PRAGMA table_info(books)
+    `).all() as Array<{ name: string }>;
+
+    const hasPublicationStatus = columnCheck.some(col => col.name === 'publication_status');
+
+    // Build query based on available schema
+    let query = `
+      SELECT
+        (SELECT COUNT(*) FROM books) as total_books,
+        (SELECT COALESCE(SUM(word_count), 0) FROM books) as total_words,
+        (SELECT COUNT(*) FROM projects) as total_projects,
+        (SELECT COUNT(*) FROM series) as total_series
+    `;
+
+    if (hasPenNames) {
+      query += `, (SELECT COUNT(*) FROM pen_names WHERE deleted_at IS NULL) as total_pen_names`;
+    } else {
+      query += `, 0 as total_pen_names`;
+    }
+
+    if (hasPublicationStatus) {
+      query += `, (SELECT COUNT(*) FROM books WHERE publication_status = 'published') as published_books`;
+    } else {
+      query += `, 0 as published_books`;
+    }
+
+    const stats = db.prepare(query).get() as {
+      total_books: number;
+      total_words: number;
+      total_projects: number;
+      total_series: number;
+      total_pen_names: number;
+      published_books: number;
+    };
+
+    res.json(stats);
+  } catch (error: any) {
+    logger.error({ error }, 'Error fetching overview statistics');
+    sendInternalError(res, error, 'fetching overview statistics');
+  }
+});
+
+/**
+ * GET /api/analytics/by-pen-name
+ * Returns book counts and word counts per pen name
+ */
+router.get('/by-pen-name', (req, res) => {
+  try {
+    // Check if pen_names table exists
+    const tableCheck = db.prepare(`
+      SELECT name FROM sqlite_master WHERE type='table' AND name='pen_names'
+    `).get() as { name: string } | undefined;
+
+    if (!tableCheck) {
+      // Return empty data if table doesn't exist
+      return res.json({ data: [] });
+    }
+
+    const data = db.prepare(`
+      SELECT
+        pn.id as pen_name_id,
+        pn.pen_name,
+        COUNT(b.id) as book_count,
+        COALESCE(SUM(b.word_count), 0) as word_count
+      FROM pen_names pn
+      LEFT JOIN books b ON b.pen_name_id = pn.id
+      WHERE pn.deleted_at IS NULL
+      GROUP BY pn.id, pn.pen_name
+      ORDER BY book_count DESC, word_count DESC
+    `).all() as Array<{
+      pen_name_id: string;
+      pen_name: string;
+      book_count: number;
+      word_count: number;
+    }>;
+
+    res.json({ data });
+  } catch (error: any) {
+    logger.error({ error }, 'Error fetching pen name analytics');
+    sendInternalError(res, error, 'fetching pen name analytics');
+  }
+});
+
+/**
+ * GET /api/analytics/by-genre
+ * Returns book counts per genre from projects table
+ */
+router.get('/by-genre', (req, res) => {
+  try {
+    const data = db.prepare(`
+      SELECT
+        p.genre,
+        COUNT(b.id) as book_count
+      FROM projects p
+      LEFT JOIN books b ON b.project_id = p.id
+      WHERE p.genre IS NOT NULL
+      GROUP BY p.genre
+      ORDER BY book_count DESC
+    `).all() as Array<{
+      genre: string;
+      book_count: number;
+    }>;
+
+    res.json({ data });
+  } catch (error: any) {
+    logger.error({ error }, 'Error fetching genre analytics');
+    sendInternalError(res, error, 'fetching genre analytics');
+  }
+});
+
+/**
+ * GET /api/analytics/by-status
+ * Returns book counts per publication status
+ */
+router.get('/by-status', (req, res) => {
+  try {
+    // Check if publication_status column exists
+    const columnCheck = db.prepare(`
+      PRAGMA table_info(books)
+    `).all() as Array<{ name: string }>;
+
+    const hasPublicationStatus = columnCheck.some(col => col.name === 'publication_status');
+
+    let data: Array<{ status: string; count: number }>;
+
+    if (hasPublicationStatus) {
+      data = db.prepare(`
+        SELECT
+          COALESCE(publication_status, 'draft') as status,
+          COUNT(*) as count
+        FROM books
+        GROUP BY status
+        ORDER BY count DESC
+      `).all() as Array<{
+        status: string;
+        count: number;
+      }>;
+    } else {
+      // Use book status as fallback
+      data = db.prepare(`
+        SELECT
+          status,
+          COUNT(*) as count
+        FROM books
+        GROUP BY status
+        ORDER BY count DESC
+      `).all() as Array<{
+        status: string;
+        count: number;
+      }>;
+    }
+
+    res.json({ data });
+  } catch (error: any) {
+    logger.error({ error }, 'Error fetching status analytics');
+    sendInternalError(res, error, 'fetching status analytics');
+  }
+});
+
+/**
+ * GET /api/analytics/by-year
+ * Returns words written and books created per year (based on created_at)
+ */
+router.get('/by-year', (req, res) => {
+  try {
+    const data = db.prepare(`
+      SELECT
+        CAST(strftime('%Y', created_at) AS INTEGER) as year,
+        COUNT(*) as book_count,
+        COALESCE(SUM(word_count), 0) as word_count
+      FROM books
+      WHERE created_at IS NOT NULL
+      GROUP BY year
+      ORDER BY year DESC
+    `).all() as Array<{
+      year: number;
+      book_count: number;
+      word_count: number;
+    }>;
+
+    res.json({ data });
+  } catch (error: any) {
+    logger.error({ error }, 'Error fetching yearly analytics');
+    sendInternalError(res, error, 'fetching yearly analytics');
+  }
+});
 
 function parseAnalyticsRow(analytics: any): any {
   if (analytics.pacing_data) analytics.pacing_data = JSON.parse(analytics.pacing_data);
