@@ -31,8 +31,25 @@ describe('ChapterOrchestratorService', () => {
       const mockPrepare = jest.fn();
       mockDb.prepare = mockPrepare;
 
+      // First prepare() call - get chapters
       const getChaptersStmt = { all: jest.fn().mockReturnValue(mockChapters) };
       mockPrepare.mockReturnValueOnce(getChaptersStmt);
+
+      // For each chapter, queueChapterWorkflow makes 2 prepare() calls
+      // Chapter 1: chapter lookup + project lookup
+      const chapterStmt1 = { get: jest.fn().mockReturnValue({ book_id: 'book-1' }) };
+      const projectStmt1 = { get: jest.fn().mockReturnValue({ generation_mode: 'publication', selected_agents: null }) };
+      mockPrepare.mockReturnValueOnce(chapterStmt1).mockReturnValueOnce(projectStmt1);
+
+      // Chapter 2: chapter lookup + project lookup
+      const chapterStmt2 = { get: jest.fn().mockReturnValue({ book_id: 'book-1' }) };
+      const projectStmt2 = { get: jest.fn().mockReturnValue({ generation_mode: 'publication', selected_agents: null }) };
+      mockPrepare.mockReturnValueOnce(chapterStmt2).mockReturnValueOnce(projectStmt2);
+
+      // Chapter 3: chapter lookup + project lookup
+      const chapterStmt3 = { get: jest.fn().mockReturnValue({ book_id: 'book-1' }) };
+      const projectStmt3 = { get: jest.fn().mockReturnValue({ generation_mode: 'publication', selected_agents: null }) };
+      mockPrepare.mockReturnValueOnce(chapterStmt3).mockReturnValueOnce(projectStmt3);
 
       mockQueueWorker.createJob = jest.fn().mockReturnValue('job-123');
 
@@ -59,6 +76,18 @@ describe('ChapterOrchestratorService', () => {
 
   describe('queueChapterWorkflow', () => {
     it('should queue complete workflow for a chapter', () => {
+      // Mock database prepare calls
+      const mockPrepare = jest.fn();
+      mockDb.prepare = mockPrepare;
+
+      // First prepare() call - chapter lookup
+      const chapterStmt = { get: jest.fn().mockReturnValue({ book_id: 'book-1' }) };
+      mockPrepare.mockReturnValueOnce(chapterStmt);
+
+      // Second prepare() call - project lookup
+      const projectStmt = { get: jest.fn().mockReturnValue({ generation_mode: 'publication', selected_agents: null }) };
+      mockPrepare.mockReturnValueOnce(projectStmt);
+
       let jobIdCounter = 1;
       mockQueueWorker.createJob = jest.fn().mockImplementation(() => {
         return `job-${jobIdCounter++}`;
@@ -105,8 +134,17 @@ describe('ChapterOrchestratorService', () => {
       const mockPrepare = jest.fn();
       mockDb.prepare = mockPrepare;
 
+      // First prepare() call - reset chapter
       const resetStmt = { run: jest.fn() };
       mockPrepare.mockReturnValueOnce(resetStmt);
+
+      // Second prepare() call (from queueChapterWorkflow) - chapter lookup
+      const chapterStmt = { get: jest.fn().mockReturnValue({ book_id: 'book-1' }) };
+      mockPrepare.mockReturnValueOnce(chapterStmt);
+
+      // Third prepare() call (from queueChapterWorkflow) - project lookup
+      const projectStmt = { get: jest.fn().mockReturnValue({ generation_mode: 'publication', selected_agents: null }) };
+      mockPrepare.mockReturnValueOnce(projectStmt);
 
       mockQueueWorker.createJob = jest.fn().mockReturnValue('job-123');
 
