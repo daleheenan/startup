@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import db from '../../db/connection.js';
 import { metricsService } from '../../services/metrics.service.js';
+import { AI_REQUEST_TYPES } from '../../constants/ai-request-types.js';
 import { createLogger } from '../../services/logger.service.js';
 import { detectIntent } from '../../services/editorial-intent-detector.js';
 import { generateEditorialResponse } from '../../services/editorial-response-generator.js';
@@ -126,6 +127,20 @@ Respond with a JSON object in this exact format:
       result.refinedDNA.themes = [result.refinedDNA.themes];
     }
 
+    // Log AI request for cost tracking
+    if (response.usage) {
+      metricsService.logAIRequest({
+        requestType: AI_REQUEST_TYPES.EDITORIAL_RESPONSE,
+        projectId: projectId,
+        bookId: null,
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+        model: 'claude-sonnet-4-20250514',
+        success: true,
+        contextSummary: 'Story concept and DNA refinement',
+      });
+    }
+
     logger.info({ projectId, changesCount: result.changes.length }, 'Story refinement completed');
 
     res.json({
@@ -202,7 +217,7 @@ router.post('/:id/editorial-assistant', async (req, res) => {
     );
 
     // Step 1: Detect intent
-    const intentResult = await detectIntent(userQuery, currentConcept, currentDNA);
+    const intentResult = await detectIntent(userQuery, currentConcept, currentDNA, projectId);
 
     logger.info(
       { projectId, intent: intentResult.intent, confidence: intentResult.confidence },
@@ -215,7 +230,8 @@ router.post('/:id/editorial-assistant', async (req, res) => {
       userQuery,
       currentConcept,
       currentDNA,
-      history
+      history,
+      projectId
     );
 
     // Calculate total token usage

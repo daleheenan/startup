@@ -1,15 +1,12 @@
-import Anthropic from '@anthropic-ai/sdk';
 import dotenv from 'dotenv';
 import { generateNameForNationality, isNationalitySupported } from '../data/nationality-names.js';
 import { createLogger } from './logger.service.js';
+import { claudeService } from './claude.service.js';
+import { AI_REQUEST_TYPES } from '../constants/ai-request-types.js';
 
 dotenv.config();
 
 const logger = createLogger('services:name-generator');
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 /**
  * Generate a culturally appropriate name based on nationality
@@ -60,21 +57,18 @@ Examples of the format:
 Your response:`;
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-opus-4-5-20251101',
-      max_tokens: 100,
+    const response = await claudeService.createCompletionWithUsage({
+      system: '',
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 100,
       temperature: 0.9,
-      messages: [
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
+      tracking: {
+        requestType: AI_REQUEST_TYPES.NAME_GENERATION,
+        contextSummary: `Generating ${gender || 'unspecified gender'} name for ${nationality}`,
+      },
     });
 
-    const responseText = message.content[0].type === 'text'
-      ? message.content[0].text.trim()
-      : '';
+    const responseText = response.content.trim();
 
     logger.info({ nationality, gender, name: responseText }, 'Generated name with AI');
 

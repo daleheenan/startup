@@ -1,9 +1,10 @@
-import Anthropic from '@anthropic-ai/sdk';
 import dotenv from 'dotenv';
 import db from '../db/connection.js';
 import { formatGenre, formatSubgenre, formatModifiers, getWordCountContext } from '../utils/genre-helpers.js';
 import { createLogger } from './logger.service.js';
 import { extractJsonArray } from '../utils/json-extractor.js';
+import { claudeService } from './claude.service.js';
+import { AI_REQUEST_TYPES } from '../constants/ai-request-types.js';
 
 const logger = createLogger('services:concept-generator');
 
@@ -18,9 +19,6 @@ export interface ConceptExclusions {
   centralConflicts: string[];
 }
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 export interface StoryPreferences {
   genre: string;
@@ -205,22 +203,24 @@ export async function generateConcepts(
   try {
     // Increase max_tokens for more concepts
     const maxTokens = conceptCount > 5 ? 8000 : 4000;
-    const message = await anthropic.messages.create({
-      model: 'claude-opus-4-5-20251101',
-      max_tokens: maxTokens,
-      temperature: 1.0, // High creativity for diverse concepts
+    const response = await claudeService.createCompletionWithUsage({
+      system: '',
       messages: [
         {
           role: 'user',
           content: prompt,
         },
       ],
+      maxTokens,
+      temperature: 1.0, // High creativity for diverse concepts
+      tracking: {
+        requestType: AI_REQUEST_TYPES.CONCEPT_GENERATION,
+        contextSummary: `Generating ${conceptCount} story concepts`
+      }
     });
 
     // Extract the response text
-    const responseText = message.content[0].type === 'text'
-      ? message.content[0].text
-      : '';
+    const responseText = response.content;
 
     // Parse the JSON response
     let concepts = parseConceptsResponse(responseText);
@@ -587,21 +587,23 @@ Return ONLY a JSON array of 5 concepts in this exact format:
   logger.info('[ConceptGenerator] Calling Claude API for refinement...');
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-opus-4-5-20251101',
-      max_tokens: 4000,
-      temperature: 1.0,
+    const response = await claudeService.createCompletionWithUsage({
+      system: '',
       messages: [
         {
           role: 'user',
           content: prompt,
         },
       ],
+      maxTokens: 4000,
+      temperature: 1.0,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.CONCEPT_GENERATION,
+        contextSummary: 'Refining story concepts based on user feedback'
+      }
     });
 
-    const responseText = message.content[0].type === 'text'
-      ? message.content[0].text
-      : '';
+    const responseText = response.content;
 
     const concepts = parseConceptsResponse(responseText);
 
@@ -709,21 +711,24 @@ export async function generateConceptSummaries(
   logger.info(`[ConceptGenerator] Calling Claude API for ${count} summaries...`);
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-opus-4-5-20251101',
-      max_tokens: count > 10 ? 4000 : 2000, // More tokens for 20 summaries
-      temperature: 1.0, // High creativity
+    const maxTokens = count > 10 ? 4000 : 2000; // More tokens for 20 summaries
+    const response = await claudeService.createCompletionWithUsage({
+      system: '',
       messages: [
         {
           role: 'user',
           content: prompt,
         },
       ],
+      maxTokens,
+      temperature: 1.0, // High creativity
+      tracking: {
+        requestType: AI_REQUEST_TYPES.CONCEPT_GENERATION,
+        contextSummary: `Generating ${count} concept summaries`
+      }
     });
 
-    const responseText = message.content[0].type === 'text'
-      ? message.content[0].text
-      : '';
+    const responseText = response.content;
 
     const summaries = parseSummariesResponse(responseText);
 
@@ -843,21 +848,23 @@ export async function expandSummariesToConcepts(
   logger.info(`[ConceptGenerator] Expanding ${selectedSummaries.length} summaries to full concepts...`);
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-opus-4-5-20251101',
-      max_tokens: 6000,
-      temperature: 0.8, // Slightly lower for consistent expansion
+    const response = await claudeService.createCompletionWithUsage({
+      system: '',
       messages: [
         {
           role: 'user',
           content: prompt,
         },
       ],
+      maxTokens: 6000,
+      temperature: 0.8, // Slightly lower for consistent expansion
+      tracking: {
+        requestType: AI_REQUEST_TYPES.CONCEPT_GENERATION,
+        contextSummary: `Expanding ${selectedSummaries.length} summaries to full concepts`
+      }
     });
 
-    const responseText = message.content[0].type === 'text'
-      ? message.content[0].text
-      : '';
+    const responseText = response.content;
 
     const concepts = parseConceptsResponse(responseText);
 
@@ -888,21 +895,23 @@ export async function expandSummaryToVariations(
   logger.info(`[ConceptGenerator] Generating ${count} variations for "${summary.title}"...`);
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-opus-4-5-20251101',
-      max_tokens: 6000,
-      temperature: 1.0, // High creativity for diverse variations
+    const response = await claudeService.createCompletionWithUsage({
+      system: '',
       messages: [
         {
           role: 'user',
           content: prompt,
         },
       ],
+      maxTokens: 6000,
+      temperature: 1.0, // High creativity for diverse variations
+      tracking: {
+        requestType: AI_REQUEST_TYPES.CONCEPT_GENERATION,
+        contextSummary: `Generating ${count} variations for "${summary.title}"`
+      }
     });
 
-    const responseText = message.content[0].type === 'text'
-      ? message.content[0].text
-      : '';
+    const responseText = response.content;
 
     const concepts = parseConceptsResponse(responseText);
 
@@ -1081,21 +1090,24 @@ export async function expandFromIdea(options: ExpandFromIdeaOptions): Promise<St
   const prompt = buildIdeaExpansionPrompt(idea, count, exclusions, preferences);
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-opus-4-5-20251101',
-      max_tokens: count > 5 ? 8000 : 5000,
-      temperature: 1.0, // High creativity for diverse concepts
+    const maxTokens = count > 5 ? 8000 : 5000;
+    const response = await claudeService.createCompletionWithUsage({
+      system: '',
       messages: [
         {
           role: 'user',
           content: prompt,
         },
       ],
+      maxTokens,
+      temperature: 1.0, // High creativity for diverse concepts
+      tracking: {
+        requestType: AI_REQUEST_TYPES.CONCEPT_GENERATION,
+        contextSummary: `Expanding story idea "${idea.storyIdea.substring(0, 50)}..." into ${count} concepts`
+      }
     });
 
-    const responseText = message.content[0].type === 'text'
-      ? message.content[0].text
-      : '';
+    const responseText = response.content;
 
     let concepts = parseConceptsResponse(responseText);
 

@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk';
 import dotenv from 'dotenv';
 import { randomUUID } from 'crypto';
 import type {
@@ -23,18 +22,17 @@ import {
   COMMERCIAL_BEATS,
   GENRE_EXPECTATIONS,
 } from './commercial-beat-validator.js';
+import { claudeService } from './claude.service.js';
+import { AI_REQUEST_TYPES } from '../constants/ai-request-types.js';
 
 dotenv.config();
 
 const logger = createLogger('services:outline-generator');
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
-
-// Use Sonnet for faster generation with good quality
-// Opus 4.5 is too slow for outline generation (12+ minutes)
-const OUTLINE_MODEL = 'claude-sonnet-4-20250514';
+// NOTE: This service previously used claude-sonnet-4-20250514 for faster generation.
+// After migration to claudeService, it now uses the configured model (typically Opus).
+// This provides higher quality but may be slower. If speed becomes an issue,
+// claudeService would need to support model parameter overrides.
 
 export interface OutlineContext {
   concept: {
@@ -463,10 +461,7 @@ async function generateActBreakdown(
   try {
     logger.info('[OutlineGenerator] Calling Claude API for act breakdown...');
 
-    const message = await anthropic.messages.create({
-      model: OUTLINE_MODEL,
-      max_tokens: 4000,
-      temperature: 0.8,
+    const response = await claudeService.createCompletionWithUsage({
       system: 'You are a JSON API that generates story outlines. Always respond with valid JSON only, no markdown formatting, no explanations, no code blocks - just raw JSON.',
       messages: [
         {
@@ -474,15 +469,20 @@ async function generateActBreakdown(
           content: prompt,
         },
       ],
+      maxTokens: 4000,
+      temperature: 0.8,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.ACT_BREAKDOWN,
+        contextSummary: 'Generating act breakdown for outline',
+      },
     });
 
     logger.info({
-      stopReason: message.stop_reason,
-      contentBlocks: message.content.length,
-      usage: message.usage
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
     }, '[OutlineGenerator] Claude API response received');
 
-    const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
+    const responseText = response.content;
 
     if (!responseText) {
       logger.error('[OutlineGenerator] Claude returned empty response text');
@@ -668,10 +668,7 @@ async function generateChaptersForAct(
   const prompt = buildChapterOutlinePrompt(context, act, template);
 
   try {
-    const message = await anthropic.messages.create({
-      model: OUTLINE_MODEL,
-      max_tokens: 6000,
-      temperature: 0.8,
+    const response = await claudeService.createCompletionWithUsage({
       system: 'You are a JSON API that generates story outlines. Always respond with valid JSON only, no markdown formatting, no explanations, no code blocks - just raw JSON.',
       messages: [
         {
@@ -679,13 +676,21 @@ async function generateChaptersForAct(
           content: prompt,
         },
       ],
+      maxTokens: 6000,
+      temperature: 0.8,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.CHAPTER_OUTLINE,
+        contextSummary: `Generating chapter outlines for Act ${act.number}`,
+      },
     });
 
-    const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
+    const responseText = response.content;
 
     logger.info({
       responseLength: responseText.length,
-      responsePreview: responseText.substring(0, 300)
+      responsePreview: responseText.substring(0, 300),
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
     }, '[OutlineGenerator] Chapter response preview');
 
     const chapters = parseChapterOutlineResponse(responseText, act);
@@ -836,10 +841,7 @@ async function generateSceneCards(
   const prompt = buildSceneCardPrompt(context, chapter, act);
 
   try {
-    const message = await anthropic.messages.create({
-      model: OUTLINE_MODEL,
-      max_tokens: 3000,
-      temperature: 0.7,
+    const response = await claudeService.createCompletionWithUsage({
       system: 'You are a JSON API that generates story outlines. Always respond with valid JSON only, no markdown formatting, no explanations, no code blocks - just raw JSON.',
       messages: [
         {
@@ -847,13 +849,21 @@ async function generateSceneCards(
           content: prompt,
         },
       ],
+      maxTokens: 3000,
+      temperature: 0.7,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.SCENE_CARD_GENERATION,
+        contextSummary: `Generating scene cards for Chapter ${chapter.number}`,
+      },
     });
 
-    const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
+    const responseText = response.content;
 
     logger.info({
       responseLength: responseText.length,
-      chapterNumber: chapter.number
+      chapterNumber: chapter.number,
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
     }, '[OutlineGenerator] Scene cards response for chapter');
 
     const sceneCards = parseSceneCardsResponse(responseText);

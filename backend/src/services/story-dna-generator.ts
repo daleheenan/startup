@@ -1,15 +1,12 @@
-import Anthropic from '@anthropic-ai/sdk';
 import dotenv from 'dotenv';
 import { createLogger } from './logger.service.js';
 import { extractJsonObject } from '../utils/json-extractor.js';
+import { claudeService } from './claude.service.js';
+import { AI_REQUEST_TYPES } from '../constants/ai-request-types.js';
 
 dotenv.config();
 
 const logger = createLogger('services:story-dna-generator');
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 export interface StoryDNA {
   genre: string;
@@ -48,23 +45,18 @@ export async function generateStoryDNA(concept: ConceptInput): Promise<StoryDNA>
   logger.info('[StoryDNAGenerator] Generating Story DNA...');
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-opus-4-5-20251101',
-      max_tokens: 2000,
+    const response = await claudeService.createCompletionWithUsage({
+      system: '',
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 2000,
       temperature: 0.7,
-      messages: [
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
+      tracking: {
+        requestType: AI_REQUEST_TYPES.STORY_DNA_GENERATION,
+        contextSummary: `Generating Story DNA for: ${concept.title}`,
+      },
     });
 
-    const responseText = message.content[0].type === 'text'
-      ? message.content[0].text
-      : '';
-
-    const storyDNA = parseStoryDNAResponse(responseText);
+    const storyDNA = parseStoryDNAResponse(response.content);
 
     logger.info('[StoryDNAGenerator] Story DNA generated successfully');
 

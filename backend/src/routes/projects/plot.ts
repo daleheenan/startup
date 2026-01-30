@@ -9,6 +9,8 @@ import type { Project } from '../../shared/types/index.js';
 import { randomUUID } from 'crypto';
 import { createLogger } from '../../services/logger.service.js';
 import { safeJsonParse, syncPlotStructureToActiveVersions, calculateStringSimilarity, findSimilarValue, getPlotColor, escapeRegex } from './utils.js';
+import { metricsService } from '../../services/metrics.service.js';
+import { AI_REQUEST_TYPES } from '../../constants/ai-request-types.js';
 
 const router = Router();
 const logger = createLogger('routes:projects:plot');
@@ -215,6 +217,20 @@ Return ONLY a JSON object:
 }`,
       }],
     });
+
+    // Track AI cost
+    if (message.usage) {
+      metricsService.logAIRequest({
+        requestType: AI_REQUEST_TYPES.COHERENCE_CHECK,
+        projectId: projectId,
+        bookId: null,
+        inputTokens: message.usage.input_tokens,
+        outputTokens: message.usage.output_tokens,
+        model: 'claude-sonnet-4-20250514',
+        success: true,
+        contextSummary: 'Validating plot coherence with story concept'
+      });
+    }
 
     const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
@@ -578,6 +594,20 @@ Return ONLY the description, nothing else.${attemptNote}`;
         messages: [{ role: 'user', content: prompt }],
       });
 
+      // Track AI cost
+      if (message.usage) {
+        metricsService.logAIRequest({
+          requestType: field === 'name' ? AI_REQUEST_TYPES.PLOT_THREAD_GENERATION : AI_REQUEST_TYPES.PLOT_GENERATION,
+          projectId: projectId,
+          bookId: null,
+          inputTokens: message.usage.input_tokens,
+          outputTokens: message.usage.output_tokens,
+          model: 'claude-sonnet-4-20250514',
+          success: true,
+          contextSummary: `Generating plot layer ${field} for ${layerType}`
+        });
+      }
+
       generatedValue = message.content[0].type === 'text'
         ? message.content[0].text.trim()
         : '';
@@ -688,6 +718,20 @@ Impact levels: 1 (minor) to 5 (critical turning point)`;
       temperature: 0.8,
       messages: [{ role: 'user', content: prompt }],
     });
+
+    // Track AI cost
+    if (message.usage) {
+      metricsService.logAIRequest({
+        requestType: AI_REQUEST_TYPES.PLOT_GENERATION,
+        projectId: projectId,
+        bookId: null,
+        inputTokens: message.usage.input_tokens,
+        outputTokens: message.usage.output_tokens,
+        model: 'claude-sonnet-4-20250514',
+        success: true,
+        contextSummary: `Generating plot points for ${layerType} layer: ${layerName}`
+      });
+    }
 
     const responseText = message.content[0].type === 'text'
       ? message.content[0].text
@@ -816,6 +860,20 @@ Extract 3-6 plot threads total. Focus on the most important narrative arcs.`;
       temperature: 0.7,
       messages: [{ role: 'user', content: prompt }],
     });
+
+    // Track AI cost
+    if (message.usage) {
+      metricsService.logAIRequest({
+        requestType: AI_REQUEST_TYPES.PLOT_ANALYSIS,
+        projectId: projectId,
+        bookId: null,
+        inputTokens: message.usage.input_tokens,
+        outputTokens: message.usage.output_tokens,
+        model: 'claude-sonnet-4-20250514',
+        success: true,
+        contextSummary: 'Extracting plot elements from story concept'
+      });
+    }
 
     const responseText = message.content[0].type === 'text'
       ? message.content[0].text
@@ -980,6 +1038,20 @@ Output ONLY valid JSON, no additional commentary:`;
       messages: [{ role: 'user', content: prompt }],
     });
 
+    // Track AI cost
+    if (message.usage) {
+      metricsService.logAIRequest({
+        requestType: AI_REQUEST_TYPES.ORIGINALITY_CHECK,
+        projectId: projectId,
+        bookId: null,
+        inputTokens: message.usage.input_tokens,
+        outputTokens: message.usage.output_tokens,
+        model: 'claude-sonnet-4-20250514',
+        success: true,
+        contextSummary: 'Implementing originality suggestion to revise story concept'
+      });
+    }
+
     const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
 
     let revisedConcept: any;
@@ -1133,6 +1205,20 @@ Output ONLY valid JSON, no additional commentary:`;
       temperature: 0.7,
       messages: [{ role: 'user', content: prompt }],
     });
+
+    // Track AI cost
+    if (message.usage) {
+      metricsService.logAIRequest({
+        requestType: AI_REQUEST_TYPES.COHERENCE_CHECK,
+        projectId: projectId,
+        bookId: null,
+        inputTokens: message.usage.input_tokens,
+        outputTokens: message.usage.output_tokens,
+        model: 'claude-sonnet-4-20250514',
+        success: true,
+        contextSummary: 'Implementing coherence suggestion to revise plot layers'
+      });
+    }
 
     const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
 
@@ -1322,6 +1408,20 @@ Return ONLY valid JSON, no markdown formatting.`;
       temperature: 0.3,
       messages: [{ role: 'user', content: prompt }],
     });
+
+    // Track AI cost
+    if (response.usage) {
+      metricsService.logAIRequest({
+        requestType: AI_REQUEST_TYPES.COHERENCE_CHECK,
+        projectId: projectId,
+        bookId: null,
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+        model: 'claude-sonnet-4-20250514',
+        success: true,
+        contextSummary: 'Fixing coherence warning with AI-suggested plot revisions'
+      });
+    }
 
     const content = response.content[0];
     if (content.type !== 'text') {
@@ -1546,6 +1646,20 @@ Generate a rich, detailed plot structure:`;
       temperature: 0.7,
       messages: [{ role: 'user', content: prompt }],
     });
+
+    // Track AI cost
+    if (message.usage) {
+      metricsService.logAIRequest({
+        requestType: AI_REQUEST_TYPES.PLOT_GENERATION,
+        projectId: projectId,
+        bookId: null,
+        inputTokens: message.usage.input_tokens,
+        outputTokens: message.usage.output_tokens,
+        model: 'claude-sonnet-4-20250514',
+        success: true,
+        contextSummary: 'Regenerating complete plot structure from story elements'
+      });
+    }
 
     const responseText = message.content[0].type === 'text'
       ? message.content[0].text

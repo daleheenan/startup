@@ -22,6 +22,7 @@ export interface ClaudeResponse {
 export interface TrackingContext {
   requestType: AIRequestType | string;
   projectId?: string | null;
+  bookId?: string | null;
   chapterId?: string | null;
   contextSummary?: string;
 }
@@ -116,6 +117,7 @@ export class ClaudeService {
           metricsService.logAIRequest({
             requestType: params.tracking.requestType,
             projectId: params.tracking.projectId,
+            bookId: params.tracking.bookId,
             chapterId: params.tracking.chapterId,
             inputTokens: result.usage.input_tokens,
             outputTokens: result.usage.output_tokens,
@@ -137,6 +139,7 @@ export class ClaudeService {
           metricsService.logAIRequest({
             requestType: params.tracking.requestType,
             projectId: params.tracking.projectId,
+            bookId: params.tracking.bookId,
             chapterId: params.tracking.chapterId,
             inputTokens: 0,
             outputTokens: 0,

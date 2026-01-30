@@ -1,16 +1,13 @@
-import Anthropic from '@anthropic-ai/sdk';
 import dotenv from 'dotenv';
 import { randomUUID } from 'crypto';
 import { createLogger } from './logger.service.js';
 import { extractJsonArray } from '../utils/json-extractor.js';
+import { claudeService } from './claude.service.js';
+import { AI_REQUEST_TYPES } from '../constants/ai-request-types.js';
 
 dotenv.config();
 
 const logger = createLogger('services:world-generator');
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 export type WorldElementType = 'location' | 'faction' | 'magic_system' | 'technology' | 'custom';
 
@@ -46,21 +43,18 @@ export async function generateWorldElements(
   logger.info('[WorldGenerator] Generating world elements...');
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-opus-4-5-20251101',
-      max_tokens: 6000,
+    const response = await claudeService.createCompletionWithUsage({
+      system: '',
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 6000,
       temperature: 0.85,
-      messages: [
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
+      tracking: {
+        requestType: AI_REQUEST_TYPES.WORLD_GENERATION,
+        contextSummary: `Generating world for "${context.title}" (${context.genre})`,
+      },
     });
 
-    const responseText = message.content[0].type === 'text'
-      ? message.content[0].text
-      : '';
+    const responseText = response.content;
 
     const worldElements = parseWorldElementsResponse(responseText);
 

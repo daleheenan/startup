@@ -73,6 +73,7 @@ describe('AI Cost Tracking', () => {
       const entry: AIRequestLogEntry = {
         requestType: 'chapter_generation',
         projectId: 'test-project-id',
+        bookId: 'test-book-id',
         chapterId: 'test-chapter-id',
         inputTokens: 1000,
         outputTokens: 500,
@@ -102,8 +103,30 @@ describe('AI Cost Tracking', () => {
       // Output: 500/1M * 75 = 0.0375 USD
       // Total: 0.0525 USD
       // GBP: 0.0525 * 0.79 = 0.041475
-      expect(runCall[6]).toBeCloseTo(0.0525, 4); // cost_usd
-      expect(runCall[7]).toBeCloseTo(0.041475, 6); // cost_gbp
+      // Positions: id(0), request_type(1), project_id(2), book_id(3), chapter_id(4),
+      //            input_tokens(5), output_tokens(6), cost_usd(7), cost_gbp(8)
+      expect(runCall[7]).toBeCloseTo(0.0525, 4); // cost_usd
+      expect(runCall[8]).toBeCloseTo(0.041475, 6); // cost_gbp
+    });
+
+    it('should include book_id when provided', () => {
+      const entry: AIRequestLogEntry = {
+        requestType: 'chapter_generation',
+        projectId: 'test-project-id',
+        bookId: 'test-book-id',
+        chapterId: 'test-chapter-id',
+        inputTokens: 1000,
+        outputTokens: 500,
+        success: true,
+      };
+
+      metricsService.logAIRequest(entry);
+
+      expect(mockStatement.run).toHaveBeenCalled();
+      const runCall = (mockStatement.run as jest.Mock).mock.calls[0];
+
+      // Verify book_id is in position 3
+      expect(runCall[3]).toBe('test-book-id');
     });
 
     it('should log request without project_id when not provided', () => {
@@ -122,8 +145,9 @@ describe('AI Cost Tracking', () => {
       expect(mockStatement.run).toHaveBeenCalled();
       const runCall = (mockStatement.run as jest.Mock).mock.calls[0];
 
-      // Project ID should be null (position 2)
+      // Project ID should be null (position 2), book_id null (position 3)
       expect(runCall[2]).toBeNull();
+      expect(runCall[3]).toBeNull();
     });
 
     it('should mark failed requests with success=0', () => {
@@ -141,11 +165,14 @@ describe('AI Cost Tracking', () => {
       expect(mockStatement.run).toHaveBeenCalled();
       const runCall = (mockStatement.run as jest.Mock).mock.calls[0];
 
-      // Success flag should be 0 (position 9)
-      expect(runCall[9]).toBe(0);
+      // Positions: id(0), request_type(1), project_id(2), book_id(3), chapter_id(4),
+      //            input_tokens(5), output_tokens(6), cost_usd(7), cost_gbp(8),
+      //            model_used(9), success(10), error_message(11), context_summary(12), created_at(13)
+      // Success flag should be 0 (position 10)
+      expect(runCall[10]).toBe(0);
 
-      // Error message should be set (position 10)
-      expect(runCall[10]).toBe('Rate limit exceeded');
+      // Error message should be set (position 11)
+      expect(runCall[11]).toBe('Rate limit exceeded');
     });
 
     it('should handle context summary when provided', () => {
@@ -163,8 +190,11 @@ describe('AI Cost Tracking', () => {
       expect(mockStatement.run).toHaveBeenCalled();
       const runCall = (mockStatement.run as jest.Mock).mock.calls[0];
 
-      // Context summary should be set (position 11)
-      expect(runCall[11]).toBe('VEB review of Chapter 5: The Dark Forest');
+      // Positions: id(0), request_type(1), project_id(2), book_id(3), chapter_id(4),
+      //            input_tokens(5), output_tokens(6), cost_usd(7), cost_gbp(8),
+      //            model_used(9), success(10), error_message(11), context_summary(12), created_at(13)
+      // Context summary should be set (position 12)
+      expect(runCall[12]).toBe('VEB review of Chapter 5: The Dark Forest');
     });
 
     it('should calculate costs correctly for large token counts', () => {
@@ -185,8 +215,9 @@ describe('AI Cost Tracking', () => {
       // Output: 100k/1M * 75 = 7.5 USD
       // Total: 8.25 USD
       // GBP: 8.25 * 0.79 = 6.5175
-      expect(runCall[6]).toBeCloseTo(8.25, 2);
-      expect(runCall[7]).toBeCloseTo(6.5175, 4);
+      // Positions: cost_usd(7), cost_gbp(8)
+      expect(runCall[7]).toBeCloseTo(8.25, 2);
+      expect(runCall[8]).toBeCloseTo(6.5175, 4);
     });
 
     it('should use default model when not specified', () => {
@@ -203,8 +234,8 @@ describe('AI Cost Tracking', () => {
       expect(mockStatement.run).toHaveBeenCalled();
       const runCall = (mockStatement.run as jest.Mock).mock.calls[0];
 
-      // Model should be default (position 8)
-      expect(runCall[8]).toBe('claude-opus-4-5-20251101');
+      // Model should be default (position 9)
+      expect(runCall[9]).toBe('claude-opus-4-5-20251101');
     });
 
     it('should handle errors gracefully', () => {
@@ -299,6 +330,7 @@ describe('AI Cost Tracking', () => {
           id: 'log-1',
           request_type: 'chapter_generation',
           project_id: 'project-1',
+          book_id: 'book-1',
           chapter_id: 'chapter-1',
           input_tokens: 1000,
           output_tokens: 500,
@@ -310,6 +342,7 @@ describe('AI Cost Tracking', () => {
           context_summary: null,
           created_at: '2025-01-29T10:00:00Z',
           project_name: 'Test Project',
+          book_name: 'Test Book',
           series_id: 'series-1',
           series_name: 'Test Series',
         },
@@ -317,6 +350,7 @@ describe('AI Cost Tracking', () => {
           id: 'log-2',
           request_type: 'veb_beta_swarm',
           project_id: 'project-1',
+          book_id: 'book-1',
           chapter_id: 'chapter-1',
           input_tokens: 2000,
           output_tokens: 1000,
@@ -328,6 +362,7 @@ describe('AI Cost Tracking', () => {
           context_summary: 'Beta reader review',
           created_at: '2025-01-29T11:00:00Z',
           project_name: 'Test Project',
+          book_name: 'Test Book',
           series_id: 'series-1',
           series_name: 'Test Series',
         },
@@ -867,8 +902,9 @@ describe('AI Cost Tracking', () => {
       // Output: 500K/1M * 75 = 37.5 USD
       // Total: 52.5 USD
       // GBP: 52.5 * 0.79 = 41.475
-      expect(runCall[6]).toBeCloseTo(52.5, 2);
-      expect(runCall[7]).toBeCloseTo(41.475, 3);
+      // Positions: cost_usd(7), cost_gbp(8)
+      expect(runCall[7]).toBeCloseTo(52.5, 2);
+      expect(runCall[8]).toBeCloseTo(41.475, 3);
     });
 
     it('should handle missing project_id in filters', () => {

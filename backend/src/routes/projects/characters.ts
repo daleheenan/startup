@@ -9,6 +9,8 @@ import type { Project } from '../../shared/types/index.js';
 import { generateProtagonist, generateSupportingCast, assignNationalities, regenerateDependentFields } from '../../services/character-generator.js';
 import { generateStoryDNA } from '../../services/story-dna-generator.js';
 import { createLogger } from '../../services/logger.service.js';
+import { metricsService } from '../../services/metrics.service.js';
+import { AI_REQUEST_TYPES } from '../../constants/ai-request-types.js';
 import { safeJsonParse, propagateCharacterNameChange } from './utils.js';
 
 const router = Router();
@@ -451,6 +453,20 @@ Return ONLY the new name, nothing else. Just the full name.`;
       messages: [{ role: 'user', content: prompt }],
     });
 
+    // Log AI request for cost tracking
+    if (message.usage) {
+      metricsService.logAIRequest({
+        requestType: AI_REQUEST_TYPES.NAME_GENERATION,
+        projectId: projectId,
+        bookId: null,
+        inputTokens: message.usage.input_tokens,
+        outputTokens: message.usage.output_tokens,
+        model: 'claude-opus-4-5-20251101',
+        success: true,
+        contextSummary: `Regenerate name for character ${characterId}`,
+      });
+    }
+
     const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
     const newName = responseText.trim();
     const oldName = character.name;
@@ -666,6 +682,20 @@ Return ONLY the new name, nothing else. Just the full name.`;
         temperature: 0.9,
         messages: [{ role: 'user', content: prompt }],
       });
+
+      // Log AI request for cost tracking
+      if (message.usage) {
+        metricsService.logAIRequest({
+          requestType: AI_REQUEST_TYPES.NAME_GENERATION,
+          projectId: projectId,
+          bookId: null,
+          inputTokens: message.usage.input_tokens,
+          outputTokens: message.usage.output_tokens,
+          model: 'claude-opus-4-5-20251101',
+          success: true,
+          contextSummary: `Regenerate name for character ${character.id} (batch operation)`,
+        });
+      }
 
       const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
       const newName = responseText.trim();

@@ -1,5 +1,6 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { createLogger } from './logger.service.js';
+import { claudeService } from './claude.service.js';
+import { AI_REQUEST_TYPES } from '../constants/ai-request-types.js';
 import type { StoryConcept } from '../shared/types/index.js';
 import type { StoryDNA } from '../shared/types/index.js';
 import type { IntentDetectionResult } from './editorial-intent-detector.js';
@@ -38,13 +39,10 @@ export async function generateEditorialResponse(
   userQuery: string,
   currentConcept: StoryConcept,
   currentDNA: StoryDNA,
-  conversationHistory: ConversationMessage[]
+  conversationHistory: ConversationMessage[],
+  projectId?: string
 ): Promise<EditorialResponse> {
   try {
-    const anthropic = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    });
-
     // Build conversation context
     const conversationContext = conversationHistory
       .slice(-10) // Last 10 messages only
@@ -173,20 +171,19 @@ DETECTED INTENT: ${intentResult.intent} (confidence: ${intentResult.confidence})
 
 ${responseInstructions}`;
 
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
+    const response = await claudeService.createCompletionWithUsage({
+      system: '',
       messages: [{ role: 'user', content: fullPrompt }],
+      maxTokens: 4096,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.EDITORIAL_RESPONSE,
+        projectId: projectId || null,
+        contextSummary: `Generating editorial response for ${intentResult.intent} intent`,
+      },
     });
 
-    // Extract the text content
-    const textContent = response.content.find(c => c.type === 'text');
-    if (!textContent || textContent.type !== 'text') {
-      throw new Error('No text response from AI');
-    }
-
     // Parse the JSON response
-    const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
+    const jsonMatch = response.content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       throw new Error('Failed to extract JSON from AI response');
     }
@@ -240,10 +237,7 @@ ${responseInstructions}`;
 
     return {
       ...result,
-      usage: {
-        input_tokens: response.usage.input_tokens,
-        output_tokens: response.usage.output_tokens,
-      },
+      usage: response.usage,
     };
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack }, 'Error generating editorial response');

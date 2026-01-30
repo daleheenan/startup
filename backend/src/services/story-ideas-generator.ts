@@ -1,7 +1,8 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { v4 as uuidv4 } from 'uuid';
 import { createLogger } from './logger.service.js';
 import { extractJsonArray } from '../utils/json-extractor.js';
+import { claudeService } from './claude.service.js';
+import { AI_REQUEST_TYPES } from '../constants/ai-request-types.js';
 
 const logger = createLogger('services:story-ideas-generator');
 
@@ -38,18 +39,8 @@ export type RegeneratableSection = 'characters' | 'plot' | 'twists';
  * Implements the Single Responsibility Principle - focused only on idea generation
  */
 export class StoryIdeasGenerator {
-  private anthropic: Anthropic;
-  private model: string;
-
   constructor() {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey || apiKey === 'placeholder-key-will-be-set-later') {
-      logger.warn('ANTHROPIC_API_KEY not configured');
-      this.anthropic = null as any;
-    } else {
-      this.anthropic = new Anthropic({ apiKey });
-    }
-    this.model = process.env.ANTHROPIC_MODEL || 'claude-opus-4-5-20251101';
+    // No initialization needed - using claudeService singleton
   }
 
   /**
@@ -58,10 +49,6 @@ export class StoryIdeasGenerator {
    * @returns Array of generated ideas with structured sections
    */
   async generateIdeas(params: GenerateIdeasParams): Promise<GeneratedIdea[]> {
-    if (!this.anthropic) {
-      throw new Error('Claude API not configured. Set ANTHROPIC_API_KEY in .env file');
-    }
-
     const { genre, subgenre, tone, themes, timePeriod, count = 5 } = params;
 
     const prompt = this.buildGeneratePrompt(genre, subgenre, tone, themes, timePeriod, count);
@@ -75,21 +62,18 @@ export class StoryIdeasGenerator {
     }, 'Generating story ideas');
 
     try {
-      const message = await this.anthropic.messages.create({
-        model: this.model,
-        max_tokens: 4000,
+      const response = await claudeService.createCompletionWithUsage({
+        system: '',
+        messages: [{ role: 'user', content: prompt }],
+        maxTokens: 4000,
         temperature: 1.0, // High creativity for diverse ideas
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
+        tracking: {
+          requestType: AI_REQUEST_TYPES.STORY_IDEA_GENERATION,
+          contextSummary: `Generating ${count} ideas for ${genre}${subgenre ? ` (${subgenre})` : ''}`,
+        },
       });
 
-      const responseText = message.content[0].type === 'text'
-        ? message.content[0].text
-        : '';
+      const responseText = response.content;
 
       const ideas = this.parseIdeasResponse(responseText);
 
@@ -114,10 +98,6 @@ export class StoryIdeasGenerator {
     section: RegeneratableSection,
     context: GeneratedIdea
   ): Promise<string[]> {
-    if (!this.anthropic) {
-      throw new Error('Claude API not configured. Set ANTHROPIC_API_KEY in .env file');
-    }
-
     const prompt = this.buildRegeneratePrompt(section, context);
 
     logger.info({
@@ -126,21 +106,18 @@ export class StoryIdeasGenerator {
     }, 'Regenerating idea section');
 
     try {
-      const message = await this.anthropic.messages.create({
-        model: this.model,
-        max_tokens: 1500,
+      const response = await claudeService.createCompletionWithUsage({
+        system: '',
+        messages: [{ role: 'user', content: prompt }],
+        maxTokens: 1500,
         temperature: 1.0,
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
+        tracking: {
+          requestType: AI_REQUEST_TYPES.STORY_IDEA_GENERATION,
+          contextSummary: `Regenerating ${section} section for idea ${ideaId}`,
+        },
       });
 
-      const responseText = message.content[0].type === 'text'
-        ? message.content[0].text
-        : '';
+      const responseText = response.content;
 
       const items = this.parseSectionResponse(responseText);
 
@@ -164,24 +141,23 @@ export class StoryIdeasGenerator {
     plotElements: string[];
     uniqueTwists: string[];
   }> {
-    if (!this.anthropic) {
-      throw new Error('Claude API not configured. Set ANTHROPIC_API_KEY in .env file');
-    }
-
     const prompt = this.buildExpandPremisePrompt(premise, timePeriod);
 
     logger.info({ premiseLength: premise.length, timePeriod }, 'Expanding premise with AI');
 
     try {
-      const message = await this.anthropic.messages.create({
-        model: this.model,
-        max_tokens: 1500,
-        temperature: 0.8,
+      const response = await claudeService.createCompletionWithUsage({
+        system: '',
         messages: [{ role: 'user', content: prompt }],
+        maxTokens: 1500,
+        temperature: 0.8,
+        tracking: {
+          requestType: AI_REQUEST_TYPES.STORY_IDEA_GENERATION,
+          contextSummary: `Expanding user premise (${premise.substring(0, 50)}...)`,
+        },
       });
 
-      const responseText =
-        message.content[0].type === 'text' ? message.content[0].text : '';
+      const responseText = response.content;
 
       const expansion = this.parseExpandPremiseResponse(responseText);
 

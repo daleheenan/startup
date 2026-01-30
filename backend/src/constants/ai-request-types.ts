@@ -73,6 +73,25 @@ export const AI_REQUEST_TYPES = {
 
   // Lesson Curation
   LESSON_CURATION: 'lesson_curation',
+
+  // Additional Generators & Utilities
+  NAME_GENERATION: 'name_generation',
+  GENRE_INFERENCE: 'genre_inference',
+  AUTHOR_STYLE_LOOKUP: 'author_style_lookup',
+  EDITORIAL_INTENT_DETECTION: 'editorial_intent_detection',
+  EDITORIAL_RESPONSE: 'editorial_response',
+  EDITORIAL_ASSISTANT: 'editorial_assistant',
+  CHARACTER_DEPENDENT_FIELDS: 'character_dependent_fields',
+  PLOT_ANALYSIS: 'plot_analysis',
+  PLOT_THREAD_GENERATION: 'plot_thread_generation',
+  SUBPLOT_GENERATION: 'subplot_generation',
+  CHARACTER_ARC_GENERATION: 'character_arc_generation',
+  ROMANCE_ARC_GENERATION: 'romance_arc_generation',
+  MYSTERY_THREAD_GENERATION: 'mystery_thread_generation',
+  ACT_BREAKDOWN: 'act_breakdown',
+  CHAPTER_OUTLINE: 'chapter_outline',
+  SCENE_CARD_GENERATION: 'scene_card_generation',
+  CHAPTER_PROCESSING: 'chapter_processing',
 } as const;
 
 export type AIRequestType = (typeof AI_REQUEST_TYPES)[keyof typeof AI_REQUEST_TYPES];
@@ -149,6 +168,25 @@ export const AI_REQUEST_TYPE_LABELS: Record<AIRequestType, string> = {
 
   // Lesson Curation
   [AI_REQUEST_TYPES.LESSON_CURATION]: 'Lesson Curation',
+
+  // Additional Generators & Utilities
+  [AI_REQUEST_TYPES.NAME_GENERATION]: 'Name Generation',
+  [AI_REQUEST_TYPES.GENRE_INFERENCE]: 'Genre Inference',
+  [AI_REQUEST_TYPES.AUTHOR_STYLE_LOOKUP]: 'Author Style Lookup',
+  [AI_REQUEST_TYPES.EDITORIAL_INTENT_DETECTION]: 'Editorial Intent Detection',
+  [AI_REQUEST_TYPES.EDITORIAL_RESPONSE]: 'Editorial Response',
+  [AI_REQUEST_TYPES.EDITORIAL_ASSISTANT]: 'Editorial Assistant',
+  [AI_REQUEST_TYPES.CHARACTER_DEPENDENT_FIELDS]: 'Character Dependent Fields',
+  [AI_REQUEST_TYPES.PLOT_ANALYSIS]: 'Plot Analysis',
+  [AI_REQUEST_TYPES.PLOT_THREAD_GENERATION]: 'Plot Thread Generation',
+  [AI_REQUEST_TYPES.SUBPLOT_GENERATION]: 'Subplot Generation',
+  [AI_REQUEST_TYPES.CHARACTER_ARC_GENERATION]: 'Character Arc Generation',
+  [AI_REQUEST_TYPES.ROMANCE_ARC_GENERATION]: 'Romance Arc Generation',
+  [AI_REQUEST_TYPES.MYSTERY_THREAD_GENERATION]: 'Mystery Thread Generation',
+  [AI_REQUEST_TYPES.ACT_BREAKDOWN]: 'Act Breakdown',
+  [AI_REQUEST_TYPES.CHAPTER_OUTLINE]: 'Chapter Outline',
+  [AI_REQUEST_TYPES.SCENE_CARD_GENERATION]: 'Scene Card Generation',
+  [AI_REQUEST_TYPES.CHAPTER_PROCESSING]: 'Chapter Processing',
 };
 
 /**
@@ -203,6 +241,26 @@ export const AI_REQUEST_TYPE_CATEGORIES = {
     AI_REQUEST_TYPES.STORY_IDEA_GENERATION,
     AI_REQUEST_TYPES.PLOT_GENERATION,
     AI_REQUEST_TYPES.CHAPTER_BRIEF,
+    AI_REQUEST_TYPES.NAME_GENERATION,
+    AI_REQUEST_TYPES.PLOT_THREAD_GENERATION,
+    AI_REQUEST_TYPES.SUBPLOT_GENERATION,
+    AI_REQUEST_TYPES.CHARACTER_ARC_GENERATION,
+    AI_REQUEST_TYPES.ROMANCE_ARC_GENERATION,
+    AI_REQUEST_TYPES.MYSTERY_THREAD_GENERATION,
+    AI_REQUEST_TYPES.ACT_BREAKDOWN,
+    AI_REQUEST_TYPES.CHAPTER_OUTLINE,
+    AI_REQUEST_TYPES.SCENE_CARD_GENERATION,
+    AI_REQUEST_TYPES.CHARACTER_DEPENDENT_FIELDS,
+  ],
+  'Editorial & Analysis': [
+    AI_REQUEST_TYPES.EDITORIAL_INTENT_DETECTION,
+    AI_REQUEST_TYPES.EDITORIAL_RESPONSE,
+    AI_REQUEST_TYPES.EDITORIAL_ASSISTANT,
+    AI_REQUEST_TYPES.GENRE_INFERENCE,
+    AI_REQUEST_TYPES.AUTHOR_STYLE_LOOKUP,
+  ],
+  'Background Processing': [
+    AI_REQUEST_TYPES.CHAPTER_PROCESSING,
   ],
   'Follow-up': [
     AI_REQUEST_TYPES.SEQUEL_IDEAS,

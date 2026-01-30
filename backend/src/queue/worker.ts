@@ -1488,6 +1488,22 @@ Return ONLY a JSON object:
         }],
       });
 
+      // Track AI cost
+      if (message.usage) {
+        const { metricsService } = await import('../services/metrics.service.js');
+        metricsService.logAIRequest({
+          requestType: AI_REQUEST_TYPES.CHAPTER_PROCESSING,
+          projectId: projectId,
+          bookId: bookId || null,
+          chapterId: null,
+          inputTokens: message.usage.input_tokens,
+          outputTokens: message.usage.output_tokens,
+          model: 'claude-sonnet-4-20250514',
+          success: true,
+          contextSummary: 'Coherence check - plot validation',
+        });
+      }
+
       const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
 

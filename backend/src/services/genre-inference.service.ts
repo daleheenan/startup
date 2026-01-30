@@ -1,6 +1,7 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { createLogger } from './logger.service.js';
 import { extractJsonObject } from '../utils/json-extractor.js';
+import { claudeService } from './claude.service.js';
+import { AI_REQUEST_TYPES } from '../constants/ai-request-types.js';
 
 const logger = createLogger('services:genre-inference');
 
@@ -50,19 +51,8 @@ const VALID_GENRES = [
  * Uses Claude AI to analyse the content and determine appropriate genre classification
  */
 export class GenreInferenceService {
-  private anthropic: Anthropic;
-  private model: string;
-
   constructor() {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey || apiKey === 'placeholder-key-will-be-set-later') {
-      logger.warn('ANTHROPIC_API_KEY not configured');
-      this.anthropic = null as any;
-    } else {
-      this.anthropic = new Anthropic({ apiKey });
-    }
-    // Use Haiku for fast, cheap inference - this is a simple classification task
-    this.model = 'claude-sonnet-4-20250514';
+    // No initialization needed - using claudeService singleton
   }
 
   /**
@@ -72,10 +62,6 @@ export class GenreInferenceService {
    * @returns Inferred genre, subgenre, tone, and themes
    */
   async inferGenre(premise: string, timePeriod?: string): Promise<GenreInferenceResult> {
-    if (!this.anthropic) {
-      throw new Error('Claude API not configured. Set ANTHROPIC_API_KEY in .env file');
-    }
-
     if (!premise || premise.trim().length < 10) {
       throw new Error('Premise must be at least 10 characters long for genre inference');
     }
@@ -88,21 +74,18 @@ export class GenreInferenceService {
     }, 'Inferring genre from premise');
 
     try {
-      const message = await this.anthropic.messages.create({
-        model: this.model,
-        max_tokens: 500,
+      const response = await claudeService.createCompletionWithUsage({
+        system: '',
+        messages: [{ role: 'user', content: prompt }],
+        maxTokens: 500,
         temperature: 0.3, // Low temperature for consistent classification
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
+        tracking: {
+          requestType: AI_REQUEST_TYPES.GENRE_INFERENCE,
+          contextSummary: `Inferring genre from ${premise.length} character premise`,
+        },
       });
 
-      const responseText = message.content[0].type === 'text'
-        ? message.content[0].text
-        : '';
+      const responseText = response.content;
 
       const result = this.parseInferenceResponse(responseText);
 

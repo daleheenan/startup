@@ -1,17 +1,14 @@
-import Anthropic from '@anthropic-ai/sdk';
 import dotenv from 'dotenv';
 import { randomUUID } from 'crypto';
 import { createLogger } from './logger.service.js';
+import { claudeService } from './claude.service.js';
 import { generateNameByNationality } from './name-generator.js';
 import { extractJsonArray, extractJsonObject } from '../utils/json-extractor.js';
+import { AI_REQUEST_TYPES } from '../constants/ai-request-types.js';
 
 dotenv.config();
 
 const logger = createLogger('services:character-generator');
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 export type CharacterRole = 'protagonist' | 'antagonist' | 'mentor' | 'sidekick' | 'love_interest' | 'supporting';
 
@@ -70,21 +67,24 @@ export async function generateProtagonist(
   logger.info({ assignedNationality }, '[CharacterGenerator] Generating protagonist...');
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-opus-4-5-20251101',
-      max_tokens: 3000,
-      temperature: 0.9, // High creativity for unique character
+    const response = await claudeService.createCompletionWithUsage({
+      system: '',
       messages: [
         {
           role: 'user',
           content: prompt,
         },
       ],
+      maxTokens: 3000,
+      temperature: 0.9, // High creativity for unique character
+      tracking: {
+        requestType: AI_REQUEST_TYPES.CHARACTER_GENERATION,
+        projectId: null,
+        contextSummary: 'Generating protagonist character',
+      },
     });
 
-    const responseText = message.content[0].type === 'text'
-      ? message.content[0].text
-      : '';
+    const responseText = response.content;
 
     let character = parseCharacterResponse(responseText, 'protagonist');
 
@@ -120,21 +120,24 @@ export async function generateSupportingCast(
   logger.info({ assignedNationalities }, '[CharacterGenerator] Generating supporting cast...');
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-opus-4-5-20251101',
-      max_tokens: 8000,
-      temperature: 0.9,
+    const response = await claudeService.createCompletionWithUsage({
+      system: '',
       messages: [
         {
           role: 'user',
           content: prompt,
         },
       ],
+      maxTokens: 8000,
+      temperature: 0.9,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.CHARACTER_GENERATION,
+        projectId: null,
+        contextSummary: 'Generating supporting cast characters',
+      },
     });
 
-    const responseText = message.content[0].type === 'text'
-      ? message.content[0].text
-      : '';
+    const responseText = response.content;
 
     let characters = parseSupportingCastResponse(responseText);
 
@@ -392,21 +395,24 @@ export async function regenerateDependentFields(params: {
   const prompt = buildDependentFieldsPrompt(newName, character, fieldsToUpdate, storyContext);
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-opus-4-5-20251101',
-      max_tokens: 2000,
-      temperature: 0.8,
+    const response = await claudeService.createCompletionWithUsage({
+      system: '',
       messages: [
         {
           role: 'user',
           content: prompt,
         },
       ],
+      maxTokens: 2000,
+      temperature: 0.8,
+      tracking: {
+        requestType: AI_REQUEST_TYPES.CHARACTER_DEPENDENT_FIELDS,
+        projectId: params.projectId || null,
+        contextSummary: `Regenerating ${fieldsToUpdate.join(', ')} for character ${newName}`,
+      },
     });
 
-    const responseText = message.content[0].type === 'text'
-      ? message.content[0].text
-      : '';
+    const responseText = response.content;
 
     const result = parseDependentFieldsResponse(responseText, fieldsToUpdate);
 

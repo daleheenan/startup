@@ -7,6 +7,7 @@ import { generateProtagonist, generateSupportingCast, assignNationalities } from
 import { generateWorldElements } from '../services/world-generator.js';
 import { metricsService } from '../services/metrics.service.js';
 import { createLogger } from '../services/logger.service.js';
+import { AI_REQUEST_TYPES } from '../constants/ai-request-types.js';
 import { universeService } from '../services/universe.service.js';
 import { detectIntent } from '../services/editorial-intent-detector.js';
 import { generateEditorialResponse } from '../services/editorial-response-generator.js';
@@ -2751,6 +2752,20 @@ Return ONLY the new name, nothing else. Just the full name.`;
       ],
     });
 
+    // Track AI cost
+    if (message.usage) {
+      metricsService.logAIRequest({
+        requestType: AI_REQUEST_TYPES.NAME_GENERATION,
+        projectId: projectId,
+        bookId: null,
+        inputTokens: message.usage.input_tokens,
+        outputTokens: message.usage.output_tokens,
+        model: 'claude-opus-4-5-20251101',
+        success: true,
+        contextSummary: `Character name regeneration for ${character.name}`
+      });
+    }
+
     const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
     const newName = responseText.trim();
     const oldName = character.name;
@@ -2981,6 +2996,20 @@ Return ONLY the new name, nothing else. Just the full name.`;
           },
         ],
       });
+
+      // Track AI cost
+      if (message.usage) {
+        metricsService.logAIRequest({
+          requestType: AI_REQUEST_TYPES.NAME_GENERATION,
+          projectId: projectId,
+          bookId: null,
+          inputTokens: message.usage.input_tokens,
+          outputTokens: message.usage.output_tokens,
+          model: 'claude-opus-4-5-20251101',
+          success: true,
+          contextSummary: `Bulk name regeneration for ${character.name}`
+        });
+      }
 
       const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
       const newName = responseText.trim();
@@ -3414,6 +3443,20 @@ Return ONLY a JSON object:
 }`,
       }],
     });
+
+    // Track AI cost
+    if (message.usage) {
+      metricsService.logAIRequest({
+        requestType: AI_REQUEST_TYPES.COHERENCE_CHECK,
+        projectId: projectId,
+        bookId: null,
+        inputTokens: message.usage.input_tokens,
+        outputTokens: message.usage.output_tokens,
+        model: 'claude-sonnet-4-20250514',
+        success: true,
+        contextSummary: 'Plot coherence validation'
+      });
+    }
 
     const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
@@ -3881,6 +3924,20 @@ Return ONLY the description, nothing else.${attemptNote}`;
         messages: [{ role: 'user', content: prompt }],
       });
 
+      // Track AI cost
+      if (message.usage) {
+        metricsService.logAIRequest({
+          requestType: field === 'name' ? AI_REQUEST_TYPES.PLOT_GENERATION : AI_REQUEST_TYPES.PLOT_GENERATION,
+          projectId: projectId,
+          bookId: null,
+          inputTokens: message.usage.input_tokens,
+          outputTokens: message.usage.output_tokens,
+          model: 'claude-sonnet-4-20250514',
+          success: true,
+          contextSummary: `Plot layer ${field} generation for ${layerType}`
+        });
+      }
+
       generatedValue = message.content[0].type === 'text'
         ? message.content[0].text.trim()
         : '';
@@ -4021,6 +4078,20 @@ Impact levels: 1 (minor) to 5 (critical turning point)`;
       temperature: 0.8,
       messages: [{ role: 'user', content: prompt }],
     });
+
+    // Track AI cost
+    if (message.usage) {
+      metricsService.logAIRequest({
+        requestType: AI_REQUEST_TYPES.PLOT_GENERATION,
+        projectId: projectId,
+        bookId: null,
+        inputTokens: message.usage.input_tokens,
+        outputTokens: message.usage.output_tokens,
+        model: 'claude-sonnet-4-20250514',
+        success: true,
+        contextSummary: `Plot points generation for ${layerName}`
+      });
+    }
 
     const responseText = message.content[0].type === 'text'
       ? message.content[0].text
@@ -4350,6 +4421,20 @@ Output ONLY valid JSON, no additional commentary:`;
       messages: [{ role: 'user', content: prompt }],
     });
 
+    // Track AI cost
+    if (message.usage) {
+      metricsService.logAIRequest({
+        requestType: AI_REQUEST_TYPES.ORIGINALITY_CHECK,
+        projectId: projectId,
+        bookId: null,
+        inputTokens: message.usage.input_tokens,
+        outputTokens: message.usage.output_tokens,
+        model: 'claude-sonnet-4-20250514',
+        success: true,
+        contextSummary: 'Implement originality suggestion'
+      });
+    }
+
     const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
 
     // Parse the response
@@ -4512,6 +4597,20 @@ Output ONLY valid JSON, no additional commentary:`;
       temperature: 0.7,
       messages: [{ role: 'user', content: prompt }],
     });
+
+    // Track AI cost
+    if (message.usage) {
+      metricsService.logAIRequest({
+        requestType: AI_REQUEST_TYPES.COHERENCE_CHECK,
+        projectId: projectId,
+        bookId: null,
+        inputTokens: message.usage.input_tokens,
+        outputTokens: message.usage.output_tokens,
+        model: 'claude-sonnet-4-20250514',
+        success: true,
+        contextSummary: 'Implement coherence suggestion'
+      });
+    }
 
     const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
 
@@ -4720,6 +4819,20 @@ Return ONLY valid JSON, no markdown formatting.`;
       temperature: 0.3,
       messages: [{ role: 'user', content: prompt }],
     });
+
+    // Track AI cost
+    if (response.usage) {
+      metricsService.logAIRequest({
+        requestType: AI_REQUEST_TYPES.COHERENCE_CHECK,
+        projectId: projectId,
+        bookId: null,
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+        model: 'claude-sonnet-4-20250514',
+        success: true,
+        contextSummary: 'Fix coherence warning'
+      });
+    }
 
     const content = response.content[0];
     if (content.type !== 'text') {
@@ -5207,6 +5320,20 @@ Respond with a JSON object in this exact format:
       messages: [{ role: 'user', content: prompt }],
     });
 
+    // Track AI cost
+    if (response.usage) {
+      metricsService.logAIRequest({
+        requestType: AI_REQUEST_TYPES.CONCEPT_GENERATION,
+        projectId: projectId,
+        bookId: null,
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+        model: 'claude-sonnet-4-20250514',
+        success: true,
+        contextSummary: 'Refine story with user feedback'
+      });
+    }
+
     // Extract the text content
     const textContent = response.content.find(c => c.type === 'text');
     if (!textContent || textContent.type !== 'text') {
@@ -5325,7 +5452,7 @@ router.post('/:id/editorial-assistant', async (req, res) => {
     );
 
     // Step 1: Detect intent
-    const intentResult = await detectIntent(userQuery, currentConcept, currentDNA);
+    const intentResult = await detectIntent(userQuery, currentConcept, currentDNA, projectId);
 
     logger.info(
       { projectId, intent: intentResult.intent, confidence: intentResult.confidence },
@@ -5338,7 +5465,8 @@ router.post('/:id/editorial-assistant', async (req, res) => {
       userQuery,
       currentConcept,
       currentDNA,
-      history
+      history,
+      projectId
     );
 
     // Calculate total token usage from both AI calls
@@ -5667,6 +5795,20 @@ Generate a rich, detailed plot structure now:`;
       temperature: 0.7,
       messages: [{ role: 'user', content: prompt }],
     });
+
+    // Track AI cost
+    if (message.usage) {
+      metricsService.logAIRequest({
+        requestType: AI_REQUEST_TYPES.PLOT_GENERATION,
+        projectId: projectId,
+        bookId: null,
+        inputTokens: message.usage.input_tokens,
+        outputTokens: message.usage.output_tokens,
+        model: 'claude-sonnet-4-20250514',
+        success: true,
+        contextSummary: 'Regenerate complete plot structure'
+      });
+    }
 
     const responseText = message.content[0].type === 'text'
       ? message.content[0].text

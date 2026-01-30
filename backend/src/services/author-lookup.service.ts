@@ -6,7 +6,8 @@
  */
 
 import { createLogger } from './logger.service.js';
-import Anthropic from '@anthropic-ai/sdk';
+import { claudeService } from './claude.service.js';
+import { AI_REQUEST_TYPES } from '../constants/ai-request-types.js';
 
 const logger = createLogger('services:author-lookup');
 
@@ -26,10 +27,6 @@ export interface AuthorLookupResult {
  */
 export async function lookupAuthor(authorName: string): Promise<AuthorLookupResult> {
   logger.info({ authorName }, 'Looking up author');
-
-  const anthropic = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY,
-  });
 
   const prompt = `You are a literary expert. I need information about the author "${authorName}" for a writing style reference system.
 
@@ -56,19 +53,18 @@ If you don't know this author, return a JSON with an error field:
 Return ONLY valid JSON, no additional text.`;
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1000,
+    const response = await claudeService.createCompletionWithUsage({
+      system: '',
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 1000,
       temperature: 0.3, // Lower temperature for factual information
-      messages: [
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
+      tracking: {
+        requestType: AI_REQUEST_TYPES.AUTHOR_STYLE_LOOKUP,
+        contextSummary: `Looking up author: ${authorName}`,
+      },
     });
 
-    const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
+    const responseText = response.content;
 
     // Extract JSON from response
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
