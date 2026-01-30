@@ -188,9 +188,18 @@ class LessonCurationService {
       }
     }
 
-    // Count lessons ready for approval (not book-specific, not duplicate)
+    // Add 'approved' suggestions for clean lessons (not book-specific, not duplicate)
     const flaggedIds = new Set(suggestions.map(s => s.lessonId));
-    const readyForApproval = lessons.filter(l => !flaggedIds.has(l.id)).length;
+    const cleanLessons = lessons.filter(l => !flaggedIds.has(l.id));
+
+    for (const lesson of cleanLessons) {
+      suggestions.push({
+        lessonId: lesson.id,
+        suggestedStatus: 'approved',
+        reason: 'No issues detected - ready for approval',
+        isBookSpecific: false,
+      });
+    }
 
     const result: CurationAnalysisResult = {
       totalLessons: lessons.length,
@@ -198,7 +207,7 @@ class LessonCurationService {
       suggestions,
       duplicateGroups,
       bookSpecificCount: bookSpecificLessons.length,
-      readyForApproval,
+      readyForApproval: cleanLessons.length,
     };
 
     logger.info({
