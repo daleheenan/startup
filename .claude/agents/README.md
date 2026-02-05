@@ -1,3 +1,6 @@
+---
+name: README
+---
 # Reusable Agent Prompts
 
 This directory contains reusable agent prompts for common tasks. Reference these when you need specialized assistance.
@@ -63,6 +66,7 @@ For large projects with multiple sprints:
 | [service-agent.md](service-agent.md) | Business logic with TDD | Complex business rules, financial calculations |
 | [integration-agent.md](integration-agent.md) | E2E testing and deployment | Cross-stack integration, E2E tests |
 | [feature-builder.md](feature-builder.md) | 7-phase structured feature development | Complex features needing structured approach |
+| [setup-agent.md](setup-agent.md) | Project scaffolding and boilerplate | New project setup, initial configuration |
 
 ### Developer vs. Specialty Agent Decision Tree
 
@@ -124,6 +128,13 @@ Task involves multiple layers (frontend + backend + DB)?
 |-------|---------|-------|
 | [lessons-curator.md](lessons-curator.md) | Curate and maintain agent lessons | `Curate lessons` |
 
+## Content & Creative Agents
+
+| Agent | Purpose | Usage |
+|-------|---------|-------|
+| [prose-editor.md](prose-editor.md) | Fiction editing, prose economy | `Edit prose for [chapter]` |
+| [social-marketer.md](social-marketer.md) | Social media engagement | `Post to social media` |
+
 ## How to Use
 
 1. **Reference an agent**: "Run the pen-test agent on the authentication system"
@@ -175,9 +186,10 @@ Don't forget to create a corresponding `.claude/lessons/agent-name.lessons.md` f
 ## Agent Categories
 
 - **Orchestration**: project-director, sprint-orchestrator, progress-reporter, sprint-retrospective-facilitator
-- **Development**: developer, implementation-engineer, architect, api-agent, frontend-agent, schema-agent, service-agent, integration-agent, feature-builder
+- **Development**: developer, implementation-engineer, architect, api-agent, frontend-agent, schema-agent, service-agent, integration-agent, feature-builder, setup-agent
 - **Quality**: code-reviewer, qa-tester, qa-test-engineer, test-architect, integration-test-engineer, bug-hunter, code-quality-inspector, code-simplifier, code-optimizer
 - **Security & Performance**: pen-test, security-hardener, performance-test-engineer, seo-architect
 - **Planning & Design**: pm-spec-writer, agile-product-strategist, software-architect-designer, ux-design-specialist, documentation-agent
 - **Deployment**: deployer, deployment-monitor, deployment-doctor
 - **Maintenance**: lessons-curator
+- **Content & Creative**: prose-editor, social-marketer

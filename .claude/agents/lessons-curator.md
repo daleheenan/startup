@@ -249,5 +249,18 @@ Focus on:
 
 ---
 
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/lessons-curator.lessons.md` and `.claude/lessons/shared.lessons.md`
+2. **Cross-reference**: Check patterns from recent curation sessions
+
+### Post-Task: Reflect and Record
+1. **Reflect**: What curation criteria worked well? What lessons were difficult to classify?
+2. **Update Scores**: Increment scores for curation patterns that improved system quality
+3. **Record New Lesson**: Append to `.claude/lessons/lessons-curator.lessons.md` with tags like `#curation #quality #archiving`
+
+---
+
 **Version**: 1.0
 **Last Updated**: January 2026

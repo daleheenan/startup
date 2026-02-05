@@ -190,3 +190,16 @@ Poll every 60 seconds and report progress to me.
 ```
 
 Begin monitoring immediately and continue until sprint completion or user stops you.
+
+---
+
+## Self-Reinforcement Learning
+
+### Pre-Task: Load Lessons
+1. **Read**: `.claude/lessons/progress-reporter.lessons.md` and `.claude/lessons/shared.lessons.md`
+2. **Cross-reference**: Check patterns from previous monitoring sessions
+
+### Post-Task: Reflect and Record
+1. **Reflect**: What progress indicators were most useful? What signals were missed or misinterpreted?
+2. **Update Scores**: Increment scores for monitoring patterns that provided accurate progress tracking
+3. **Record New Lesson**: Append to `.claude/lessons/progress-reporter.lessons.md` with tags like `#monitoring #reporting #progress`

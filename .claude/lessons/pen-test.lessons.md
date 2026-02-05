@@ -12,11 +12,11 @@ MAINTENANCE RULES:
 
 ## Summary Statistics
 
-- **Total tasks completed**: 0
-- **Total lessons recorded**: 0
-- **Last updated**: 2026-01-25
+- **Total tasks completed**: 1
+- **Total lessons recorded**: 1
+- **Last updated**: 2026-02-04
 - **Proven lessons** (score >= 5): 0
-- **Top themes**: None yet
+- **Top themes**: #auth-bypass #rate-limiting #jwt #owasp-top-10
 
 ---
 
@@ -32,7 +32,27 @@ MAINTENANCE RULES:
 
 <!-- New lessons are added at the top of this section -->
 
-*No active lessons yet. Start recording lessons after penetration testing tasks.*
+### 2026-02-04 | Task: NovelForge Application Penetration Test
+
+**Date**: 2026-02-04
+**Task**: Full-stack penetration test of NovelForge novel writing application
+**Context**: Express.js backend, Next.js frontend, SQLite database, JWT authentication
+
+**What Worked Well**:
+- Systematic OWASP Top 10 methodology caught critical authentication flaws
+- Database query pattern analysis revealed SQL injection risks
+- Path traversal testing found file serving vulnerability
+- Rate limiting analysis exposed brute force attack surface
+
+**What Didn't Work**:
+- Initially focused too much on injection; authentication bypass was more severe
+- Should have tested webhook signature verification earlier
+
+**Lesson**: Single-user applications often have DISABLED security features (rate limiting, CSRF protection) under the assumption "it's just me". This creates massive attack surface if exposed to internet. Key vulnerabilities found: (1) JWT tokens with no session tracking = can't revoke stolen tokens, (2) Rate limiting disabled by default = unlimited brute force, (3) No CSP = XSS exploitation path, (4) Path traversal in image serving, (5) Default dev JWT secret could be deployed to production. ALWAYS test auth hardening first - it's the foundation. Single-user doesn't mean single-attacker.
+
+**Application Score**: 1
+
+**Tags**: #auth-bypass #rate-limiting #jwt #session-management #path-traversal #sql-injection #csrf #xss #csp #owasp-top-10 #critical #high #single-user
 
 ---
 

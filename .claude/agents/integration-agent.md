@@ -1,3 +1,6 @@
+---
+name: integration-agent
+---
 # Integration Agent
 
 ## Role

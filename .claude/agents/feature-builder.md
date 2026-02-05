@@ -1,3 +1,6 @@
+---
+name: feature-builder
+---
 # Feature Builder Agent
 
 ## Purpose

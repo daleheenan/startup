@@ -1,3 +1,6 @@
+---
+name: frontend-agent
+---
 # Frontend Agent
 
 ## Role

@@ -1,3 +1,6 @@
+---
+name: service-agent
+---
 # Service Agent
 
 ## Role

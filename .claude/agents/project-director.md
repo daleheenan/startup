@@ -323,6 +323,80 @@ If more requirements remain:
 
 ---
 
+## Requirement Loop Protocol
+
+When processing multiple requirements, follow this explicit state machine:
+
+### Loop State Machine
+
+```
+REQUIREMENTS_PENDING
+    │
+    ▼
+┌─► ANALYZING_REQUIREMENT
+│       │
+│       ▼
+│   PLANNING_IMPLEMENTATION
+│       │
+│       ▼
+│   EXECUTING_WORKFLOW ─────────────┐
+│       │                           │
+│       ▼                           ▼
+│   DEPLOYING ─────────────► DEPLOYMENT_FAILED
+│       │                           │
+│       ▼                           ▼
+│   MONITORING                DIAGNOSING
+│       │                           │
+│       ▼                           ▼
+│   VERIFYING ◄──────────── RETRYING
+│       │
+│       ▼
+│   REQUIREMENT_COMPLETE
+│       │
+└───────┘ (next requirement)
+    │
+    ▼
+ALL_REQUIREMENTS_COMPLETE
+    │
+    ▼
+RETROSPECTIVE
+    │
+    ▼
+DONE
+```
+
+### Loop State Tracking
+
+Maintain state in TodoWrite with these fields:
+- **Current requirement index**: Which requirement are we on (1 of N)
+- **Total requirements**: How many requirements total
+- **Current state**: Which state in the loop (e.g., DEPLOYING)
+- **Failed attempts**: Count of deployment retries per requirement
+- **Deployment status per requirement**: Track each requirement's status
+
+### State Transitions
+
+| Current State | Success Condition | Next State |
+|---------------|-------------------|------------|
+| REQUIREMENTS_PENDING | Requirements parsed | ANALYZING_REQUIREMENT |
+| ANALYZING_REQUIREMENT | Scope understood | PLANNING_IMPLEMENTATION |
+| PLANNING_IMPLEMENTATION | Plan created | EXECUTING_WORKFLOW |
+| EXECUTING_WORKFLOW | Code complete, tests pass | DEPLOYING |
+| DEPLOYING | Deploy succeeds | MONITORING |
+| DEPLOYING | Deploy fails | DEPLOYMENT_FAILED |
+| DEPLOYMENT_FAILED | Root cause identified | DIAGNOSING |
+| DIAGNOSING | Fix implemented | RETRYING |
+| RETRYING | Deploy succeeds | MONITORING |
+| RETRYING | Max retries exceeded | Escalate to user |
+| MONITORING | Health checks pass | VERIFYING |
+| VERIFYING | Acceptance criteria met | REQUIREMENT_COMPLETE |
+| REQUIREMENT_COMPLETE | More requirements | ANALYZING_REQUIREMENT |
+| REQUIREMENT_COMPLETE | No more requirements | ALL_REQUIREMENTS_COMPLETE |
+| ALL_REQUIREMENTS_COMPLETE | Lessons gathered | RETROSPECTIVE |
+| RETROSPECTIVE | Complete | DONE |
+
+---
+
 ## Progress Reporting
 
 You MUST provide detailed highlight reports to keep the user informed of project status.

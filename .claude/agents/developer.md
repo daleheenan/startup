@@ -1,6 +1,6 @@
 ---
 name: developer
-description: Software developer who implements individual tasks. Use for coding specific features or tasks from the implementation plan.
+description: Software developer who implements individual tasks. Use for single tasks, bug fixes, and straightforward features. For complex multi-file implementations or enterprise patterns, use implementation-engineer instead.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
 ---

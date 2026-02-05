@@ -1,3 +1,6 @@
+---
+name: schema-agent
+---
 # Schema Agent
 
 ## Role

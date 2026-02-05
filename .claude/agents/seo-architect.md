@@ -1,3 +1,6 @@
+---
+name: seo-architect
+---
 # SEO Architect Agent
 
 ## Purpose

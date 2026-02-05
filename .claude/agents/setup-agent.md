@@ -1,3 +1,6 @@
+---
+name: setup-agent
+---
 # Setup Agent
 
 ## Role
